@@ -1,0 +1,1393 @@
+#  SPDX-License-Identifier: MIT OR Apache-2.0
+#  Copyright (c) 2025-2026 gwz
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Dict, Optional, List
+
+from l0_analysis import AnalysisResult
+from l0_logger import log_debug
+from l0_ast import (
+    Node, TypeRef as AstTypeRef, Stmt, Block, LetStmt, AssignStmt, ExprStmt, IfStmt, WhileStmt,
+    ReturnStmt, MatchArm, MatchStmt, Expr, IntLiteral, StringLiteral, BoolLiteral, NullLiteral, VarRef,
+    UnaryOp, BinaryOp, CallExpr, IndexExpr, FieldAccessExpr, ParenExpr, CastExpr, VariantPattern,
+    TryExpr, TypeExpr, DropStmt, NewExpr, WildcardPattern, BreakStmt, ContinueStmt, ForStmt, ByteLiteral,
+    TypeAliasDecl)
+from l0_compilation import CompilationUnit
+from l0_diagnostics import diag_from_node
+from l0_locals import FunctionEnv
+from l0_symbols import ModuleEnv, SymbolKind, Symbol
+from l0_types import (
+    Type,
+    FuncType,
+    BuiltinType,
+    StructType,
+    EnumType,
+    get_builtin_type,
+    PointerType,
+    NullableType,
+    NullType,
+    get_null_type,
+    format_type, L0_PRIMITIVE_TYPES,
+)
+
+
+# Expression type checking for L0
+
+
+@dataclass
+class ExpressionTypeChecker:
+    """Minimal expression-level type checker for L0.
+
+    Implements:
+      - Expression typing: literals, variables, operators, calls, constructors,
+        casts, dereference, indexing, field access, try-operator, sizeof
+      - Structs and enums (construction, field access, variant patterns)
+      - Function calls (with argument checking)
+      - Basic type compatibility rules (int, bool, string, pointers, nullability)
+      - Widening from inferred types to annotated types
+      - Statement checking: let (with inference), return, if, while, match, drop
+      - Type system: resolution, compatibility, nullability, pointers, aliases
+      - Pattern analysis: binding, exhaustiveness, redundant wildcard warnings
+      - Control flow: return path checking, unreachable code warnings,
+        flow-sensitive liveness for dropped variables
+      - Infrastructure: type memoization, scoped local tracking, diagnostics,
+        error recovery
+      - Basic error recovery to continue checking after errors
+      - Diagnostic reporting
+
+    Populates `analysis.expr_types[id(expr)]` and appends diagnostics to `analysis.diagnostics`.
+    """
+    analysis: AnalysisResult
+
+    def __post_init__(self) -> None:
+        if self.analysis.cu is None:
+            raise ValueError("ExpressionTypeChecker requires a non-empty CompilationUnit")
+
+        self.cu: CompilationUnit = self.analysis.cu
+        self.module_envs: Dict[str, ModuleEnv] = self.analysis.module_envs
+        self.struct_infos = self.analysis.struct_infos
+        self.enum_infos = self.analysis.enum_infos
+        self.func_types = self.analysis.func_types
+        self.func_envs = self.analysis.func_envs
+        self.diagnostics = self.analysis.diagnostics
+        self.expr_types = self.analysis.expr_types
+
+        # Cached builtin types
+        self.int_type: BuiltinType = get_builtin_type("int")
+        self.byte_type: BuiltinType = get_builtin_type("byte")
+        self.bool_type: BuiltinType = get_builtin_type("bool")
+        self.string_type: BuiltinType = get_builtin_type("string")
+        self.void_type: BuiltinType = get_builtin_type("void")
+        self.null_type: NullType = get_null_type()
+
+        # Per-function state (set in _check_function)
+        self._current_func_env: Optional[FunctionEnv] = None
+        self._current_func_type: Optional[FuncType] = None
+        self._local_scopes: List[Dict[str, Type]] = []
+        self._alive_scopes: List[Dict[str, bool]] = []  # definite liveness (True=usable)
+        self._return_paths: bool = False  # does current path guarantee a return?
+        self._breakable_loop_depth: int = 0  # depth of loops allowing 'break'/'continue'
+        self._next_stmt_unreachable: bool = False  # is next statement unreachable (after break/continue)?
+
+    # ------------------------------------------------------------------
+    # Public entry point
+    # ------------------------------------------------------------------
+
+    def check(self) -> None:
+        """Run expression/type checking for all non-extern functions.
+
+        This is meant to be called once from L0Driver.analyze, after
+        name resolution, signatures, and local scopes have been built.
+        """
+        if self.cu is None:
+            return
+
+        for key, func_env in self.func_envs.items():
+            func_type = self.func_types.get(key)
+            if func_type is None:
+                # SignatureResolver should have produced this; if it did not,
+                # we conservatively skip the function rather than crash.
+                continue
+
+            if func_env.func.is_extern:
+                continue
+
+            self._check_function(func_env, func_type)
+
+    # ------------------------------------------------------------------
+    # Function / block / statement traversal
+    # ------------------------------------------------------------------
+
+    def _check_function(self, func_env: FunctionEnv, func_type: FuncType) -> None:
+        self._current_func_env = func_env
+        self._current_func_type = func_type
+
+        # Root scope: one frame containing parameters
+        self._local_scopes = [self._make_param_scope(func_env, func_type)]
+        self._alive_scopes = [self._make_param_alive_scope(func_env)]
+
+        # Track whether the function body guarantees a return along all paths.
+        self._return_paths = False
+        self._check_block(func_env.func.body, check_return_paths=True, push_new_scope=False)
+        self._breakable_loop_depth = 0
+        self._next_stmt_unreachable = False
+        guarantees_return = self._return_paths
+
+        # Only require guaranteed return when result type is non-void.
+        is_void_result = self._is_void(func_type.result)
+        if not is_void_result and not guarantees_return:
+            self._error(
+                func_env.func,
+                f"[TYP-0010] not all control paths return a value of type '{format_type(func_type.result)}'",
+            )
+
+        self._local_scopes = []
+        self._current_func_env = None
+        self._current_func_type = None
+
+    def _make_param_scope(self, func_env: FunctionEnv, func_type: FuncType) -> Dict[str, Type]:
+        scope: Dict[str, Type] = {}
+        func = func_env.func
+        for param, param_ty in zip(func.params, func_type.params):
+            scope[param.name] = param_ty
+        return scope
+
+    def _make_param_alive_scope(self, func_env: FunctionEnv) -> Dict[str, bool]:
+        scope: Dict[str, bool] = {}
+        func = func_env.func
+        for param in func.params:
+            scope[param.name] = True
+        return scope
+
+    # Basic lexical scope stack (function body and nested blocks)
+
+    def _push_scope(self) -> None:
+        self._local_scopes.append({})
+        self._alive_scopes.append({})
+
+    def _pop_scope(self) -> None:
+        assert self._local_scopes, "scope stack underflow"
+        self._local_scopes.pop()
+        self._alive_scopes.pop()
+
+    def _declare_local(self, name: str, typ: Type, node: Node) -> None:
+        """Declare a local in the innermost scope.
+
+        """
+        assert self._local_scopes, "no active scope"
+        local = self._local_scopes[-1]
+        if name in local:
+            self._error(node,
+                        f"[TYP-0020] local variable '{name}' already declared in this scope with type '{format_type(local[name])}'")
+            return None
+
+        if self._lookup_local(name) is not None:
+            self._warn(node, f"[TYP-0021] local variable '{name}' shadows variable from outer scope")
+
+        local[name] = typ
+        self._alive_scopes[-1][name] = True
+        return None
+
+    def _lookup_local(self, name: str) -> Optional[Type]:
+        for scope in reversed(self._local_scopes):
+            if name in scope:
+                return scope[name]
+        return None
+
+    def _lookup_alive(self, name: str) -> Optional[bool]:
+        for scope in reversed(self._alive_scopes):
+            if name in scope:
+                return scope[name]
+        return None
+
+    def _set_alive(self, name: str, alive: bool) -> None:
+        for scope in reversed(self._alive_scopes):
+            if name in scope:
+                scope[name] = alive
+                return
+
+    def _check_block(self, block: Block, *, check_return_paths: bool = False, push_new_scope: bool = True) -> None:
+        if push_new_scope:
+            self._push_scope()
+        try:
+            unreachable_warning_issued = False
+            guarantees_return = False
+            check_or_not = check_return_paths
+            for stmt in block.stmts:
+                # Check for unreachable code after a guaranteed return
+                if guarantees_return and not unreachable_warning_issued:
+                    self._warn(stmt, "[TYP-0031] unreachable code after 'return'")
+                    unreachable_warning_issued = True
+                if self._next_stmt_unreachable and not unreachable_warning_issued:
+                    self._warn(stmt, "[TYP-0030] unreachable code")
+                    unreachable_warning_issued = True
+                # Check the statement
+                self._check_stmt(stmt, check_return_paths=check_or_not)
+                # Update return path tracking
+                if check_return_paths:
+                    guarantees_return = guarantees_return or self._return_paths
+                    if guarantees_return:
+                        check_or_not = False  # no need to check further statements (they are unreachable)
+
+            if check_return_paths:
+                self._return_paths = guarantees_return
+        finally:
+            self._next_stmt_unreachable = False  # reset for outer scope
+            if push_new_scope:
+                self._pop_scope()
+
+    def _check_stmt(self, stmt: Stmt, *, check_return_paths: bool = False) -> None:
+
+        if check_return_paths:
+            self._return_paths = False  # reset before checking this statement
+
+        if isinstance(stmt, ReturnStmt):
+            self._check_return(stmt)
+            if check_return_paths:
+                self._return_paths = True
+            return None
+
+        if isinstance(stmt, ExprStmt):
+            self._infer_expr(stmt.expr)
+            return None
+
+        if isinstance(stmt, LetStmt):
+            annot_ty = None  # type from annotation (if any)
+            value_ty = None  # type from expression
+
+            # Resolve annotation if present
+            if stmt.type is not None:
+                annot_ty = self._resolve_type_ref(stmt.type)
+                if annot_ty is None:  # error in type ref
+                    self._error(stmt.type, f"[TYP-0040] cannot resolve type annotation for variable '{stmt.name}'")
+                    return None
+                if annot_ty is get_builtin_type("void"):
+                    self._error(stmt, "[TYP-0050] variable cannot have type 'void'")
+                    return None
+                # Infer initializer type in the context of annotation
+                value_ty = self._infer_expr(stmt.value,
+                                            widening_type=annot_ty,
+                                            context_descriptor=f"initializer for variable '{stmt.name}'")
+                if value_ty is None:
+                    # Error already reported by _infer_expr
+                    return None
+
+            # When widening_type is provided, _infer_expr already checks compatibility
+            if annot_ty is not None:
+                self._declare_local(stmt.name, annot_ty, stmt)
+                return None
+
+            # No annotation: infer from initializer
+            value_ty = self._infer_expr(stmt.value, context_descriptor=f"initializer for variable '{stmt.name}'")
+
+            # Type inference
+            if value_ty is None:
+                # Error in expression, can't infer (should have been reported already)
+                return self._error(stmt, f"[TYP-0051] initializer for '{stmt.name}' type mismatch")
+            elif isinstance(value_ty, NullType):
+                return self._error(stmt, "[TYP-0052] cannot infer type from 'null'; explicit type required")
+            elif self._is_void(value_ty):
+                return self._error(stmt.value, "[TYP-0053] initializer is 'void', cannot assign to variable")
+            else:
+                self._declare_local(stmt.name, value_ty, stmt)
+
+            return None
+
+        if isinstance(stmt, AssignStmt):
+            # Flow-sensitive: assignment re-validates a dropped variable
+            if isinstance(stmt.target, VarRef):
+                self._set_alive(stmt.target.name, True)
+
+            # Infer target type first, then use it as context for value
+            target_ty = self._infer_expr(stmt.target)
+
+            if target_ty is not None:
+                # Use target type as widening context for the value
+                self._infer_expr(stmt.value,
+                                 widening_type=target_ty,
+                                 context_descriptor=f"assignment to {self._describe_lvalue(stmt.target)}")
+            else:
+                # Target type inference failed, still check value for errors
+                self._infer_expr(stmt.value)
+
+            return None
+
+        if isinstance(stmt, DropStmt):
+            var_ty = self._lookup_local(stmt.name)
+            if var_ty is None:
+                self._error(stmt, f"[TYP-0060] unknown variable '{stmt.name}'")
+                return None
+
+            is_ptr = isinstance(var_ty, PointerType)
+            is_opt_ptr = isinstance(var_ty, NullableType) and isinstance(var_ty.inner, PointerType)
+            if not (is_ptr or is_opt_ptr):
+                self._error(stmt, f"[TYP-0061] cannot drop non-pointer type '{format_type(var_ty)}'")
+                return None
+
+            alive = self._lookup_alive(stmt.name)
+            if alive is False:
+                self._error(stmt, f"[TYP-0062] use of dropped variable '{stmt.name}'")
+                return None
+
+            self._set_alive(stmt.name, False)
+            return None
+
+        if isinstance(stmt, IfStmt):
+            cond_ty = self._infer_expr(stmt.cond, context_descriptor="condition in if statement")
+
+            if cond_ty is not None and not self._is_bool(cond_ty):
+                self._error(stmt, "[TYP-0070] if condition must have type 'bool'")
+
+            pre_alive = [dict(scope) for scope in self._alive_scopes]
+
+            # then branch
+            self._check_stmt(stmt.then_stmt, check_return_paths=check_return_paths)
+            then_alive = [dict(scope) for scope in self._alive_scopes]
+            then_returns = self._return_paths
+
+            # else branch
+            else_returns = False
+            if stmt.else_stmt is not None:
+                # Restore pre-if liveness
+                self._alive_scopes = [dict(scope) for scope in pre_alive]
+                self._check_stmt(stmt.else_stmt, check_return_paths=check_return_paths)
+                else_alive = [dict(scope) for scope in self._alive_scopes]
+                else_returns = self._return_paths
+
+                # Merge then/else liveness
+                for scope_index in range(len(self._alive_scopes)):
+                    for var_name in self._alive_scopes[scope_index]:
+                        then_var_alive = then_alive[scope_index].get(var_name, True)
+                        else_var_alive = else_alive[scope_index].get(var_name, True)
+                        self._alive_scopes[scope_index][var_name] = then_var_alive and else_var_alive
+
+            if check_return_paths:
+                # An if-else guarantees a return only if BOTH branches do.
+                # An if without an else never guarantees a return.
+                self._return_paths = then_returns and else_returns
+
+            return None
+
+        if isinstance(stmt, WhileStmt):
+            cond_ty = self._infer_expr(stmt.cond, context_descriptor="condition in while loop")
+            if cond_ty is not None and not self._is_bool(cond_ty):
+                self._error(stmt, "[TYP-0080] while condition must have type 'bool'")
+
+            self._breakable_loop_depth += 1
+            self._check_block(stmt.body, check_return_paths=check_return_paths)
+            self._breakable_loop_depth -= 1
+            return None
+
+        if isinstance(stmt, ForStmt):
+            self._push_scope()
+            try:
+                if stmt.init:
+                    self._check_stmt(stmt.init)
+
+                if stmt.cond:
+                    cond_ty = self._infer_expr(stmt.cond)
+                    if cond_ty is not None and not self._is_bool(cond_ty):
+                        self._error(stmt, "[TYP-0090] for loop condition must have type 'bool'")
+
+                if stmt.update:
+                    self._check_stmt(stmt.update)
+
+                self._breakable_loop_depth += 1
+                self._check_block(stmt.body, check_return_paths=check_return_paths)
+                self._breakable_loop_depth -= 1
+                return None
+            finally:
+                self._pop_scope()
+
+        if isinstance(stmt, MatchStmt):
+            # Type the scrutinee
+            scrutinee_ty = self._infer_expr(stmt.expr)
+
+            if not isinstance(scrutinee_ty, EnumType):
+                self._error(stmt, f"[TYP-0100] match expression must have enum type, got '{format_type(scrutinee_ty)}'")
+                return None
+
+            all_arms_return = len(stmt.arms) > 0  # False if no arms
+
+            # Check each arm with pattern variables in scope
+            for arm in stmt.arms:
+                assert isinstance(arm, MatchArm)
+
+                # Push a new scope for this arm
+                self._push_scope()
+                try:
+                    # Bind pattern variables if this is a variant pattern
+                    if isinstance(arm.pattern, VariantPattern) and isinstance(scrutinee_ty, EnumType):
+                        # Look up the enum and variant info
+                        enum_info = self.enum_infos.get((scrutinee_ty.module, scrutinee_ty.name))
+                        if enum_info:
+                            variant_info = enum_info.variants.get(arm.pattern.name)
+                            if variant_info:
+                                # Check arity matches
+                                if len(arm.pattern.vars) == len(variant_info.field_types):
+                                    # Bind each pattern variable to its field type
+                                    for var_name, field_type in zip(arm.pattern.vars, variant_info.field_types):
+                                        self._declare_local(var_name, field_type, arm)
+                                else:
+                                    self._error(
+                                        arm.pattern,
+                                        f"[TYP-0101] pattern variable count mismatch: variant '{arm.pattern.name}' "
+                                        f"has {len(variant_info.field_types)} fields but pattern has "
+                                        f"{len(arm.pattern.vars)} variables"
+                                    )
+                            else:
+                                self._error(
+                                    arm.pattern,
+                                    f"[TYP-0102] unknown variant '{arm.pattern.name}' for enum {format_type(scrutinee_ty)}"
+                                )
+
+                    # Check the arm body with pattern variables in scope
+                    # Don't call _check_block because it would push another scope
+                    this_arm_returns = False
+
+                    check_or_not = check_return_paths
+                    self._check_block(arm.body, check_return_paths=check_or_not, push_new_scope=False)
+                    if check_return_paths:
+                        this_arm_returns = self._return_paths
+
+                    all_arms_return = all_arms_return and this_arm_returns
+
+                finally:
+                    self._pop_scope()
+
+            enum_info = self.enum_infos.get((scrutinee_ty.module, scrutinee_ty.name))
+            if not enum_info:
+                self._error(stmt, f"[TYP-0103] no type information for enum '{format_type(scrutinee_ty)}'")
+                return None
+
+            # check that all variants are covered (or wildcard present)
+            arm_variants = set(arm.pattern.name for arm in stmt.arms if isinstance(arm.pattern, VariantPattern))
+            is_wildcard_present = any(isinstance(arm.pattern, WildcardPattern) for arm in stmt.arms)
+            is_exhaustive = is_wildcard_present
+            if not is_wildcard_present:
+                defined_variants = set(enum_info.variants.keys())
+                if arm_variants == defined_variants:
+                    is_exhaustive = True
+                else:
+                    missing_variants = defined_variants - arm_variants
+                    self._error(
+                        stmt,
+                        f"[TYP-0104] non-exhaustive match: missing variants ("
+                        f"{', '.join(missing_variants)}) for enum {format_type(scrutinee_ty)}"
+                    )
+            elif len(arm_variants) == len(enum_info.variants):
+                # wildcard is a no-op if all variants are already covered
+                self._warn(stmt,
+                           f"[TYP-0105] unreachable wildcard pattern in match: all variants of "
+                           f"enum {format_type(scrutinee_ty)} are already covered")
+
+            if check_return_paths:
+                # A match guarantees a return if it is exhaustive AND all arms return.
+                self._return_paths = is_exhaustive and all_arms_return
+
+            return None
+
+        # Handle standalone block statements (nested blocks)
+        if isinstance(stmt, Block):
+            self._check_block(stmt, check_return_paths=check_return_paths)
+            return None
+
+        if isinstance(stmt, BreakStmt):
+            if self._breakable_loop_depth < 1:
+                self._error(stmt, "[TYP-0110] 'break' statement not within a loop")
+            self._next_stmt_unreachable = True
+            return None
+
+        if isinstance(stmt, ContinueStmt):
+            if self._breakable_loop_depth < 1:
+                self._error(stmt, "[TYP-0120] 'continue' statement not within a loop")
+            self._next_stmt_unreachable = True
+            return None
+
+        # Unknown (should not happen if AST is well-formed)
+        self._error(stmt, f"[TYP-0139] unknown statement type: {type(stmt).__name__}")
+        return None
+
+    # ------------------------------------------------------------------
+    # Expression typing
+    # ------------------------------------------------------------------
+
+    def _infer_type_expr(self, expr: TypeExpr) -> Optional[Type]:
+        """
+        TypeExpr is only valid as an argument to type-accepting intrinsics.
+        When encountered standalone, it's an error.
+        """
+        # Type expressions don't have a runtime value type.
+        # They're handled specially in _infer_call for intrinsics.
+        self._error(expr,
+                    "[TYP-0290] type expression is only valid as argument to type-accepting intrinsics such as 'sizeof'")
+        return None
+
+    def _infer_expr(self, expr: Optional[Expr], *,
+                    widening_type: Optional[Type] = None, context_descriptor="expression") -> Optional[Type]:
+        if expr is None:
+            return self._error(Expr(), "[TYP-0149] cannot infer type of None expression")
+
+        # Memoization: if we already inferred a type, reuse it.
+        existing = self.expr_types.get(id(expr))
+        if existing is not None:
+            return existing
+
+        result: Optional[Type]
+
+        if isinstance(expr, IntLiteral):
+            result = self.int_type
+
+        elif isinstance(expr, ByteLiteral):
+            result = self.byte_type
+
+        elif isinstance(expr, StringLiteral):
+            result = self.string_type
+
+        elif isinstance(expr, BoolLiteral):
+            result = self.bool_type
+
+        elif isinstance(expr, NullLiteral):
+            result = self.null_type
+
+        elif isinstance(expr, VarRef):
+            result = self._infer_var_ref(expr)
+
+        elif isinstance(expr, UnaryOp):
+            result = self._infer_unary(expr)
+
+        elif isinstance(expr, BinaryOp):
+            result = self._infer_binary(expr)
+
+        elif isinstance(expr, CallExpr):
+            result = self._infer_call(expr)
+
+        elif isinstance(expr, IndexExpr):
+            result = self._infer_index(expr)
+
+        elif isinstance(expr, FieldAccessExpr):
+            result = self._infer_field_access(expr)
+
+        elif isinstance(expr, ParenExpr):
+            result = self._infer_expr(expr.inner)
+
+        elif isinstance(expr, CastExpr):
+            result = self._infer_cast(expr)
+
+        elif isinstance(expr, NewExpr):
+            result = self._infer_new(expr)
+
+        elif isinstance(expr, TypeExpr):
+            return self._infer_type_expr(expr)
+
+        elif isinstance(expr, TryExpr):
+            result = self._infer_try(expr)
+
+        else:
+            result = None
+
+        if result is not None:
+            self.expr_types[id(expr)] = result  # Always store natural type
+
+        if result is not None and widening_type is not None:
+            # Check widening if provided from context
+            # (e.g., assignment target, struct field, function arg, etc.)
+            if not self._can_assign(widening_type, result):
+                return self._error(
+                    expr,
+                    f"{context_descriptor} type mismatch: "
+                    f"expected '{format_type(widening_type)}', got '{format_type(result)}'",
+                )
+
+        return result
+
+    def _infer_var_ref(self, expr: VarRef) -> Optional[Type]:
+        # 1. Locals / parameters
+        local_ty = self._lookup_local(expr.name)
+        if local_ty is not None:
+            alive = self._lookup_alive(expr.name)
+            if alive is False:
+                self._error(expr, f"[TYP-0150] use of dropped variable '{expr.name}'")
+            return local_ty
+
+        # 2. Module-level symbols (functions only, for now)
+        assert self._current_func_env is not None
+        module_name = self._current_func_env.module_name
+        mod_env = self.module_envs.get(module_name)
+        if mod_env is None:
+            return None
+
+        sym = mod_env.all.get(expr.name)
+        if sym is None:
+            # Unknown name; NameResolver should normally have flagged this
+            # already, but we defensively add a diagnostic instead of
+            # crashing.
+            self._error(expr, f"[TYP-0159] unknown identifier '{expr.name}'")
+            return None
+
+        if sym.kind is SymbolKind.FUNC and sym.type is not None:
+            # Functions have a FuncType; at expression level their type is
+            # precisely that.
+            return sym.type
+
+        if sym.kind is SymbolKind.LET and sym.type is not None:
+            # Top-level let bindings have their resolved type
+            return sym.type
+
+        # Struct, enum, and variant types are not values by themselves.
+        # They only become values when used in constructor calls (handled in _infer_call).
+        # For plain VarRef usage, report an error.
+        self._error(expr, f"[TYP-0151] symbol '{expr.name}' is not a value")
+        return None
+
+    def _infer_unary(self, expr) -> Optional[Type]:
+        assert isinstance(expr, UnaryOp)
+        op = expr.op
+        operand_ty = self._infer_expr(expr.operand)
+
+        # Unary minus: int -> int
+        if op == "-":
+            if self._is_int_assignable(operand_ty):
+                return self.int_type
+            if operand_ty is not None:
+                self._error(
+                    expr,
+                    f"[TYP-0160] unary '-' expects operand of type 'int', got '{format_type(operand_ty)}'",
+                )
+            return None
+
+        # Logical not: bool -> bool
+        if op == "!":
+            if self._is_bool(operand_ty):
+                return self.bool_type
+            if operand_ty is not None:
+                self._error(
+                    expr,
+                    f"[TYP-0161] unary '!' expects operand of type 'bool', got '{format_type(operand_ty)}'",
+                )
+            return None
+
+        # Dereference: T* -> T
+        if op == "*":
+            from l0_types import PointerType
+
+            if isinstance(operand_ty, PointerType):
+                return operand_ty.inner
+            if operand_ty is not None:
+                self._error(
+                    expr,
+                    f"[TYP-0162] cannot dereference expression of type '{format_type(operand_ty)}'; "
+                    "expected a pointer type",
+                )
+            return None
+
+        # Unknown unary operator: just traverse operand for now.
+        return operand_ty
+
+    def _infer_binary(self, expr: BinaryOp) -> Optional[Type]:
+        op = expr.op
+        left_ty = self._infer_expr(expr.left)
+        right_ty = self._infer_expr(expr.right)
+
+        # Arithmetic int ops -> int
+        if op in {"+", "-", "*", "/"}:
+            return self._binary_expect_both_int(expr, left_ty, right_ty, result=self.int_type)
+
+        # Comparison int ops -> bool
+        if op in {"<", "<=", ">", ">="}:
+            return self._binary_expect_both_int(expr, left_ty, right_ty, result=self.bool_type)
+
+        # Equality: same-type operands OR null check -> bool
+        if op in {"==", "!="}:
+            return self._binary_equality(expr, left_ty, right_ty)
+
+        # Logical bool ops -> bool
+        if op in {"&&", "||"}:
+            return self._binary_expect_both_bool(expr, left_ty, right_ty, result=self.bool_type)
+
+        # Future: bitwise, etc.
+
+        return None
+
+    def _binary_expect_both_int(
+            self, expr: BinaryOp, left: Optional[Type], right: Optional[Type], result: Optional[Type]
+    ) -> Optional[Type]:
+        if self._is_int_assignable(left) and self._is_int_assignable(right):
+            return result
+        if left is not None and right is not None:
+            self._error(
+                expr,
+                f"[TYP-0170] operator '{expr.op}' expects operands of type 'int', got "
+                f"'{format_type(left)}' and '{format_type(right)}'",
+            )
+        return None
+
+    def _binary_expect_both_bool(
+            self, expr: BinaryOp, left: Optional[Type], right: Optional[Type], result: Optional[Type]
+    ) -> Optional[Type]:
+        if self._is_bool(left) and self._is_bool(right):
+            return result
+        if left is not None and right is not None:
+            self._error(
+                expr,
+                f"[TYP-0171] operator '{expr.op}' expects operands of type 'bool', got "
+                f"'{format_type(left)}' and '{format_type(right)}'",
+            )
+        return None
+
+    def _binary_equality(
+            self, expr: BinaryOp, left: Optional[Type], right: Optional[Type]
+    ) -> Optional[Type]:
+        if left is None or right is None:
+            return None
+
+        # Check for null comparison: One side is NullType, other is Nullable/Ptr
+        is_null_check = (
+                (isinstance(left, NullType) and self._is_nullable_or_ptr(right)) or
+                (isinstance(right, NullType) and self._is_nullable_or_ptr(left))
+        )
+
+        # If it's not a null check, enforce both sides have the same type (or compatible)
+        if not is_null_check and not (self._can_assign(right, left) or self._can_assign(left, right)):
+            self._error(
+                expr,
+                f"[TYP-0172] equality operator '{expr.op}' requires both operands to have the "
+                f"same type (or be a valid null check), got '{format_type(left)}' and '{format_type(right)}'",
+            )
+            return None
+
+        # Restrict what types can be compared for equality (e.g. only int and bool for now)
+        if not is_null_check and not (
+                self._is_int_assignable(left) or self._is_bool(left)
+        ):
+            self._error(
+                expr,
+                f"[TYP-0173] equality not supported for type '{format_type(left)}' in this stage",
+            )
+            return None
+
+        return self.bool_type
+
+    def _try_infer_intrinsic(self, expr: CallExpr) -> Optional[Type]:
+        """
+        Check if this is an intrinsic call and infer its type.
+        Returns None if not an intrinsic (caller should continue with normal call handling).
+        Returns a Type if intrinsic was handled (even on error, returns a recovery type).
+        """
+        if not isinstance(expr.callee, VarRef):
+            return None
+
+        name = expr.callee.name
+
+        if name == "sizeof":
+            return self._infer_sizeof_intrinsic(expr)
+
+        # Not an intrinsic
+        return None
+
+    def _infer_sizeof_intrinsic(self, expr: CallExpr) -> Type:
+        """Handle sizeof(T) or sizeof(expr) intrinsic."""
+        if len(expr.args) != 1:
+            self._error(expr, "[TYP-0241] sizeof expects exactly 1 argument")
+            return self.int_type
+
+        arg = expr.args[0]
+
+        if isinstance(arg, TypeExpr):
+            # sizeof(T) - direct type argument
+            target_ty = self._resolve_type_ref(arg.type_ref)
+            if target_ty is None:
+                return self.int_type
+            if self._is_void(target_ty):
+                self._error(expr, "[TYP-0240] cannot take sizeof(void)")
+            # Store resolved type for codegen
+            self._store_sizeof_target(expr, target_ty)
+            return self.int_type
+
+        if isinstance(arg, VarRef):
+            # Could be sizeof(TypeName) or sizeof(variable)
+            # Try resolving as type first
+            target_ty = self._try_resolve_type_name(arg.name)
+            if target_ty is not None:
+                if self._is_void(target_ty):
+                    self._error(expr, "[TYP-0240] cannot take sizeof(void)")
+                self._store_sizeof_target(expr, target_ty)
+                return self.int_type
+
+            # Fall through to treat as expression
+
+        # sizeof(expr) - use expression's type
+        arg_ty = self._infer_expr(arg)
+        if arg_ty is None:
+            return self.int_type
+        if self._is_void(arg_ty):
+            self._error(expr, "[TYP-0240] cannot take sizeof(void)")
+        self._store_sizeof_target(expr, arg_ty)
+        return self.int_type
+
+    def _try_resolve_type_name(self, name: str) -> Optional[Type]:
+        """Try to resolve an identifier as a type name. Returns None if not a type."""
+        assert self._current_func_env is not None
+        module_name = self._current_func_env.module_name
+        env = self.module_envs.get(module_name)
+        if env is None:
+            return None
+
+        sym = env.all.get(name)
+        if sym is None:
+            return None
+
+        if sym.kind == SymbolKind.STRUCT:
+            return StructType(module=sym.module.name, name=name)
+        if sym.kind == SymbolKind.ENUM:
+            return EnumType(module=sym.module.name, name=name)
+        if sym.kind == SymbolKind.TYPE_ALIAS:
+            # Prefer the resolved target type computed by SignatureResolver.
+            if sym.type is not None:
+                return sym.type
+
+            # Graceful fallback: try resolving from the AST node if it is a TypeAliasDecl.
+            # This shouldn't normally happen (pass ordering should resolve aliases first),
+            # so we only log at debug level and avoid crashing.
+            ctx = getattr(self.analysis, "context", None)
+            if isinstance(sym.node, TypeAliasDecl):
+                log_debug(
+                    ctx,
+                    f"Type alias '{name}' in module '{module_name}' was not resolved yet; falling back to decl.target",
+                )
+                return self._resolve_type_ref(sym.node.target)
+
+            log_debug(
+                ctx,
+                f"TYPE_ALIAS symbol '{name}' in module '{module_name}' has unexpected node type "
+                f"{type(sym.node).__name__}; treating as non-type",
+            )
+            return None
+
+        # It's a function or variable, not a type
+        return None
+
+    def _store_sizeof_target(self, expr: CallExpr, target_ty: Type) -> None:
+        """Store the resolved sizeof target type for codegen."""
+        self.analysis.intrinsic_targets[id(expr)] = target_ty
+
+    def _infer_call(self, expr: CallExpr) -> Optional[Type]:
+        # Check for intrinsic calls first
+        if isinstance(expr.callee, VarRef):
+            intrinsic_result = self._try_infer_intrinsic(expr)
+            if intrinsic_result is not None:
+                return intrinsic_result
+
+        # Only allow calling plain identifiers.
+        if not isinstance(expr.callee, VarRef):
+            self._error(expr, "[TYP-0180] callee must be a function name")
+            # Still traverse arguments to type-check them.
+            for arg in expr.args:
+                self._infer_expr(arg)
+            return None
+
+        # Look up the callee symbol to determine if it's a function, struct, or enum variant
+        assert self._current_func_env is not None
+        module_name = self._current_func_env.module_name
+        mod_env = self.module_envs.get(module_name)
+
+        if mod_env is None:
+            self._error(expr, f"[TYP-9189] internal error: no module env for '{module_name}'")
+            return None
+
+        sym = mod_env.all.get(expr.callee.name)
+        if sym is None:
+            self._error(expr, f"[TYP-0189] unknown identifier '{expr.callee.name}'")
+            return None
+
+        # Handle struct constructors or type-alias-to-struct constructors
+        if sym.kind is SymbolKind.STRUCT or (sym.kind is SymbolKind.TYPE_ALIAS and isinstance(sym.type, StructType)):
+            return self._infer_struct_constructor(expr, sym)
+
+        # Handle enum variant constructors
+        if sym.kind is SymbolKind.ENUM_VARIANT:
+            return self._infer_variant_constructor(expr, sym)
+
+        # Handle regular function calls
+        if sym.kind is not SymbolKind.FUNC:
+            self._error(expr, f"[TYP-0181] symbol '{expr.callee.name}' is not callable")
+            return None
+
+        callee_ty = sym.type
+        if not isinstance(callee_ty, FuncType):
+            if callee_ty is not None:
+                self._error(expr, "[TYP-0182] callee is not a function")
+            return None
+
+        # Arity check
+        expected_arity = len(callee_ty.params)
+        given_arity = len(expr.args)
+        if expected_arity != given_arity:
+            self._error(
+                expr,
+                f"[TYP-0183] function call has wrong number of arguments: "
+                f"expected {expected_arity}, got {given_arity}",
+            )
+
+        # Type-check arguments (where we have enough information)
+        for index, arg in enumerate(expr.args):
+            if index < len(callee_ty.params):
+                param_ty = callee_ty.params[index]
+                self._infer_expr(arg, widening_type=param_ty,
+                                 context_descriptor=f"argument {index + 1} to function '{expr.callee.name}'")
+        return callee_ty.result
+
+    def _infer_struct_constructor(self, expr: CallExpr, sym: Symbol) -> Optional[Type]:
+        """
+        Infer type for struct constructor call: Point(1, 2) or MyAlias(1, 2) where
+        MyAlias is a type alias to a struct.
+
+        Arguments must match struct fields in declaration order.
+        """
+        assert isinstance(expr.callee, VarRef)
+        if sym.kind is SymbolKind.TYPE_ALIAS and isinstance(sym.type, StructType):
+            # Type alias to struct
+            struct_type = sym.type
+            module_name = struct_type.module
+            struct_name = struct_type.name
+        else:
+            # Direct struct
+            module_name = sym.module.name
+            struct_name = expr.callee.name
+            struct_type = StructType(module_name, struct_name)
+
+        # Look up struct info to get field types
+        info = self.struct_infos.get((module_name, struct_name))
+        if info is None:
+            self._error(expr, f"[TYP-0190] no type information for struct '{struct_name}'")
+            return None
+
+        # Arity check
+        expected_arity = len(info.fields)
+        given_arity = len(expr.args)
+        if expected_arity != given_arity:
+            self._error(
+                expr,
+                f"[TYP-0191] struct constructor '{struct_name}' expects {expected_arity} "
+                f"argument(s), got {given_arity}",
+            )
+
+        # Type-check arguments against field types
+        for index, arg in enumerate(expr.args):
+            if index < len(info.fields):
+                field_info = info.fields[index]
+                self._infer_expr(arg, widening_type=field_info.type,
+                                 context_descriptor=f"argument {index + 1} to struct constructor '{struct_name}' for field '{field_info.name}'")
+
+        return struct_type
+
+    def _infer_variant_constructor(self, expr: CallExpr, sym: Symbol) -> Optional[Type]:
+        """
+        Infer type for enum variant constructor call: Int(42)
+
+        Arguments must match variant payload fields in declaration order.
+        Returns the enum type (not the variant type).
+        """
+        assert isinstance(expr.callee, VarRef)
+        variant_name = expr.callee.name
+
+        # The variant's type should be a FuncType: (payload...) -> EnumType
+        # This was set by SignatureResolver
+        if not isinstance(sym.type, FuncType):
+            self._error(expr, f"[TYP-0200] variant '{variant_name}' has no type information")
+            return None
+
+        variant_type = sym.type
+        enum_type = variant_type.result
+
+        if not isinstance(enum_type, EnumType):
+            self._error(expr, f"[TYP-9209] internal error: variant '{variant_name}' does not produce enum type")
+            return None
+
+        # Arity check
+        expected_arity = len(variant_type.params)
+        given_arity = len(expr.args)
+        if expected_arity != given_arity:
+            self._error(
+                expr,
+                f"[TYP-0201] variant constructor '{variant_name}' expects {expected_arity} "
+                f"argument(s), got {given_arity}",
+            )
+
+        # Type-check arguments against payload types
+        for index, arg in enumerate(expr.args):
+            if index < len(variant_type.params):
+                param_ty = variant_type.params[index]
+                self._infer_expr(arg,
+                                 widening_type=param_ty,
+                                 context_descriptor=f"argument {index + 1} to variant constructor '{variant_name}'")
+
+        return enum_type
+
+    def _infer_index(self, expr: IndexExpr) -> Optional[Type]:
+        array_ty = self._infer_expr(expr.array)
+        index_ty = self._infer_expr(expr.index)
+
+        if index_ty is not None and not self._is_int_assignable(index_ty):
+            self._error(expr, f"[TYP-0210] index expression must have type 'int', got '{format_type(index_ty)}'")
+
+        if isinstance(array_ty, NullableType):
+            self._error(
+                expr,
+                f"[TYP-0211] cannot index into nullable type '{format_type(array_ty)}'; expected a non-null array",
+            )
+            return None
+
+        # if isinstance(array_ty, ArrayType): # TODO Uncomment when ArrayType is defined (buffers and slices)
+        #     return array_ty.inner
+
+        if array_ty is not None:
+            self._error(
+                expr,
+                f"[TYP-0212] cannot index into expression of type '{format_type(array_ty)}'; expected an array type",
+            )
+
+        return None
+
+    def _infer_field_access(self, expr: FieldAccessExpr) -> Optional[Type]:
+        obj_ty = self._infer_expr(expr.obj)
+
+        if isinstance(obj_ty, NullableType) and isinstance(obj_ty.inner, StructType):
+            self._error(
+                expr,
+                f"[TYP-0220] cannot access field '{expr.field}' on nullable struct '{format_type(obj_ty)}'; expected a non-null struct",
+            )
+            return None
+
+        # Dereference pointer to struct if needed
+        if isinstance(obj_ty, PointerType) and isinstance(obj_ty.inner, StructType):
+            obj_ty = obj_ty.inner
+
+        if isinstance(obj_ty, StructType):
+            info = self.struct_infos.get((obj_ty.module, obj_ty.name))
+            if info is None:
+                return None
+
+            for field_info in info.fields:
+                if field_info.name == expr.field:
+                    return field_info.type
+
+            self._error(
+                expr,
+                f"[TYP-0221] struct {format_type(obj_ty)} has no field '{expr.field}'",
+            )
+            return None
+
+        if obj_ty is not None:
+            self._error(
+                expr,
+                f"[TYP-0222] cannot access field '{expr.field}' on non-struct type '{format_type(obj_ty)}'",
+            )
+
+        return None
+
+    def _infer_cast(self, expr: CastExpr) -> Optional[Type]:
+        expr_ty = self._infer_expr(expr.expr)
+        if expr_ty is None:
+            return None
+
+        target_ty = self._resolve_type_ref(expr.target_type)
+        if target_ty is None:
+            return None
+
+        # Allow the cast if the types are assignable (including nullability changes)
+        if self._can_assign(target_ty, expr_ty, allow_promotion=True):
+            return target_ty
+
+        # Otherwise, report an error
+        return self._error(
+            expr, f"[TYP-0230] cannot cast from {format_type(expr_ty)} to {format_type(target_ty)}"
+        )
+
+    def _infer_try(self, expr: TryExpr) -> Optional[Type]:
+        if self._current_func_type is None:
+            return None
+
+        inner_ty = self._infer_expr(expr.expr)
+        if inner_ty is None:
+            return None
+
+        if not isinstance(inner_ty, NullableType):
+            self._error(expr, f"[TYP-0250] cannot apply '?' to non-nullable type '{format_type(inner_ty)}'")
+            return None
+
+        if not isinstance(self._current_func_type.result, NullableType):
+            self._error(expr, "[TYP-0251] cannot use '?' in a function that does not return a nullable type (T?)")
+            return None
+
+        return inner_ty.inner
+
+    # ------------------------------------------------------------------
+    # Return statements
+    # ------------------------------------------------------------------
+
+    def _check_return(self, stmt: ReturnStmt) -> None:
+        if self._current_func_type is None:
+            self._error(stmt, "[TYP-0260] return statement outside of function")
+            return
+
+        expected = self._current_func_type.result
+        if stmt.value is None:
+            actual = self.void_type
+        else:
+            # Use expected type as widening context for return value
+            actual = self._infer_expr(stmt.value,
+                                      widening_type=expected,
+                                      context_descriptor="return value")
+            # If _infer_expr returns None, it already reported the error
+            if actual is None:
+                return
+
+    # ------------------------------------------------------------------
+    # Helpers: TypeRef resolution (mirrors SignatureResolver logic)
+    # ------------------------------------------------------------------
+
+    def _resolve_type_ref(self, tref) -> Optional[Type]:
+        """
+        Resolve a frontend TypeRef to a semantic Type in the context of the
+        *current function's module*.
+
+        This mirrors the rules used in SignatureResolver:
+
+          - builtin names: int, bool, string, void
+          - struct / enum names from the module env
+          - type aliases via the symbol's already-resolved sym.type
+          - pointer_depth and is_nullable are applied afterward
+        """
+
+        if not isinstance(tref, AstTypeRef):
+            return None
+
+        # We need to know which module we are in.
+        if self._current_func_env is None:
+            return None
+
+        module_name = self._current_func_env.module_name
+        env = self.module_envs.get(module_name)
+        if env is None:
+            return None
+
+        base_name = tref.name
+
+        # Builtins first (reserved names)
+        if base_name in L0_PRIMITIVE_TYPES:
+            base: Type = get_builtin_type(base_name)
+        else:
+            sym = env.all.get(base_name)
+            if sym is None:
+                # Unknown type name in this module
+                self._error(
+                    tref,
+                    f"[TYP-0279] unknown type '{base_name}' in module '{module_name}'",
+                )
+                return None
+
+            if sym.kind == SymbolKind.STRUCT:
+                base = StructType(sym.module.name, sym.name)
+            elif sym.kind == SymbolKind.ENUM:
+                base = EnumType(sym.module.name, sym.name)
+            elif sym.kind == SymbolKind.ENUM_VARIANT:
+                return None # Variants cannot be used as types directly, let the caller handle this case
+            elif sym.kind == SymbolKind.TYPE_ALIAS:
+                # SignatureResolver should already have resolved aliases and
+                # stored the resulting Type in sym.type.
+                if sym.type is None:
+                    # Be conservative if something went wrong earlier.
+                    self._error(
+                        tref,
+                        f"[TYP-0270] type alias '{base_name}' in module '{module_name}'"
+                        " does not have a resolved type",
+                    )
+                    return None
+                base = sym.type
+            else:
+                # Non-type symbol used as a type name
+                self._error(
+                    tref,
+                    f"[TYP-0271] symbol '{base_name}' in module '{module_name}' "
+                    f"is not a type (kind={sym.kind.name})",
+                )
+                return None
+
+        # Apply pointer depth
+        t: Type = base
+        for _ in range(tref.pointer_depth):
+            t = PointerType(t)
+
+        # Apply nullable suffix
+        if tref.is_nullable:
+            t = NullableType(t)
+
+        return t
+
+    # ------------------------------------------------------------------
+    # Helpers: diagnostics and type comparisons
+    # ------------------------------------------------------------------
+
+    def _can_assign(self, target: Type, source: Type, *, allow_promotion=False) -> bool:
+        """
+        Check if 'source' type can be assigned to 'target' type.
+        Implements implicit promotion rules and null assignment.
+        """
+        # Exact match
+        if self._types_equal(target, source):
+            return True
+
+        # Null assignment
+        # null -> T?
+        if isinstance(source, NullType):
+            if isinstance(target, NullableType):
+                return True
+
+        # Allow widening for certain built-in types (byte -> int)
+        if isinstance(source, BuiltinType) and isinstance(target, BuiltinType):
+            if source.name == "byte" and target.name == "int":
+                return True
+
+        # Checked narrowing for built-in types (int -> byte) in casts
+        if allow_promotion and isinstance(source, BuiltinType) and isinstance(target, BuiltinType):
+            # Allow int -> byte in checked contexts (casts)
+            if source.name == "int" and target.name == "byte":
+                return True
+
+        # Allow widening non-nullable to nullable promotion (T -> T?)
+        if isinstance(target, NullableType):
+            if self._can_assign(target.inner, source):
+                return True
+
+        # Nullable to non-nullable demotion (T? -> T) only if allowed (e.g., in casts)
+        if allow_promotion and not isinstance(target, NullableType) and isinstance(source, NullableType):
+            if self._can_assign(target, source.inner):
+                return True
+
+        # Recursive checks for Nullable types
+        if isinstance(source, NullableType) and isinstance(target, NullableType):
+            # T1? -> T2? if T1 -> T2
+            return self._can_assign(target.inner, source.inner)
+
+        # Recursive checks for Pointer types
+        if isinstance(source, PointerType) and isinstance(target, PointerType):
+            # T1* -> T2* if T1 -> T2 or T2 is void or T1 is void
+            if self._is_void(target.inner) or self._is_void(source.inner):
+                return True
+            return self._can_assign(target.inner, source.inner)
+
+        return False
+
+    def _is_nullable_or_ptr(self, t: Type) -> bool:
+        return isinstance(t, (NullableType, PointerType))
+
+    def _error(self, node: Node, message: str) -> None:
+        self._diagnostic(node, message, kind="error")
+
+    def _warn(self, node: Node, message: str) -> None:
+        self._diagnostic(node, message, kind="warning")
+
+    def _diagnostic(self, node: Node, message: str, kind: str = "info") -> None:
+        mod_name = None
+        filename = None
+        if self.cu is not None and self._current_func_env is not None:
+            mod_name = self._current_func_env.module_name
+            mod = self.cu.modules.get(mod_name)
+            if mod is not None:
+                filename = mod.filename
+
+        self.diagnostics.append(
+            diag_from_node(
+                kind=kind,
+                message=message,
+                module_name=mod_name,
+                filename=filename,
+                node=node
+            )
+        )
+
+    def _is_int_assignable(self, typ: Optional[Type]) -> bool:
+        return isinstance(typ, BuiltinType) and (typ.name == "int" or typ.name == "byte")
+
+    def _is_bool(self, typ: Optional[Type]) -> bool:
+        return isinstance(typ, BuiltinType) and typ.name == "bool"
+
+    def _is_string(self, typ: NullType | Type) -> bool:
+        return isinstance(typ, BuiltinType) and typ.name == "string"
+
+    def _is_void(self, typ: Type) -> bool:
+        return isinstance(typ, BuiltinType) and typ.name == "void"
+
+    def _types_equal(self, a: Type, b: Type) -> bool:
+        # Rely on dataclass value equality for now.
+        return a == b
+
+    def _describe_lvalue(self, expr: Expr) -> str:
+        """Generate a human-readable description of an lvalue expression."""
+        if isinstance(expr, VarRef):
+            return f"variable '{expr.name}'"
+        elif isinstance(expr, FieldAccessExpr):
+            return f"field '{expr.field}'"
+        elif isinstance(expr, IndexExpr):
+            return "array element"
+        elif isinstance(expr, UnaryOp) and expr.op == "*":
+            return "dereferenced pointer"
+        else:
+            return "expression"
+
+    def _infer_new(self, expr: NewExpr) -> Optional[Type]:
+        # `new TYPE(args...)` allocates a TYPE instance on the heap and returns a pointer.
+        # TYPE can be any type (builtin/struct/type-alias) or an enum variant constructor.
+
+        if self._current_func_env is None:
+            return self._error(expr, f"[TYP-9288] internal error: 'new' outside function context")
+
+        module_name = self._current_func_env.module_name
+        mod_env = self.module_envs.get(module_name)
+
+        if mod_env is None:
+            return self._error(expr, f"[TYP-9289] internal error: no module env for '{module_name}'")
+
+        base_ty = self._resolve_type_ref(expr.type_ref)
+
+        if base_ty is None:
+            # Type resolution failed - check if it's an enum variant constructor (e.g., new CaseA(42))
+            sym = mod_env.all.get(expr.type_ref.name)
+            if sym and sym.kind is SymbolKind.ENUM_VARIANT:
+                enum_ty = self._infer_variant_constructor(
+                    CallExpr(callee=VarRef(name=expr.type_ref.name), args=expr.args), sym)
+                return PointerType(enum_ty) if enum_ty else None
+            return self._error(expr, f"[TYP-0280] unknown type in 'new' expression")
+
+        if isinstance(base_ty, EnumType):
+            return self._error(expr, f"[TYP-0281] cannot allocate enum type '{format_type(base_ty)}' without a variant")
+
+        if isinstance(base_ty, StructType):
+            info = self.struct_infos.get((base_ty.module, base_ty.name))
+            if info is None:
+                return self._error(expr, f"[TYP-0282] missing struct info for {base_ty.module}.{base_ty.name}")
+
+            if len(expr.args) > 0:
+                if len(expr.args) != len(info.fields):
+                    self._error(expr,
+                                f"[TYP-0283] struct '{base_ty.name}' expects {len(info.fields)} argument(s), got {len(expr.args)}")
+
+                for field, arg in zip(info.fields, expr.args):
+                    self._infer_expr(arg, widening_type=field.type,
+                                     context_descriptor=f"field '{field.name}' of struct '{base_ty.name}'")
+
+        else:
+            # Non-struct types (builtins, pointers, nullable): expect 0 or 1 argument
+            if len(expr.args) > 1:
+                self._error(expr,
+                            f"[TYP-0285] 'new {format_type(base_ty)}' expects at most 1 argument, got {len(expr.args)}")
+            elif len(expr.args) == 1:
+                arg_ty = self._infer_expr(expr.args[0])
+                if arg_ty is not None and not self._can_assign(base_ty, arg_ty):
+                    self._error(expr.args[0],
+                                f"[TYP-0286] cannot initialize '{format_type(base_ty)}' with value of type '{format_type(arg_ty)}'")
+
+        return PointerType(base_ty)

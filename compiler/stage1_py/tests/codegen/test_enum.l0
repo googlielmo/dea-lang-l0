@@ -1,0 +1,52 @@
+/*
+ * SPDX-License-Identifier: MIT OR Apache-2.0
+ * Copyright (c) 2025-2026 gwz
+ */
+
+module test_enum;
+
+import sys.rt;
+import sys.unsafe;
+
+import std.io;
+
+enum Expr {
+    Int(value: int);
+    Add(left: Expr*, right: Expr*);
+    Mul(left: Expr*, right: Expr*);
+}
+
+func make_expr_ptr(e: Expr) -> Expr* {
+    let ptr: Expr* = rt_alloc(sizeof(Expr)) as Expr*;
+    *ptr = e;
+    return ptr;
+}
+
+func eval(e: Expr*) -> int {
+    match (*e) {
+        Int(value) => {
+            return value;
+        }
+        Add(left, right) => {
+            return eval(left) + eval(right);
+        }
+        Mul(left, right) => {
+            return eval(left) * eval(right);
+        }
+    }
+    return 0;
+}
+
+func main() -> int {
+    let v1: Expr = Int(5);
+    let v2: Expr = Int(7);
+    
+    let e1: Expr* = make_expr_ptr(v1);
+    let e2: Expr* = make_expr_ptr(v2);
+    let sum: Expr* = make_expr_ptr(Add(e1, e2));
+    
+    let result: int = eval(sum);
+    printl_i(result);
+    
+    return 0;
+}

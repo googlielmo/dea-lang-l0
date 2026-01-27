@@ -1,0 +1,302 @@
+# Dea/L<sub>0</sub>: A Small, Safe, C-Family Language
+
+> _C-family syntax, with UB-free semantics and modern sum types + pattern matching._
+
+**Dea/L<sub>0</sub>** or simply **L0** is a small systems language with a staged compiler.
+
+It is the first step in growing a new, ideal systems programming language called **Dea**.
+
+The current implementation **emits portable C (C99)** as a bootstrap backend; the backend is intended to evolve (e.g.,
+with LLVM).
+
+It is designed to eventually **compile its own compiler** (Stage 2: L0-in-L0).
+
+This repository is primarily the **L0 language + toolchain**, and includes:
+
+* The language definition and design documents (`docs/`).
+* A **Stage 1 bootstrap compiler** (`l0c`) used to validate the language and generate C99.
+* A small trusted **C kernel/runtime** used by generated programs.
+* A Stage 2 L0-in-L0 compiler (in development).
+
+Stage 1 is implemented in **Python** intentionally (fast iteration, simple reference implementation).
+
+The Python Stage 1 compiler is located in the [`compiler/stage1_py`](compiler/stage1_py) directory.
+
+Generated programs link a small trusted **C kernel/runtime** that encapsulates platform-specific behavior.
+L0 aims to eliminate **undefined behavior**: operations are either well-defined, rejected with diagnostics,
+or (where appropriate) trigger a defined runtime failure.
+
+L0 is C-family in **surface syntax**:
+
+* braces/semicolons, explicit types, pointers, and familiar operator precedence.
+
+It is **not C** in key semantic ways:
+
+* enums with payloads and statement-only **`match`**,
+* explicit **optional types** (`T?`, with `null` as the empty value),
+* a postfix **null propagation operator** (`expr?`) to propagate `null` from an expression of type `T?`,
+* no undefined behavior at the language level.
+
+The design goals and technical model are described in the project documents in the [docs](docs) folder.
+
+## Example
+
+```l0
+module demo;
+
+enum Expr {
+    Int(value: int);
+    Add(left: Expr*, right: Expr*);
+}
+
+func eval(e: Expr*) -> int {
+    match (*e) {
+        Int(value) => { return value; }
+        Add(left, right) => { return eval(left) + eval(right); }
+        // no default case: all variants handled (exhaustive)
+    }
+}
+
+func add_opt(a: int?, b: int?) -> int? {
+    let x: int = a?;    // propagate `null` if `a` is null
+    let y: int = b?;    // propagate `null` if `b` is null
+    return (x + y) as int?;
+}
+```
+
+## Table of contents
+
+1. [Getting Started](#getting-started)
+2. [Motivation](#motivation)
+3. [Language overview](#language-overview)
+4. [Grammar](#grammar)
+5. [Compiler implementation architecture](#compiler-implementation-architecture)
+6. [CLI](#cli)
+7. [Project status](#project-status)
+8. [License](#license)
+9. [Author](#author)
+
+## Getting Started
+
+### Prerequisites
+
+- Python 3.14 or later
+- A C99-compatible compiler (gcc or clang)
+- Git (for cloning the repository)
+
+### Setup
+
+#### 1. Clone the repository:
+
+   ```shell
+   git clone https://github.com/googlielmo/dea-lang-l0.git
+   cd L0
+   ```
+
+#### 2. Set environment variables (optional):
+
+   The `l0c` wrapper script sets sensible defaults, but you can override them:
+
+   ```shell
+   export L0_HOME=/path/to/l0/compiler/stage1_py
+   export L0_SYSTEM=/path/to/l0/compiler/stage1_py/l0/stdlib
+   export L0_RUNTIME_INCLUDE=/path/to/l0/compiler/stage1_py/runtime
+   ```
+
+   If not set, defaults are relative to the repository root:
+    - `L0_HOME` → `compiler/stage1_py`
+    - `L0_SYSTEM` → `$L0_HOME/l0/stdlib`
+    - `L0_RUNTIME_INCLUDE` → `$L0_HOME/runtime`
+
+#### 3. Verify installation:
+
+   ```shell
+   ./l0c --help
+   ```
+
+### First Steps
+
+#### 1. Create a simple L0 program:
+
+   ```l0
+   // hello.l0
+   module hello;
+   import std.io;
+
+   func main() -> int {
+       println("Hello, L0!");
+       return 0;
+   }
+   ```
+
+#### 2. Run it:
+
+   ```shell
+   ./l0c run hello.l0
+   ```
+
+   This compiles and executes the program in one step.
+
+#### 3. Build an executable:
+
+   ```shell
+   ./l0c build hello.l0 -o hello
+   ./hello
+   ```
+
+#### 4. Check for errors without building:
+
+   ```shell
+   ./l0c check hello.l0
+   ```
+
+### Project Structure
+
+When working on L0 projects, use `--project-root` (or `-P`) to specify your source directories:
+
+```shell
+./l0c run -P ./src -P ./lib main.l0
+```
+
+The compiler searches for modules in:
+
+1. System roots (standard library, specified via `--sys-root`/`-S` or `L0_SYSTEM`)
+2. Project roots (specified via `--project-root`/`-P` or working directory)
+
+### Examples
+
+Explore the `examples/` directory for sample L0 programs demonstrating various language features.
+
+## Motivation
+
+The project aims to build a **bootstrap-friendly**, **well-specified**, **simple**, and **safe** systems language.
+
+In other words, it's "the minimum viable systems language for writing a self-hosted compiler".
+
+Its first self-hosted compiler will be written in L0 itself (Stage 2).
+To support this, Stage 1 provides:
+
+* A complete, deterministic parser.
+* A precise semantic model.
+* A small C kernel, isolating all platform-dependent behavior.
+* Predictable, explicit control over types, pointers, and runtime.
+
+## Language overview
+
+L0's surface syntax is C-like:
+
+```l0
+module demo;
+
+import std.io;
+
+struct Token { kind: int; value: string; }
+
+func add(a: int, b: int) -> int {
+    return a + b;
+}
+```
+
+Key properties:
+
+* **No UB**: operations are defined or errors.
+* **Modules**: one file = one module (dotted names supported).
+* **Types**: builtins, structs, enums with payloads, type aliases.
+* **Automatically reference counted string values**: `string` is a first-class type.
+* **Pointers**: `T*`, nullable `T*?`; no address-of operator `&` in early stages.
+* **Auto-dereference**: Field access `ptr.field` automatically dereferences pointers.
+* **Pattern matching**: statement-only, simple variant patterns.
+* **Expressions**: C-like precedence, no assignment-as-expression.
+* **Statements**: `let`, assignment, if/else, while, return, match.
+* **Extern functions** interface with the C kernel.
+* **Introspection**: `sizeof(T)` available at compile time.
+* **Null Safety**:
+    * Postfix **try operator** `?` for short-circuiting null propagation (optional chaining).
+    * Checked casts: `T? as T` (unwrap with panic if null) and `T as T?` (safe wrap).
+
+## Grammar
+
+The authoritative Stage-1 grammar is in [l0_grammar.md](docs/l0_grammar.md).
+
+Pointer and nullable types look like this:
+
+```
+T
+T*
+T**
+T?
+T*?
+```
+
+Expressions include unary (`-`, `!`, `*`, `~`, `sizeof`), binary arithmetic, logical, comparisons, bitwise, indexing,
+calls, field access, `as` casts, and the **try operator** `?`.
+
+## Compiler implementation architecture
+
+See [architecture.md](docs/architecture.md) for an overview of the Python L0 stage-1 compiler implementation
+architecture and data flow.
+
+See also [design_decisions.md](docs/design_decisions.md) for additional context.
+
+## CLI
+
+Provided by the `l0c` executable (Python):
+
+```shell
+./l0c --help
+```
+
+Output:
+```
+usage: l0c [-h] [--verbose] [--project-root PROJECT_ROOT] [--sys-root SYS_ROOT] {run,build,gen,codegen,check,analyze,tok,tokens,ast,sym,symbols,type,types} ...
+
+L0 compiler (Stage 1)
+
+positional arguments:
+  {run,build,gen,codegen,check,analyze,tok,tokens,ast,sym,symbols,type,types}
+                        Command to run
+    run                 Build and run a module
+    build               Build an executable
+    gen (codegen)       Generate C code
+    check (analyze)     Parse and analyze a module
+    tok (tokens)        Dump lexer tokens
+    ast                 Pretty-print the parsed AST
+    sym (symbols)       Dump module-level symbols
+    type (types)        Dump resolved types
+
+options:
+  -h, --help            show this help message and exit
+  --verbose, -v
+  --project-root, -P PROJECT_ROOT
+                        Add a project source root (can be passed multiple times)
+  --sys-root, -S SYS_ROOT
+                        Add a system/stdlib source root (can be passed multiple times; default: $L0_SYSTEM as colon-separated paths)
+```
+
+Example usage:
+
+```shell
+./l0c -P examples run hello
+```
+
+Output:
+```
+Hello, World!
+```
+
+## Project status
+
+The authoritative status file is [project_status.md](docs/project_status.md).
+
+## License
+
+This project is dual-licensed under the following terms:
+
+- MIT License (see [LICENSE.MIT](LICENSE.MIT))
+- Apache License 2.0 (see [LICENSE.APACHE](LICENSE.APACHE))
+
+You may use this software under either license at your option.
+
+## Author
+
+Created and maintained by gwz ([@googlielmo](https://github.com/googlielmo)).

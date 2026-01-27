@@ -1,0 +1,289 @@
+/*
+ * SPDX-License-Identifier: MIT OR Apache-2.0
+ * Copyright (c) 2025-2026 gwz
+ */
+
+module tokens;
+
+import std.io;
+import std.string;
+import std.unit;
+
+import util.string;
+import util.vector;
+import util.map;
+
+enum TokenType {
+    TT_EOF;
+
+    TT_IDENT(text: string);
+    TT_UNDERSCORE;
+    TT_INT(text: string, value: int);
+    TT_BYTE(text: string, value: byte);
+    TT_STRING(text: string, value: string);
+
+    // Keywords
+    TT_MODULE;
+    TT_IMPORT;
+    TT_FUNC;
+    TT_STRUCT;
+    TT_ENUM;
+    TT_TYPE;
+    TT_EXTERN;
+    TT_LET;
+    TT_RETURN;
+    TT_MATCH;
+    TT_IF;
+    TT_ELSE;
+    TT_WHILE;
+    TT_FOR;
+    TT_BREAK;
+    TT_CONTINUE;
+    TT_TRUE;
+    TT_FALSE;
+    TT_SIZEOF;
+    TT_NULL;
+    TT_AS;
+    TT_NEW;
+    TT_DROP;
+
+    // Punctuation / operators
+    TT_LBRACE;      // {
+    TT_RBRACE;      // }
+    TT_LPAREN;      // (
+    TT_RPAREN;      // )
+    TT_LBRACKET;    // [
+    TT_RBRACKET;    // ]
+    TT_COMMA;       // ,
+    TT_SEMI;        // ;
+    TT_COLON;       // :
+    TT_ARROW_FUNC;  // ->
+    TT_ARROW_MATCH; // =>
+    TT_EQ;          // =
+    TT_PLUS;        // +
+    TT_MINUS;       // -
+    TT_STAR;        // *
+    TT_SLASH;       // /
+    TT_LT;          // <
+    TT_GT;          // >
+    TT_LE;          // <
+    TT_GE;          // <=
+    TT_EQEQ;        // ==
+    TT_NE;          // !=
+    TT_ANDAND;      // &&
+    TT_OROR;        // ||
+    TT_BANG;        // !
+    TT_QUESTION;    // ?
+    TT_DOT;         // .
+
+    TT_FUTURE_EXTENSION;  // placeholder for future tokens
+}
+
+struct Token {
+    token_type: TokenType;
+    index: int;     // offset in source, 0-based
+    line: int;      // 1-based
+    column: int;    // 1-based
+}
+
+func token_to_string(token: Token) -> string {
+    match (token.token_type) {
+        TT_EOF => { return "end-of-file"; }
+        TT_IDENT(t) => { return concat3_s("ident(", t, ")"); }
+        TT_UNDERSCORE => { return "_"; }
+        TT_INT(t, v) => { return concat3_s("int(", t, ")"); }
+        TT_BYTE(t, v) => { return concat3_s("byte(", t, ")"); }
+        TT_STRING(t, v) => { return concat3_s("string(", t, ")"); }
+
+        // Keywords
+        TT_MODULE => { return "module"; }
+        TT_IMPORT => { return "import"; }
+        TT_FUNC => { return "func"; }
+        TT_STRUCT => { return "struct"; }
+        TT_ENUM => { return "enum"; }
+        TT_TYPE => { return "type"; }
+        TT_EXTERN => { return "extern"; }
+        TT_LET => { return "let"; }
+        TT_RETURN => { return "return"; }
+        TT_MATCH => { return "match"; }
+        TT_IF => { return "if"; }
+        TT_ELSE => { return "else"; }
+        TT_WHILE => { return "while"; }
+        TT_FOR => { return "for"; }
+        TT_BREAK => { return "break"; }
+        TT_CONTINUE => { return "continue"; }
+        TT_TRUE => { return "true"; }
+        TT_FALSE => { return "false"; }
+        TT_SIZEOF => { return "sizeof"; }
+        TT_NULL => { return "null"; }
+        TT_AS => { return "as"; }
+        TT_NEW => { return "new"; }
+        TT_DROP => { return "drop"; }
+
+        // Punctuation / operators
+        TT_LBRACE => { return "{"; }
+        TT_RBRACE => { return "}"; }
+        TT_LPAREN => { return "("; }
+        TT_RPAREN => { return ")"; }
+        TT_LBRACKET => { return "["; }
+        TT_RBRACKET => { return "]"; }
+        TT_COMMA => { return ","; }
+        TT_SEMI => { return ";"; }
+        TT_COLON => { return ":"; }
+        TT_ARROW_FUNC => { return "->"; }
+        TT_ARROW_MATCH => { return "=>"; }
+        TT_EQ => { return "="; }
+        TT_PLUS => { return "+"; }
+        TT_MINUS => { return "-"; }
+        TT_STAR => { return "*"; }
+        TT_SLASH => { return "/"; }
+        TT_LT => { return "<"; }
+        TT_GT => { return ">"; }
+        TT_LE => { return "<="; }
+        TT_GE => { return ">="; }
+        TT_EQEQ => { return "=="; }
+        TT_NE => { return "!="; }
+        TT_ANDAND => { return "&&"; }
+        TT_OROR => { return "||"; }
+        TT_BANG => { return "!"; }
+        TT_QUESTION => { return "?"; }
+        TT_DOT => { return "."; }
+
+        TT_FUTURE_EXTENSION => { return "<future-extension>"; }
+    }
+}
+
+func is_reserved_keyword(token: Token) -> bool {
+    match (token.token_type) {
+        TT_MODULE => { return true; }
+        TT_IMPORT => { return true; }
+        TT_FUNC => { return true; }
+        TT_STRUCT => { return true; }
+        TT_ENUM => { return true; }
+        TT_TYPE => { return true; }
+        TT_EXTERN => { return true; }
+        TT_LET => { return true; }
+        TT_RETURN => { return true; }
+        TT_MATCH => { return true; }
+        TT_IF => { return true; }
+        TT_ELSE => { return true; }
+        TT_WHILE => { return true; }
+        TT_FOR => { return true; }
+        TT_BREAK => { return true; }
+        TT_CONTINUE => { return true; }
+        TT_TRUE => { return true; }
+        TT_FALSE => { return true; }
+        TT_SIZEOF => { return true; }
+        TT_NULL => { return true; }
+        TT_AS => { return true; }
+        TT_NEW => { return true; }
+        TT_DROP => { return true; }
+        _ => { return false; }
+    }
+}
+
+func ident_to_token(ident: string, index: int, line: int, col: int) -> Token {
+    if (eq_s(ident, "module")) {
+        return Token(TT_MODULE(), index, line, col);
+    }
+    if (eq_s(ident, "import")) {
+        return Token(TT_IMPORT(), index, line, col);
+    }
+    if (eq_s(ident, "func")) {
+        return Token(TT_FUNC(), index, line, col);
+    }
+    if (eq_s(ident, "struct")) {
+        return Token(TT_STRUCT(), index, line, col);
+    }
+    if (eq_s(ident, "enum")) {
+        return Token(TT_ENUM(), index, line, col);
+    }
+    if (eq_s(ident, "type")) {
+        return Token(TT_TYPE(), index, line, col);
+    }
+    if (eq_s(ident, "extern")) {
+        return Token(TT_EXTERN(), index, line, col);
+    }
+    if (eq_s(ident, "let")) {
+        return Token(TT_LET(), index, line, col);
+    }
+    if (eq_s(ident, "return")) {
+        return Token(TT_RETURN(), index, line, col);
+    }
+    if (eq_s(ident, "match")) {
+        return Token(TT_MATCH(), index, line, col);
+    }
+    if (eq_s(ident, "if")) {
+        return Token(TT_IF(), index, line, col);
+    }
+    if (eq_s(ident, "else")) {
+        return Token(TT_ELSE(), index, line, col);
+    }
+    if (eq_s(ident, "while")) {
+        return Token(TT_WHILE(), index, line, col);
+    }
+    if (eq_s(ident, "for")) {
+        return Token(TT_FOR(), index, line, col);
+    }
+    if (eq_s(ident, "break")) {
+        return Token(TT_BREAK(), index, line, col);
+    }
+    if (eq_s(ident, "continue")) {
+        return Token(TT_CONTINUE(), index, line, col);
+    }
+    if (eq_s(ident, "true")) {
+        return Token(TT_TRUE(), index, line, col);
+    }
+    if (eq_s(ident, "false")) {
+        return Token(TT_FALSE(), index, line, col);
+    }
+    if (eq_s(ident, "sizeof")) {
+        return Token(TT_SIZEOF(), index, line, col);
+    }
+    if (eq_s(ident, "null")) {
+        return Token(TT_NULL(), index, line, col);
+    }
+    if (eq_s(ident, "as")) {
+        return Token(TT_AS(), index, line, col);
+    }
+    if (eq_s(ident, "new")) {
+        return Token(TT_NEW(), index, line, col);
+    }
+    if (eq_s(ident, "drop")) {
+        return Token(TT_DROP(), index, line, col);
+    }
+    return Token(TT_IDENT(ident), index, line, col);
+}
+
+// ------------------------------------
+// Token Vector utilities
+// ------------------------------------
+
+struct TokenVector {
+    vec: VectorBase*;
+}
+
+func tv_create() -> TokenVector {
+    let vec = vec_create(sizeof(Token), 16);
+    return TokenVector(vec);
+}
+
+func tv_push(self: TokenVector, token: Token) {
+    vec_grow(self.vec);
+    let data = vec_get(self.vec, self.vec.length - 1) as Token*;
+    *data = token;
+}
+
+func tv_get(self: TokenVector, index: int) -> Token {
+    vec_check(self.vec, index);
+    let data = vec_get(self.vec, index) as Token*;
+    return *data;
+}
+
+func tv_len(self: TokenVector) -> int {
+    return self.vec.length;
+}
+
+func tv_free(self: TokenVector) {
+    vec_free(self.vec);
+}

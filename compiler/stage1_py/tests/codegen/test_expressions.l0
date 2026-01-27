@@ -1,0 +1,68 @@
+/*
+ * SPDX-License-Identifier: MIT OR Apache-2.0
+ * Copyright (c) 2025-2026 gwz
+ */
+
+module test_expressions;
+
+import std.io;
+
+func test_literals() -> int {
+    let i: int = 42;
+    let b: bool = true;
+    if (b) {
+        return i;
+    }
+    return 0;
+}
+
+func test_unary() -> int {
+    let x: int = 10;
+    let neg: int = -x;
+    let b: bool = true;
+    let not_b: bool = !b;
+    if (not_b) {
+        return 0;
+    }
+    return neg;
+}
+
+func test_binary() -> int {
+    let a: int = 10;
+    let b: int = 20;
+    let c = -a;
+    let sum: int = a + b;
+    let diff: int = b - a;
+    let prod: int = a * b;
+    let quot: int = b / a;
+    let cmp: bool = a < b;
+    let eq: bool = -c == a;
+    let and: bool = cmp && eq;
+    let or: bool = cmp || eq;
+    if (and) {
+        return sum;
+    }
+    return 0;
+}
+
+func test_call_simple(x: int, y: int) -> int {
+    return x + y;
+}
+
+func test_call() -> int {
+    return test_call_simple(10, 20);
+}
+
+func test_paren() -> int {
+    let x: int = (10 + 20) * 2;
+    return x;
+}
+
+func main() -> int {
+    printl_i(test_literals());
+    printl_i(test_unary());
+    printl_i(test_binary());
+    printl_i(test_call());
+    printl_i(test_paren());
+    return 0;
+}

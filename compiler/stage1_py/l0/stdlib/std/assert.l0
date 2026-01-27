@@ -1,0 +1,17 @@
+/*
+ * SPDX-License-Identifier: MIT OR Apache-2.0
+ * Copyright (c) 2025-2026 gwz
+ */
+
+/**
+ * This module provides assertion functionality.
+ */
+module std.assert;
+
+import sys.rt;
+
+// Asserts that the given condition is true.
+// If the condition is false, aborts the program with the provided message.
+func assert(cond: bool, msg: string) {
+    if (!cond) rt_abort(msg);
+}

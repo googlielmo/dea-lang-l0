@@ -1,0 +1,140 @@
+/*
+ * SPDX-License-Identifier: MIT OR Apache-2.0
+ * Copyright (c) 2025-2026 gwz
+ */
+
+module nullopt;
+
+import std.string;
+import std.io;
+import std.unit;
+import std.optional;
+
+func test_opt_Unit_return() -> Unit? {
+    printl_s("entering test_opt_Unit_return (inner)");
+    // simulate some condition that causes early return
+    return null;
+}
+
+func test_Unit_return() -> Unit? {
+    printl_s("entering test_Unit_return (outer)");
+    test_opt_Unit_return()?; // propagate null return value with try operator
+    printl_s("exiting test_Unit_return (outer)"); // should NOT be printed
+    return present(); // return a non-null Unit?
+}
+
+func test_opt_int_return() -> int? {
+    printl_s("entering test_opt_int_return (inner)");
+    // simulate some condition that causes early return
+    return null;
+}
+
+func test_int_return() -> int? {
+    printl_s("entering test_int_return (outer)");
+
+    test_opt_int_return()?; // propagate null return value with try operator
+
+    printl_s("exiting test_int_return (outer)"); // should NOT be printed
+
+    return 42 as int?;
+}
+
+func test_opt_int_return2() -> int? {
+    printl_s("entering test_opt_int_return2 (outer)");
+
+    let x : int? = null;
+    let y = x?; // propagate null value with try operator
+
+    printl_s("exiting test_opt_int_return2 (outer)"); // should NOT be printed
+
+    return 42 as int?;
+}
+
+func failing_string() -> string? {
+    return null;
+}
+
+func test_failing_unwrap_s() -> int? {
+    let s: string = failing_string()?;
+    let val: int? = len_s(s) as int?;
+    return val;
+}
+
+func failing_i() -> int? {
+    return null;
+}
+
+func test_failing_unwrap_i() -> int? {
+    let i: int = failing_i()?;
+    let val = 10 as int?;
+    return val;
+}
+
+func test_opt_i() -> int? {
+    let val = 10 as int?;
+    return val;
+}
+
+func main() -> void {
+
+    let z = test_Unit_return();
+    if (z == null) {
+        z = null; // it is allowed to assign `null` to z of type `Unit?`, it's the only value it can take explicitly
+                  // (other than the implicit "nothing" (Unit) of a "return;" statement)
+        printl_s("test_Unit_return returned null");
+    } else {
+        printl_s("test_Unit_return did not return null, unexpectedly!!!");
+    }
+
+    let y = test_opt_int_return();
+    if (y == null) {
+        printl_s("test_opt_int_return returned null");
+    } else {
+        printl_s("test_opt_int_return did not return null, unexpectedly!!!");
+    }
+
+    let w = test_opt_int_return2();
+    if (w == null) {
+        printl_s("test_opt_int_return2 returned null");
+    } else {
+        printl_s("test_opt_int_return2 did not return null, unexpectedly!!!");
+    }
+
+    print_s("sizof(Unit?) = ");
+    print_i(sizeof(Unit?)); // has a non-zero size, since it can hold "present()" (some Unit) or, distinctly, `null`
+    print_s("\n");
+
+    print_s("sizof(int?) = ");
+    print_i(sizeof(int?));
+    print_s("\n");
+
+    let u1: Unit = unit();
+    let u2: Unit? = null;
+    let u3: Unit? = present();
+
+    if (u2 == null) {
+        printl_s("u2 is null, as expected.");
+    } else {
+        printl_s("u2 is not null, unexpectedly!!!");
+    }
+
+    if (u3 != null) {
+        printl_s("u3 is not null, as expected.");
+    } else {
+        printl_s("u3 is null, unexpectedly!!!");
+    }
+
+    // sizeof Unit should be 1 (to distinguish from null)
+    print_s("sizof(Unit) = ");
+    print_i(sizeof(Unit));
+    print_s("\n");
+
+    // sizeof Unit? should be same as sizeof(Unit?)
+    print_s("sizof(Unit?) = ");
+    print_i(sizeof(Unit?));
+    print_s("\n");
+
+    printl_b(test_failing_unwrap_s() == null);
+    printl_b(test_failing_unwrap_i() == null);
+    printl_b(unwrap_or_i(test_opt_i(), 0) == 10);
+}

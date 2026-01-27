@@ -1,0 +1,45 @@
+/*
+ * SPDX-License-Identifier: MIT OR Apache-2.0
+ * Copyright (c) 2025-2026 gwz
+ */
+
+module test_edge_cases;
+
+import std.io;
+
+func empty() -> void {
+    return;
+}
+
+func no_params() -> int {
+    return 42;
+}
+
+func nested_blocks() -> int {
+    let x: int = 10;
+    {
+        let y: int = 20;
+        x = x + y;
+    }
+    return x;
+}
+
+func multiple_returns(n: int) -> int {
+    if (n > 0) {
+        return 1;
+    }
+    if (n < 0) {
+        return -1;
+    }
+    return 0;
+}
+
+func main() -> int {
+    empty();
+    printl_i(no_params());
+    printl_i(nested_blocks());
+    printl_i(multiple_returns(5));
+    printl_i(multiple_returns(-5));
+    printl_i(multiple_returns(0));
+    return 0;
+}

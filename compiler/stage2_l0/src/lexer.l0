@@ -1,0 +1,184 @@
+/*
+ * SPDX-License-Identifier: MIT OR Apache-2.0
+ * Copyright (c) 2025-2026 gwz
+ */
+
+module lexer;
+
+import std.io;
+import std.string;
+import std.unit;
+
+import util.string;
+import util.vector;
+import util.map;
+
+import tokens;
+
+/* -------------------------------------
+   Extra character classification functions
+   ------------------------------------ */
+
+func is_ident_start(c: char) -> bool {
+    return is_alpha(c) || c == '_';
+}
+
+func is_ident_part(c: char) -> bool {
+    return is_alnum(c) || c == '_';
+}
+
+/* ------------------------------------
+   Lexer State and functions
+   ------------------------------------ */
+
+/**
+ * Enum representing the current lexer error state.
+ */
+enum LexerErrorState {
+    NoError;
+    Error(code: string, message: string);
+}
+
+/**
+ * Lexer state object that keeps track of the current position in the source code being lexed.
+ */
+struct LexerState {
+    source: string;
+    filename: string;
+    length: int;
+    index: int;
+    line: int;
+    column: int;
+    error: LexerErrorState;
+}
+
+func ls_create(source: string, filename: string) -> LexerState* {
+    let self = new LexerState(
+        source,
+        filename,
+        len_s(source),
+        0,
+        1,
+        1,
+        NoError()
+    );
+    return self;
+}
+
+func ls_at_end(self: LexerState*) -> bool {
+    return self.index >= self.length;
+}
+
+func ls_peek(self: LexerState*) -> char {
+    if (ls_at_end(self)) {
+        return '\0';
+    }
+    return char_at_s(self.source, self.index);
+}
+
+func ls_peek_next(self: LexerState*) -> byte {
+    if (self.index + 1 >= self.length) {
+        return '\0';
+    }
+    return char_at_s(self.source, self.index + 1);
+}
+
+func ls_advance(self: LexerState*) -> byte {
+    let current_char = ls_peek(self);
+    if (!ls_at_end(self)) {
+        self.index = self.index + 1;
+        if (current_char == '\n') {
+            self.line = self.line + 1;
+            self.column = 1;
+        } else {
+            self.column = self.column + 1;
+        }
+    }
+    return current_char;
+}
+
+// --- main API ---
+
+func tokenize(self: LexerState*) -> TokenVector? {
+    let tokens = tv_create();
+    while (!ls_at_end(self)) {
+        let token = ls_next_token(self)?;
+        tv_push(tokens, token);
+        match (token.token_type) {
+            TT_EOF => { break; }
+            _ => {}
+        }
+    }
+    return tokens as TokenVector?;
+}
+
+func ls_next_token(self: LexerState*) -> Token? {
+    ls_skip_whitespace_and_comments(self)?;
+
+    let start_index = self.index;
+    let start_line = self.line;
+    let start_column = self.column;
+
+    if (ls_at_end(self)) {
+        return Token(TT_EOF(), self.index, self.line, self.column);
+    }
+
+    let c = ls_advance(self);
+
+    // identifiers / keywords and underscore wildcard
+    if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_') {
+        let ident_str = "";
+        ident_str = concat_s(ident_str, byte_to_s(c as char));
+        while (true) {
+            let next_c = ls_peek(self);
+            if ((next_c >= 'a' && next_c <= 'z') || (next_c >= 'A' && next_c <= 'Z') || (next_c >= '0' && next_c <= '9') || next_c == '_') {
+                ident_str = concat_s(ident_str, byte_to_s(ls_advance(self)));
+            } else {
+                break;
+            }
+        }
+        return ident_to_token(ident_str, start_index, start_line, start_column);
+    }
+
+    // For now, return EOF as a placeholder
+    return Token(TT_EOF(), start_index, start_line, start_column);
+}
+
+func ls_skip_whitespace_and_comments(self: LexerState*) -> Unit? {
+    while (true) {
+        let c = ls_peek(self);
+        if (c == ' ' || c == '\r' || c == '\t' || c == '\n') {
+            ls_advance(self);
+            continue;
+        } else if (c == '/') {
+            if (ls_peek_next(self) == '/') {
+                // Single-line comment
+                while (ls_peek(self) != '\n' && !ls_at_end(self)) {
+                    ls_advance(self);
+                }
+                continue;
+            } else if (ls_peek_next(self) == '*') {
+                // Multi-line comment
+                ls_advance(self); // consume '/'
+                ls_advance(self); // consume '*'
+                while (true) {
+                    if (ls_at_end(self)) {
+                        self.error = Error("LEX-0070", "unterminated block comment");
+                        return null; // Unterminated comment
+                    }
+                    if (ls_peek(self) == '*' && ls_peek_next(self) == '/') {
+                        ls_advance(self); // consume '*'
+                        ls_advance(self); // consume '/'
+                        break;
+                    }
+                    ls_advance(self);
+                }
+            } else {
+                break; // Not a comment
+            }
+        } else {
+            break; // Not whitespace or comment
+        }
+    }
+    return present();
+}

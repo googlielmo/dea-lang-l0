@@ -1,0 +1,8 @@
+#!/bin/bash
+DIR=$(dirname "$0")
+
+# Set the L0_HOME environment variable to point to the L0 installation directory if not already set;
+# the default is compiler/stage1_py under the script directory
+export L0_HOME="${L0_HOME:-$DIR/compiler/stage1_py}"
+
+python3 "$L0_HOME/l0c.py" "$@"

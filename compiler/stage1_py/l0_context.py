@@ -1,0 +1,43 @@
+"""
+Compilation context for cross-cutting compiler options.
+
+This module defines the CompilationContext dataclass which holds compiler
+options that affect multiple stages of compilation (code generation,
+diagnostics, etc.).
+"""
+
+#  SPDX-License-Identifier: MIT OR Apache-2.0
+#  Copyright (c) 2025-2026 gwz
+
+from dataclasses import dataclass
+from enum import IntEnum
+
+
+class LogLevel(IntEnum):
+    """Hierarchical logging levels for the L0 compiler."""
+    SILENT = 0      # No logging (default)
+    ERROR = 3       # Error messages only
+    WARNING = 6     # Warning messages
+    INFO = 10       # General progress messages (-v)
+    DEBUG = 30      # Detailed diagnostic information (-vvv)
+
+
+@dataclass
+class CompilationContext:
+    """
+    Holds cross-cutting compiler options that affect multiple compilation stages.
+
+    Attributes:
+        emit_line_directives:   If True, emit #line directives in generated C code
+                                for better debugging and error messages.
+        log_rich_format:        If True, emit logs in rich format: may include log level, timestamps, etc.
+        log_level:              Current logging level (0=SILENT, 1=INFO, 3=DEBUG).
+    """
+    emit_line_directives: bool = True
+    log_rich_format: bool = False
+    log_level: LogLevel = LogLevel.WARNING
+
+    @staticmethod
+    def default() -> 'CompilationContext':
+        """Create a CompilationContext with default settings."""
+        return CompilationContext(log_level=LogLevel.WARNING)

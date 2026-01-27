@@ -1,0 +1,66 @@
+/*
+ * SPDX-License-Identifier: MIT OR Apache-2.0
+ * Copyright (c) 2025-2026 gwz
+ */
+
+module test_stdlib;
+
+import std.io;
+import std.assert;
+import std.optional;
+import sys.rt;
+
+func test_assert_ok() -> int {
+    assert(true, "assertion should not fail");
+    return 1;
+}
+
+func test_optional_int() -> int {
+    let opt_full = 10 as int?;
+    let opt_empty: int? = null;
+
+    let sum: int = (opt_full as int) + unwrap_or_i(opt_empty, 5);
+    if (opt_full != null && opt_empty == null) {
+        return sum;
+    }
+    return 0;
+}
+
+func test_optional_string() -> string {
+    let opt = "hi" as string?;
+    let fallback: string? = null;
+
+    let first: string = opt as string;
+    let second: string = unwrap_or_s(fallback, "!");
+    return rt_string_concat(first, second);
+}
+
+func test_sys_rt_rand() -> int {
+    rt_srand(42);
+    let count: int = 0;
+    let r: int = rt_rand(1); // Always 0
+    return r;
+}
+
+func test_sys_rt_rand_loop() -> int {
+    rt_srand(0); // Seed with current time
+    let ok: int = 0;
+    let count: int = 0;
+    while (count < 1000) {
+        let r: int = rt_rand(8); // 0...7 inclusive
+        if (r >= 0 && r < 8) {
+            ok = ok + 1;
+        }
+        count = count + 1;
+    }
+    return ok; // Should be 1000
+}
+
+func main() -> int {
+    printl_i(test_assert_ok());
+    printl_i(test_optional_int());
+    printl_s(test_optional_string());
+    printl_i(test_sys_rt_rand());
+    printl_i(test_sys_rt_rand_loop());
+    return 0;
+}

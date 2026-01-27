@@ -1,0 +1,118 @@
+/*
+ * SPDX-License-Identifier: MIT OR Apache-2.0
+ * Copyright (c) 2025-2026 gwz
+ */
+
+module newdrop;
+
+import std.io;
+
+struct MyStruct {
+    a: int;
+    b: int;
+}
+
+enum MyEnum {
+    CaseA(x: int);
+    CaseB(y: string);
+}
+
+func drop_var(t: string*) -> void {
+    drop t;
+}
+
+func main() -> void {
+
+
+    print_s("creating stack-allocated MyStruct...\n");
+    let stack_x: MyStruct = MyStruct(42, 84); // Stack allocation
+    print_s("MyStruct a: ");
+    print_i(stack_x.a);
+    print_s(", b: ");
+    print_i(stack_x.b);
+    print_s("\n");
+
+    print_s("allocating new MyStruct...\n");
+    let new_x = new MyStruct(7, 14); // Heap allocation
+    print_s("New MyStruct a: ");
+    print_i((*new_x).a);
+    print_s(", b: ");
+    print_i((*new_x).b);
+    print_s("\n");
+    drop new_x; // Explicitly free heap allocation
+
+    print_s("allocating new MyStruct with default constructor...\n");
+    let new_x2 = new MyStruct(); // Heap allocation with default constructor
+    print_s("New MyStruct(2) a: ");
+    print_i((*new_x2).a);
+    print_s(", b: ");
+    print_i((*new_x2).b);
+    print_s("\n");
+    drop new_x2; // Explicitly free heap allocation
+
+    print_s("allocating new MyStruct without parentheses...\n");
+    let new_x3 = new MyStruct; // Heap allocation with default constructor (no parentheses)
+    print_s("New MyStruct(3) a: ");
+    print_i((*new_x3).a);
+    print_s(", b: ");
+    print_i((*new_x3).b);
+    print_s("\n");
+    drop new_x3; // Explicitly free heap allocation
+
+    print_s("creating stack-allocated MyEnum...\n");
+    let e1 = CaseA(100); // Stack allocation of enum
+    match (e1) {
+        CaseA(x) => {
+            print_s("Matched CaseA with value: ");
+            print_i(x);
+            print_s("\n");
+        }
+        CaseB(y) => {
+            print_s("Matched CaseB with value: ");
+            print_s(y);
+            print_s("\n");
+        }
+    }
+
+    print_s("allocating new CaseB...\n");
+    let e2 = new CaseB("Hello, World!"); // Heap allocation of enum
+    match (*e2) {
+        CaseA(x) => {
+            print_s("Matched CaseA with value: ");
+            print_i(x);
+            print_s("\n");
+        }
+        CaseB(y) => {
+            print_s("Matched CaseB with value: ");
+            print_s(y);
+            print_s("\n");
+        }
+    }
+    drop e2; // Explicitly free heap allocation
+
+    print_s("allocating new string...\n");
+    let t = new string("new/drop test");
+    print_s("->");
+    print_s(*t);
+    print_s("<-\n");
+    drop t; // t is dropped here (t is dead after this point)
+
+
+    print_s("allocating new string...\n");
+    t = new string("another new/drop test"); // Reassign variable t (t is alive again)
+    print_s("->");
+    print_s(*t);
+    print_s("<-\n");
+
+    drop_var(t); // delegate drop to drop_var function (t is dead after this point)
+
+//    drop t; // t is already dead here --> panic!
+
+    print_s("Allocating new int...\n");
+    let p = new int(42);
+    print_s("->");
+    print_i(*p);
+    print_s("<-\n");
+    drop p;
+
+}

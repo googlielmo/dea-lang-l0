@@ -1,0 +1,48 @@
+/*
+ * SPDX-License-Identifier: MIT OR Apache-2.0
+ * Copyright (c) 2025-2026 gwz
+ */
+
+/**
+ * Standard library module for string operations.
+ *
+ * This module provides basic string manipulation functions such as
+ * length retrieval, character access, comparison, concatenation,
+ * and slicing.
+ */
+module std.string;
+
+import sys.rt;
+
+// Returns the length of the given string.
+func len_s(s: string) -> int {
+    return rt_strlen(s);
+}
+
+// Returns the character code (0-255) at the specified index in the string.
+func char_at_s(s: string, index: int) -> byte {
+    return rt_string_get(s, index);
+}
+
+// Compares two strings for equality.
+func eq_s(a: string, b: string) -> bool {
+    return rt_string_equals(a, b);
+}
+
+// Concatenates two strings and returns the result.
+func concat_s(a: string, b: string) -> string {
+    return rt_string_concat(a, b);
+}
+
+// Returns a slice of the string from start to end (exclusive).
+func slice_s(s: string, start: int, end: int) -> string {
+    return rt_string_slice(s, start, end);
+}
+
+func byte_to_s(b: byte) -> string {
+    return rt_string_from_byte(b);
+}
+
+func bytes_to_s(bytes: byte*, len: int) -> string {
+    return rt_string_from_byte_array(bytes, len);
+}

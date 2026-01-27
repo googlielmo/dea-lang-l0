@@ -1,0 +1,47 @@
+/*
+ * SPDX-License-Identifier: MIT OR Apache-2.0
+ * Copyright (c) 2025-2026 gwz
+ */
+
+module test_match;
+
+import std.io;
+
+enum Result {
+    Ok(value: int);
+    Err(code: int);
+}
+
+func process(r: Result) -> int {
+    match (r) {
+        Ok(v) => {
+            return v;
+        }
+        Err(c) => {
+            return -c;
+        }
+    }
+}
+
+func process_with_wildcard(r: Result) -> int {
+    match (r) {
+        Ok(v) => {
+            return v;
+        }
+        _ => {
+            return 0;
+        }
+    }
+}
+
+func main() -> int {
+    let r1: Result = Ok(42);
+    let r2: Result = Err(5);
+    
+    printl_i(process(r1));
+    printl_i(process(r2));
+    printl_i(process_with_wildcard(r1));
+    printl_i(process_with_wildcard(r2));
+    
+    return 0;
+}

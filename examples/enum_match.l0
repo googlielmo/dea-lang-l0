@@ -1,0 +1,30 @@
+/*
+ * SPDX-License-Identifier: MIT OR Apache-2.0
+ * Copyright (c) 2025-2026 gwz
+ */
+
+module enum_match;
+
+import std.io;
+
+enum Color { Red(v: int); Green(v: int); Blue(v: int); }
+
+func f(c: Color) -> int {
+    match (c) {
+        Red(r) => { return 1; }
+        Green(g) => { return 2; }
+        Blue(b) => { return 3; }
+    }
+}
+
+func main() -> void {
+    let c1: Color = Red(0);
+    let c2: Color = Green(0);
+    let c3: Color = Blue(0);
+
+    let r1: int = f(c1);
+    let r2: int = f(c2);
+    let r3: int = f(c3);
+
+    printl_i(r1 + r2 + r3); // Should print 6
+}

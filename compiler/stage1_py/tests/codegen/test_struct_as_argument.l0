@@ -1,0 +1,36 @@
+/*
+ * SPDX-License-Identifier: MIT OR Apache-2.0
+ * Copyright (c) 2025-2026 gwz
+ */
+
+module test_struct_as_argument;
+
+import std.io;
+
+struct Point {
+    x: int;
+    y: int;
+}
+
+type AliasPoint = Point;
+type AnotherAliasPoint = AliasPoint;
+
+func add(p1: Point, p2: Point) -> AnotherAliasPoint {
+    let p : AliasPoint = Point(
+        p1.x + p2.x,
+        p1.y + p2.y
+    );
+
+    return p;
+}
+
+func main() -> int {
+    let point1 : AliasPoint = Point(2, 3);
+    let point2 : Point = AliasPoint(4, 5);
+    let result : AnotherAliasPoint = add(point1, point2);
+
+    printl_i(result.x);
+    printl_i(result.y);
+
+    return 0;
+}

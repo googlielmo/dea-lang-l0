@@ -1,0 +1,30 @@
+/*
+ * SPDX-License-Identifier: MIT OR Apache-2.0
+ * Copyright (c) 2025-2026 gwz
+ */
+
+module test_struct;
+
+import std.io;
+
+struct Point {
+    x: int;
+    y: int;
+}
+
+struct Line {
+    start: Point;
+    end: Point;
+}
+
+func main() -> int {
+    let p: Point = Point(10, 20);
+    printl_i(p.x);
+    printl_i(p.y);
+    
+    let line: Line = Line(Point(0, 0), Point(10, 10));
+    printl_i(line.start.x);
+    printl_i(line.end.x);
+    
+    return 0;
+}

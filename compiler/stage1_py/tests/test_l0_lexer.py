@@ -1,0 +1,182 @@
+#  SPDX-License-Identifier: MIT OR Apache-2.0
+#  Copyright (c) 2026 gwz
+
+import pytest
+
+from l0_lexer import Lexer, LexerError, TokenKind
+
+
+def test_int_literal_above_32bit_range_raises():
+    src = "2147483648"
+
+    with pytest.raises(LexerError) as excinfo:
+        Lexer.from_source(src).tokenize()
+
+    assert "exceeds 32-bit signed range" in excinfo.value.message
+    assert excinfo.value.line == 1
+    assert excinfo.value.column == 1
+
+
+def test_int_literal_below_32bit_range_raises():
+    src = "-2147483649"
+
+    with pytest.raises(LexerError) as excinfo:
+        Lexer.from_source(src).tokenize()
+
+    assert "exceeds 32-bit signed range" in excinfo.value.message
+    assert excinfo.value.line == 1
+    assert excinfo.value.column == 1
+
+
+def test_common_tokenization_cases_and_comments():
+    src = """// leading comment
+let x: int = -42;
+// trailing comment on its own line
+/* block comment spanning
+several
+        lines */ x = x - 1;
+_ => -> ==
+"""
+    tokens = Lexer.from_source(src).tokenize()
+    kinds = [t.kind for t in tokens]
+    texts = [t.text for t in tokens]
+
+    assert kinds == [
+        TokenKind.LET,
+        TokenKind.IDENT,
+        TokenKind.COLON,
+        TokenKind.IDENT,
+        TokenKind.EQ,
+        TokenKind.INT,
+        TokenKind.SEMI,
+        TokenKind.IDENT,
+        TokenKind.EQ,
+        TokenKind.IDENT,
+        TokenKind.MINUS,
+        TokenKind.INT,
+        TokenKind.SEMI,
+        TokenKind.UNDERSCORE,
+        TokenKind.ARROW_MATCH,
+        TokenKind.ARROW_FUNC,
+        TokenKind.EQEQ,
+        TokenKind.EOF,
+    ]
+
+    assert "-42" in texts
+    minus_index = texts.index("-")
+    assert texts[minus_index + 1] == "1"
+
+
+def test_string_literal_tokenized_without_escapes():
+    src = "let s: string = \"abc 123\";"
+
+    tokens = Lexer.from_source(src).tokenize()
+    assert [t.kind for t in tokens][:5] == [
+        TokenKind.LET,
+        TokenKind.IDENT,
+        TokenKind.COLON,
+        TokenKind.IDENT,
+        TokenKind.EQ,
+    ]
+
+    string_tok = tokens[5]
+    assert string_tok.kind is TokenKind.STRING
+    assert string_tok.text == "abc 123"
+    assert (string_tok.line, string_tok.column) == (1, 17)
+
+
+def test_unterminated_string_literal_raises_with_location():
+    src = 'let msg = "unterminated\nnext line'
+
+    with pytest.raises(LexerError) as excinfo:
+        Lexer.from_source(src).tokenize()
+
+    assert "unterminated string literal" in excinfo.value.message
+    # Error should surface at the newline that terminates the string.
+    assert excinfo.value.line == 1
+    assert excinfo.value.column == 24
+
+
+def test_line_and_column_increment_across_newlines_and_comments():
+    src = "\n// comment on line 2\n    let x = 0;\n"
+
+    tokens = Lexer.from_source(src).tokenize()
+    let_tok = tokens[0]
+
+    assert let_tok.kind is TokenKind.LET
+    assert (let_tok.line, let_tok.column) == (3, 5)
+
+
+# ============================================================================
+# Escape sequence error tests
+# ============================================================================
+
+
+def test_lexer_invalid_hex_escape_non_hex():
+    """Test that invalid hex escape sequence raises error."""
+    src = '"\\xGG"'
+
+    with pytest.raises(LexerError) as excinfo:
+        Lexer.from_source(src).tokenize()
+
+    assert "invalid hex escape sequence" in excinfo.value.message
+
+
+def test_lexer_invalid_unicode_escape_incomplete():
+    """Test that incomplete \\u escape raises error."""
+    src = '"\\u12"'  # Only 2 hex digits, needs 4
+
+    with pytest.raises(LexerError) as excinfo:
+        Lexer.from_source(src).tokenize()
+
+    assert "invalid unicode escape sequence (\\u)" in excinfo.value.message
+
+
+def test_lexer_invalid_unicode_escape_long_incomplete():
+    """Test that incomplete \\U escape raises error."""
+    src = '"\\U1234567"'  # Only 7 hex digits, needs 8
+
+    with pytest.raises(LexerError) as excinfo:
+        Lexer.from_source(src).tokenize()
+
+    assert "invalid unicode escape sequence (\\U)" in excinfo.value.message
+
+
+def test_lexer_unknown_escape_sequence():
+    """Test that unknown escape sequence raises error."""
+    src = '"\\q"'
+
+    with pytest.raises(LexerError) as excinfo:
+        Lexer.from_source(src).tokenize()
+
+    assert "unknown escape sequence" in excinfo.value.message
+
+
+def test_lexer_octal_escape_out_of_range():
+    """Test that octal escape > 255 raises error."""
+    src = '"\\777"'  # 0o777 = 511 > 255
+
+    with pytest.raises(LexerError) as excinfo:
+        Lexer.from_source(src).tokenize()
+
+    assert "octal escape sequence out of range" in excinfo.value.message
+
+
+def test_lexer_unterminated_block_comment():
+    """Test that unterminated block comment raises error."""
+    src = "/* this comment never ends"
+
+    with pytest.raises(LexerError) as excinfo:
+        Lexer.from_source(src).tokenize()
+
+    assert "unterminated block comment" in excinfo.value.message
+
+
+def test_lexer_unexpected_character():
+    """Test that unexpected character raises error."""
+    src = "@"
+
+    with pytest.raises(LexerError) as excinfo:
+        Lexer.from_source(src).tokenize()
+
+    assert "unexpected character" in excinfo.value.message

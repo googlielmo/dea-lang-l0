@@ -1,0 +1,75 @@
+/*
+ * SPDX-License-Identifier: MIT OR Apache-2.0
+ * Copyright (c) 2025-2026 gwz
+ */
+
+module util.array;
+
+import sys.rt;
+import sys.unsafe;
+
+import std.assert;
+import std.string;
+
+
+/* ------------------------------------
+   Array: Fixed-size Array Implementation
+   ------------------------------------ */
+
+/*
+ * ArrayBase implements an array of elements of a given size.
+ * Elements can be accessed via index, and the array can be resized on demand.
+ * See VectorBase for a dynamic array implementation.
+ *
+ * Note: This is a low-level implementation and does not provide type safety.
+ * It is the caller's responsibility to manage types and casting.
+ */
+struct ArrayBase {
+    capacity: int;
+    element_size: int;
+    data: void*;
+}
+
+func arr_create(element_size: int, length: int) -> ArrayBase* {
+    assert(element_size > 0, "Element size must be greater than 0 for array creation");
+    assert(length >= 0, "Initial length must be non-negative for array creation");
+    let initial_capacity = length;
+    if (length == 0) {
+        /* Avoid zero-size allocations, which are platform-dependent */
+        initial_capacity = 1;
+    }
+    let new_data = rt_alloc(element_size * initial_capacity);
+    assert(new_data != null, "Failed to allocate memory for array creation");
+    let self = new ArrayBase(
+        length,
+        element_size,
+        new_data as void*
+    );
+    return self;
+}
+
+func arr_check(self: ArrayBase*, index: int) {
+    assert(index >= 0 && index < self.capacity, "Index out of bounds in array access");
+}
+
+func arr_resize(self: ArrayBase*, new_length: int) {
+    assert(new_length >= 0, "New length must be non-negative for array resize");
+    let new_capacity = new_length;
+    if (new_capacity == 0) {
+        new_capacity = 1;
+    }
+    let new_data = rt_realloc(self.data, self.element_size * new_capacity) as void*;
+    assert(new_data != null, "Failed to realloc memory for array resize");
+    self.capacity = new_length;
+    self.data = new_data;
+}
+
+func arr_get(self: ArrayBase*, index: int) -> void* {
+    arr_check(self, index);
+    return rt_array_element(self.data, self.element_size, index);
+}
+
+func arr_free(self: ArrayBase*) {
+    rt_free(self.data);
+    drop self;
+}

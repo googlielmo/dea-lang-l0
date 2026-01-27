@@ -1,0 +1,300 @@
+/*
+ * SPDX-License-Identifier: MIT OR Apache-2.0
+ * Copyright (c) 2025-2026 gwz
+ */
+
+module string_util_test;
+
+import std.io;
+import std.string;
+import util.string;
+
+func print_bool(label: string, val: bool) {
+    if (val) {
+        printl_ss(label, "true");
+    } else {
+        printl_ss(label, "false");
+    }
+}
+
+func test_is_space() {
+    printl_s("=== Test is_space ===");
+
+    print_bool("  is_space(' '):", is_space(' '));
+    print_bool("  is_space('\\t'):", is_space('\t'));
+    print_bool("  is_space('\\n'):", is_space('\n'));
+    print_bool("  is_space('\\r'):", is_space('\r'));
+    print_bool("  is_space('a'):", is_space('a'));
+    print_bool("  is_space('0'):", is_space('0'));
+    print_bool("  is_space('!'):", is_space('!'));
+
+    printl_s("is_space tests passed!\n");
+}
+
+func test_is_digit() {
+    printl_s("=== Test is_digit ===");
+
+    print_bool("  is_digit('0'):", is_digit('0'));
+    print_bool("  is_digit('5'):", is_digit('5'));
+    print_bool("  is_digit('9'):", is_digit('9'));
+    print_bool("  is_digit('a'):", is_digit('a'));
+    print_bool("  is_digit('Z'):", is_digit('Z'));
+    print_bool("  is_digit(' '):", is_digit(' '));
+
+    printl_s("is_digit tests passed!\n");
+}
+
+func test_is_alpha() {
+    printl_s("=== Test is_alpha ===");
+
+    print_bool("  is_alpha('a'):", is_alpha('a'));
+    print_bool("  is_alpha('z'):", is_alpha('z'));
+    print_bool("  is_alpha('A'):", is_alpha('A'));
+    print_bool("  is_alpha('Z'):", is_alpha('Z'));
+    print_bool("  is_alpha('m'):", is_alpha('m'));
+    print_bool("  is_alpha('0'):", is_alpha('0'));
+    print_bool("  is_alpha(' '):", is_alpha(' '));
+    print_bool("  is_alpha('_'):", is_alpha('_'));
+
+    printl_s("is_alpha tests passed!\n");
+}
+
+func test_is_alnum() {
+    printl_s("=== Test is_alnum ===");
+
+    print_bool("  is_alnum('a'):", is_alnum('a'));
+    print_bool("  is_alnum('Z'):", is_alnum('Z'));
+    print_bool("  is_alnum('5'):", is_alnum('5'));
+    print_bool("  is_alnum('_'):", is_alnum('_'));
+    print_bool("  is_alnum(' '):", is_alnum(' '));
+
+    printl_s("is_alnum tests passed!\n");
+}
+
+func test_to_digit() {
+    printl_s("=== Test to_digit ===");
+
+    printl_si("  to_digit('0'):", to_digit('0'));
+    printl_si("  to_digit('1'):", to_digit('1'));
+    printl_si("  to_digit('5'):", to_digit('5'));
+    printl_si("  to_digit('9'):", to_digit('9'));
+
+    printl_s("to_digit tests passed!\n");
+}
+
+func test_to_upper() {
+    printl_s("=== Test to_upper ===");
+
+    printl_si("  to_upper('a') (expect 65):", to_upper('a'));
+    printl_si("  to_upper('z') (expect 90):", to_upper('z'));
+    printl_si("  to_upper('A') (expect 65):", to_upper('A'));
+    printl_si("  to_upper('5') (expect 53):", to_upper('5'));
+
+    printl_s("to_upper tests passed!\n");
+}
+
+func test_to_lower() {
+    printl_s("=== Test to_lower ===");
+
+    printl_si("  to_lower('A') (expect 97):", to_lower('A'));
+    printl_si("  to_lower('Z') (expect 122):", to_lower('Z'));
+    printl_si("  to_lower('a') (expect 97):", to_lower('a'));
+    printl_si("  to_lower('5') (expect 53):", to_lower('5'));
+
+    printl_s("to_lower tests passed!\n");
+}
+
+func test_string_buffer() {
+    printl_s("=== Test StringBuffer ===");
+
+    printl_s("Creating StringBuffer...");
+    let sb = sb_create();
+
+    printl_s("Appending strings: 'Hello', ', ', 'World', '!'...");
+    sb_append(sb, "Hello");
+    sb_append(sb, ", ");
+    sb_append(sb, "World");
+    sb_append(sb, "!");
+
+    printl_si("  sb_size:", sb_size(sb));
+
+    let result = sb_to_string(sb);
+    printl_ss("  sb_to_string:", result);
+
+    sb_free(sb);
+    printl_s("StringBuffer tests passed!\n");
+}
+
+func test_string_buffer_empty() {
+    printl_s("=== Test StringBuffer (empty) ===");
+
+    let sb = sb_create();
+    printl_si("  empty sb_size:", sb_size(sb));
+    let result = sb_to_string(sb);
+    printl_ss("  empty sb_to_string:", result);
+    printl_si("  result length:", len_s(result));
+
+    sb_free(sb);
+    printl_s("Empty StringBuffer tests passed!\n");
+}
+
+func test_char_buffer() {
+    printl_s("=== Test CharBuffer ===");
+
+    printl_s("Creating CharBuffer...");
+    let cb = cb_create();
+
+    printl_s("Appending chars: 'H', 'e', 'l', 'l', 'o'...");
+    cb_append(cb, 'H');
+    cb_append(cb, 'e');
+    cb_append(cb, 'l');
+    cb_append(cb, 'l');
+    cb_append(cb, 'o');
+
+    printl_si("  cb_size:", cb_size(cb));
+
+    let result = cb_to_string(cb);
+    printl_ss("  cb_to_string:", result);
+
+    cb_free(cb);
+    printl_s("CharBuffer tests passed!\n");
+}
+
+func test_char_buffer_clear() {
+    printl_s("=== Test CharBuffer clear ===");
+
+    let cb = cb_create();
+    cb_append(cb, 'A');
+    cb_append(cb, 'B');
+    cb_append(cb, 'C');
+    printl_si("  size before clear:", cb_size(cb));
+
+    printl_s("Clearing buffer...");
+    cb_clear(cb);
+    printl_si("  size after clear:", cb_size(cb));
+
+    printl_s("Appending 'X', 'Y' after clear...");
+    cb_append(cb, 'X');
+    cb_append(cb, 'Y');
+    printl_si("  size after new appends:", cb_size(cb));
+
+    let result = cb_to_string(cb);
+    printl_ss("  cb_to_string:", result);
+
+    cb_free(cb);
+    printl_s("CharBuffer clear tests passed!\n");
+}
+
+func test_concat3_s() {
+    printl_s("=== Test concat3_s ===");
+
+    let result = concat3_s("one", "-", "two");
+    printl_ss("  concat3_s('one', '-', 'two'):", result);
+
+    let result2 = concat3_s("", "middle", "");
+    printl_ss("  concat3_s('', 'middle', ''):", result2);
+
+    let result3 = concat3_s("a", "b", "c");
+    printl_ss("  concat3_s('a', 'b', 'c'):", result3);
+
+    printl_s("concat3_s tests passed!\n");
+}
+
+func test_repeat_s() {
+    printl_s("=== Test repeat_s ===");
+
+    let r1 = repeat_s("ab", 3);
+    printl_ss("  repeat_s('ab', 3):", r1);
+
+    let r2 = repeat_s("x", 5);
+    printl_ss("  repeat_s('x', 5):", r2);
+
+    let r3 = repeat_s("hello", 0);
+    printl_ss("  repeat_s('hello', 0):", r3);
+    printl_si("    (length):", len_s(r3));
+
+    let r4 = repeat_s("!", 1);
+    printl_ss("  repeat_s('!', 1):", r4);
+
+    printl_s("repeat_s tests passed!\n");
+}
+
+func test_trim_s() {
+    printl_s("=== Test trim_s ===");
+
+    let t1 = trim_s("  hello  ");
+    printl_s(concat3_s("  trim_s('  hello  '): '", t1, "'"));
+
+    let t2 = trim_s("no spaces");
+    printl_s(concat3_s("  trim_s('no spaces'): '", t2, "'"));
+
+    let t3 = trim_s("   ");
+    printl_s(concat3_s("  trim_s('   '): '", t3, "'"));
+    printl_si("    (length):", len_s(t3));
+
+    let t4 = trim_s("\t\n  spaced \n\t");
+    printl_s(concat3_s("  trim_s('\\t\\n  spaced \\n\\t'): '", t4, "'"));
+
+    let t5 = trim_s("");
+    printl_s(concat3_s("  trim_s(''): '", t5, "'"));
+    printl_si("    (length):", len_s(t5));
+
+    printl_s("trim_s tests passed!\n");
+}
+
+func test_to_upper_s() {
+    printl_s("=== Test to_upper_s ===");
+
+    let u1 = to_upper_s("hello");
+    printl_ss("  to_upper_s('hello'):", u1);
+
+    let u2 = to_upper_s("Hello World");
+    printl_ss("  to_upper_s('Hello World'):", u2);
+
+    let u3 = to_upper_s("ALREADY UPPER");
+    printl_ss("  to_upper_s('ALREADY UPPER'):", u3);
+
+    let u4 = to_upper_s("123abc");
+    printl_ss("  to_upper_s('123abc'):", u4);
+
+    let u5 = to_upper_s("");
+    printl_ss("  to_upper_s(''):", u5);
+    printl_si("    (length):", len_s(u5));
+
+    printl_s("to_upper_s tests passed!\n");
+}
+
+func main() {
+    printl_s("==========================================");
+    printl_s("      String Utilities Test Suite");
+    printl_s("==========================================\n");
+
+    // Character classification
+    test_is_space();
+    test_is_digit();
+    test_is_alpha();
+    test_is_alnum();
+
+    // Character manipulation
+    test_to_digit();
+    test_to_upper();
+    test_to_lower();
+
+    // StringBuffer
+    test_string_buffer();
+    test_string_buffer_empty();
+
+    // CharBuffer
+    test_char_buffer();
+    test_char_buffer_clear();
+
+    // String utilities
+    test_concat3_s();
+    test_repeat_s();
+    test_trim_s();
+    test_to_upper_s();
+
+    printl_s("==========================================");
+    printl_s("  All String Utility tests passed!");
+    printl_s("==========================================");
+}

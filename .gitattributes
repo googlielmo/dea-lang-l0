@@ -1,0 +1,8 @@
+# Treats L0 as C for stats
+*.l0 linguist-language=C
+
+# Mark docs as documentation
+docs/* linguist-documentation
+
+# Mark generated files
+*.generated.l0 linguist-generated

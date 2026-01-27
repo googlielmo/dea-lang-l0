@@ -1,0 +1,50 @@
+/*
+ * SPDX-License-Identifier: MIT OR Apache-2.0
+ * Copyright (c) 2025-2026 gwz
+ */
+
+module test_constructors;
+
+import std.io;
+
+struct Point {
+    x: int;
+    y: int;
+}
+
+struct Empty {
+}
+
+enum Option {
+    Some(value: int);
+    None();
+}
+
+func main() -> int {
+    let p: Point = Point(10, 20);
+    printl_i(p.x);
+    printl_i(p.y);
+    
+    let opt1: Option = Some(42);
+    let opt2: Option = None();
+    
+    match (opt1) {
+        Some(v) => {
+            printl_i(v);
+        }
+        None() => {
+            printl_i(0);
+        }
+    }
+    
+    match (opt2) {
+        Some(v) => {
+            printl_i(v);
+        }
+        None() => {
+            printl_i(100);
+        }
+    }
+    
+    return 0;
+}

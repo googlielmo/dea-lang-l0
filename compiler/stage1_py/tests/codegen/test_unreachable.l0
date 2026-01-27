@@ -1,0 +1,197 @@
+/*
+ * SPDX-License-Identifier: MIT OR Apache-2.0
+ * Copyright (c) 2025-2026 gwz
+ */
+
+module test_unreachable;
+
+import std.io;
+
+// Case 1: if without else - code after is always reachable
+func case1(x: int) -> int {
+    let a: string = "case1";
+    if (x > 0) {
+        return 1;
+    }
+    // Reachable: no else branch
+    printl_s(a);
+    return 0;
+}
+
+// Case 2: if-else where both return - code after is unreachable
+func case2(x: int) -> int {
+    let a: string = "case2";
+    if (x > 0) {
+        return 1;
+    } else {
+        return 0;
+    }
+    // Unreachable: both branches return
+    // Should NOT emit cleanup for 'a' here (already done in branches)
+}
+
+// Case 3: if-else where only then returns
+func case3(x: int) -> int {
+    let a: string = "case3";
+    if (x > 0) {
+        return 1;
+    } else {
+        printl_s(a);
+    }
+    // Reachable: else didn't return
+    return 0;
+}
+
+// Case 4: if-else where only else returns
+func case4(x: int) -> int {
+    let a: string = "case4";
+    if (x > 0) {
+        printl_s(a);
+    } else {
+        return 0;
+    }
+    // Reachable: then didn't return
+    return 1;
+}
+
+// Case 5: if-else where neither returns
+func case5(x: int) -> int {
+    let a: string = "case5";
+    if (x > 0) {
+        printl_s(a);
+    } else {
+        printl_s(a);
+    }
+    // Reachable: neither returned
+    return 0;
+}
+
+// Case 6: nested if-else, inner both return
+func case6(x: int, y: int) -> int {
+    let a: string = "case6";
+    if (x > 0) {
+        if (y > 0) {
+            return 1;
+        } else {
+            return 2;
+        }
+        // Unreachable within then-branch
+    } else {
+        return 0;
+    }
+    // Unreachable: both outer branches return
+}
+
+// Case 7: nested if-else, inner incomplete
+func case7(x: int, y: int) -> int {
+    let a: string = "case7";
+    if (x > 0) {
+        if (y > 0) {
+            return 1;
+        }
+        // Reachable: inner if has no else
+        printl_s(a);
+    } else {
+        return 0;
+    }
+    // Reachable: then-branch can fall through
+    return 2;
+}
+
+// Case 8: cleanup in branch-local scope
+func case8(x: int) -> int {
+    if (x > 0) {
+        let b: string = "branch-local";
+        printl_s(b);
+        // 'b' should be cleaned up here at scope exit
+    }
+    return 0;
+}
+
+// Case 9: cleanup with early return in branch
+func case9(x: int) -> int {
+    if (x > 0) {
+        let b: string = "early-return";
+        return 1;
+        // 'b' cleaned up by return, NOT at scope exit
+    }
+    return 0;
+}
+
+// Case 10: chained if-else-if
+func case10(x: int) -> int {
+    let a: string = "case10";
+    if (x > 10) {
+        return 3;
+    } else {
+        if (x > 5) {
+            return 2;
+        } else {
+            if (x > 0) {
+                return 1;
+            } else {
+                return 0;
+            }
+        }
+    }
+    // Unreachable: all paths return
+}
+
+func case11(x: int) -> int {
+    while (x > 0) {
+        let a: string = "case11";
+        while (x > 5) {
+            let b: string = "inner";
+            if (x > 10) {
+                let c: string = "deepest";
+                break;  // breaks inner loop only
+            }
+            x = x - 1;
+        }
+        printl_s(a);  // a still alive
+        x = x - 1;
+    }
+    return x;
+}
+
+func case12(x: int) -> int {
+    while (x > 0) {
+        let a: string = "case12";
+        if (x > 5) {
+            let b: string = "skip-rest";
+            x = x - 1;
+            continue;  // should cleanup b and a, then jump to loop condition
+        }
+        else let c: string = "not-skipped";
+        printl_s(a);
+        x = x - 1;
+    }
+    return x;
+}
+
+func main() -> int {
+    printl_i(case1(5));
+    printl_i(case1(0));
+    printl_i(case2(5));
+    printl_i(case2(0));
+    printl_i(case3(5));
+    printl_i(case3(0));
+    printl_i(case4(5));
+    printl_i(case4(0));
+    printl_i(case5(5));
+    printl_i(case5(0));
+    printl_i(case6(5, 5));
+    printl_i(case6(0, 0));
+    printl_i(case7(5, 0));
+    printl_i(case7(0, 0));
+    printl_i(case8(5));
+    printl_i(case9(5));
+    printl_i(case10(15));
+    printl_i(case11(1));
+    printl_i(case11(6));
+    printl_i(case11(12));
+    printl_i(case12(1));
+    printl_i(case12(6));
+    printl_i(case12(12));
+    return 0;
+}

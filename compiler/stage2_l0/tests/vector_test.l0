@@ -1,0 +1,292 @@
+/*
+ * SPDX-License-Identifier: MIT OR Apache-2.0
+ * Copyright (c) 2025-2026 gwz
+ */
+
+module vector_test;
+
+import std.io;
+import std.string;
+import util.vector;
+
+func test_vec_create() {
+    printl_s("=== Test vec_create ===");
+
+    // Test creating vector with int elements
+    printl_s("Creating vector for int elements (capacity 4)...");
+    let vec_int = vec_create(sizeof(int), 4);
+    printl_si("  size:", vec_size(vec_int));
+    printl_si("  capacity:", vec_capacity(vec_int));
+    vec_free(vec_int);
+    printl_s("  Freed int vector.");
+
+    // Test creating vector with byte elements
+    printl_s("Creating vector for byte elements (capacity 8)...");
+    let vec_byte = vec_create(sizeof(byte), 8);
+    printl_si("  size:", vec_size(vec_byte));
+    printl_si("  capacity:", vec_capacity(vec_byte));
+    vec_free(vec_byte);
+    printl_s("  Freed byte vector.");
+
+    printl_s("vec_create tests passed!\n");
+}
+
+func test_vec_push_and_grow() {
+    printl_s("=== Test vec_push and vec_grow ===");
+
+    // Create small vector to test growth
+    printl_s("Creating int vector with initial capacity 2...");
+    let vec = vec_create(sizeof(int), 2);
+    printl_si("  initial size:", vec_size(vec));
+    printl_si("  initial capacity:", vec_capacity(vec));
+
+    // Push elements manually using vec_push
+    printl_s("Pushing 5 elements (should trigger resize)...");
+    for (let i = 0; i < 5; i = i + 1) {
+        let dest = vec_push(vec) as int*;
+        *dest = (i + 1) * 10;
+        printl_ii(i, (i + 1) * 10);
+    }
+
+    printl_si("  final size:", vec_size(vec));
+    printl_si("  final capacity:", vec_capacity(vec));
+
+    // Read back values
+    printl_s("Reading values back...");
+    for (let i = 0; i < vec_size(vec); i = i + 1) {
+        let val = vec_get(vec, i) as int*;
+        printl_ii(i, *val);
+    }
+
+    vec_free(vec);
+    printl_s("vec_push tests passed!\n");
+}
+
+func test_vec_push_int() {
+    printl_s("=== Test vec_push_int ===");
+
+    let vec = vec_create(sizeof(int), 4);
+    printl_s("Pushing integers: 100, 200, 300...");
+    vec_push_int(vec, 100);
+    vec_push_int(vec, 200);
+    vec_push_int(vec, 300);
+
+    printl_si("  size:", vec_size(vec));
+
+    printl_s("Reading back...");
+    for (let i = 0; i < vec_size(vec); i = i + 1) {
+        let val = vec_get(vec, i) as int*;
+        printl_ii(i, *val);
+    }
+
+    vec_free(vec);
+    printl_s("vec_push_int tests passed!\n");
+}
+
+func test_vec_push_byte() {
+    printl_s("=== Test vec_push_byte ===");
+
+    let vec = vec_create(sizeof(byte), 4);
+    printl_s("Pushing bytes: 'A', 'B', 'C', 'D'...");
+    vec_push_byte(vec, 'A');
+    vec_push_byte(vec, 'B');
+    vec_push_byte(vec, 'C');
+    vec_push_byte(vec, 'D');
+
+    printl_si("  size:", vec_size(vec));
+
+    printl_s("Reading back (A=65, B=66, C=67, D=68)...");
+    for (let i = 0; i < vec_size(vec); i = i + 1) {
+        let val = vec_get(vec, i) as byte*;
+        printl_ii(i, *val);
+    }
+
+    vec_free(vec);
+    printl_s("vec_push_byte tests passed!\n");
+}
+
+func test_vec_push_bool() {
+    printl_s("=== Test vec_push_bool ===");
+
+    let vec = vec_create(sizeof(bool), 4);
+    printl_s("Pushing bools: true, false, true, false...");
+    vec_push_bool(vec, true);
+    vec_push_bool(vec, false);
+    vec_push_bool(vec, true);
+    vec_push_bool(vec, false);
+
+    printl_si("  size:", vec_size(vec));
+
+    printl_s("Reading back...");
+    for (let i = 0; i < vec_size(vec); i = i + 1) {
+        let val = vec_get(vec, i) as bool*;
+        printl_ib(i, *val);
+    }
+
+    vec_free(vec);
+    printl_s("vec_push_bool tests passed!\n");
+}
+
+func test_vec_push_ptr() {
+    printl_s("=== Test vec_push_ptr ===");
+
+    // Create some values to point to
+    let v1 = new int;
+    *v1 = 1000;
+    let v2 = new int;
+    *v2 = 2000;
+    let v3 = new int;
+    *v3 = 3000;
+
+    let vec = vec_create(sizeof(void*), 4);
+    printl_s("Pushing pointers to [1000, 2000, 3000]...");
+    vec_push_ptr(vec, v1 as void*);
+    vec_push_ptr(vec, v2 as void*);
+    vec_push_ptr(vec, v3 as void*);
+
+    printl_si("  size:", vec_size(vec));
+
+    printl_s("Reading and dereferencing pointers...");
+    for (let i = 0; i < vec_size(vec); i = i + 1) {
+        let ptr_ptr = vec_get(vec, i) as int**;
+        printl_ii(i, **ptr_ptr);
+    }
+
+    vec_free(vec);
+    drop v1;
+    drop v2;
+    drop v3;
+    printl_s("vec_push_ptr tests passed!\n");
+}
+
+func test_vec_reserve() {
+    printl_s("=== Test vec_reserve ===");
+
+    let vec = vec_create(sizeof(int), 2);
+    printl_si("  initial capacity:", vec_capacity(vec));
+
+    printl_s("Reserving capacity for 100 elements...");
+    vec_reserve(vec, 100);
+    printl_si("  new capacity:", vec_capacity(vec));
+    printl_si("  size (should still be 0):", vec_size(vec));
+
+    // Push some elements to verify it works
+    printl_s("Pushing 10 elements...");
+    for (let i = 0; i < 10; i = i + 1) {
+        vec_push_int(vec, i);
+    }
+    printl_si("  size after push:", vec_size(vec));
+    printl_si("  capacity (should still be 100):", vec_capacity(vec));
+
+    vec_free(vec);
+    printl_s("vec_reserve tests passed!\n");
+}
+
+func test_vec_zap() {
+    printl_s("=== Test vec_zap ===");
+
+    let vec = vec_create(sizeof(int), 4);
+    printl_s("Pushing values: 111, 222, 333...");
+    vec_push_int(vec, 111);
+    vec_push_int(vec, 222);
+    vec_push_int(vec, 333);
+
+    printl_s("Before zap:");
+    for (let i = 0; i < vec_size(vec); i = i + 1) {
+        let val = vec_get(vec, i) as int*;
+        printl_ii(i, *val);
+    }
+
+    printl_s("Zapping index 1...");
+    vec_zap(vec, 1);
+
+    printl_s("After zap:");
+    for (let i = 0; i < vec_size(vec); i = i + 1) {
+        let val = vec_get(vec, i) as int*;
+        printl_ii(i, *val);
+    }
+
+    vec_free(vec);
+    printl_s("vec_zap tests passed!\n");
+}
+
+func test_vec_clear() {
+    printl_s("=== Test vec_clear ===");
+
+    let vec = vec_create(sizeof(int), 4);
+    printl_s("Pushing 5 values...");
+    for (let i = 0; i < 5; i = i + 1) {
+        vec_push_int(vec, i * 100);
+    }
+    printl_si("  size before clear:", vec_size(vec));
+    printl_si("  capacity before clear:", vec_capacity(vec));
+
+    printl_s("Clearing vector...");
+    vec_clear(vec);
+    printl_si("  size after clear:", vec_size(vec));
+    printl_si("  capacity after clear:", vec_capacity(vec));
+
+    // Push again to verify it still works
+    printl_s("Pushing 2 new values after clear...");
+    vec_push_int(vec, 999);
+    vec_push_int(vec, 888);
+    printl_si("  size:", vec_size(vec));
+
+    printl_s("Reading values:");
+    for (let i = 0; i < vec_size(vec); i = i + 1) {
+        let val = vec_get(vec, i) as int*;
+        printl_ii(i, *val);
+    }
+
+    vec_free(vec);
+    printl_s("vec_clear tests passed!\n");
+}
+
+func test_many_elements() {
+    printl_s("=== Test many elements (growth stress test) ===");
+
+    let vec = vec_create(sizeof(int), 1);
+    printl_s("Starting with capacity 1, pushing 100 elements...");
+
+    for (let i = 0; i < 100; i = i + 1) {
+        vec_push_int(vec, i);
+    }
+
+    printl_si("  final size:", vec_size(vec));
+    printl_si("  final capacity:", vec_capacity(vec));
+
+    // Verify first and last few values
+    printl_s("Verifying values...");
+    let v0 = vec_get(vec, 0) as int*;
+    printl_si("  vec[0]:", *v0);
+    let v1 = vec_get(vec, 1) as int*;
+    printl_si("  vec[1]:", *v1);
+    let v98 = vec_get(vec, 98) as int*;
+    printl_si("  vec[98]:", *v98);
+    let v99 = vec_get(vec, 99) as int*;
+    printl_si("  vec[99]:", *v99);
+
+    vec_free(vec);
+    printl_s("Many elements test passed!\n");
+}
+
+func main() {
+    printl_s("======================================");
+    printl_s("       VectorBase Test Suite");
+    printl_s("======================================\n");
+
+    test_vec_create();
+    test_vec_push_and_grow();
+    test_vec_push_int();
+    test_vec_push_byte();
+    test_vec_push_bool();
+    test_vec_push_ptr();
+    test_vec_reserve();
+    test_vec_zap();
+    test_vec_clear();
+    test_many_elements();
+
+    printl_s("======================================");
+    printl_s("   All VectorBase tests passed!");
+    printl_s("======================================");
+}

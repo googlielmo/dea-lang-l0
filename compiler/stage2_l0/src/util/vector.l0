@@ -1,0 +1,161 @@
+/*
+ * SPDX-License-Identifier: MIT OR Apache-2.0
+ * Copyright (c) 2025-2026 gwz
+ */
+
+module util.vector;
+
+import sys.rt;
+import sys.unsafe;
+
+import std.assert;
+import std.string;
+
+import util.array;
+
+/* ------------------------------------
+   Vector: Dynamic Array Implementation
+   ------------------------------------ */
+
+/*
+ * VectorBase implements a dynamic array (vector) of elements of a given size.
+ * It uses ArrayBase internally to manage storage.
+ * It can grow dynamically as elements are added, and a capacity can be reserved in advance.
+ *
+ * Note: This is a low-level implementation and does not provide type safety.
+ * It is the caller's responsibility to manage types and casting.
+ */
+struct VectorBase {
+    arr: ArrayBase*;
+    length: int;
+}
+
+func vec_create(element_size: int, initial_capacity: int) -> VectorBase* {
+    assert(element_size > 0, "Element size must be greater than 0 for vector creation");
+    let arr = arr_create(element_size, initial_capacity);
+    let self = new VectorBase(arr, 0);
+    return self;
+}
+
+func vec_grow(self: VectorBase*) {
+    if (self.length >= self.arr.capacity) {
+        arr_resize(self.arr, self.arr.capacity * 2);
+    }
+    self.length = self.length + 1;
+}
+
+func vec_reserve(self: VectorBase*, total_capacity: int) {
+    if (total_capacity > self.arr.capacity) {
+        arr_resize(self.arr, total_capacity);
+    }
+}
+
+func vec_check(self: VectorBase*, index: int) {
+    arr_check(self.arr, index);
+}
+
+func vec_get(self: VectorBase*, index: int) -> void* {
+    return arr_get(self.arr, index);
+}
+
+func vec_push(self: VectorBase*) -> void* {
+    vec_grow(self);
+    return vec_get(self, self.length - 1);
+}
+
+func vec_size(self: VectorBase*) -> int {
+    return self.length;
+}
+
+func vec_capacity(self: VectorBase*) -> int {
+    return self.arr.capacity;
+}
+
+func vec_zap(self: VectorBase*, index: int) {
+    let dest_ptr = arr_get(self.arr, index);
+    rt_memset(dest_ptr, 0, self.arr.element_size);
+}
+
+func vec_clear(self: VectorBase*) {
+    /* Reset capacity to 1, length to 0 */
+    arr_resize(self.arr, 1);
+    self.length = 0;
+}
+
+func vec_free(self: VectorBase*) {
+    arr_free(self.arr);
+    drop self;
+}
+
+/* ------------------------------------
+   Vector specialized push functions
+   ------------------------------------ */
+
+func vec_push_int(self: VectorBase*, val: int) {
+    assert(self.arr.element_size == sizeof(int), "Element size mismatch in vec_push_int");
+    let dest = vec_push(self) as int*;
+    *dest = val;
+}
+
+func vec_push_byte(self: VectorBase*, val: byte) {
+    assert(self.arr.element_size == sizeof(byte), "Element size mismatch in vec_push_byte");
+    let dest = vec_push(self) as byte*;
+    *dest = val;
+}
+
+func vec_push_bool(self: VectorBase*, val: bool) {
+    assert(self.arr.element_size == sizeof(bool), "Element size mismatch in vec_push_bool");
+    let dest = vec_push(self) as bool*;
+    *dest = val;
+}
+
+func vec_push_ptr(self: VectorBase*, val: void*) {
+    assert(self.arr.element_size == sizeof(void*), "Element size mismatch in vec_push_ptr");
+    let dest = vec_push(self) as void**;
+    *dest = val;
+}
+
+/* ------------------------------------
+   String Vector specialization
+   ------------------------------------ */
+
+type VectorString = VectorBase;
+
+func vs_create(initial_capacity: int) -> VectorString* {
+    return vec_create(sizeof(string), initial_capacity);
+}
+
+func vs_push(self: VectorString*, val: string) {
+    let dest = vec_push(self) as string*;
+    *dest = val;
+    rt_string_retain(val);
+}
+
+func vs_get(self: VectorString*, index: int) -> string {
+    let src = vec_get(self, index) as string*;
+    return *src;
+}
+
+func vs_size(self: VectorString*) -> int {
+    return vec_size(self);
+}
+
+func vs_capacity(self: VectorString*) -> int {
+    return vec_capacity(self);
+}
+
+func vs_clear(self: VectorString*) {
+    for (let i: int = 0; i < vec_size(self); i = i + 1) {
+        let str_ptr = vec_get(self, i) as string*;
+        rt_string_release(*str_ptr);
+    }
+    vec_clear(self);
+}
+
+func vs_free(self: VectorString*) {
+    for (let i: int = 0; i < vec_size(self); i = i + 1) {
+        let str_ptr = vec_get(self, i) as string*;
+        rt_string_release(*str_ptr);
+    }
+    vec_free(self);
+}

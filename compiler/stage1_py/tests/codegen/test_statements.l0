@@ -1,0 +1,97 @@
+/*
+ * SPDX-License-Identifier: MIT OR Apache-2.0
+ * Copyright (c) 2025-2026 gwz
+ */
+
+module test_statements;
+
+import std.string;
+import std.io;
+import std.optional;
+import std.assert;
+
+func test_let() -> int {
+    let x: int = 10;
+    let y: int = 20;
+    return x + y;
+}
+
+func test_let_type_inf() -> int {
+    let x = 10;
+    let y = 20;
+    return x + y;
+}
+
+func test_assign() -> int {
+    let x: int = 10;
+    x = 20;
+    x = x + 5;
+    return x;
+}
+
+func test_if(n: int) -> int {
+    if (n > 0) {
+        return 1;
+    } else {
+        return 0;
+    }
+}
+
+func test_while() -> int {
+    let i: int = 0;
+    let sum: int = 0;
+    while (i < 10) {
+        sum = sum + i;
+        i = i + 1;
+    }
+    return sum;
+}
+
+func test_return_void() -> void {
+    printl_i(99);
+    return;
+}
+
+func test_sizeof() -> int {
+    return sizeof(int) + sizeof(void*);
+}
+
+func failing_string() -> string? {
+    return null;
+}
+
+func test_failing_unwrap_s() -> int? {
+    let s: string = failing_string()?;
+    let val: int? = len_s(s) as int?;
+    return val;
+}
+
+func failing_i() -> int? {
+    return null;
+}
+
+func test_failing_unwrap_i() -> int? {
+    let i: int = failing_i()?;
+    let val = 10 as int?;
+    return val;
+}
+
+func test_opt_i() -> int? {
+    let val = 10 as int?;
+    return val;
+}
+
+func main() -> int {
+    printl_i(test_let());
+    printl_i(test_let_type_inf());
+    printl_i(test_assign());
+    printl_i(test_if(5));
+    printl_i(test_if(-5));
+    printl_i(test_while());
+    test_return_void();
+    printl_b(test_sizeof() == 8 || test_sizeof() == 12); // 8 or 12 depending on architecture
+    printl_b(test_failing_unwrap_s() == null);
+    printl_b(test_failing_unwrap_i() == null);
+    printl_b(unwrap_or_i(test_opt_i(), 0) == 10);
+    return 0;
+}

@@ -1,0 +1,188 @@
+/*
+ * SPDX-License-Identifier: MIT OR Apache-2.0
+ * Copyright (c) 2025-2026 gwz
+ */
+
+module test_mul;
+
+import std.io;
+
+
+func test_zero_cases() -> void {
+    print_s("Testing zero cases...\n");
+    
+    let z1: int = 0 * 0;
+    let z2: int = 0 * 1;
+    let z3: int = 1 * 0;
+    let z4: int = 0 * -1;
+    let z5: int = -1 * 0;
+    let z6: int = 0 * 2147483647;
+    let z7: int = -2147483648 * 0;
+    
+    if (z1 == 0 && z2 == 0 && z3 == 0 && z4 == 0 && z5 == 0 && z6 == 0 && z7 == 0) {
+        print_s("  OK: All zero cases passed\n");
+    } else {
+        print_s("  FAIL: Zero case failed\n");
+    }
+}
+
+func test_positive_positive() -> void {
+    print_s("Testing positive * positive...\n");
+    
+    let r1: int = 1 * 1;
+    let r2: int = 2 * 3;
+    let r3: int = 1000 * 1000;
+    let r4: int = 46340 * 46340;
+    
+    if (r1 == 1 && r2 == 6 && r3 == 1000000 && r4 == 2147395600) {
+        print_s("  OK: Valid positive cases passed\n");
+    } else {
+        print_s("  FAIL: Positive case failed\n");
+        print_s("    r1="); print_i(r1); printl();
+        print_s("    r2="); print_i(r2); printl();
+        print_s("    r3="); print_i(r3); printl();
+        print_s("    r4="); print_i(r4); printl();
+    }
+}
+
+func test_negative_negative() -> void {
+    print_s("Testing negative * negative...\n");
+    
+    let r1: int = -1 * -1;
+    let r2: int = -2 * -3;
+    let r3: int = -1000 * -1000;
+    let r4: int = -46340 * -46340;
+    
+    if (r1 == 1 && r2 == 6 && r3 == 1000000 && r4 == 2147395600) {
+        print_s("  OK: Valid negative cases passed\n");
+    } else {
+        print_s("  FAIL: Negative case failed\n");
+    }
+}
+
+func test_mixed_signs() -> void {
+    print_s("Testing mixed signs...\n");
+
+//    print_s("  r1 = 1 * -1...\n");
+    let r1: int = 1 * -1;
+
+//    print_s("  r2 = -1 * 1...\n");
+    let r2: int = -1 * 1;
+
+//    print_s("  r3 = 2 * -3...\n");
+    let r3: int = 2 * -3;
+
+//    print_s("  r4 = -3 * 2...\n");
+    let r4: int = -3 * 2;
+
+//    print_s("  r5 = 10 * -10...\n");
+    let r5: int = 10 * -10;
+
+//    print_s("  r6 = -10 * 10...\n");
+    let r6: int = -10 * 10;
+
+//    print_s("  r7 = 46340 * -46340...\n");
+    let r7: int = 46340 * -46340;
+//    print_s("  r7 done\n");
+
+//    print_s("  r8 = -46340 * 46340...\n");
+    let r8: int = -46340 * 46340;
+//    print_s("  r8 done\n");
+
+    if (r1 == -1 && r2 == -1 && r3 == -6 && r4 == -6 &&
+        r5 == -100 && r6 == -100 && r7 == -2147395600 && r8 == -2147395600) {
+        print_s("  OK: Valid mixed sign cases passed\n");
+    } else {
+        print_s("  FAIL: Mixed sign case failed\n");
+    }
+}
+
+func test_edge_cases() -> void {
+    print_s("Testing edge cases...\n");
+    
+    let r1: int = 2147483647 * 1;
+    let r2: int = 1 * 2147483647;
+    let r3: int = 2147483647 * -1;
+    let r4: int = -1 * 2147483647;
+    let r5: int = -2147483648 * 1;
+    let r6: int = 1 * -2147483648;
+    
+    if (r1 == 2147483647 && r2 == 2147483647 && 
+        r3 == -2147483647 && r4 == -2147483647 &&
+        r5 == -2147483648 && r6 == -2147483648) {
+        print_s("  OK: Edge cases passed\n");
+    } else {
+        print_s("  FAIL: Edge case failed\n");
+    }
+}
+
+func test_overflow_positive() -> void {
+    print_s("Testing overflow: 46341 * 46341 (should panic)...\n");
+    let bad: int = 46341 * 46341;
+    print_s("  FAIL: Should have panicked!\n");
+}
+
+func test_overflow_max_times_2() -> void {
+    print_s("Testing overflow: INT32_MAX * 2 (should panic)...\n");
+    let bad: int = 2147483647 * 2;
+    print_s("  FAIL: Should have panicked!\n");
+}
+
+func test_overflow_large() -> void {
+    print_s("Testing overflow: 100000 * 100000 (should panic)...\n");
+    let bad: int = 100000 * 100000;
+    print_s("  FAIL: Should have panicked!\n");
+}
+
+func test_overflow_negative() -> void {
+    print_s("Testing overflow: -46341 * -46341 (should panic)...\n");
+    let bad: int = -46341 * -46341;
+    print_s("  FAIL: Should have panicked!\n");
+}
+
+func test_underflow_mixed() -> void {
+    print_s("Testing underflow: 46341 * -46341 (should panic)...\n");
+    let bad: int = 46341 * -46341;
+    print_s("  FAIL: Should have panicked!\n");
+}
+
+func test_int32_min_times_minus_one() -> void {
+    print_s("Testing overflow: INT32_MIN * -1 (should panic)...\n");
+    let bad: int = -2147483648 * -1;
+    print_s("  FAIL: Should have panicked!\n");
+}
+
+func main() -> int {
+    print_s("==================================================\n");
+    print_s("L0 Multiplication Operator Test Suite\n");
+    print_s("==================================================\n");
+    printl();
+    
+    test_zero_cases();
+    test_positive_positive();
+    test_negative_negative();
+    test_mixed_signs();
+    test_edge_cases();
+    
+    printl();
+    print_s("==================================================\n");
+    print_s("All valid cases passed!\n");
+    print_s("==================================================\n");
+    printl();
+    
+    print_s("Now testing overflow cases (comment out to skip):\n");
+    printl();
+    
+//  Uncomment ONE at a time to test overflow detection:
+
+//    test_overflow_positive();
+//    test_overflow_max_times_2();
+//    test_overflow_large();
+//    test_overflow_negative();
+//    test_underflow_mixed();
+//    test_int32_min_times_minus_one();
+    
+    print_s("(Overflow tests commented out - uncomment one at a time)\n");
+    
+    return 0;
+}

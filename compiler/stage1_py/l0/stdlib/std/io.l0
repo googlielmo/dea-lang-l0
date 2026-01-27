@@ -1,0 +1,383 @@
+/*
+ * SPDX-License-Identifier: MIT OR Apache-2.0
+ * Copyright (c) 2025-2026 gwz
+ */
+
+/**
+ * Standard I/O module
+ *
+ * Provides functions for file I/O, standard input reading,
+ * output flushing, and printing to stdout and stderr.
+ */
+module std.io;
+
+import sys.rt;
+
+import std.unit;
+
+// -----------------------------
+// File I/O
+// -----------------------------
+
+// Read the entire content of a file as a string optional.
+// Returns the content of the file, or null on error.
+func read_file(path: string) -> string? {
+    let rd_opt = rt_read_file_all(path);
+    if (rd_opt == null || rt_errno() != 0) {
+        return null;
+    }
+    return rd_opt;
+}
+
+// Write a string as the entire content of a file.
+// Returns null on error.
+func write_file(path: string, data: string) -> Unit? {
+    let ok = rt_write_file_all(path, data);
+    if (!ok || rt_errno() != 0) {
+        return null;
+    }
+    return present();
+}
+
+// Input
+
+// Read a line from standard input.
+// Returns null on EOF or error.
+func read_line() -> string? {
+    let rl = rt_read_line();
+    if (rl == null || rt_errno() != 0) {
+        // EOF or error
+        return null;
+    }
+    return rl;
+}
+
+// Read a single character from standard input.
+// Returns null on EOF or error.
+func read_char() -> int? {
+    let c = rt_read_char();
+    if (c == -1 || rt_errno() != 0) {
+        // EOF or error
+        return null;
+    }
+    return c as int?;
+}
+
+// Read a single character from standard input.
+// Returns -1 on EOF or error.
+func read_char_or_eof() -> int {
+    let c = rt_read_char();
+    if (c == -1 || rt_errno() != 0) {
+        // EOF or error
+        return -1;
+    }
+    return c;
+}
+
+// Flush output buffers
+
+// Flush stdout.
+func flush_stdout() -> void {
+    rt_flush_stdout();
+}
+
+// Flush stderr.
+func flush_stderr() -> void {
+    rt_flush_stderr();
+}
+
+// -----------------------------
+// Print variants (stdout)
+// -----------------------------
+
+// Print a newline to stdout.
+func printl() -> void {
+    rt_println();
+}
+
+// print_*() primitive types
+
+// Print a string to stdout.
+func print_s(s: string) -> void {
+    rt_print(s);
+}
+
+// Print an integer to stdout.
+func print_i(x: int) -> void {
+    rt_print_int(x);
+}
+
+// Print a boolean to stdout.
+func print_b(x: bool) -> void {
+    rt_print_bool(x);
+}
+
+// printl_* primitive types
+
+// Print a string to stdout followed by a newline.
+func printl_s(s: string) -> void {
+    rt_print(s);
+    rt_println();
+}
+
+// Print an integer to stdout followed by a newline.
+func printl_i(x: int) -> void {
+    rt_print_int(x);
+    rt_println();
+}
+
+// Print a boolean to stdout followed by a newline.
+func printl_b(x: bool) -> void {
+    rt_print_bool(x);
+    rt_println();
+}
+
+// print_** 2 params
+
+// Print two strings to stdout separated by a space.
+func print_ss(s1: string, s2: string) -> void {
+    rt_print(s1);
+    rt_print(" ");
+    rt_print(s2);
+}
+
+// Print a string and an integer to stdout separated by a space.
+func print_si(s: string, x: int) -> void {
+    rt_print(s);
+    rt_print(" ");
+    rt_print_int(x);
+}
+
+// Print a string and a boolean to stdout separated by a space.
+func print_sb(s: string, b: bool) -> void {
+    rt_print(s);
+    rt_print(" ");
+    rt_print_bool(b);
+}
+
+// Print an integer and a string to stdout separated by a space.
+func print_is(x: int, s: string) -> void {
+    rt_print_int(x);
+    rt_print(" ");
+    rt_print(s);
+}
+
+// Print two integers to stdout separated by a space.
+func print_ii(x1: int, x2: int) -> void {
+    rt_print_int(x1);
+    rt_print(" ");
+    rt_print_int(x2);
+}
+
+// Print an integer and a boolean to stdout separated by a space.
+func print_ib(x: int, b: bool) -> void {
+    rt_print_int(x);
+    rt_print(" ");
+    rt_print_bool(b);
+}
+
+// Print a boolean and a string to stdout separated by a space.
+func print_bs(b: bool, s: string) -> void {
+    rt_print_bool(b);
+    rt_print(" ");
+    rt_print(s);
+}
+
+// Print a boolean and an integer to stdout separated by a space.
+func print_bi(b: bool, x: int) -> void {
+    rt_print_bool(b);
+    rt_print(" ");
+    rt_print_int(x);
+}
+
+// Print two booleans to stdout separated by a space.
+func print_bb(b1: bool, b2: bool) -> void {
+    rt_print_bool(b1);
+    rt_print(" ");
+    rt_print_bool(b2);
+}
+
+// printl_** 2 params
+
+// Print two strings to stdout separated by a space, followed by a newline.
+func printl_ss(s1: string, s2: string) -> void {
+    rt_print(s1);
+    rt_print(" ");
+    rt_print(s2);
+    rt_println();
+}
+
+// Print a string and an integer to stdout separated by a space, followed by a newline.
+func printl_si(s: string, x: int) -> void {
+    rt_print(s);
+    rt_print(" ");
+    rt_print_int(x);
+    rt_println();
+}
+
+// Print a string and a boolean to stdout separated by a space, followed by a newline.
+func printl_sb(s: string, b: bool) -> void {
+    rt_print(s);
+    rt_print(" ");
+    rt_print_bool(b);
+    rt_println();
+}
+
+// Print an integer and a string to stdout separated by a space, followed by a newline.
+func printl_is(x: int, s: string) -> void {
+    rt_print_int(x);
+    rt_print(" ");
+    rt_print(s);
+    rt_println();
+}
+
+// Print two integers to stdout separated by a space, followed by a newline.
+func printl_ii(x1: int, x2: int) -> void {
+    rt_print_int(x1);
+    rt_print(" ");
+    rt_print_int(x2);
+    rt_println();
+}
+
+// Print an integer and a boolean to stdout separated by a space, followed by a newline.
+func printl_ib(x: int, b: bool) -> void {
+    rt_print_int(x);
+    rt_print(" ");
+    rt_print_bool(b);
+    rt_println();
+}
+
+// Print a boolean and a string to stdout separated by a space, followed by a newline.
+func printl_bs(b: bool, s: string) -> void {
+    rt_print_bool(b);
+    rt_print(" ");
+    rt_print(s);
+    rt_println();
+}
+
+// Print a boolean and an integer to stdout separated by a space, followed by a newline.
+func printl_bi(b: bool, x: int) -> void {
+    rt_print_bool(b);
+    rt_print(" ");
+    rt_print_int(x);
+    rt_println();
+}
+
+// Print two booleans to stdout separated by a space, followed by a newline.
+func printl_bb(b1: bool, b2: bool) -> void {
+    rt_print_bool(b1);
+    rt_print(" ");
+    rt_print_bool(b2);
+    rt_println();
+}
+
+// -----------------------------
+// Error Print variants (stderr)
+// -----------------------------
+
+// Print a newline to stderr.
+func err_printl() -> void {
+    rt_println_stderr();
+}
+
+// err_print_*() primitive types
+
+// Print a string to stderr.
+func err_print_s(s: string) -> void {
+    rt_print_stderr(s);
+}
+
+// Print an integer to stderr.
+func err_print_i(x: int) -> void {
+    rt_print_int_stderr(x);
+}
+
+// Print a boolean to stderr.
+func err_print_b(x: bool) -> void {
+    rt_print_bool_stderr(x);
+}
+
+// err_printl_* primitive types
+
+// Print a string to stderr followed by a newline.
+func err_printl_s(s: string) -> void {
+    rt_print_stderr(s);
+    rt_println_stderr();
+}
+
+// Print an integer to stderr followed by a newline.
+func err_printl_i(x: int) -> void {
+    rt_print_int_stderr(x);
+    rt_println_stderr();
+}
+
+// Print a boolean to stderr followed by a newline.
+func err_printl_b(x: bool) -> void {
+    rt_print_bool_stderr(x);
+    rt_println_stderr();
+}
+
+// err_print_** 2 params
+
+// Print two strings to stderr separated by a space.
+func err_print_ss(s1: string, s2: string) -> void {
+    rt_print_stderr(s1);
+    rt_print_stderr(" ");
+    rt_print_stderr(s2);
+}
+
+// Print a string and an integer to stderr separated by a space.
+func err_print_si(s: string, x: int) -> void {
+    rt_print_stderr(s);
+    rt_print_stderr(" ");
+    rt_print_int_stderr(x);
+}
+
+// Print a string and a boolean to stderr separated by a space.
+func err_print_sb(s: string, b: bool) -> void {
+    rt_print_stderr(s);
+    rt_print_stderr(" ");
+    rt_print_bool_stderr(b);
+}
+
+// Print an integer and a string to stderr separated by a space.
+func err_print_is(x: int, s: string) -> void {
+    rt_print_int_stderr(x);
+    rt_print_stderr(" ");
+    rt_print_stderr(s);
+}
+
+// Print two integers to stderr separated by a space.
+func err_print_ii(x1: int, x2: int) -> void {
+    rt_print_int_stderr(x1);
+    rt_print_stderr(" ");
+    rt_print_int_stderr(x2);
+}
+
+// Print an integer and a boolean to stderr separated by a space.
+func err_print_ib(x: int, b: bool) -> void {
+    rt_print_int_stderr(x);
+    rt_print_stderr(" ");
+    rt_print_bool_stderr(b);
+}
+
+// Print a boolean and a string to stderr separated by a space.
+func err_print_bs(b: bool, s: string) -> void {
+    rt_print_bool_stderr(b);
+    rt_print_stderr(" ");
+    rt_print_stderr(s);
+}
+
+// Print a boolean and an integer to stderr separated by a space.
+func err_print_bi(b: bool, x: int) -> void {
+    rt_print_bool_stderr(b);
+    rt_print_stderr(" ");
+    rt_print_int_stderr(x);
+}
+
+// Print two booleans to stderr separated by a space.
+func err_print_bb(b1: bool, b2: bool) -> void {
+    rt_print_bool_stderr(b1);
+    rt_print_stderr(" ");
+    rt_print_bool_stderr(b2);
+}

@@ -1,0 +1,58 @@
+/*
+ * SPDX-License-Identifier: MIT OR Apache-2.0
+ * Copyright (c) 2025-2026 gwz
+ */
+
+module lexer_test;
+
+import std.io;
+import std.string;
+
+import tokens;
+import lexer;
+
+func print_bool(label: string, val: bool) {
+    if (val) {
+        printl_ss(label, "true");
+    } else {
+        printl_ss(label, "false");
+    }
+}
+
+func test_token_vector() {
+    printl_s("=== TokenVector Test ===");
+
+    // Create TokenVector
+    printl_s("Creating TokenVector...");
+    let tv = tv_create();
+    printl_si("Initial length:", tv_len(tv));
+
+    // Create some test tokens
+    printl_s("\nPushing tokens...");
+    let tok1 = Token(TT_MODULE(), 0, 1, 1);
+    let tok2 = Token(TT_IDENT("foo"), 7, 1, 8);
+    let tok3 = Token(TT_SEMI(), 10, 1, 11);
+    let tok4 = Token(TT_EOF(), 11, 1, 12);
+
+    tv_push(tv, tok1);
+    tv_push(tv, tok2);
+    tv_push(tv, tok3);
+    tv_push(tv, tok4);
+    printl_si("Length after pushing 4 tokens:", tv_len(tv));
+
+    // Test get
+    printl_s("\nTesting get...");
+    for (let i = 0; i < tv_len(tv); i = i + 1) {
+        let tok = tv_get(tv, i);
+        printl_si("  Token at index:", i);
+        printl_ss("    type:", token_to_string(tok));
+        printl_si("    line:", tok.line);
+        printl_si("    column:", tok.column);
+    }
+
+    printl_s("\nDone!");
+}
+
+func main() {
+    test_token_vector();
+}

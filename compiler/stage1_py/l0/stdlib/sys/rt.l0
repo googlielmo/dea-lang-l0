@@ -1,0 +1,103 @@
+/*
+ * SPDX-License-Identifier: MIT OR Apache-2.0
+ * Copyright (c) 2025-2026 gwz
+ */
+
+module sys.rt;
+
+// Runtime support functions for string manipulation, I/O, and system operations
+
+// Return the character at the given index in the string as an integer (0-255)
+extern func rt_string_get(s: string, index: int) -> byte;
+
+// Return the length of the string
+extern func rt_strlen(str: string) -> int;
+
+// Return whether two strings are equal
+extern func rt_string_equals(a: string, b: string) -> bool;
+
+// Concatenate two strings and return the result
+extern func rt_string_concat(a: string, b: string) -> string;
+
+// Return a slice of the string from start to end (exclusive)
+extern func rt_string_slice(s: string, start: int, end: int) -> string;
+
+// Create a string from a byte array of given length
+extern func rt_string_from_byte_array(bytes: byte*, len: int) -> string;
+
+// Create a string from a single byte value
+extern func rt_string_from_byte(b: byte) -> string;
+
+// Increment reference count for heap strings.
+// No-op for static or non-reference-counted strings.
+extern func rt_string_retain(s: string) -> string;
+
+// Decrement reference count for heap strings and free if count reaches zero.
+// No-op for static or non-reference-counted strings.
+extern func rt_string_release(s: string) -> void;
+
+// Read a file’s entire contents into a string
+extern func rt_read_file_all(path: string) -> string?;
+
+// Write a string completely to a file
+extern func rt_write_file_all(path: string, data: string) -> bool;
+
+// Flush the standard output buffer
+extern func rt_flush_stdout() -> void;
+
+// Flush the standard error buffer
+extern func rt_flush_stderr() -> void;
+
+// Print a string to standard output without newline
+extern func rt_print(s: string) -> void;
+
+// Print a string to standard error without newline
+extern func rt_print_stderr(s: string) -> void;
+
+// Print a newline to standard output
+extern func rt_println() -> void;
+
+// Print a newline to standard error
+extern func rt_println_stderr() -> void;
+
+// Print an integer to standard output
+extern func rt_print_int(x: int) -> void;
+
+// Print an integer to standard error
+extern func rt_print_int_stderr(x: int) -> void;
+
+// Print a boolean to standard output
+extern func rt_print_bool(x: bool) -> void;
+
+// Print a boolean to standard error
+extern func rt_print_bool_stderr(x: bool) -> void;
+
+// Read a line from standard input, returning null if EOF
+extern func rt_read_line() -> string?;
+
+// Read a single character from standard input
+extern func rt_read_char() -> int;
+
+// Abort program execution with a message
+extern func rt_abort(message: string) -> void;
+
+// Exit the program with the provided code
+extern func rt_exit(code: int) -> void;
+
+// Seed the runtime random number generator
+extern func rt_srand(seed: int) -> void;
+
+// Generate a random integer less than the given maximum
+extern func rt_rand(max: int) -> int;
+
+// Get the last runtime error number
+extern func rt_errno() -> int;
+
+// Get the value of an environment variable, or null if not set
+extern func rt_get_env_var(name: string) -> string?;
+
+// Get the number of command-line arguments
+extern func rt_get_argc() -> int;
+
+// Get the command-line argument at the given index
+extern func rt_get_argv(i: int) -> string;
