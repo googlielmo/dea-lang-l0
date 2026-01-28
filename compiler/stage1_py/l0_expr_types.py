@@ -440,7 +440,7 @@ class ExpressionTypeChecker:
                             else:
                                 self._error(
                                     arm.pattern,
-                                    f"[TYP-0102] unknown variant '{arm.pattern.name}' for enum {format_type(scrutinee_ty)}"
+                                    f"[TYP-0102] unknown variant '{arm.pattern.name}' for enum '{format_type(scrutinee_ty)}'"
                                 )
 
                     # Check the arm body with pattern variables in scope
@@ -475,13 +475,13 @@ class ExpressionTypeChecker:
                     self._error(
                         stmt,
                         f"[TYP-0104] non-exhaustive match: missing variants ("
-                        f"{', '.join(missing_variants)}) for enum {format_type(scrutinee_ty)}"
+                        f"{', '.join(missing_variants)}) for enum '{format_type(scrutinee_ty)}'"
                     )
             elif len(arm_variants) == len(enum_info.variants):
                 # wildcard is a no-op if all variants are already covered
                 self._warn(stmt,
                            f"[TYP-0105] unreachable wildcard pattern in match: all variants of "
-                           f"enum {format_type(scrutinee_ty)} are already covered")
+                           f"enum '{format_type(scrutinee_ty)}' are already covered")
 
             if check_return_paths:
                 # A match guarantees a return if it is exhaustive AND all arms return.
@@ -889,7 +889,7 @@ class ExpressionTypeChecker:
             return self.int_type
 
         if not isinstance(arg_ty, EnumType):
-            self._error(expr, f"[TYP-0243] ord expects an enum value, got {format_type(arg_ty)}")
+            self._error(expr, f"[TYP-0243] ord expects an enum value, got '{format_type(arg_ty)}'")
             return self.int_type
 
         return self.int_type
@@ -1097,7 +1097,7 @@ class ExpressionTypeChecker:
 
             self._error(
                 expr,
-                f"[TYP-0221] struct {format_type(obj_ty)} has no field '{expr.field}'",
+                f"[TYP-0221] struct '{format_type(obj_ty)}' has no field '{expr.field}'",
             )
             return None
 
@@ -1124,7 +1124,7 @@ class ExpressionTypeChecker:
 
         # Otherwise, report an error
         return self._error(
-            expr, f"[TYP-0230] cannot cast from {format_type(expr_ty)} to {format_type(target_ty)}"
+            expr, f"[TYP-0230] cannot cast from '{format_type(expr_ty)}' to '{format_type(target_ty)}'"
         )
 
     def _infer_try(self, expr: TryExpr) -> Optional[Type]:

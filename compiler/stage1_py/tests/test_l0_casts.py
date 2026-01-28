@@ -128,9 +128,9 @@ def test_casts_wrong_types(tmp_path):
 
     assert result.has_errors()
     assert len(result.diagnostics) == 3
-    assert any("cannot cast from string to int" in d.message for d in result.diagnostics)
-    assert any("cannot cast from int to string" in d.message for d in result.diagnostics)
-    assert any("cannot cast from bool to int" in d.message for d in result.diagnostics)
+    assert any("cannot cast from 'string' to 'int'" in d.message for d in result.diagnostics)
+    assert any("cannot cast from 'int' to 'string'" in d.message for d in result.diagnostics)
+    assert any("cannot cast from 'bool' to 'int'" in d.message for d in result.diagnostics)
 
 def  test_casts_wrong_enum_struct(tmp_path):
     """Test casts involving enums and structs."""
@@ -167,7 +167,7 @@ def  test_casts_wrong_enum_struct(tmp_path):
     assert result.has_errors()
     assert len(result.diagnostics) == 4
 
-    assert any("cannot cast from casts::Color to int" in d.message for d in result.diagnostics)
-    assert any("cannot cast from int to casts::Color" in d.message for d in result.diagnostics)
-    assert any("cannot cast from casts::Point to casts::Point*" in d.message for d in result.diagnostics)
-    assert any("cannot cast from casts::Point* to casts::Point" in d.message for d in result.diagnostics)
+    assert any("cannot cast from 'casts::Color' to 'int'" in d.message for d in result.diagnostics)
+    assert any("cannot cast from 'int' to 'casts::Color'" in d.message for d in result.diagnostics)
+    assert any("cannot cast from 'casts::Point' to 'casts::Point*'" in d.message for d in result.diagnostics)
+    assert any("cannot cast from 'casts::Point*' to 'casts::Point'" in d.message for d in result.diagnostics)

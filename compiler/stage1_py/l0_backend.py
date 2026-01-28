@@ -1274,7 +1274,7 @@ class Backend:
 
         if not (isinstance(var_type, PointerType) or
                 isinstance(var_type, NullableType) and isinstance(var_type.inner, PointerType)):
-            self.ice(f"[ICE-1061] drop requires pointer type, got {format_type(var_type)}", node=stmt)
+            self.ice(f"[ICE-1061] drop requires pointer type, got '{format_type(var_type)}'", node=stmt)
 
         if isinstance(var_type, NullableType) and isinstance(var_type.inner, PointerType):
             inner_type = var_type.inner.inner
@@ -1540,7 +1540,7 @@ class Backend:
         if isinstance(e, NullLiteral):
             if isinstance(expected, (NullableType, PointerType)):
                 return self.emitter.emit_null_literal(expected)
-            self.ice(f"[ICE-1090] invalid expected type for null literal: {format_type(expected)}", node=e)
+            self.ice(f"[ICE-1090] invalid expected type for null literal: '{format_type(expected)}'", node=e)
 
         # Get natural type of expression
         natural_ty = self.analysis.expr_types.get(id(e))
@@ -1599,7 +1599,7 @@ class Backend:
                 self.ice("[ICE-1091] missing expected type for null literal", node=expr)
             if isinstance(expected_ty, (NullableType, PointerType)):
                 return self.emitter.emit_null_literal(expected_ty)
-            self.ice(f"[ICE-1090] invalid expected type for null literal: {format_type(expected_ty)}", node=expr)
+            self.ice(f"[ICE-1090] invalid expected type for null literal: '{format_type(expected_ty)}'", node=expr)
 
         elif isinstance(expr, VarRef):
             # Check if this is a function or top-level let reference and use mangled name

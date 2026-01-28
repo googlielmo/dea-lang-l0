@@ -329,7 +329,7 @@ class CEmitter:
             if for_initializer:
                 return "{0}"
             return self.emit_none_value_for_nullable(expected_type)
-        self.ice(f"[ICE-1292] invalid expected type for null literal: {format_type(expected_type)}", None)
+        self.ice(f"[ICE-1292] invalid expected type for null literal: '{format_type(expected_type)}'", None)
 
     def emit_widen_int(self, c_expr: str, src_type: BuiltinType, dst_type: BuiltinType) -> str:
         """Emit C code for implicit integer widening."""
