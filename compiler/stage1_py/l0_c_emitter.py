@@ -219,6 +219,14 @@ class CEmitter:
         c_type = self.emit_type(typ)
         return f"((l0_int)sizeof({c_type}))"
 
+    def emit_ord(self, c_enum_expr: str) -> str:
+        """
+        Emit C code for ord(enum_value) intrinsic.
+
+        Returns a C expression that extracts the tag field and casts to l0_int.
+        """
+        return f"((l0_int)(({c_enum_expr}).tag))"
+
     # ============================================================================
     # Type Emission (L0 types -> C types)
     # ============================================================================

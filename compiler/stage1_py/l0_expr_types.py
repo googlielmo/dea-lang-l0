@@ -43,7 +43,7 @@ class ExpressionTypeChecker:
     Implements:
       - Expression typing: literals, variables, operators, calls, constructors,
         casts, dereference, indexing, field access, try-operator, sizeof
-      - Structs and enums (construction, field access, variant patterns)
+      - Structs and enums (construction, field access, variant patterns, ord)
       - Function calls (with argument checking)
       - Basic type compatibility rules (int, bool, string, pointers, nullability)
       - Widening from inferred types to annotated types
@@ -784,6 +784,9 @@ class ExpressionTypeChecker:
         if name == "sizeof":
             return self._infer_sizeof_intrinsic(expr)
 
+        if name == "ord":
+            return self._infer_ord_intrinsic(expr)
+
         # Not an intrinsic
         return None
 
@@ -872,6 +875,24 @@ class ExpressionTypeChecker:
     def _store_sizeof_target(self, expr: CallExpr, target_ty: Type) -> None:
         """Store the resolved sizeof target type for codegen."""
         self.analysis.intrinsic_targets[id(expr)] = target_ty
+
+    def _infer_ord_intrinsic(self, expr: CallExpr) -> Type:
+        """Handle ord(enum_value) intrinsic - returns 0-based ordinal of enum variant."""
+        if len(expr.args) != 1:
+            self._error(expr, "[TYP-0242] ord expects exactly 1 argument")
+            return self.int_type
+
+        arg = expr.args[0]
+        arg_ty = self._infer_expr(arg)
+
+        if arg_ty is None:
+            return self.int_type
+
+        if not isinstance(arg_ty, EnumType):
+            self._error(expr, f"[TYP-0243] ord expects an enum value, got {format_type(arg_ty)}")
+            return self.int_type
+
+        return self.int_type
 
     def _infer_call(self, expr: CallExpr) -> Optional[Type]:
         # Check for intrinsic calls first

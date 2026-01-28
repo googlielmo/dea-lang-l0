@@ -1316,6 +1316,9 @@ class Backend:
         if name == "sizeof":
             return self._emit_sizeof_intrinsic(expr)
 
+        if name == "ord":
+            return self._emit_ord_intrinsic(expr)
+
         # Not an intrinsic
         return None
 
@@ -1326,6 +1329,16 @@ class Backend:
             self.ice("[ICE-1120] failed to resolve sizeof target type", node=expr)
 
         return self.emitter.emit_sizeof_type(target_ty)
+
+    def _emit_ord_intrinsic(self, expr: CallExpr) -> str:
+        """Emit ord(enum_value) intrinsic - returns 0-based ordinal of enum variant."""
+        if len(expr.args) != 1:
+            self.ice("[ICE-1121] ord expects exactly 1 argument", node=expr)
+
+        arg = expr.args[0]
+        c_arg = self._emit_expr(arg)
+
+        return self.emitter.emit_ord(c_arg)
 
     # -------------------------------------------------------------------------
     # Constructor emission
