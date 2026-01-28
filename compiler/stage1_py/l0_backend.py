@@ -1445,8 +1445,9 @@ class Backend:
         # Allocate memory
         self.emitter.emit_alloc_obj(c_ptr_ty, c_base, tmp)
 
-        # If no args, zero-initialize
-        if not expr.args:
+        # If no args and not an enum variant, zero-initialize
+        # (Enum variants need proper tag initialization even with no payload)
+        if not expr.args and not isinstance(base_ty, EnumType):
             self.emitter.emit_zero_init(tmp, c_base)
             return tmp
 
