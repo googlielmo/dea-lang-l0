@@ -1,13 +1,17 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Claude Code (claude.ai/code) and other AI tools and agents when working with code in this
+repository.
 
 ## Project Overview
 
-Dea/L0 is a small, safe, C-family systems language with a compile-to-C backend. The goal is to build a self-hosting compiler (Stage 2 in L0 itself). Stage 1 is implemented in Python for fast iteration.
+Dea/L0 is a small, safe, C-family systems language with a compile-to-C backend. The goal is to build a self-hosting
+compiler (Stage 2 in L0 itself). Stage 1 is implemented in Python for fast iteration.
 
 Key design principles:
-- **No undefined behavior** - operations are well-defined, rejected with diagnostics, or trigger defined runtime failures
+
+- **No undefined behavior** - operations are well-defined, rejected with diagnostics, or trigger defined runtime
+  failures
 - **C-like syntax** with algebraic enums, pattern matching, and optional types (`T?`)
 - **Compile to C99** - portable output works with GCC, Clang, TinyCC
 
@@ -68,24 +72,31 @@ Source (.l0) → Lexer → Parser → NameResolver → SignatureResolver
 
 ### Key Files (compiler/stage1_py/)
 
-| File | Purpose |
-|------|---------|
-| `l0c.py` | CLI driver, argument parsing, orchestrates compilation |
-| `l0_lexer.py` | Tokenization (keywords, operators, literals) |
-| `l0_parser.py` | Recursive-descent parser producing AST |
-| `l0_ast.py` | AST node dataclasses |
-| `l0_driver.py` | Module loading, import resolution, caching |
-| `l0_codegen.py` | C99 code generation with string ARC |
-| `l0_expr_types.py` | Expression type inference and checking |
-| `l0_signatures.py` | Function/struct type resolution |
-| `l0_name_resolver.py` | Module-level symbol binding |
-| `l0_locals.py` | Local variable scoping |
-| `l0_types.py` | Type representations |
-| `runtime/l0_runtime.h` | C kernel runtime (allocation, I/O, strings) |
+| File                   | Purpose                                                |
+|------------------------|--------------------------------------------------------|
+| `l0c.py`               | CLI driver, argument parsing, orchestrates compilation |
+| `l0_lexer.py`          | Tokenization (keywords, operators, literals)           |
+| `l0_parser.py`         | Recursive-descent parser producing AST                 |
+| `l0_ast.py`            | AST node dataclasses                                   |
+| `l0_driver.py`         | Module loading, import resolution, caching             |
+| `l0_backend.py`        | Code generation orchestration (language-agnostic)      |
+| `l0_c_emitter.py`      | C99 code emission                                      |
+| `l0_compilation.py`    | Compilation unit (closed set of modules)               |
+| `l0_context.py`        | Cross-cutting compiler options                         |
+| `l0_diagnostics.py`    | Error/warning reporting                                |
+| `l0_expr_types.py`     | Expression type inference and checking                 |
+| `l0_signatures.py`     | Function/struct type resolution                        |
+| `l0_name_resolver.py`  | Module-level symbol binding                            |
+| `l0_locals.py`         | Local variable scoping                                 |
+| `l0_symbols.py`        | Symbol table and symbol kinds                          |
+| `l0_types.py`          | Type representations                                   |
+| `runtime/l0_runtime.h` | C kernel runtime (allocation, I/O, strings)            |
 
 ### Stage 2 Compiler (compiler/stage2_l0/)
 
 The self-hosted compiler in L0, under active development:
+
+- `src/main.l0` - Compiler entry point
 - `src/tokens.l0` - Token type definitions
 - `src/lexer.l0` - Lexer implementation
 - `src/util/` - Utility libraries (vector, map, string, array)
@@ -94,12 +105,16 @@ The self-hosted compiler in L0, under active development:
 ### Standard Library
 
 Located in `compiler/stage1_py/l0/stdlib/`:
+
 - `std/io.l0` - print, println, input
 - `std/string.l0` - string utilities
 - `std/rand.l0` - random numbers
 - `std/system.l0` - system calls, command line args
 - `std/assert.l0` - assertions
+- `std/optional.l0` - optional type utilities
+- `std/unit.l0` - unit type
 - `sys/unsafe.l0` - unsafe operations
+- `sys/rt.l0` - runtime primitives
 
 ## Language Quick Reference
 
@@ -146,17 +161,24 @@ Types: `int`, `uint`, `byte`, `ubyte`, `bool`, `string`, `void`, `T*` (pointer),
 - Commit messages: Use multiline format with summary line and detailed body for non-trivial changes.
 - Summary line: Sentence case with period at end (e.g., "Add `byte` type support.").
 - Body: Factual description of changes only. List items end with periods.
+- Do not end messages with tag-phrases like "for clarity", "for better performance", "for consistency", etc. State what
+  changed, not why it's supposedly good (e.g., "Fix null pointer deref in X." not "Fix null pointer deref in X for
+  safety.").
 - Use backticks for L0 code snippets and type names in commit messages.
 - Do not include Co-Authored-By lines in commits.
 
 ## Documentation
 
 Detailed design documents in `docs/`:
+
 - `architecture.md` - compiler pipeline and data flow
-- `l0_grammar.md` - formal EBNF grammar
+- `c_backend_design.md` - C backend architecture
 - `design_decisions.md` - rationale for key decisions
+- `l0_grammar.md` - formal EBNF grammar
 - `project_status.md` - implementation status and roadmap
+- `standard_library.md` - standard library reference
 
 Community files:
+
 - `CONTRIBUTING.md` - development setup and contribution guidelines
 - `SECURITY.md` - vulnerability reporting
