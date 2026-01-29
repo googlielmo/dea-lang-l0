@@ -4,7 +4,7 @@
 
 **Dea/L<sub>0</sub>** or simply **L0** is a small systems language with a staged compiler.
 
-It is the first step in growing a new, ideal systems programming language called **Dea**.
+It is the first step in growing a new, small and carefully designed systems programming language called **Dea**.
 
 The current implementation **emits portable C (C99)** as a bootstrap backend; the backend is intended to evolve (e.g.,
 with LLVM).
@@ -90,23 +90,25 @@ func add_opt(a: int?, b: int?) -> int? {
 
    ```shell
    git clone https://github.com/googlielmo/dea-lang-l0.git
-   cd L0
+   cd dea-lang-l0
    ```
 
 #### 2. Set environment variables (optional):
 
-   The `l0c` wrapper script sets sensible defaults, but you can override them:
+The `l0c` wrapper script sets sensible defaults, but you can override them with these variables:
 
    ```shell
    export L0_HOME=/path/to/l0/compiler/stage1_py
+   
+   # Optional: override system and runtime include paths (defaults are relative to L0_HOME)
    export L0_SYSTEM=/path/to/l0/compiler/stage1_py/l0/stdlib
    export L0_RUNTIME_INCLUDE=/path/to/l0/compiler/stage1_py/runtime
    ```
 
-   If not set, defaults are relative to the repository root:
-    - `L0_HOME` → `compiler/stage1_py`
-    - `L0_SYSTEM` → `$L0_HOME/l0/stdlib`
-    - `L0_RUNTIME_INCLUDE` → `$L0_HOME/runtime`
+If not set, defaults are relative to the repository root:
+- `L0_HOME` → `compiler/stage1_py`
+- `L0_SYSTEM` → `$L0_HOME/l0/stdlib`
+- `L0_RUNTIME_INCLUDE` → `$L0_HOME/runtime`
 
 #### 3. Verify installation:
 
@@ -118,9 +120,11 @@ func add_opt(a: int?, b: int?) -> int? {
 
 #### 1. Create a simple L0 program:
 
+Create a file named `hello.l0` with the following content:
+
    ```l0
-   // hello.l0
    module hello;
+
    import std.io;
 
    func main() -> int {
@@ -135,7 +139,13 @@ func add_opt(a: int?, b: int?) -> int? {
    ./l0c run hello.l0
    ```
 
-   This compiles and executes the program in one step.
+This compiles and executes the program in one step.
+
+You can just use the module name (without `.l0`) and the compiler will use the corresponding file:
+
+   ```shell
+   ./l0c run hello
+   ```
 
 #### 3. Build an executable:
 
@@ -155,7 +165,7 @@ func add_opt(a: int?, b: int?) -> int? {
 When working on L0 projects, use `--project-root` (or `-P`) to specify your source directories:
 
 ```shell
-./l0c run -P ./src -P ./lib main.l0
+./l0c run -P ./src -P ./lib main
 ```
 
 The compiler searches for modules in:
@@ -173,7 +183,7 @@ The project aims to build a **bootstrap-friendly**, **well-specified**, **simple
 
 In other words, it's "the minimum viable systems language for writing a self-hosted compiler".
 
-Its first self-hosted compiler will be written in L0 itself (Stage 2).
+Its first self-hosted compiler is being written in L0 itself (Stage 2).
 To support this, Stage 1 provides:
 
 * A complete, deterministic parser.
@@ -228,7 +238,7 @@ T?
 T*?
 ```
 
-Expressions include unary (`-`, `!`, `*`, `~`, `sizeof`), binary arithmetic, logical, comparisons, bitwise, indexing,
+Expressions include unary (`-`, `!`, `*`, `~`), binary arithmetic, logical, comparisons, bitwise, indexing,
 calls, field access, `as` casts, and the **try operator** `?`.
 
 ## Compiler implementation architecture
@@ -247,6 +257,7 @@ Provided by the `l0c` executable (Python):
 ```
 
 Output:
+
 ```
 usage: l0c [-h] [--verbose] [--project-root PROJECT_ROOT] [--sys-root SYS_ROOT] {run,build,gen,codegen,check,analyze,tok,tokens,ast,sym,symbols,type,types} ...
 
@@ -276,13 +287,36 @@ options:
 Example usage:
 
 ```shell
-./l0c -P examples run hello
+./l0c -P examples run hamurabi
 ```
 
 Output:
+
 ```
-Hello, World!
+                                HAMURABI
+               CREATIVE COMPUTING  MORRISTOWN, NEW JERSEY
+                      WITH THANKS TO  DAVID H. AHL
+
+
+
+TRY YOUR HAND AT GOVERNING ANCIENT SUMERIA
+FOR A TEN-YEAR TERM OF OFFICE.
+
+
+
+Hamurabi: I beg to report to you, 
+In year 0, 0 people starved, 5 came to the city.
+Population is now 95
+The city now owns 1000 acres.
+You harvested 3 bushels per acre.
+Rats ate 200 bushels.
+You now have 2800 bushels in store.
+
+Land is trading at 23 bushels per acre.
+How many acres do you wish to buy?
 ```
+
+Enjoy the game! Type your inputs as prompted and see how well you can govern ancient Sumeria.
 
 ## Project status
 

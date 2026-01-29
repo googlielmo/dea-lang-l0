@@ -69,6 +69,7 @@ Use verbose flags to see compilation stages:
 - Use sentence case with a period at the end (e.g., "Add `byte` type support.").
 - For non-trivial changes, include a detailed body describing what changed.
 - Use backticks for L0 code snippets and type names.
+- AI tools and agents should not add Co-Authored-By lines to commits.
 
 ## Pull requests
 
@@ -81,6 +82,15 @@ A PR should include:
 
 By submitting a contribution, you agree that it may be distributed under the project's dual license (MIT OR Apache-2.0),
 consistent with the repository LICENSE files.
+
+## AI-Assisted Contributions Policy
+
+The use of AI or other automated tools to assist in writing code, documentation, or other project materials is
+**encouraged** in order to experiment, iterate rapidly, and explore solutions more efficiently.
+Contributors remain fully responsible for the correctness, rights to contribute and license, licensing compatibility,
+and security of their contributions, regardless of the tools used.
+
+**All contributions must comply with the project’s licensing, contribution guidelines, and quality standards.**
 
 ## Code of Conduct
 
