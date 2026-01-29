@@ -2,6 +2,7 @@
 #  Copyright (c) 2025-2026 gwz
 
 from dataclasses import dataclass, field
+from enum import Enum
 from typing import Dict, List, Optional, Tuple
 
 from l0_compilation import CompilationUnit
@@ -11,6 +12,11 @@ from l0_locals import FunctionEnv
 from l0_signatures import StructInfo, EnumInfo
 from l0_symbols import ModuleEnv
 from l0_types import Type, FuncType
+
+
+class VarRefResolution(Enum):
+    LOCAL = "local"
+    MODULE = "module"
 
 
 @dataclass
@@ -41,6 +47,9 @@ class AnalysisResult:
 
     # Expression types keyed by id(expr_node)
     expr_types: Dict[int, Type] = field(default_factory=dict)
+
+    # VarRef resolution keyed by id(expr_node): VarRefResolution.LOCAL or VarRefResolution.MODULE
+    var_ref_resolution: Dict[int, VarRefResolution] = field(default_factory=dict)
 
     # Intrinsic function/type targets keyed by intrinsic id(expr_node)
     intrinsic_targets: Dict[int, Type] = field(default_factory=dict)

@@ -23,6 +23,7 @@ have been completed so far.
     * `func` and `extern func` with `->`.
     * Statements: `let`, `if/else`, `while`, `return`, `match` (statement-only).
     * Patterns: `Variant(...)`, `_`.
+    * Bare variant syntax: `Variant` is accepted as alias for `Variant()` (zero-arg only).
     * Expressions with full precedence rules:
       unary ops, binary ops, calls, field access, `as` casts, postfix try `?`.
 * Produces a clean Python AST via `dataclasses`, with `TypeRef` in all type positions.
@@ -137,6 +138,7 @@ have been completed so far.
     * Patterns introduce `PATTERN_VAR`s.
     * `_` never binds.
     * **Duplicate variable declarations** in the same scope are detected and reported as errors.
+    * **Shadowing an enum variant is always a warning** (locals still win on resolution).
 * Provides:
     * `get_block_scope(block)`.
     * `get_match_arm_scope(arm)`.

@@ -21,7 +21,7 @@ The backend contains zero knowledge of target language syntax.
 from dataclasses import dataclass, field
 from typing import List, Optional, Dict, Set, NoReturn, Tuple, Any
 
-from l0_analysis import AnalysisResult
+from l0_analysis import AnalysisResult, VarRefResolution
 from l0_ast import (
     FuncDecl, StructDecl, EnumDecl, EnumVariant, LetDecl,
     Stmt, Block, LetStmt, AssignStmt, ExprStmt, IfStmt, WhileStmt, ReturnStmt, DropStmt, MatchStmt, Expr, IntLiteral,
@@ -1604,6 +1604,14 @@ class Backend:
         elif isinstance(expr, VarRef):
             # Check if this is a function or top-level let reference and use mangled name
             # CRITICAL: extern functions are NOT mangled (FFI boundary)
+            resolution = self.analysis.var_ref_resolution.get(id(expr))
+            if resolution is None:
+                self.ice(f"[ICE-1102] missing VarRef resolution for '{expr.name}'", node=expr)
+            if resolution is VarRefResolution.LOCAL:
+                if is_statement:
+                    self.emitter.emit_comment(f"var ref {expr.name}")
+                    return ""
+                return self.emitter.emit_var_ref(self.emitter.mangle_identifier(expr.name))
             if self.current_module:
                 sym = self._lookup_symbol(expr.name, self.current_module)
                 if sym and sym.kind == SymbolKind.FUNC:
@@ -1616,11 +1624,12 @@ class Backend:
                 elif sym and sym.kind == SymbolKind.LET:
                     # Mangle top-level let bindings
                     return self.emitter.emit_var_ref(self.emitter.mangle_let_name(sym.module.name, expr.name))
-            # Regular variable reference (local)
-            if is_statement:
-                self.emitter.emit_comment(f"var ref {expr.name}")
-                return ""
-            return self.emitter.emit_var_ref(self.emitter.mangle_identifier(expr.name))
+                elif sym and sym.kind == SymbolKind.ENUM_VARIANT:
+                    # Bare zero-arg variant constructor (e.g. `Red` as alias for `Red()`)
+                    expr_type = self.analysis.expr_types.get(id(expr))
+                    if isinstance(expr_type, EnumType):
+                        return self.emitter.emit_variant_constructor_for_type(expr_type, expr.name, [])
+            self.ice(f"[ICE-1103] unresolved VarRef '{expr.name}' after type checking", node=expr)
 
         elif isinstance(expr, UnaryOp):
             c_operand = self._emit_expr(expr.operand)

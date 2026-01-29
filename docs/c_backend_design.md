@@ -177,6 +177,13 @@ struct l0_module_Expr e = {
 };
 ```
 
+Zero-argument enum variants may be written without parentheses. `Red` and `Red()` produce
+identical C output:
+
+```c
+struct l0_module_Color c = { .tag = l0_module_Color_Red };
+```
+
 ## Code Organization
 
 ### Generated file structure

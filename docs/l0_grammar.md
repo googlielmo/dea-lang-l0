@@ -319,6 +319,8 @@ PrimaryExpr         ::=     IntLiteral
 Notes:
 
 * `Ident` as a primary expression is a simple variable reference.
+  When the identifier resolves to a zero-argument enum variant, it acts as a constructor
+  (e.g. `Red` is equivalent to `Red()`).
 * `as` casts support `T?` <-> `T` conversion.
 * The `?` type suffix denotes nullable types in the `Type` grammar.
 * `?` as a postfix operator is the **null propagation operator** (also known as the **try operator**).

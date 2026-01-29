@@ -6,7 +6,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Dict, Optional, List
 
-from l0_analysis import AnalysisResult
+from l0_analysis import AnalysisResult, VarRefResolution
 from l0_logger import log_debug
 from l0_ast import (
     Node, TypeRef as AstTypeRef, Stmt, Block, LetStmt, AssignStmt, ExprStmt, IfStmt, WhileStmt,
@@ -185,6 +185,23 @@ class ExpressionTypeChecker:
 
         if self._lookup_local(name) is not None:
             self._warn(node, f"[TYP-0021] local variable '{name}' shadows variable from outer scope")
+
+        if self._current_func_env is not None:
+            module_name = self._current_func_env.module_name
+            env = self.module_envs.get(module_name)
+            if env is not None:
+                sym = env.all.get(name)
+                if sym is not None and sym.kind is SymbolKind.ENUM_VARIANT:
+                    if sym.module.name != module_name:
+                        self._warn(
+                            node,
+                            f"[TYP-0023] local variable '{name}' shadows imported enum variant '{sym.module.name}::{name}'",
+                        )
+                    else:
+                        self._warn(
+                            node,
+                            f"[TYP-0022] local variable '{name}' shadows enum variant '{sym.module.name}::{name}'",
+                        )
 
         local[name] = typ
         self._alive_scopes[-1][name] = True
@@ -607,6 +624,7 @@ class ExpressionTypeChecker:
         # 1. Locals / parameters
         local_ty = self._lookup_local(expr.name)
         if local_ty is not None:
+            self.analysis.var_ref_resolution[id(expr)] = VarRefResolution.LOCAL
             alive = self._lookup_alive(expr.name)
             if alive is False:
                 self._error(expr, f"[TYP-0150] use of dropped variable '{expr.name}'")
@@ -616,6 +634,7 @@ class ExpressionTypeChecker:
         assert self._current_func_env is not None
         module_name = self._current_func_env.module_name
         mod_env = self.module_envs.get(module_name)
+
         if mod_env is None:
             return None
 
@@ -630,15 +649,31 @@ class ExpressionTypeChecker:
         if sym.kind is SymbolKind.FUNC and sym.type is not None:
             # Functions have a FuncType; at expression level their type is
             # precisely that.
+            self.analysis.var_ref_resolution[id(expr)] = VarRefResolution.MODULE
             return sym.type
 
         if sym.kind is SymbolKind.LET and sym.type is not None:
             # Top-level let bindings have their resolved type
+            self.analysis.var_ref_resolution[id(expr)] = VarRefResolution.MODULE
             return sym.type
 
-        # Struct, enum, and variant types are not values by themselves.
+        # Zero-arg enum variants can be used as bare identifiers (e.g. `Red` instead of `Red()`).
+        if sym.kind is SymbolKind.ENUM_VARIANT and isinstance(sym.type, FuncType):
+            self.analysis.var_ref_resolution[id(expr)] = VarRefResolution.MODULE
+            variant_type = sym.type
+            if len(variant_type.params) == 0:
+                enum_type = variant_type.result
+                if isinstance(enum_type, EnumType):
+                    return enum_type
+            # Variant has payload fields — bare usage is an error.
+            self._error(
+                expr,
+                f"[TYP-0152] variant '{expr.name}' requires arguments; use '{expr.name}(...)' constructor syntax",
+            )
+            return None
+
+        # Struct, enum, and other type symbols are not values by themselves.
         # They only become values when used in constructor calls (handled in _infer_call).
-        # For plain VarRef usage, report an error.
         self._error(expr, f"[TYP-0151] symbol '{expr.name}' is not a value")
         return None
 

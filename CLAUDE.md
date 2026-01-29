@@ -131,6 +131,11 @@ enum Expr {
     Add(left: Expr*, right: Expr*);
 }
 
+// Zero-arg variants: bare name or call syntax
+enum Color { Red(); Green(); Blue(); }
+let c: Color = Red;       // equivalent to Red()
+let d: Color = Green();
+
 // Functions
 func eval(e: Expr*) -> int {
     match (*e) {
