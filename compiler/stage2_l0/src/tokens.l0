@@ -184,73 +184,73 @@ func is_reserved_keyword(token: Token) -> bool {
 
 func ident_to_token(ident: string, index: int, line: int, col: int) -> Token {
     if (eq_s(ident, "module")) {
-        return Token(TT_MODULE(), index, line, col);
+        return Token(TT_MODULE, index, line, col);
     }
     if (eq_s(ident, "import")) {
-        return Token(TT_IMPORT(), index, line, col);
+        return Token(TT_IMPORT, index, line, col);
     }
     if (eq_s(ident, "func")) {
-        return Token(TT_FUNC(), index, line, col);
+        return Token(TT_FUNC, index, line, col);
     }
     if (eq_s(ident, "struct")) {
-        return Token(TT_STRUCT(), index, line, col);
+        return Token(TT_STRUCT, index, line, col);
     }
     if (eq_s(ident, "enum")) {
-        return Token(TT_ENUM(), index, line, col);
+        return Token(TT_ENUM, index, line, col);
     }
     if (eq_s(ident, "type")) {
-        return Token(TT_TYPE(), index, line, col);
+        return Token(TT_TYPE, index, line, col);
     }
     if (eq_s(ident, "extern")) {
-        return Token(TT_EXTERN(), index, line, col);
+        return Token(TT_EXTERN, index, line, col);
     }
     if (eq_s(ident, "let")) {
-        return Token(TT_LET(), index, line, col);
+        return Token(TT_LET, index, line, col);
     }
     if (eq_s(ident, "return")) {
-        return Token(TT_RETURN(), index, line, col);
+        return Token(TT_RETURN, index, line, col);
     }
     if (eq_s(ident, "match")) {
-        return Token(TT_MATCH(), index, line, col);
+        return Token(TT_MATCH, index, line, col);
     }
     if (eq_s(ident, "if")) {
-        return Token(TT_IF(), index, line, col);
+        return Token(TT_IF, index, line, col);
     }
     if (eq_s(ident, "else")) {
-        return Token(TT_ELSE(), index, line, col);
+        return Token(TT_ELSE, index, line, col);
     }
     if (eq_s(ident, "while")) {
-        return Token(TT_WHILE(), index, line, col);
+        return Token(TT_WHILE, index, line, col);
     }
     if (eq_s(ident, "for")) {
-        return Token(TT_FOR(), index, line, col);
+        return Token(TT_FOR, index, line, col);
     }
     if (eq_s(ident, "break")) {
-        return Token(TT_BREAK(), index, line, col);
+        return Token(TT_BREAK, index, line, col);
     }
     if (eq_s(ident, "continue")) {
-        return Token(TT_CONTINUE(), index, line, col);
+        return Token(TT_CONTINUE, index, line, col);
     }
     if (eq_s(ident, "true")) {
-        return Token(TT_TRUE(), index, line, col);
+        return Token(TT_TRUE, index, line, col);
     }
     if (eq_s(ident, "false")) {
-        return Token(TT_FALSE(), index, line, col);
+        return Token(TT_FALSE, index, line, col);
     }
     if (eq_s(ident, "sizeof")) {
-        return Token(TT_SIZEOF(), index, line, col);
+        return Token(TT_SIZEOF, index, line, col);
     }
     if (eq_s(ident, "null")) {
-        return Token(TT_NULL(), index, line, col);
+        return Token(TT_NULL, index, line, col);
     }
     if (eq_s(ident, "as")) {
-        return Token(TT_AS(), index, line, col);
+        return Token(TT_AS, index, line, col);
     }
     if (eq_s(ident, "new")) {
-        return Token(TT_NEW(), index, line, col);
+        return Token(TT_NEW, index, line, col);
     }
     if (eq_s(ident, "drop")) {
-        return Token(TT_DROP(), index, line, col);
+        return Token(TT_DROP, index, line, col);
     }
     return Token(TT_IDENT(ident), index, line, col);
 }

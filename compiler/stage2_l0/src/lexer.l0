@@ -60,7 +60,7 @@ func ls_create(source: string, filename: string) -> LexerState* {
         0,
         1,
         1,
-        NoError()
+        NoError
     );
     return self;
 }
@@ -120,7 +120,7 @@ func ls_next_token(self: LexerState*) -> Token? {
     let start_column = self.column;
 
     if (ls_at_end(self)) {
-        return Token(TT_EOF(), self.index, self.line, self.column);
+        return Token(TT_EOF, self.index, self.line, self.column);
     }
 
     let c = ls_advance(self);
@@ -141,7 +141,7 @@ func ls_next_token(self: LexerState*) -> Token? {
     }
 
     // For now, return EOF as a placeholder
-    return Token(TT_EOF(), start_index, start_line, start_column);
+    return Token(TT_EOF, start_index, start_line, start_column);
 }
 
 func ls_skip_whitespace_and_comments(self: LexerState*) -> Unit? {

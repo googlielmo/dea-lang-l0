@@ -29,10 +29,10 @@ func test_token_vector() {
 
     // Create some test tokens
     printl_s("\nPushing tokens...");
-    let tok1 = Token(TT_MODULE(), 0, 1, 1);
+    let tok1 = Token(TT_MODULE, 0, 1, 1);
     let tok2 = Token(TT_IDENT("foo"), 7, 1, 8);
-    let tok3 = Token(TT_SEMI(), 10, 1, 11);
-    let tok4 = Token(TT_EOF(), 11, 1, 12);
+    let tok3 = Token(TT_SEMI, 10, 1, 11);
+    let tok4 = Token(TT_EOF, 11, 1, 12);
 
     tv_push(tv, tok1);
     tv_push(tv, tok2);
