@@ -31,6 +31,7 @@ from l0_types import (
     get_null_type,
     format_type, L0_PRIMITIVE_TYPES,
 )
+from l0_resolve import resolve_symbol, resolve_type_ref, TypeResolveErrorKind
 
 
 # Expression type checking for L0
@@ -188,20 +189,19 @@ class ExpressionTypeChecker:
 
         if self._current_func_env is not None:
             module_name = self._current_func_env.module_name
-            env = self.module_envs.get(module_name)
-            if env is not None:
-                sym = env.all.get(name)
-                if sym is not None and sym.kind is SymbolKind.ENUM_VARIANT:
-                    if sym.module.name != module_name:
-                        self._warn(
-                            node,
-                            f"[TYP-0023] local variable '{name}' shadows imported enum variant '{sym.module.name}::{name}'",
-                        )
-                    else:
-                        self._warn(
-                            node,
-                            f"[TYP-0022] local variable '{name}' shadows enum variant '{sym.module.name}::{name}'",
-                        )
+            sym_result = resolve_symbol(self.module_envs, module_name, name)
+            sym = sym_result.symbol
+            if sym is not None and sym.kind is SymbolKind.ENUM_VARIANT:
+                if sym.module.name != module_name:
+                    self._warn(
+                        node,
+                        f"[TYP-0023] local variable '{name}' shadows imported enum variant '{sym.module.name}::{name}'",
+                    )
+                else:
+                    self._warn(
+                        node,
+                        f"[TYP-0022] local variable '{name}' shadows enum variant '{sym.module.name}::{name}'",
+                    )
 
         local[name] = typ
         self._alive_scopes[-1][name] = True
@@ -633,12 +633,9 @@ class ExpressionTypeChecker:
         # 2. Module-level symbols (functions only, for now)
         assert self._current_func_env is not None
         module_name = self._current_func_env.module_name
-        mod_env = self.module_envs.get(module_name)
 
-        if mod_env is None:
-            return None
-
-        sym = mod_env.all.get(expr.name)
+        sym_result = resolve_symbol(self.module_envs, module_name, expr.name)
+        sym = sym_result.symbol
         if sym is None:
             # Unknown name; NameResolver should normally have flagged this
             # already, but we defensively add a diagnostic instead of
@@ -869,11 +866,9 @@ class ExpressionTypeChecker:
         """Try to resolve an identifier as a type name. Returns None if not a type."""
         assert self._current_func_env is not None
         module_name = self._current_func_env.module_name
-        env = self.module_envs.get(module_name)
-        if env is None:
-            return None
 
-        sym = env.all.get(name)
+        sym_result = resolve_symbol(self.module_envs, module_name, name)
+        sym = sym_result.symbol
         if sym is None:
             return None
 
@@ -947,13 +942,9 @@ class ExpressionTypeChecker:
         # Look up the callee symbol to determine if it's a function, struct, or enum variant
         assert self._current_func_env is not None
         module_name = self._current_func_env.module_name
-        mod_env = self.module_envs.get(module_name)
 
-        if mod_env is None:
-            self._error(expr, f"[TYP-9189] internal error: no module env for '{module_name}'")
-            return None
-
-        sym = mod_env.all.get(expr.callee.name)
+        sym_result = resolve_symbol(self.module_envs, module_name, expr.callee.name)
+        sym = sym_result.symbol
         if sym is None:
             self._error(expr, f"[TYP-0189] unknown identifier '{expr.callee.name}'")
             return None
@@ -1218,70 +1209,46 @@ class ExpressionTypeChecker:
           - pointer_depth and is_nullable are applied afterward
         """
 
-        if not isinstance(tref, AstTypeRef):
-            return None
-
         # We need to know which module we are in.
         if self._current_func_env is None:
             return None
 
         module_name = self._current_func_env.module_name
-        env = self.module_envs.get(module_name)
-        if env is None:
-            return None
-
-        base_name = tref.name
-
-        # Builtins first (reserved names)
-        if base_name in L0_PRIMITIVE_TYPES:
-            base: Type = get_builtin_type(base_name)
-        else:
-            sym = env.all.get(base_name)
-            if sym is None:
-                # Unknown type name in this module
+        result = resolve_type_ref(self.module_envs, module_name, tref)
+        if result.type is None:
+            if result.error is TypeResolveErrorKind.INVALID_NULLABLE_VOID:
+                self._error(tref, "[TYP-0278] type 'void' cannot be nullable")
+                return None
+            if result.error is TypeResolveErrorKind.VARIANT_AS_TYPE:
+                return None
+            if result.error is TypeResolveErrorKind.UNKNOWN_TYPE:
                 self._error(
                     tref,
-                    f"[TYP-0279] unknown type '{base_name}' in module '{module_name}'",
+                    f"[TYP-0279] unknown type '{result.name}' in module '{module_name}'",
+                )
+                return None
+            if result.error in (TypeResolveErrorKind.UNKNOWN_MODULE, TypeResolveErrorKind.MODULE_NOT_IMPORTED):
+                self._error(
+                    tref,
+                    f"[TYP-0279] unknown type '{result.name}' in module '{module_name}'",
+                )
+                return None
+            if result.error is TypeResolveErrorKind.UNRESOLVED_ALIAS:
+                self._error(
+                    tref,
+                    f"[TYP-0270] type alias '{result.name}' in module '{module_name}'"
+                    " does not have a resolved type",
+                )
+                return None
+            if result.error is TypeResolveErrorKind.NOT_A_TYPE:
+                self._error(
+                    tref,
+                    f"[TYP-0271] symbol '{result.name}' in module '{module_name}' "
+                    f"is not a type (kind={result.symbol.kind.name})",
                 )
                 return None
 
-            if sym.kind == SymbolKind.STRUCT:
-                base = StructType(sym.module.name, sym.name)
-            elif sym.kind == SymbolKind.ENUM:
-                base = EnumType(sym.module.name, sym.name)
-            elif sym.kind == SymbolKind.ENUM_VARIANT:
-                return None # Variants cannot be used as types directly, let the caller handle this case
-            elif sym.kind == SymbolKind.TYPE_ALIAS:
-                # SignatureResolver should already have resolved aliases and
-                # stored the resulting Type in sym.type.
-                if sym.type is None:
-                    # Be conservative if something went wrong earlier.
-                    self._error(
-                        tref,
-                        f"[TYP-0270] type alias '{base_name}' in module '{module_name}'"
-                        " does not have a resolved type",
-                    )
-                    return None
-                base = sym.type
-            else:
-                # Non-type symbol used as a type name
-                self._error(
-                    tref,
-                    f"[TYP-0271] symbol '{base_name}' in module '{module_name}' "
-                    f"is not a type (kind={sym.kind.name})",
-                )
-                return None
-
-        # Apply pointer depth
-        t: Type = base
-        for _ in range(tref.pointer_depth):
-            t = PointerType(t)
-
-        # Apply nullable suffix
-        if tref.is_nullable:
-            t = NullableType(t)
-
-        return t
+        return result.type
 
     # ------------------------------------------------------------------
     # Helpers: diagnostics and type comparisons
@@ -1411,7 +1378,8 @@ class ExpressionTypeChecker:
 
         if base_ty is None:
             # Type resolution failed - check if it's an enum variant constructor (e.g., new CaseA(42))
-            sym = mod_env.all.get(expr.type_ref.name)
+            sym_result = resolve_symbol(self.module_envs, module_name, expr.type_ref.name)
+            sym = sym_result.symbol
             if sym and sym.kind is SymbolKind.ENUM_VARIANT:
                 enum_ty = self._infer_variant_constructor(
                     CallExpr(callee=VarRef(name=expr.type_ref.name), args=expr.args), sym)

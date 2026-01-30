@@ -20,6 +20,7 @@ from l0_types import (
     FuncType,
     get_builtin_type,
 )
+from l0_resolve import resolve_symbol, resolve_type_ref, TypeResolveErrorKind
 
 
 @dataclass
@@ -113,70 +114,64 @@ class SignatureResolver:
 
         Returns a Type or None on error (and emits diagnostics).
         """
-        base_name = tref.name
-
-        # Builtins first (reserved names)
-        if base_name in L0_PRIMITIVE_TYPES:
-            base: Type = get_builtin_type(base_name)
-        else:
-            sym = env.all.get(base_name)
-            if sym is None:
+        result = resolve_type_ref(
+            self.module_envs,
+            env.name,
+            tref,
+            resolve_alias=lambda sym: self._resolve_type_alias_symbol(env, sym, alias_stack),
+        )
+        if result.type is None:
+            if result.error is TypeResolveErrorKind.UNKNOWN_TYPE:
                 self._emit(
                     diag_from_node(
                         kind="error",
-                        message=f"[SIG-0019] unknown type '{base_name}' in module '{env.name}'",
+                        message=f"[SIG-0019] unknown type '{result.name}' in module '{env.name}'",
                         module_name=env.name,
                         filename=env.module.filename,
-                        node=tref
+                        node=tref,
                     )
                 )
                 return None
-
-            if sym.kind == SymbolKind.STRUCT:
-                base = StructType(sym.module.name, sym.name)
-            elif sym.kind == SymbolKind.ENUM:
-                base = EnumType(sym.module.name, sym.name)
-            elif sym.kind == SymbolKind.TYPE_ALIAS:
-                base = self._resolve_type_alias_symbol(env, sym, alias_stack)
-                if base is None:
-                    return None
-            else:
+            if result.error in (TypeResolveErrorKind.UNKNOWN_MODULE, TypeResolveErrorKind.MODULE_NOT_IMPORTED):
                 self._emit(
                     diag_from_node(
                         kind="error",
-                        message=(
-                            f"[SIG-0010] symbol '{base_name}' in module '{env.name}' "
-                            f"is not a type (kind={sym.kind.name})"
-                        ),
+                        message=f"[SIG-0019] unknown type '{result.name}' in module '{env.name}'",
                         module_name=env.name,
                         filename=env.module.filename,
-                        node=tref
+                        node=tref,
                     )
                 )
                 return None
-
-        # Apply pointer depth
-        t: Type = base
-        for _ in range(tref.pointer_depth):
-            t = PointerType(t)
-
-        # Apply nullable suffix
-        if tref.is_nullable:
-            if t == get_builtin_type("void"):
+            if result.error is TypeResolveErrorKind.UNRESOLVED_ALIAS:
+                return None
+            if result.error is TypeResolveErrorKind.INVALID_NULLABLE_VOID:
                 self._emit(
                     diag_from_node(
                         kind="error",
                         message="[SIG-0011] type 'void' cannot be nullable",
                         module_name=env.name,
                         filename=env.module.filename,
-                        node=tref
+                        node=tref,
+                    )
+                )
+                return None
+            if result.error in (TypeResolveErrorKind.NOT_A_TYPE, TypeResolveErrorKind.VARIANT_AS_TYPE):
+                self._emit(
+                    diag_from_node(
+                        kind="error",
+                        message=(
+                            f"[SIG-0010] symbol '{result.name}' in module '{env.name}' "
+                            f"is not a type (kind={result.symbol.kind.name})"
+                        ),
+                        module_name=env.name,
+                        filename=env.module.filename,
+                        node=tref,
                     )
                 )
                 return None
 
-            t = NullableType(t)
-
-        return t
+        return result.type
 
     def _resolve_type_alias_symbol(
             self,
@@ -380,7 +375,8 @@ class SignatureResolver:
         elif isinstance(expr, CallExpr) and isinstance(expr.callee, VarRef):
             # Struct or enum variant construction: Point(1, 2) or Color.Red
             name = expr.callee.name
-            sym = env.all.get(name)
+            sym_result = resolve_symbol(self.module_envs, env.name, name)
+            sym = sym_result.symbol
             if sym is None:
                 return None
 

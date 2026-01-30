@@ -37,6 +37,7 @@ from l0_scope_context import ScopeContext
 from l0_types import (
     L0_PRIMITIVE_TYPES, Type, BuiltinType, StructType, EnumType, PointerType, NullableType, FuncType, format_type,
 )
+from l0_resolve import resolve_symbol, resolve_type_ref
 
 
 @dataclass
@@ -1836,35 +1837,8 @@ class Backend:
         This is needed so `let x: int? = null;` uses the declared type (int?) instead of
         the initializer type (null).
         """
-        # Builtins
-        if tref.name in L0_PRIMITIVE_TYPES:
-            base = BuiltinType(name=tref.name)
-        else:
-            # User type or alias (including imported symbols)
-            sym = self._lookup_symbol(tref.name, module_name)
-            if sym is None:
-                return None
-
-            if sym.kind is SymbolKind.TYPE_ALIAS and sym.type is not None:
-                base = sym.type
-            elif sym.kind is SymbolKind.STRUCT:
-                base = StructType(sym.module.name, sym.name)
-            elif sym.kind is SymbolKind.ENUM:
-                base = EnumType(sym.module.name, sym.name)
-            else:
-                return None
-
-        t = base
-
-        # Apply trailing '*'s from the TypeRef syntax
-        for _ in range(tref.pointer_depth):
-            t = PointerType(t)
-
-        # Apply trailing '?'
-        if tref.is_nullable:
-            t = NullableType(t)
-
-        return t
+        result = resolve_type_ref(self.analysis.module_envs, module_name, tref)
+        return result.type
 
     def _lookup_symbol(self, name: str, current_module_name: str) -> Optional[Symbol]:
         """
@@ -1873,22 +1847,13 @@ class Backend:
         This is used to determine which module a function is defined in
         so we can generate the correct mangled name.
         """
-        env = self.analysis.module_envs.get(current_module_name)
-        if not env:
-            return None
-        return env.all.get(name)
+        result = resolve_symbol(self.analysis.module_envs, current_module_name, name)
+        return result.symbol
 
     def _is_extern_function(self, sym: Symbol) -> bool:
-        """
-        Check if a symbol represents an extern function.
-
-        Extern functions are the FFI boundary and must NOT be mangled.
-        """
-        if sym.kind != SymbolKind.FUNC:
+        if sym.kind is not SymbolKind.FUNC:
             return False
-        if isinstance(sym.node, FuncDecl):
-            return sym.node.is_extern
-        return False
+        return isinstance(sym.node, FuncDecl) and sym.node.is_extern
 
     def find_variant_decl(
             self, module_name: str, enum_name: str, variant_name: str
