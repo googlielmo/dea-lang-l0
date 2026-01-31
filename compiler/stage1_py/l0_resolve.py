@@ -61,15 +61,28 @@ def _is_imported(current_env: ModuleEnv, module_name: str) -> bool:
 
 
 def resolve_symbol(
-    module_envs: Dict[str, ModuleEnv],
-    current_module: str,
-    name: str,
-    module_path: Optional[List[str]] = None,
-    *,
-    require_import: bool = True,
+        module_envs: Dict[str, ModuleEnv],
+        current_module: str,
+        name: str,
+        module_path: Optional[List[str]] = None,
+        *,
+        require_import: bool = True,
 ) -> SymbolResolution:
+    """
+    Resolve a symbol by name, optionally qualified by module path.
+    :param module_envs: the mapping of module names to their environments
+    :param current_module: the name of the current module performing the lookup
+    :param name: the name of the symbol to resolve
+    :param module_path: optional list of module names qualifying the symbol
+    :param require_import: whether to require the module to be imported for unqualified lookups
+    :return: a SymbolResolution object containing the result or error information.
+    """
     module_name = ".".join(module_path) if module_path else current_module
     current_env = module_envs.get(current_module)
+
+    # Treat lookups qualified with the current module as unqualified
+    if module_path is not None and module_name == current_module:
+        module_path = None
 
     if module_path and require_import:
         if current_env is None:
@@ -86,20 +99,21 @@ def resolve_symbol(
         # For unqualified lookups, check if the name is ambiguous
         if not module_path and name in env.ambiguous_imports:
             modules = tuple(env.ambiguous_imports[name])
-            return SymbolResolution(None, ResolveErrorKind.AMBIGUOUS_SYMBOL, module_name, name, ambiguous_modules=modules)
+            return SymbolResolution(None, ResolveErrorKind.AMBIGUOUS_SYMBOL,
+                                    module_name, name, ambiguous_modules=modules)
         return SymbolResolution(None, ResolveErrorKind.UNKNOWN_SYMBOL, module_name, name)
 
     return SymbolResolution(sym, None, module_name, name)
 
 
 def resolve_type_ref(
-    module_envs: Dict[str, ModuleEnv],
-    current_module: str,
-    tref: TypeRef,
-    module_path: Optional[List[str]] = None,
-    *,
-    resolve_alias: Optional[Callable[[Symbol], Optional[Type]]] = None,
-    require_import: bool = True,
+        module_envs: Dict[str, ModuleEnv],
+        current_module: str,
+        tref: TypeRef,
+        module_path: Optional[List[str]] = None,
+        *,
+        resolve_alias: Optional[Callable[[Symbol], Optional[Type]]] = None,
+        require_import: bool = True,
 ) -> TypeResolution:
     base_name = tref.name
 

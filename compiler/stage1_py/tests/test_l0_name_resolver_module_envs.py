@@ -230,7 +230,7 @@ def test_imported_symbol_conflicts_with_local_definition(tmp_path):
 
     # There should be a diagnostic complaining about the conflict (and it should be an error)
     msgs = [d.message for d in resolver.diagnostics]
-    assert any("conflicts with local definition" in msg for msg in msgs)
+    assert any("RES-0021" in msg for msg in msgs)
     kinds = {d.kind for d in resolver.diagnostics}
     assert kinds == {"warning"}
 
@@ -305,7 +305,7 @@ def test_local_and_imported_extern_with_same_signature_is_only_warning(tmp_path)
     if resolver.diagnostics:
         kinds = {d.kind for d in resolver.diagnostics}
         assert kinds == {"warning"}
-        assert any("is shadowed by local extern" in msg for msg in msgs)
+        assert any("RES-0020" in msg for msg in msgs)
 
 
 def test_local_and_imported_extern_with_different_signature_is_error(tmp_path):
@@ -363,6 +363,6 @@ def test_local_and_imported_extern_with_different_signature_is_error(tmp_path):
     # A conflict diagnostic should be reported (as a warning; local wins)
     assert resolver.diagnostics
     msgs = [d.message for d in resolver.diagnostics]
-    assert any("conflicts with local definition" in msg for msg in msgs)
+    assert any("RES-0021" in msg for msg in msgs)
     kinds = {d.kind for d in resolver.diagnostics}
     assert kinds == {"warning"}

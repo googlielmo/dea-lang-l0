@@ -68,6 +68,47 @@ def test_qualified_type_and_constructor(write_l0_file, temp_project):
     assert not result.has_errors()
 
 
+def test_qualified_variant_pattern_with_current_module_name(write_l0_file, temp_project):
+    write_l0_file(
+        "colors",
+        """
+        module colors;
+
+        enum Color {
+            Red;
+        }
+        """,
+    )
+
+    write_l0_file(
+        "main",
+        """
+        module main;
+        
+        import colors;
+
+        enum LocalColor {
+            Red;
+        }
+
+        func f(c: LocalColor) -> int {
+            match (c) {
+                main::Red => {
+                    return 1;
+                }
+            }
+        }
+        """,
+    )
+
+    paths = SourceSearchPaths()
+    paths.add_project_root(temp_project)
+    driver = L0Driver(search_paths=paths)
+
+    result = driver.analyze("main")
+    assert not result.has_errors()
+
+
 def test_qualified_expr_requires_import(write_l0_file, temp_project):
     write_l0_file(
         "main",
@@ -380,10 +421,10 @@ def test_ambiguous_identifier_error_message(write_l0_file, temp_project):
 
     result = driver.analyze("main")
     assert result.has_errors()
-    typ_0159_diags = [d for d in result.diagnostics if "TYP-0159" in d.message]
-    assert len(typ_0159_diags) > 0
-    assert any("ambiguous" in d.message for d in typ_0159_diags)
-    assert any("uno" in d.message and "due" in d.message for d in typ_0159_diags)
+    typ_0155_diags = [d for d in result.diagnostics if "TYP-0155" in d.message]
+    assert len(typ_0155_diags) > 0
+    assert any("ambiguous" in d.message for d in typ_0155_diags)
+    assert any("uno" in d.message and "due" in d.message for d in typ_0155_diags)
 
 
 def test_ambiguous_call_identifier(write_l0_file, temp_project):
@@ -530,10 +571,10 @@ def test_three_modules_ambiguous(write_l0_file, temp_project):
 
     result = driver.analyze("main")
     assert result.has_errors()
-    typ_0159_diags = [d for d in result.diagnostics if "TYP-0159" in d.message]
-    assert len(typ_0159_diags) > 0
-    assert any("ambiguous" in d.message for d in typ_0159_diags)
-    assert any("uno" in d.message and "due" in d.message and "tre" in d.message for d in typ_0159_diags)
+    typ_0155_diags = [d for d in result.diagnostics if "TYP-0155" in d.message]
+    assert len(typ_0155_diags) > 0
+    assert any("ambiguous" in d.message for d in typ_0155_diags)
+    assert any("uno" in d.message and "due" in d.message and "tre" in d.message for d in typ_0155_diags)
 
 
 def test_local_shadows_imported_struct(write_l0_file, temp_project):

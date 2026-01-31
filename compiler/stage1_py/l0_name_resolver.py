@@ -167,14 +167,12 @@ class NameResolver:
 
                     # Special-case: extern function prototypes
                     if self._extern_signatures_compatible(local_sym, sym):
-                        # Stay silent here or downgrade to a warning?
                         env.diagnostics.append(
                             diag_from_node(
                                 kind="warning",
                                 message=(
-                                    f"[RES-0020] imported extern function '{name}' from module "
-                                    f"'{imported_mod_name}' is shadowed by local extern "
-                                    f"in module '{env.name}'"
+                                    f"[RES-0020] imported extern function '{imported_mod_name}::{name}' "
+                                    f"will be shadowed by a compatible local extern declaration in module '{env.name}'"
                                 ),
                                 module_name=env.name,
                                 filename=env.module.filename,
@@ -184,13 +182,13 @@ class NameResolver:
                         # Keep local; do not import this symbol
                         continue
 
-                    # Fallback: real conflict
+                    # Fallback: report shadowing
                     env.diagnostics.append(
                         diag_from_node(
                             kind="warning",
                             message=(
-                                f"[RES-0021] imported symbol '{name}' from module '{imported_mod_name}' "
-                                f"conflicts with local definition in module '{env.name}'"
+                                f"[RES-0021] imported symbol '{imported_mod_name}::{name}' will be shadowed "
+                                f"by a local definition in module '{env.name}'"
                             ),
                             module_name=env.name,
                             filename=env.module.filename,
@@ -208,8 +206,11 @@ class NameResolver:
                             kind="warning",
                             message=(
                                 f"[RES-0022] symbol '{name}' imported from multiple modules "
-                                f"('{prev_module}', '{imported_mod_name}') into '{env.name}'"
+                                f"('{prev_module}', '{imported_mod_name}') into '{env.name}'; "
+                                f"unqualified '{name}' will be ambiguous unless a local definition shadows it; "
+                                f"otherwise qualify as '<module>::{name}'"
                             ),
+
                             module_name=env.name,
                             filename=env.module.filename,
                             node=imp,

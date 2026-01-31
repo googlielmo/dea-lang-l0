@@ -721,19 +721,19 @@ class ExpressionTypeChecker:
             if sym_result.error is ResolveErrorKind.UNKNOWN_MODULE:
                 self._error(
                     expr,
-                    f"[TYP-0159] unknown identifier '{qualified_name}' (unknown module '{sym_result.module_name}')",
+                    f"[TYP-0153] unknown identifier '{qualified_name}' (unknown module '{sym_result.module_name}')",
                 )
             elif sym_result.error is ResolveErrorKind.MODULE_NOT_IMPORTED:
                 self._error(
                     expr,
-                    f"[TYP-0159] unknown identifier '{qualified_name}' (module '{sym_result.module_name}' not imported)",
+                    f"[TYP-0154] unknown identifier '{qualified_name}' (module '{sym_result.module_name}' not imported)",
                 )
             elif sym_result.error is ResolveErrorKind.AMBIGUOUS_SYMBOL:
                 modules_str = "', '".join(sym_result.ambiguous_modules)
                 hints = " or ".join(f"'{m}::{expr.name}'" for m in sym_result.ambiguous_modules)
                 self._error(
                     expr,
-                    f"[TYP-0159] ambiguous identifier '{expr.name}' (imported from modules '{modules_str}'); "
+                    f"[TYP-0155] ambiguous identifier '{expr.name}' (imported from modules '{modules_str}'); "
                     f"use {hints} to disambiguate",
                 )
             else:
@@ -979,19 +979,19 @@ class ExpressionTypeChecker:
                     if sym_result.error is ResolveErrorKind.UNKNOWN_MODULE:
                         self._error(
                             node,
-                            f"[TYP-0159] unknown identifier '{qualified_name}' (unknown module '{sym_result.module_name}')",
+                            f"[TYP-0300] unknown type '{qualified_name}' (unknown module '{sym_result.module_name}')",
                         )
                     else:
                         self._error(
                             node,
-                            f"[TYP-0159] unknown identifier '{qualified_name}' (module '{sym_result.module_name}' not imported)",
+                            f"[TYP-0301] unknown type '{qualified_name}' (module '{sym_result.module_name}' not imported)",
                         )
             elif sym_result.error is ResolveErrorKind.AMBIGUOUS_SYMBOL and node is not None:
                 modules_str = "', '".join(sym_result.ambiguous_modules)
                 hints = " or ".join(f"'{m}::{name}'" for m in sym_result.ambiguous_modules)
                 self._error(
                     node,
-                    f"[TYP-0159] ambiguous identifier '{name}' (imported from modules '{modules_str}'); "
+                    f"[TYP-0303] ambiguous identifier '{name}' (imported from modules '{modules_str}'); "
                     f"use {hints} to disambiguate",
                 )
             return None
