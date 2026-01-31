@@ -31,7 +31,7 @@ from l0_types import (
     get_null_type,
     format_type, L0_PRIMITIVE_TYPES,
 )
-from l0_resolve import resolve_symbol, resolve_type_ref, TypeResolveErrorKind
+from l0_resolve import resolve_symbol, resolve_type_ref, TypeResolveErrorKind, ResolveErrorKind
 
 
 # Expression type checking for L0
@@ -202,6 +202,28 @@ class ExpressionTypeChecker:
                         node,
                         f"[TYP-0022] local variable '{name}' shadows enum variant '{sym.module.name}::{name}'",
                     )
+            elif sym is not None and sym.kind in (SymbolKind.FUNC, SymbolKind.STRUCT,
+                                                   SymbolKind.ENUM, SymbolKind.TYPE_ALIAS):
+                kind_label = sym.kind.name.lower().replace("_", " ")
+                if sym.module.name != module_name:
+                    self._warn(
+                        node,
+                        f"[TYP-0025] local variable '{name}' shadows imported "
+                        f"{kind_label} '{sym.module.name}::{name}'",
+                    )
+                else:
+                    self._warn(
+                        node,
+                        f"[TYP-0025] local variable '{name}' shadows "
+                        f"{kind_label} '{sym.module.name}::{name}'",
+                    )
+            elif sym is None and sym_result.error is ResolveErrorKind.AMBIGUOUS_SYMBOL:
+                modules_str = "', '".join(sym_result.ambiguous_modules)
+                self._warn(
+                    node,
+                    f"[TYP-0024] local variable '{name}' shadows ambiguous imported symbol "
+                    f"(from modules '{modules_str}')",
+                )
 
         local[name] = typ
         self._alive_scopes[-1][name] = True
@@ -437,9 +459,58 @@ class ExpressionTypeChecker:
                 try:
                     # Bind pattern variables if this is a variant pattern
                     if isinstance(arm.pattern, VariantPattern) and isinstance(scrutinee_ty, EnumType):
+                        invalid_variant = False
+                        if self._reject_name_qualifier(
+                            arm.pattern, arm.pattern.name,
+                            arm.pattern.name_qualifier, arm.pattern.module_path
+                        ):
+                            invalid_variant = True
+                        elif arm.pattern.module_path is not None:
+                            assert self._current_func_env is not None
+                            module_name = self._current_func_env.module_name
+                            sym_result = resolve_symbol(
+                                self.module_envs,
+                                module_name,
+                                arm.pattern.name,
+                                module_path=arm.pattern.module_path,
+                            )
+                            sym = sym_result.symbol
+                            qualified = f"{'.'.join(arm.pattern.module_path)}::{arm.pattern.name}"
+                            if sym is None:
+                                if sym_result.error is ResolveErrorKind.UNKNOWN_MODULE:
+                                    self._error(
+                                        arm.pattern,
+                                        f"[TYP-0102] unknown variant '{qualified}' for enum '{format_type(scrutinee_ty)}'"
+                                        f" (unknown module '{sym_result.module_name}')",
+                                    )
+                                elif sym_result.error is ResolveErrorKind.MODULE_NOT_IMPORTED:
+                                    self._error(
+                                        arm.pattern,
+                                        f"[TYP-0102] unknown variant '{qualified}' for enum '{format_type(scrutinee_ty)}'"
+                                        f" (module '{sym_result.module_name}' not imported)",
+                                    )
+                                else:
+                                    self._error(
+                                        arm.pattern,
+                                        f"[TYP-0102] unknown variant '{qualified}' for enum '{format_type(scrutinee_ty)}'",
+                                    )
+                                invalid_variant = True
+                            elif sym.kind is not SymbolKind.ENUM_VARIANT:
+                                self._error(
+                                    arm.pattern,
+                                    f"[TYP-0102] unknown variant '{qualified}' for enum '{format_type(scrutinee_ty)}'",
+                                )
+                                invalid_variant = True
+                            elif sym.module.name != scrutinee_ty.module:
+                                self._error(
+                                    arm.pattern,
+                                    f"[TYP-0102] unknown variant '{qualified}' for enum '{format_type(scrutinee_ty)}'",
+                                )
+                                invalid_variant = True
+
                         # Look up the enum and variant info
                         enum_info = self.enum_infos.get((scrutinee_ty.module, scrutinee_ty.name))
-                        if enum_info:
+                        if enum_info and not invalid_variant:
                             variant_info = enum_info.variants.get(arm.pattern.name)
                             if variant_info:
                                 # Check arity matches
@@ -621,26 +692,52 @@ class ExpressionTypeChecker:
         return result
 
     def _infer_var_ref(self, expr: VarRef) -> Optional[Type]:
+        # Reject overqualified names early (e.g. color::Color::Red)
+        if self._reject_name_qualifier(expr, expr.name, expr.name_qualifier, expr.module_path):
+            return None
+
         # 1. Locals / parameters
-        local_ty = self._lookup_local(expr.name)
-        if local_ty is not None:
-            self.analysis.var_ref_resolution[id(expr)] = VarRefResolution.LOCAL
-            alive = self._lookup_alive(expr.name)
-            if alive is False:
-                self._error(expr, f"[TYP-0150] use of dropped variable '{expr.name}'")
-            return local_ty
+        if expr.module_path is None:
+            local_ty = self._lookup_local(expr.name)
+            if local_ty is not None:
+                self.analysis.var_ref_resolution[id(expr)] = VarRefResolution.LOCAL
+                alive = self._lookup_alive(expr.name)
+                if alive is False:
+                    self._error(expr, f"[TYP-0150] use of dropped variable '{expr.name}'")
+                return local_ty
 
         # 2. Module-level symbols (functions only, for now)
         assert self._current_func_env is not None
         module_name = self._current_func_env.module_name
 
-        sym_result = resolve_symbol(self.module_envs, module_name, expr.name)
+        sym_result = resolve_symbol(self.module_envs, module_name, expr.name, module_path=expr.module_path)
         sym = sym_result.symbol
         if sym is None:
-            # Unknown name; NameResolver should normally have flagged this
-            # already, but we defensively add a diagnostic instead of
-            # crashing.
-            self._error(expr, f"[TYP-0159] unknown identifier '{expr.name}'")
+            qualified_name = (
+                f"{'.'.join(expr.module_path)}::{expr.name}"
+                if expr.module_path
+                else expr.name
+            )
+            if sym_result.error is ResolveErrorKind.UNKNOWN_MODULE:
+                self._error(
+                    expr,
+                    f"[TYP-0159] unknown identifier '{qualified_name}' (unknown module '{sym_result.module_name}')",
+                )
+            elif sym_result.error is ResolveErrorKind.MODULE_NOT_IMPORTED:
+                self._error(
+                    expr,
+                    f"[TYP-0159] unknown identifier '{qualified_name}' (module '{sym_result.module_name}' not imported)",
+                )
+            elif sym_result.error is ResolveErrorKind.AMBIGUOUS_SYMBOL:
+                modules_str = "', '".join(sym_result.ambiguous_modules)
+                hints = " or ".join(f"'{m}::{expr.name}'" for m in sym_result.ambiguous_modules)
+                self._error(
+                    expr,
+                    f"[TYP-0159] ambiguous identifier '{expr.name}' (imported from modules '{modules_str}'); "
+                    f"use {hints} to disambiguate",
+                )
+            else:
+                self._error(expr, f"[TYP-0159] unknown identifier '{qualified_name}'")
             return None
 
         if sym.kind is SymbolKind.FUNC and sym.type is not None:
@@ -844,7 +941,7 @@ class ExpressionTypeChecker:
         if isinstance(arg, VarRef):
             # Could be sizeof(TypeName) or sizeof(variable)
             # Try resolving as type first
-            target_ty = self._try_resolve_type_name(arg.name)
+            target_ty = self._try_resolve_type_name(arg.name, node=arg, module_path=arg.module_path)
             if target_ty is not None:
                 if self._is_void(target_ty):
                     self._error(expr, "[TYP-0240] cannot take sizeof(void)")
@@ -862,14 +959,41 @@ class ExpressionTypeChecker:
         self._store_sizeof_target(expr, arg_ty)
         return self.int_type
 
-    def _try_resolve_type_name(self, name: str) -> Optional[Type]:
+    def _try_resolve_type_name(
+        self,
+        name: str,
+        *,
+        node: Optional[Node] = None,
+        module_path: Optional[List[str]] = None,
+    ) -> Optional[Type]:
         """Try to resolve an identifier as a type name. Returns None if not a type."""
         assert self._current_func_env is not None
         module_name = self._current_func_env.module_name
 
-        sym_result = resolve_symbol(self.module_envs, module_name, name)
+        sym_result = resolve_symbol(self.module_envs, module_name, name, module_path=module_path)
         sym = sym_result.symbol
         if sym is None:
+            if module_path and sym_result.error in (ResolveErrorKind.UNKNOWN_MODULE, ResolveErrorKind.MODULE_NOT_IMPORTED):
+                qualified_name = f"{'.'.join(module_path)}::{name}"
+                if node is not None:
+                    if sym_result.error is ResolveErrorKind.UNKNOWN_MODULE:
+                        self._error(
+                            node,
+                            f"[TYP-0159] unknown identifier '{qualified_name}' (unknown module '{sym_result.module_name}')",
+                        )
+                    else:
+                        self._error(
+                            node,
+                            f"[TYP-0159] unknown identifier '{qualified_name}' (module '{sym_result.module_name}' not imported)",
+                        )
+            elif sym_result.error is ResolveErrorKind.AMBIGUOUS_SYMBOL and node is not None:
+                modules_str = "', '".join(sym_result.ambiguous_modules)
+                hints = " or ".join(f"'{m}::{name}'" for m in sym_result.ambiguous_modules)
+                self._error(
+                    node,
+                    f"[TYP-0159] ambiguous identifier '{name}' (imported from modules '{modules_str}'); "
+                    f"use {hints} to disambiguate",
+                )
             return None
 
         if sym.kind == SymbolKind.STRUCT:
@@ -939,14 +1063,44 @@ class ExpressionTypeChecker:
                 self._infer_expr(arg)
             return None
 
+        # Reject overqualified callee names early (e.g. color::Color::Red(...))
+        if isinstance(expr.callee, VarRef) and self._reject_name_qualifier(
+            expr, expr.callee.name, expr.callee.name_qualifier, expr.callee.module_path
+        ):
+            return None
+
         # Look up the callee symbol to determine if it's a function, struct, or enum variant
         assert self._current_func_env is not None
         module_name = self._current_func_env.module_name
 
-        sym_result = resolve_symbol(self.module_envs, module_name, expr.callee.name)
+        sym_result = resolve_symbol(self.module_envs, module_name, expr.callee.name, module_path=expr.callee.module_path)
         sym = sym_result.symbol
         if sym is None:
-            self._error(expr, f"[TYP-0189] unknown identifier '{expr.callee.name}'")
+            qualified_name = (
+                f"{'.'.join(expr.callee.module_path)}::{expr.callee.name}"
+                if expr.callee.module_path
+                else expr.callee.name
+            )
+            if sym_result.error is ResolveErrorKind.UNKNOWN_MODULE:
+                self._error(
+                    expr,
+                    f"[TYP-0189] unknown identifier '{qualified_name}' (unknown module '{sym_result.module_name}')",
+                )
+            elif sym_result.error is ResolveErrorKind.MODULE_NOT_IMPORTED:
+                self._error(
+                    expr,
+                    f"[TYP-0189] unknown identifier '{qualified_name}' (module '{sym_result.module_name}' not imported)",
+                )
+            elif sym_result.error is ResolveErrorKind.AMBIGUOUS_SYMBOL:
+                modules_str = "', '".join(sym_result.ambiguous_modules)
+                hints = " or ".join(f"'{m}::{expr.callee.name}'" for m in sym_result.ambiguous_modules)
+                self._error(
+                    expr,
+                    f"[TYP-0189] ambiguous identifier '{expr.callee.name}' (imported from modules '{modules_str}'); "
+                    f"use {hints} to disambiguate",
+                )
+            else:
+                self._error(expr, f"[TYP-0189] unknown identifier '{qualified_name}'")
             return None
 
         # Handle struct constructors or type-alias-to-struct constructors
@@ -1213,24 +1367,37 @@ class ExpressionTypeChecker:
         if self._current_func_env is None:
             return None
 
+        # Reject overqualified type references (e.g. color::Color::Red as a type)
+        if self._reject_name_qualifier(tref, tref.name, tref.name_qualifier, tref.module_path):
+            return None
+
         module_name = self._current_func_env.module_name
-        result = resolve_type_ref(self.module_envs, module_name, tref)
+        result = resolve_type_ref(self.module_envs, module_name, tref, module_path=tref.module_path)
         if result.type is None:
             if result.error is TypeResolveErrorKind.INVALID_NULLABLE_VOID:
                 self._error(tref, "[TYP-0278] type 'void' cannot be nullable")
                 return None
             if result.error is TypeResolveErrorKind.VARIANT_AS_TYPE:
                 return None
+            if result.error is TypeResolveErrorKind.AMBIGUOUS_TYPE:
+                modules_str = "', '".join(result.ambiguous_modules)
+                hints = " or ".join(f"'{m}::{result.name}'" for m in result.ambiguous_modules)
+                self._error(
+                    tref,
+                    f"[TYP-0279] ambiguous type '{result.name}' (imported from modules '{modules_str}'); "
+                    f"use {hints} to disambiguate",
+                )
+                return None
             if result.error is TypeResolveErrorKind.UNKNOWN_TYPE:
                 self._error(
                     tref,
-                    f"[TYP-0279] unknown type '{result.name}' in module '{module_name}'",
+                    f"[TYP-0279] unknown type '{result.name}' in module '{result.module_name}'",
                 )
                 return None
             if result.error in (TypeResolveErrorKind.UNKNOWN_MODULE, TypeResolveErrorKind.MODULE_NOT_IMPORTED):
                 self._error(
                     tref,
-                    f"[TYP-0279] unknown type '{result.name}' in module '{module_name}'",
+                    f"[TYP-0279] unknown type '{result.name}' in module '{result.module_name}'",
                 )
                 return None
             if result.error is TypeResolveErrorKind.UNRESOLVED_ALIAS:
@@ -1361,6 +1528,29 @@ class ExpressionTypeChecker:
         else:
             return "expression"
 
+    def _reject_name_qualifier(
+        self,
+        node: Node,
+        name: str,
+        name_qualifier: Optional[List[str]],
+        module_path: Optional[List[str]],
+    ) -> bool:
+        """If name_qualifier is present, emit error and return True."""
+        if name_qualifier is None:
+            return False
+        full = "::".join(name_qualifier + [name])
+        if module_path:
+            full = f"{'.'.join(module_path)}::{full}"
+        simple = name
+        if module_path:
+            simple = f"{'.'.join(module_path)}::{name}"
+        self._error(
+            node,
+            f"[TYP-0158] qualified symbol paths ('{full}') are not supported; "
+            f"use '{simple}' to refer to the symbol directly",
+        )
+        return True
+
     def _infer_new(self, expr: NewExpr) -> Optional[Type]:
         # `new TYPE(args...)` allocates a TYPE instance on the heap and returns a pointer.
         # TYPE can be any type (builtin/struct/type-alias) or an enum variant constructor.
@@ -1378,11 +1568,18 @@ class ExpressionTypeChecker:
 
         if base_ty is None:
             # Type resolution failed - check if it's an enum variant constructor (e.g., new CaseA(42))
-            sym_result = resolve_symbol(self.module_envs, module_name, expr.type_ref.name)
+            sym_result = resolve_symbol(
+                self.module_envs,
+                module_name,
+                expr.type_ref.name,
+                module_path=expr.type_ref.module_path,
+            )
             sym = sym_result.symbol
             if sym and sym.kind is SymbolKind.ENUM_VARIANT:
                 enum_ty = self._infer_variant_constructor(
-                    CallExpr(callee=VarRef(name=expr.type_ref.name), args=expr.args), sym)
+                    CallExpr(callee=VarRef(name=expr.type_ref.name, module_path=expr.type_ref.module_path), args=expr.args),
+                    sym,
+                )
                 return PointerType(enum_ty) if enum_ty else None
             return self._error(expr, f"[TYP-0280] unknown type in 'new' expression")
 

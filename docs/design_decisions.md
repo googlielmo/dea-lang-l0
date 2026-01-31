@@ -213,9 +213,38 @@ Notes:
 * If future stages need streaming or very large files, we can add a separate file-handle API later without changing
   existing compiler logic.
 
-## 6. Containers and Pretty Printer in L0
+## 6. Qualified Names for Module Disambiguation
 
-### 6.1. Specialized Containers (No Generics Yet)
+To disambiguate symbols imported from multiple modules, L0 supports qualified names of the form
+`module.path::Symbol`.
+
+Design choices:
+
+* Qualified names are permitted in **types**, **expressions**, and **match variant patterns**.
+* The module path must refer to an **imported module**; otherwise it is a compile-time error.
+* Qualified lookup resolves against the **target module's locals** and does not participate in open import merging.
+* Unqualified names continue to follow the existing open-import rules; ambiguous imports remain errors and do not
+  become available without qualification.
+* `::` is reserved for module qualification only (no namespaces or aliases yet).
+* Multi-segment paths like `color::Color::Red` are parsed but rejected during semantic analysis. The parser consumes
+  the full `::` chain to produce a clear error message suggesting the correct `module::Name` form, rather than leaving
+  unconsumed tokens that produce confusing parse errors.
+
+Examples:
+
+```l0
+import util.math;
+
+let x: util.math::Vector = util.math::Vector(0, 1);
+let n: int = util.math::norm(x);
+```
+
+This keeps Stage 1/2 name resolution simple and preserves existing ambiguity checks, while allowing explicit
+module-qualified references when needed.
+
+## 7. Containers and Pretty Printer in L0
+
+### 7.1. Specialized Containers (No Generics Yet)
 
 Given Stage 1 has **no generics**, we adopt specialized containers with a common pattern. Example:
 
@@ -245,7 +274,7 @@ Implementation:
 * Element size is known by convention or small helper functions.
 * All container resizing and lifetime rules are explicit and simple.
 
-### 6.2. Maps and Symbol Tables
+### 7.2. Maps and Symbol Tables
 
 For symbol tables and similar:
 
@@ -257,7 +286,7 @@ For symbol tables and similar:
 
 This keeps hashing and resizing complexity out of the early L0 runtime.
 
-### 6.3. String Builder and Printer
+### 7.3. String Builder and Printer
 
 For C codegen and diagnostics, we use a simple **StringBuilder** and **Printer** in L0.
 
@@ -296,9 +325,9 @@ C codegen and diagnostic printing use `Printer` to manage indentation and layout
 
 This keeps generated C and diagnostics readable and consistent.
 
-## 7. Integer Model and Mapping to C
+## 8. Integer Model and Mapping to C
 
-### 7.1. L0 Integer Semantics
+### 8.1. L0 Integer Semantics
 
 L0 **does not** simply inherit whatever integer sizes C happens to use.
 
@@ -318,7 +347,7 @@ This makes L0 programs’ behavior independent of:
 
 * Whether the C implementation uses LP64, LLP64, ILP32, etc.
 
-### 7.2. C Backend Mapping
+### 8.2. C Backend Mapping
 
 Generated C always uses an internal, fixed-width layer, e.g.:
 
@@ -340,7 +369,7 @@ Mapping:
 
 The backend never emits plain `int`/`long` with semantic significance; it uses these typedefs instead.
 
-### 7.3. `size_t` and Large Sizes
+### 8.3. `size_t` and Large Sizes
 
 `size_t` is treated as a **kernel implementation detail only**:
 
@@ -375,9 +404,9 @@ Later, when `usize` is introduced in L0, we can map:
 
 * `usize` ↔ `size_t` or `uintptr_t` in a controlled way, still without exposing raw C types to L0 user code.
 
-## 8. C Backend Portability and Toolchain Abstraction
+## 9. C Backend Portability and Toolchain Abstraction
 
-### 8.1. Target C Subset
+### 9.1. Target C Subset
 
 L0’s backend targets a **conservative, strictly-conforming C subset**:
 
@@ -394,7 +423,7 @@ The generated C should be “boring”:
 * Use only `struct`, `enum`, `if`, `while`, `for`, `switch`, basic expressions.
 * Use fixed-width typedefs (`l0_int`, etc.) from `<stdint.h>`.
 
-### 8.2. Toolchain Configuration
+### 9.2. Toolchain Configuration
 
 The L0 compiler treats the C compiler as an **external toolchain object**, configured by:
 
@@ -411,7 +440,7 @@ Porting to a new C compiler is then primarily a matter of:
 * Adding a new toolchain configuration.
 * Possibly adjusting the kernel’s C code for platform-specific quirks.
 
-### 8.3. Kernel as the Only Non-portable C
+### 9.3. Kernel as the Only Non-portable C
 
 Any platform- or compiler-specific C code is strictly confined to the kernel:
 
@@ -424,7 +453,7 @@ The generated C from the L0 compiler remains free of such details, and only incl
 * `"l0_runtime.h"` (kernel API).
 * C standard headers (`<stdint.h>`, `<stddef.h>`, `<stdbool.h>`).
 
-## 9. Future Evolution
+## 10. Future Evolution
 
 Planned directions:
 
@@ -538,13 +567,11 @@ This gives fully defined semantics independent of the C implementation.
 
 The C backend implements these using 32-bit operations and explicit checks where needed.
 
-## 2. Top-level `const` and `let`
+## 2. Top-level `const`
 
 We extend the set of **top-level declarations** with:
 
 * `const` declarations (compile-time constants).
-
-* `let` declarations (global variables).
 
 ### 2.1. Syntax
 
@@ -553,12 +580,9 @@ At top level, allowed forms now include:
 ```l0
 // constant
 const NAME: Type = expr;
-
-// mutable global
-let NAME: Type = expr;
 ```
 
-in addition to existing `func`, `extern func`, `struct`, `enum`, `type` declarations.
+in addition to existing `func`, `extern func`, `struct`, `enum`, `type`, and `let` declarations.
 
 Examples:
 
@@ -567,8 +591,6 @@ module compiler.config;
 
 const MAX_PARSE_ERRORS: int = 50;
 const TAB_WIDTH: int = 4;
-
-let global_stats_enabled: bool = false;
 ```
 
 ### 2.2. Semantics of `const`
@@ -605,29 +627,7 @@ Implementation:
 
 `const` values are conceptually inlined; codegen is free to embed them as literals or as static data, as appropriate.
 
-### 2.3. Semantics of top-level `let`
-
-* A top-level `let` defines a **mutable global variable**, initialized before `main` runs.
-* The initializer is evaluated at program start, in a well-defined order (e.g. module order, or as defined later).
-* The initializer may be:
-
-    * Any expression valid at runtime (restricted to constant expressions in Stage 1).
-    * It may call functions, allocate memory, etc., if desired (later stages).
-
-Example:
-
-```l0
-let diagnostics_enabled: bool = true;
-
-let token_cache_capacity: int = 4096;
-```
-
-For Stage 2 compiler use, we can recommend:
-
-* Prefer `const` where possible (for configuration constants, sizes, flags).
-* Use global `let` sparingly, mainly for simple flags or counters.
-
-### 2.4. UB-free guarantees
+### 2.3. UB-free guarantees
 
 * Modifying a `const` is a **compile-time error** (not UB).
 * Reading/writing a top-level `let` is always well-defined in single-threaded semantics:

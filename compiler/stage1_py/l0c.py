@@ -144,7 +144,7 @@ def build_compilation_context(args: argparse.Namespace) -> CompilationContext:
         log_level = LogLevel.ERROR
 
     return CompilationContext(
-        emit_line_directives=not args.no_line_directives,
+        emit_line_directives=not getattr(args, 'no_line_directives', False),
         log_rich_format=log_rich_format,
         log_level=log_level,
     )

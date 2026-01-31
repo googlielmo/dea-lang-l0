@@ -21,10 +21,6 @@ class NameResolver:
         * duplicate local definitions
         * conflicts between local and imported definitions
         * conflicts between multiple imports exporting the same name
-
-    It does NOT yet:
-        * resolve expression/statement/local variable names
-        * handle qualified names, aliases, or using directives
     """
 
     def __init__(self, cu: CompilationUnit):
@@ -137,7 +133,7 @@ class NameResolver:
 
     def _open_imports(self, env: ModuleEnv) -> None:
         """
-        Apply Option B import semantics:
+        Apply the following import semantics:
 
         - For each imported module, add its locals into env.imported/env.all.
         - If a name collides with a local, keep the local and report an error.
@@ -191,7 +187,7 @@ class NameResolver:
                     # Fallback: real conflict
                     env.diagnostics.append(
                         diag_from_node(
-                            kind="error",
+                            kind="warning",
                             message=(
                                 f"[RES-0021] imported symbol '{name}' from module '{imported_mod_name}' "
                                 f"conflicts with local definition in module '{env.name}'"
@@ -204,12 +200,12 @@ class NameResolver:
                     # Keep local; do not overwrite
                     continue
 
-                # Name already imported from another module -> ambiguous
+                # Name already imported from another module -> ambiguous, will need disambiguation later
                 if name in env.imported and env.imported[name] is not sym:
                     prev_module = env.imported[name].module.name
                     env.diagnostics.append(
                         diag_from_node(
-                            kind="error",
+                            kind="warning",
                             message=(
                                 f"[RES-0022] symbol '{name}' imported from multiple modules "
                                 f"('{prev_module}', '{imported_mod_name}') into '{env.name}'"
@@ -222,6 +218,11 @@ class NameResolver:
                     # Remove from visible set; name becomes unusable
                     if name in env.all and env.all[name] is env.imported[name]:
                         del env.all[name]
+                    # Track ambiguous names for better diagnostics later
+                    if name not in env.ambiguous_imports:
+                        env.ambiguous_imports[name] = [prev_module, imported_mod_name]
+                    else:
+                        env.ambiguous_imports[name].append(imported_mod_name)
                     # Keep the first imported symbol in env.imported as bookkeeping,
                     # but resolution will consult env.all only.
                     continue

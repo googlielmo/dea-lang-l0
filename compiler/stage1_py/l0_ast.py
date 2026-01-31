@@ -30,6 +30,8 @@ class TypeRef(Node):
     name: str  # e.g. "int", "MyStruct", etc.
     pointer_depth: int = 0  # number of *
     is_nullable: bool = False  # trailing ?
+    module_path: Optional[List[str]] = None  # module path for qualified names
+    name_qualifier: Optional[List[str]] = None  # extra :: segments (e.g. Color in color::Color::Red)
 
 
 # --- declarations ---
@@ -201,6 +203,8 @@ class WildcardPattern(Pattern):
 class VariantPattern(Pattern):
     name: str
     vars: List[str]
+    module_path: Optional[List[str]] = None
+    name_qualifier: Optional[List[str]] = None  # extra :: segments (e.g. Color in color::Color::Red)
 
 
 # --- expressions ---
@@ -237,6 +241,8 @@ class NullLiteral(Expr):
 @dataclass
 class VarRef(Expr):
     name: str
+    module_path: Optional[List[str]] = None
+    name_qualifier: Optional[List[str]] = None  # extra :: segments (e.g. Color in color::Color::Red)
 
 
 @dataclass

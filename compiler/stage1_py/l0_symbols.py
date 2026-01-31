@@ -45,6 +45,7 @@ class ModuleEnv:
     locals: Dict[str, Symbol] = field(default_factory=dict)
     imported: Dict[str, Symbol] = field(default_factory=dict)
     all: Dict[str, Symbol] = field(default_factory=dict)
+    ambiguous_imports: Dict[str, List[str]] = field(default_factory=dict)
     diagnostics: List[Diagnostic] = field(default_factory=list)
 
     @property

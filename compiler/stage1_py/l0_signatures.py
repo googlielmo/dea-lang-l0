@@ -114,13 +114,46 @@ class SignatureResolver:
 
         Returns a Type or None on error (and emits diagnostics).
         """
+        # Reject overqualified type references (e.g. color::Color::Red as a type)
+        if tref.name_qualifier is not None:
+            full = "::".join(tref.name_qualifier + [tref.name])
+            if tref.module_path:
+                full = f"{'.'.join(tref.module_path)}::{full}"
+            simple = tref.name
+            if tref.module_path:
+                simple = f"{'.'.join(tref.module_path)}::{tref.name}"
+            self._emit(diag_from_node(
+                kind="error",
+                message=f"[SIG-0018] qualified symbol paths ('{full}') are not supported; "
+                        f"use '{simple}' to refer to the type directly",
+                module_name=env.name, filename=env.module.filename, node=tref,
+            ))
+            return None
+
         result = resolve_type_ref(
             self.module_envs,
             env.name,
             tref,
+            module_path=tref.module_path,
             resolve_alias=lambda sym: self._resolve_type_alias_symbol(env, sym, alias_stack),
         )
         if result.type is None:
+            if result.error is TypeResolveErrorKind.AMBIGUOUS_TYPE:
+                modules_str = "', '".join(result.ambiguous_modules)
+                hints = " or ".join(f"'{m}::{result.name}'" for m in result.ambiguous_modules)
+                self._emit(
+                    diag_from_node(
+                        kind="error",
+                        message=(
+                            f"[SIG-0019] ambiguous type '{result.name}' (imported from modules "
+                            f"'{modules_str}'); use {hints} to disambiguate"
+                        ),
+                        module_name=env.name,
+                        filename=env.module.filename,
+                        node=tref,
+                    )
+                )
+                return None
             if result.error is TypeResolveErrorKind.UNKNOWN_TYPE:
                 self._emit(
                     diag_from_node(
@@ -375,7 +408,7 @@ class SignatureResolver:
         elif isinstance(expr, CallExpr) and isinstance(expr.callee, VarRef):
             # Struct or enum variant construction: Point(1, 2) or Color.Red
             name = expr.callee.name
-            sym_result = resolve_symbol(self.module_envs, env.name, name)
+            sym_result = resolve_symbol(self.module_envs, env.name, name, module_path=expr.callee.module_path)
             sym = sym_result.symbol
             if sym is None:
                 return None
@@ -390,15 +423,11 @@ class SignatureResolver:
 
             # Enum variant constructor
             if sym.kind == SymbolKind.ENUM_VARIANT:
-                # Find which enum this variant belongs to by checking module declarations
-                for other_sym_name, other_sym in env.all.items():
-                    if other_sym.kind == SymbolKind.ENUM:
-                        # Check if this enum has the variant
-                        enum_decl = other_sym.node
-                        if isinstance(enum_decl, EnumDecl):
-                            for variant in enum_decl.variants:
-                                if variant.name == name:
-                                    return EnumType(other_sym.module.name, other_sym.name)
+                for decl in sym.module.decls:
+                    if isinstance(decl, EnumDecl):
+                        for variant in decl.variants:
+                            if variant.name == name:
+                                return EnumType(sym.module.name, decl.name)
                 return None
 
             return None

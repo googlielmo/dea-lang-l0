@@ -142,6 +142,7 @@ class Diagnostic:
                 loc += f":{self.column}"
             if self.module_name is not None:
                 loc += f"({self.module_name})"
+        if loc:
             loc += ": "
         return f"{loc}{self.kind}: {self.message}"
 

@@ -67,6 +67,36 @@ class Parser:
             raise ParseError(f"{msg}, got {self._peek()} instead", self._peek(), self.filename)
         return self._advance()
 
+    def _expect_variable_name(self, msg: str) -> Token:
+        tok = self._peek()
+        if tok.kind == TokenKind.FUTURE_EXTENSION:
+            raise ParseError(
+                f"[PAR-0010] invalid variable name '{tok.text}': reserved keyword",
+                tok,
+                self.filename,
+            )
+        tok = self._expect(TokenKind.IDENT, msg)
+        if is_reserved_keyword(tok.text):
+            raise ParseError(
+                f"[PAR-0011] invalid variable name '{tok.text}': reserved identifier",
+                tok,
+                self.filename,
+            )
+        return tok
+
+    def _span_start(self) -> Span:
+        here = self._peek()
+        return Span(here.line, here.column, here.line, here.column)
+
+    def _extend_span(self, start: Span) -> Span:
+        here = self._last()
+        return Span(
+            start.start_line,
+            start.start_column,
+            here.line,
+            here.column + len(here.text),
+        )
+
     def _get_dotted_module_name(self, first: Token) -> list[str]:
         parts = [first.text]
 
@@ -75,32 +105,27 @@ class Parser:
             parts.append(ident.text)
         return parts
 
-    # Variable name check
-
-    def _expect_variable_name(self, msg: str) -> Token:
-        tok = self._peek()
-        if tok.kind == TokenKind.FUTURE_EXTENSION:
-            raise ParseError(f"[PAR-0010] invalid variable name '{tok.text}': reserved keyword", tok, self.filename)
-        tok = self._expect(TokenKind.IDENT, msg)
-        if is_reserved_keyword(tok.text):
-            raise ParseError(f"[PAR-0011] invalid variable name '{tok.text}': reserved identifier", tok, self.filename)
-        return tok
-
-    # Span helpers
-    def _span_start(self) -> Span:
-        # “where we are now” before consuming the construct
-        here = self._peek()
-        return Span(here.line, here.column, here.line, here.column)  # 0-width span initially
-
-    def _extend_span(self, start: Span) -> Span:
-        # “where we are after parsing the construct”
-        here = self._last()
-        return Span(
-            start.start_line,
-            start.start_column,
-            here.line,
-            here.column + len(here.text),
-        )
+    def _try_parse_qualified_name(self) -> Optional[tuple[list[str], Optional[list[str]], Token]]:
+        if not self._check(TokenKind.IDENT):
+            return None
+        saved = self.index
+        first = self._advance()
+        parts = [first.text]
+        while self._match(TokenKind.DOT):
+            if not self._check(TokenKind.IDENT):
+                self.index = saved
+                return None
+            parts.append(self._advance().text)
+        if not self._match(TokenKind.DOUBLE_COLON):
+            self.index = saved
+            return None
+        name_tok = self._expect(TokenKind.IDENT, "[PAR-0401] expected identifier after '::'")
+        # Collect additional ::Ident segments (overqualified names like color::Color::Red)
+        qualifier: list[str] = []
+        while self._match(TokenKind.DOUBLE_COLON):
+            qualifier.append(name_tok.text)
+            name_tok = self._expect(TokenKind.IDENT, "[PAR-0401] expected identifier after '::'")
+        return parts, qualifier if qualifier else None, name_tok
 
     # --- entry point ---
 
@@ -252,7 +277,14 @@ class Parser:
 
     def _parse_type(self) -> TypeRef:
         start = self._span_start()
-        name_tok = self._expect(TokenKind.IDENT, "[PAR-0400] expected type name")
+        module_path = None
+        name_qualifier = None
+        name_tok = None
+        qualified = self._try_parse_qualified_name()
+        if qualified is not None:
+            module_path, name_qualifier, name_tok = qualified
+        else:
+            name_tok = self._expect(TokenKind.IDENT, "[PAR-0400] expected type name")
         pointer_depth = 0
         while self._match(TokenKind.STAR):
             pointer_depth += 1
@@ -262,7 +294,8 @@ class Parser:
         if self._peek().kind is TokenKind.LBRACKET:
             raise ParseError("[PAR-9401] array types not yet supported: use pointers and [] indexing in expressions",
                              self._peek(), self.filename)
-        return TypeRef(name_tok.text, pointer_depth, is_nullable, span=self._extend_span(start))
+        return TypeRef(name_tok.text, pointer_depth, is_nullable, module_path=module_path,
+                       name_qualifier=name_qualifier, span=self._extend_span(start))
 
     # --- blocks and statements ---
 
@@ -432,8 +465,15 @@ class Parser:
         if self._match(TokenKind.UNDERSCORE):
             return WildcardPattern(span=self._extend_span(start))
         # Variant pattern: Name(...) or just Name
-        if self._match(TokenKind.IDENT):
-            name_tok = self.tokens[self.index - 1]
+        if self._check(TokenKind.IDENT):
+            module_path = None
+            name_qualifier = None
+            name_tok = None
+            qualified = self._try_parse_qualified_name()
+            if qualified is not None:
+                module_path, name_qualifier, name_tok = qualified
+            else:
+                name_tok = self._advance()
             vars: List[str] = []
             if self._match(TokenKind.LPAREN):
                 if not self._check(TokenKind.RPAREN):
@@ -443,7 +483,8 @@ class Parser:
                         if not self._match(TokenKind.COMMA):
                             break
                 self._expect(TokenKind.RPAREN, "[PAR-0181] expected ')' in pattern")
-            return VariantPattern(name_tok.text, vars, span=self._extend_span(start))
+            return VariantPattern(name_tok.text, vars, module_path=module_path,
+                                  name_qualifier=name_qualifier, span=self._extend_span(start))
         raise ParseError(f"[PAR-0182] unexpected token in pattern: {self._peek()}", self._peek(), self.filename)
 
     def _parse_break_stmt(self) -> Stmt:
@@ -664,8 +705,14 @@ class Parser:
             return NullLiteral(span=self._extend_span(start))
 
         # Identifier (variable reference, or ambiguous type name resolved later)
-        if self._match(TokenKind.IDENT):
-            return VarRef(tok.text, span=self._extend_span(start))
+        if self._check(TokenKind.IDENT):
+            qualified = self._try_parse_qualified_name()
+            if qualified is not None:
+                module_path, name_qualifier, name_tok = qualified
+                return VarRef(name_tok.text, module_path=module_path,
+                              name_qualifier=name_qualifier, span=self._extend_span(start))
+            name_tok = self._advance()
+            return VarRef(name_tok.text, span=self._extend_span(start))
 
         # Parenthesized expression
         if self._match(TokenKind.LPAREN):

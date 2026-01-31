@@ -47,7 +47,7 @@ class CCodeBuilder:
         self.lines.append(line)
 
     def to_string(self) -> str:
-        return "\n".join(self.lines)
+        return "\n".join(self.lines) + "\n" # Ensure trailing newline
 
 
 @dataclass

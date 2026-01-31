@@ -232,7 +232,7 @@ def test_imported_symbol_conflicts_with_local_definition(tmp_path):
     msgs = [d.message for d in resolver.diagnostics]
     assert any("conflicts with local definition" in msg for msg in msgs)
     kinds = {d.kind for d in resolver.diagnostics}
-    assert kinds == {"error"}
+    assert kinds == {"warning"}
 
 
 def test_local_and_imported_extern_with_same_signature_is_only_warning(tmp_path):
@@ -360,9 +360,9 @@ def test_local_and_imported_extern_with_different_signature_is_error(tmp_path):
     assert "f" in env_main.all
     assert env_main.all["f"].module.name == "app.main"
 
-    # A conflict diagnostic should be reported (and it should be an error)
+    # A conflict diagnostic should be reported (as a warning; local wins)
     assert resolver.diagnostics
     msgs = [d.message for d in resolver.diagnostics]
     assert any("conflicts with local definition" in msg for msg in msgs)
     kinds = {d.kind for d in resolver.diagnostics}
-    assert "error" in kinds
+    assert kinds == {"warning"}

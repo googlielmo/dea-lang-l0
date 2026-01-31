@@ -55,6 +55,7 @@ class TokenKind(Enum):
     COMMA = auto()  # ,
     SEMI = auto()  # ;
     COLON = auto()  # :
+    DOUBLE_COLON = auto()  # ::
     ARROW_FUNC = auto()  # ->
     ARROW_MATCH = auto()  # =>
     EQ = auto()  # =
@@ -291,6 +292,9 @@ class Lexer:
         if c == ";":
             return Token(TokenKind.SEMI, c, start_line, start_col)
         if c == ":":
+            if self._peek() == ":":
+                self._advance()
+                return Token(TokenKind.DOUBLE_COLON, "::", start_line, start_col)
             return Token(TokenKind.COLON, c, start_line, start_col)
         if c == ".":
             return Token(TokenKind.DOT, c, start_line, start_col)

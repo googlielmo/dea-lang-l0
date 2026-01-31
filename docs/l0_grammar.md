@@ -54,7 +54,7 @@ Note: not all keywords are used in L<sub>0</sub>; some are reserved for future s
 ### 1.4 Symbols / operators
 
 ```text
-{ } ( ) [ ] ; , : .
+{ } ( ) [ ] ; , : . ::
 -> => 
 = == != < <= > >=
 + - * /
@@ -151,10 +151,17 @@ L<sub>0</sub> has simple named types, pointer suffixes, and an optional nullable
 ```ebnf
 Type                ::=     SimpleType PointerSuffix* NullableSuffix?
 
-SimpleType          ::=     Ident
+SimpleType          ::=     QualifiedIdent
 PointerSuffix       ::=     "*"
 NullableSuffix      ::=     "?"     (* applies to the preceding type syntactically *)
+
+QualifiedIdent      ::=     Ident
+                      |     ModulePath "::" Ident
+                      |     ModulePath "::" Ident ( "::" Ident )+   (* parsed, rejected semantically *)
 ```
+
+Note: multi-segment `::` paths (e.g. `color::Color::Red`) are consumed by the parser to avoid confusing leftover-token
+errors, but are rejected during semantic analysis with a diagnostic suggesting the correct single-`::` form.
 
 Examples (all syntactically valid types in L<sub>0</sub>):
 
@@ -236,7 +243,7 @@ Patterns (L<sub>0</sub> subset):
 ```ebnf
 Pattern             ::=     VariantPattern | WildcardPattern
 
-VariantPattern      ::=     Ident "(" ( PatternVarList )? ")"
+VariantPattern      ::=     QualifiedIdent "(" ( PatternVarList )? ")"
 PatternVarList      ::=     Ident ( "," Ident )*
 
 WildcardPattern     ::=     "_"
@@ -303,7 +310,7 @@ Arg                 ::=     TypeExpr
                       |     Expr
 
 TypeExpr            ::=     BuiltinTypeName ( "*" )* ( "?" )?
-                      |     Ident ( "*" )+ ( "?" )?
+                      |     QualifiedIdent ( "*" )+ ( "?" )?
 
 BuiltinTypeName     ::=     "int" | "byte" | "bool" | "string" | "void"
 
@@ -311,13 +318,15 @@ PrimaryExpr         ::=     IntLiteral
                       |     ByteLiteral
                       |     StringLiteral
                       |     BoolLiteral
-                      |     Ident
+                      |     QualifiedIdent
                       |     "new" Type ( "(" ArgList? ")" )?
                       |     "(" Expr ")"
 ```
 
 Notes:
 
+* `QualifiedIdent` in expressions resolves to a module-qualified symbol reference.
+  The module must be imported.
 * `Ident` as a primary expression is a simple variable reference.
   When the identifier resolves to a zero-argument enum variant, it acts as a constructor
   (e.g. `Red` is equivalent to `Red()`).
@@ -326,7 +335,7 @@ Notes:
 * `?` as a postfix operator is the **null propagation operator** (also known as the **try operator**).
 * `TypeExpr` allows types in argument position for intrinsics like `sizeof(int*)`.
 * A `TypeExpr` is syntactically unambiguous: either a builtin type name, or an identifier
-  followed by `*` or `?` suffixes that end at an argument boundary (`,` or `)`).
+  (including a qualified name) followed by `*` or `?` suffixes that end at an argument boundary (`,` or `)`).
 * Plain identifiers like `sizeof(Point)` parse as `Expr`; the type checker resolves
   whether `Point` refers to a type or variable.
 * `sizeof` is not a keyword; it's a compiler-recognized intrinsic function.

@@ -3,7 +3,7 @@
 
 from dataclasses import dataclass
 from enum import Enum, auto
-from typing import Dict, List, Optional, Callable
+from typing import Dict, List, Optional, Callable, Tuple
 
 from l0_ast import TypeRef
 from l0_symbols import ModuleEnv, Symbol, SymbolKind
@@ -23,6 +23,7 @@ class ResolveErrorKind(Enum):
     UNKNOWN_MODULE = auto()
     MODULE_NOT_IMPORTED = auto()
     UNKNOWN_SYMBOL = auto()
+    AMBIGUOUS_SYMBOL = auto()
 
 
 class TypeResolveErrorKind(Enum):
@@ -33,6 +34,7 @@ class TypeResolveErrorKind(Enum):
     UNKNOWN_MODULE = auto()
     MODULE_NOT_IMPORTED = auto()
     INVALID_NULLABLE_VOID = auto()
+    AMBIGUOUS_TYPE = auto()
 
 
 @dataclass(frozen=True)
@@ -41,6 +43,7 @@ class SymbolResolution:
     error: Optional[ResolveErrorKind]
     module_name: str
     name: str
+    ambiguous_modules: Optional[Tuple[str, ...]] = None
 
 
 @dataclass(frozen=True)
@@ -50,6 +53,7 @@ class TypeResolution:
     module_name: str
     name: str
     symbol: Optional[Symbol] = None
+    ambiguous_modules: Optional[Tuple[str, ...]] = None
 
 
 def _is_imported(current_env: ModuleEnv, module_name: str) -> bool:
@@ -79,6 +83,10 @@ def resolve_symbol(
 
     sym = env.locals.get(name) if module_path else env.all.get(name)
     if sym is None:
+        # For unqualified lookups, check if the name is ambiguous
+        if not module_path and name in env.ambiguous_imports:
+            modules = tuple(env.ambiguous_imports[name])
+            return SymbolResolution(None, ResolveErrorKind.AMBIGUOUS_SYMBOL, module_name, name, ambiguous_modules=modules)
         return SymbolResolution(None, ResolveErrorKind.UNKNOWN_SYMBOL, module_name, name)
 
     return SymbolResolution(sym, None, module_name, name)
@@ -119,6 +127,11 @@ def resolve_type_ref(
             err = TypeResolveErrorKind.UNKNOWN_MODULE
         elif sym_result.error is ResolveErrorKind.MODULE_NOT_IMPORTED:
             err = TypeResolveErrorKind.MODULE_NOT_IMPORTED
+        elif sym_result.error is ResolveErrorKind.AMBIGUOUS_SYMBOL:
+            return TypeResolution(
+                None, TypeResolveErrorKind.AMBIGUOUS_TYPE, sym_result.module_name, base_name,
+                ambiguous_modules=sym_result.ambiguous_modules,
+            )
         else:
             err = TypeResolveErrorKind.UNKNOWN_TYPE
         return TypeResolution(None, err, sym_result.module_name, base_name)

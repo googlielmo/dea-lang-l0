@@ -537,7 +537,7 @@ class Backend:
         if not self.current_module:
             self.ice("[ICE-1030] current_module not set during let initialization", node=expr)
 
-        sym = self._lookup_symbol(name, self.current_module)
+        sym = self._lookup_symbol(name, self.current_module, module_path=expr.callee.module_path)
         if sym is None:
             self.ice(f"[ICE-1031] unknown constructor name: {name}", node=expr)
 
@@ -1359,7 +1359,7 @@ class Backend:
 
         # Look up the symbol to check if this is actually a constructor
         if self.current_module:
-            sym = self._lookup_symbol(name, self.current_module)
+            sym = self._lookup_symbol(name, self.current_module, module_path=expr.callee.module_path)
             if sym is None:
                 return None
 
@@ -1481,7 +1481,7 @@ class Backend:
             # `new` for enums is only allowed via a variant constructor name.
             assert self.current_module is not None
             variant_name = expr.type_ref.name
-            sym = self._lookup_symbol(variant_name, self.current_module)
+            sym = self._lookup_symbol(variant_name, self.current_module, module_path=expr.type_ref.module_path)
             if sym is None or sym.kind != SymbolKind.ENUM_VARIANT:
                 self.ice("[ICE-1220] new enum allocation missing variant symbol (type checker invariant violated)", node=expr)
 
@@ -1614,7 +1614,7 @@ class Backend:
                     return ""
                 return self.emitter.emit_var_ref(self.emitter.mangle_identifier(expr.name))
             if self.current_module:
-                sym = self._lookup_symbol(expr.name, self.current_module)
+                sym = self._lookup_symbol(expr.name, self.current_module, module_path=expr.module_path)
                 if sym and sym.kind == SymbolKind.FUNC:
                     if self._is_extern_function(sym):
                         # Don't mangle extern functions
@@ -1655,7 +1655,7 @@ class Backend:
                 # Regular function call - look up and mangle the name
                 # CRITICAL: extern functions are NOT mangled (FFI boundary)
                 if self.current_module:
-                    sym = self._lookup_symbol(expr.callee.name, self.current_module)
+                    sym = self._lookup_symbol(expr.callee.name, self.current_module, module_path=expr.callee.module_path)
                     if sym and sym.kind == SymbolKind.FUNC:
                         if self._is_extern_function(sym):
                             # Don't mangle extern functions
@@ -1840,14 +1840,14 @@ class Backend:
         result = resolve_type_ref(self.analysis.module_envs, module_name, tref)
         return result.type
 
-    def _lookup_symbol(self, name: str, current_module_name: str) -> Optional[Symbol]:
+    def _lookup_symbol(self, name: str, current_module_name: str, module_path: Optional[List[str]] = None) -> Optional[Symbol]:
         """
         Look up a symbol in the current module's environment.
 
         This is used to determine which module a function is defined in
         so we can generate the correct mangled name.
         """
-        result = resolve_symbol(self.analysis.module_envs, current_module_name, name)
+        result = resolve_symbol(self.analysis.module_envs, current_module_name, name, module_path=module_path)
         return result.symbol
 
     def _is_extern_function(self, sym: Symbol) -> bool:

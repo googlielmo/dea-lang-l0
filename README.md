@@ -211,6 +211,7 @@ Key properties:
 
 * **No UB**: operations are defined or errors.
 * **Modules**: one file = one module (dotted names supported).
+* **Qualified names**: disambiguate imported symbols with `module.path::Symbol` in types, expressions, and patterns.
 * **Types**: builtins, structs, enums with payloads, type aliases.
 * **Automatically reference counted string values**: `string` is a first-class type.
 * **Pointers**: `T*`, nullable `T*?`; no address-of operator `&` in early stages.

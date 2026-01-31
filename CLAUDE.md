@@ -144,6 +144,12 @@ func eval(e: Expr*) -> int {
     }
 }
 
+// Qualified names for disambiguation
+import shapes;
+import colors;           // both export `Red`
+let p: shapes::Point = shapes::Point(1, 2);
+let c: colors::Color = colors::Red;
+
 // Optional types and try operator
 func safe_div(a: int, b: int) -> int? {
     if (b == 0) { return null; }
@@ -160,6 +166,16 @@ Types: `int`, `uint`, `byte`, `ubyte`, `bool`, `string`, `void`, `T*` (pointer),
 - `match` is statement-only (no expression match)
 - No generics, traits, or macros in Stage 1
 - Auto-dereference: `ptr.field` works without explicit `(*ptr).field`
+- Qualified names use a single `module::Name` form only. Multi-segment paths like `color::Color::Red` are parsed but
+  rejected during semantic analysis with a diagnostic suggesting the correct `module::Name` form.
+
+## Diagnostic Codes
+
+Every diagnostic message uses a unique code in the format `[XXX-NNNN]` (e.g., `[TYP-0158]`, `[SIG-0018]`, `[PAR-0401]`). Before adding a new diagnostic code, grep `compiler/stage1_py/` to confirm it is unused:
+
+```bash
+grep -r 'XXX-NNNN' --include='*.py' compiler/stage1_py/
+```
 
 ## Git Conventions
 
