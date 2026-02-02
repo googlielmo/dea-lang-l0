@@ -7,9 +7,8 @@ from dataclasses import dataclass
 from typing import Dict, Optional, List
 
 from l0_analysis import AnalysisResult, VarRefResolution
-from l0_logger import log_debug
 from l0_ast import (
-    Node, TypeRef as AstTypeRef, Stmt, Block, LetStmt, AssignStmt, ExprStmt, IfStmt, WhileStmt,
+    Node, Stmt, Block, LetStmt, AssignStmt, ExprStmt, IfStmt, WhileStmt,
     ReturnStmt, MatchArm, MatchStmt, Expr, IntLiteral, StringLiteral, BoolLiteral, NullLiteral, VarRef,
     UnaryOp, BinaryOp, CallExpr, IndexExpr, FieldAccessExpr, ParenExpr, CastExpr, VariantPattern,
     TryExpr, TypeExpr, DropStmt, NewExpr, WildcardPattern, BreakStmt, ContinueStmt, ForStmt, ByteLiteral,
@@ -17,6 +16,8 @@ from l0_ast import (
 from l0_compilation import CompilationUnit
 from l0_diagnostics import diag_from_node
 from l0_locals import FunctionEnv
+from l0_logger import log_debug
+from l0_resolve import resolve_symbol, resolve_type_ref, TypeResolveErrorKind, ResolveErrorKind
 from l0_symbols import ModuleEnv, SymbolKind, Symbol
 from l0_types import (
     Type,
@@ -29,9 +30,7 @@ from l0_types import (
     NullableType,
     NullType,
     get_null_type,
-    format_type, L0_PRIMITIVE_TYPES,
-)
-from l0_resolve import resolve_symbol, resolve_type_ref, TypeResolveErrorKind, ResolveErrorKind
+    format_type, )
 
 
 # Expression type checking for L0
@@ -103,13 +102,20 @@ class ExpressionTypeChecker:
         name resolution, signatures, and local scopes have been built.
         """
         if self.cu is None:
+            self._error(
+                None,
+                "[TYP-0001] no compilation unit available for expression type checking"
+            )
             return
 
         for key, func_env in self.func_envs.items():
             func_type = self.func_types.get(key)
             if func_type is None:
-                # SignatureResolver should have produced this; if it did not,
-                # we conservatively skip the function rather than crash.
+                # SignatureResolver should have produced this already
+                self._error(
+                    None,
+                    f"[TYP-0002] missing function type for '{func_env.module_name}::{func_env.func.name}'; skipping type check",
+                )
                 continue
 
             if func_env.func.is_extern:
@@ -203,7 +209,7 @@ class ExpressionTypeChecker:
                         f"[TYP-0022] local variable '{name}' shadows enum variant '{sym.module.name}::{name}'",
                     )
             elif sym is not None and sym.kind in (SymbolKind.FUNC, SymbolKind.STRUCT,
-                                                   SymbolKind.ENUM, SymbolKind.TYPE_ALIAS):
+                                                  SymbolKind.ENUM, SymbolKind.TYPE_ALIAS):
                 kind_label = sym.kind.name.lower().replace("_", " ")
                 if sym.module.name != module_name:
                     self._warn(
@@ -461,8 +467,8 @@ class ExpressionTypeChecker:
                     if isinstance(arm.pattern, VariantPattern) and isinstance(scrutinee_ty, EnumType):
                         invalid_variant = False
                         if self._reject_name_qualifier(
-                            arm.pattern, arm.pattern.name,
-                            arm.pattern.name_qualifier, arm.pattern.module_path
+                                arm.pattern, arm.pattern.name,
+                                arm.pattern.name_qualifier, arm.pattern.module_path
                         ):
                             invalid_variant = True
                         elif arm.pattern.module_path is not None:
@@ -960,11 +966,11 @@ class ExpressionTypeChecker:
         return self.int_type
 
     def _try_resolve_type_name(
-        self,
-        name: str,
-        *,
-        node: Optional[Node] = None,
-        module_path: Optional[List[str]] = None,
+            self,
+            name: str,
+            *,
+            node: Optional[Node] = None,
+            module_path: Optional[List[str]] = None,
     ) -> Optional[Type]:
         """Try to resolve an identifier as a type name. Returns None if not a type."""
         assert self._current_func_env is not None
@@ -973,7 +979,8 @@ class ExpressionTypeChecker:
         sym_result = resolve_symbol(self.module_envs, module_name, name, module_path=module_path)
         sym = sym_result.symbol
         if sym is None:
-            if module_path and sym_result.error in (ResolveErrorKind.UNKNOWN_MODULE, ResolveErrorKind.MODULE_NOT_IMPORTED):
+            if module_path and sym_result.error in (ResolveErrorKind.UNKNOWN_MODULE,
+                                                    ResolveErrorKind.MODULE_NOT_IMPORTED):
                 qualified_name = f"{'.'.join(module_path)}::{name}"
                 if node is not None:
                     if sym_result.error is ResolveErrorKind.UNKNOWN_MODULE:
@@ -1065,7 +1072,7 @@ class ExpressionTypeChecker:
 
         # Reject overqualified callee names early (e.g. color::Color::Red(...))
         if isinstance(expr.callee, VarRef) and self._reject_name_qualifier(
-            expr, expr.callee.name, expr.callee.name_qualifier, expr.callee.module_path
+                expr, expr.callee.name, expr.callee.name_qualifier, expr.callee.module_path
         ):
             return None
 
@@ -1073,7 +1080,8 @@ class ExpressionTypeChecker:
         assert self._current_func_env is not None
         module_name = self._current_func_env.module_name
 
-        sym_result = resolve_symbol(self.module_envs, module_name, expr.callee.name, module_path=expr.callee.module_path)
+        sym_result = resolve_symbol(self.module_envs, module_name, expr.callee.name,
+                                    module_path=expr.callee.module_path)
         sym = sym_result.symbol
         if sym is None:
             qualified_name = (
@@ -1474,13 +1482,13 @@ class ExpressionTypeChecker:
     def _is_nullable_or_ptr(self, t: Type) -> bool:
         return isinstance(t, (NullableType, PointerType))
 
-    def _error(self, node: Node, message: str) -> None:
+    def _error(self, node: Optional[Node], message: str) -> None:
         self._diagnostic(node, message, kind="error")
 
-    def _warn(self, node: Node, message: str) -> None:
+    def _warn(self, node: Optional[Node], message: str) -> None:
         self._diagnostic(node, message, kind="warning")
 
-    def _diagnostic(self, node: Node, message: str, kind: str = "info") -> None:
+    def _diagnostic(self, node: Optional[Node], message: str, kind: str = "info") -> None:
         mod_name = None
         filename = None
         if self.cu is not None and self._current_func_env is not None:
@@ -1529,11 +1537,11 @@ class ExpressionTypeChecker:
             return "expression"
 
     def _reject_name_qualifier(
-        self,
-        node: Node,
-        name: str,
-        name_qualifier: Optional[List[str]],
-        module_path: Optional[List[str]],
+            self,
+            node: Node,
+            name: str,
+            name_qualifier: Optional[List[str]],
+            module_path: Optional[List[str]],
     ) -> bool:
         """If name_qualifier is present, emit error and return True."""
         if name_qualifier is None:
@@ -1577,7 +1585,8 @@ class ExpressionTypeChecker:
             sym = sym_result.symbol
             if sym and sym.kind is SymbolKind.ENUM_VARIANT:
                 enum_ty = self._infer_variant_constructor(
-                    CallExpr(callee=VarRef(name=expr.type_ref.name, module_path=expr.type_ref.module_path), args=expr.args),
+                    CallExpr(callee=VarRef(name=expr.type_ref.name, module_path=expr.type_ref.module_path),
+                             args=expr.args),
                     sym,
                 )
                 return PointerType(enum_ty) if enum_ty else None
