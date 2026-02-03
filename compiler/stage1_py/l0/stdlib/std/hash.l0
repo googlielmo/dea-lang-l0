@@ -1,0 +1,47 @@
+/*
+ * SPDX-License-Identifier: MIT OR Apache-2.0
+ * Copyright (c) 2025-2026 gwz
+ */
+
+/**
+ * This module provides hashing functionality.
+ */
+module std.hash;
+
+// Hash functions for various types.
+
+// Hash a boolean value.
+extern func rt_hash_bool(value: bool) -> int;
+
+ // Hash a byte value.
+extern func rt_hash_byte(value: byte) -> int;
+
+// Hash an integer value.
+extern func rt_hash_int(value: int) -> int;
+
+// Hash a string value.
+extern func rt_hash_string(value: string) -> int;
+
+// Hash raw data given a pointer and its length.
+extern func rt_hash_data(data: void*, size: int) -> int;
+
+// Hash optional types.
+
+// Hash an optional boolean value.
+extern func rt_hash_opt_bool(opt: bool?) -> int;
+
+// Hash an optional byte value.
+extern func rt_hash_opt_byte(opt: byte?) -> int;
+
+// Hash an optional integer value.
+extern func rt_hash_opt_int(opt: int?) -> int;
+
+// Hash an optional string value.
+extern func rt_hash_opt_string(opt: string?) -> int;
+
+// Hash a pointer value. Note: this hashes the pointer address, not the data it points to.
+extern func rt_hash_ptr(ptr: void*) -> int;
+
+// Hash an optional pointer value. Note: this hashes the pointer address, not the data it points to.
+// Panics if the optional is empty.
+extern func rt_hash_opt_ptr(opt: void*?) -> int;
