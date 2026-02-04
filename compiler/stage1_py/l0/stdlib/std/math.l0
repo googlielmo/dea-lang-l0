@@ -1,0 +1,22 @@
+/*
+ * SPDX-License-Identifier: MIT OR Apache-2.0
+ * Copyright (c) 2025-2026 gwz
+ */
+
+/**
+ * This module will provide mathematical utility functions.
+ */
+module std.math;
+
+import std.assert;
+
+// Euclidean modulo: always returns non-negative result, even if a is negative.
+// Requires b > 0.
+func emod(a: int, b: int) -> int {
+    assert(b > 0, "emod: divisor must be greater than 0");
+    let r: int = a % b;
+    if (r < 0) {
+        return r + b;
+    }
+    return r;
+}
