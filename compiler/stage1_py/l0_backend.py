@@ -90,7 +90,7 @@ class Backend:
     def _pop_scope(self) -> None:
         """Exit current scope."""
         if self._current_scope is None:
-            self.ice("s[ICE-1330] scope underflow")
+            self.ice("[ICE-1330] scope underflow")
         self._current_scope = self._current_scope.parent
 
     def _types_equal(self, a: Type, b: Type) -> bool:
