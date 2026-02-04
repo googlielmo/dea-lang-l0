@@ -87,7 +87,6 @@ class TokenKind(Enum):
     FUTURE_EXTENSION = auto()  # placeholder for future tokens
 
 
-
 KEYWORDS = {
     "module": TokenKind.MODULE,
     "import": TokenKind.IMPORT,
@@ -273,13 +272,28 @@ class Lexer:
             text = "".join(chars)
 
             # validate that the char literal **represents a single byte**
-            utf8string = text.encode("utf-8").decode("unicode_escape").encode("utf-8")
-            if len(utf8string) != 1:
-                raise LexerError("[LEX-0030] char literal must represent a single byte", self.filename, start_line, start_col)
-            # if text is a \u or \U escape, convert it to the \xXX form to be C99-compatible
-            if text.startswith("\\u") or text.startswith("\\U"):
-                byte_value = utf8string[0]
-                text = f"\\x{byte_value:02x}"
+            if text.startswith("\\x"):
+                # Hex escape: \xH+ (variable length, C rules)
+                hex_digits = text[2:]
+                value = int(hex_digits, 16)
+
+                if value > 255:
+                    raise LexerError(
+                        f"[LEX-0031] character literal hex escape out of range (0-255): '\\x{hex_digits}' = {value}",
+                        self.filename, start_line, start_col
+                    )
+            elif text.startswith("\\") and len(text) > 1 and text[1] in OCT_CHARS:
+                # octal escape (range was checked during escape parsing)
+                pass
+            else:
+                utf8string = text.encode("utf-8").decode("unicode_escape").encode("utf-8")
+                if len(utf8string) != 1:
+                    raise LexerError("[LEX-0030] character literal must represent a single byte", self.filename, start_line, start_col)
+
+                # if text is a \u or \U escape, convert it to the \xXX form to be C99-compatible
+                if text.startswith("\\u") or text.startswith("\\U"):
+                    byte_value = utf8string[0]
+                    text = f"\\x{byte_value:02x}"
 
             return Token(TokenKind.BYTE, text, start_line, start_col)
 

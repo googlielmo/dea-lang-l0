@@ -15,6 +15,7 @@ DIAGNOSTIC_CODE_FAMILIES = {
         "LEX-0020",
         "LEX-0021",
         "LEX-0030",
+        "LEX-0031",
         "LEX-0040",
         "LEX-0050",
         "LEX-0051",
