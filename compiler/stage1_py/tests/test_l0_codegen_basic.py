@@ -276,6 +276,7 @@ def test_codegen_arithmetic_expressions(codegen_single):
             let diff: int = a - b;
             let prod: int = a * b;
             let quot: int = a / b;
+            let rem: int = a % b;
             return sum;
         }
         """,
@@ -289,6 +290,7 @@ def test_codegen_arithmetic_expressions(codegen_single):
     assert "_rt_isub(a, b)" in c_code
     assert "_rt_imul(a, b)" in c_code
     assert "_rt_idiv(a, b)" in c_code
+    assert "_rt_imod(a, b)" in c_code
 
 
 def test_codegen_comparison_expressions(codegen_single):

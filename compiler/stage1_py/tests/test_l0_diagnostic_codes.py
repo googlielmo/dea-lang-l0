@@ -70,6 +70,7 @@ PAR_TRIGGERS = {
     "PAR-0211": "module main; func main() -> int { let v: int = arr[0; return v; }",
     "PAR-0224": "module main; func main() -> int { let x: int = (1 + 2; return x; }",
     "PAR-0225": "module main; func main() -> int { let x: int = ; return 0; }",
+    "PAR-0226": "module main; func main() -> int { let x: int = 1 & 2; return x; }",
     "PAR-0310": "import std.io;",
     "PAR-0311": "module ;",
     "PAR-0312": "module main\nfunc main() -> int { return 0; }",

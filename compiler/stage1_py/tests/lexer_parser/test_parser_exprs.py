@@ -1,6 +1,8 @@
 #  SPDX-License-Identifier: MIT OR Apache-2.0
 #  Copyright (c) 2026 gwz
 
+import pytest
+
 from conftest import has_error_code
 
 
@@ -13,7 +15,7 @@ def test_parser_exprs_valid_operators_and_calls(analyze_single):
     }
 
     func main() -> int {
-        let a: int = (1 + 2) * 3 - 4 / 2;
+        let a: int = (1 + 2) * 3 - 4 / 2 % 3;
         let b: int = -a;
         let ok: bool = (a < 10) && (a != 0);
         let nope: bool = !ok || (a >= 2) || (a <= 5);
@@ -80,3 +82,41 @@ def test_parser_expr_unexpected_token(analyze_single):
     result = analyze_single("main", src)
     assert result.has_errors()
     assert has_error_code(result.diagnostics, "PAR-0225")
+
+
+@pytest.mark.parametrize(
+    ("op", "desc"),
+    [
+        ("&", "bitwise AND"),
+        ("|", "bitwise OR"),
+        ("^", "bitwise XOR"),
+        ("<<", "left shift"),
+        (">>", "right shift"),
+    ],
+)
+def test_parser_reserved_binary_operator(analyze_single, op, desc):
+    src = f"""
+    module main;
+
+    func main() -> int {{
+        let x: int = 1 {op} 2;
+        return x;
+    }}
+    """
+    result = analyze_single("main", src)
+    assert result.has_errors()
+    assert has_error_code(result.diagnostics, "PAR-0226")
+
+
+def test_parser_reserved_unary_tilde(analyze_single):
+    src = """
+    module main;
+
+    func main() -> int {
+        let x: int = ~1;
+        return x;
+    }
+    """
+    result = analyze_single("main", src)
+    assert result.has_errors()
+    assert has_error_code(result.diagnostics, "PAR-0226")

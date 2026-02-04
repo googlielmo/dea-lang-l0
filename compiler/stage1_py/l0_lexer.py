@@ -63,6 +63,7 @@ class TokenKind(Enum):
     MINUS = auto()  # -
     STAR = auto()  # *
     SLASH = auto()  # /
+    MODULO = auto()  # %
     LT = auto()  # <
     GT = auto()  # >
     LE = auto()  # <
@@ -74,6 +75,14 @@ class TokenKind(Enum):
     BANG = auto()  # !
     QUESTION = auto()  # ?
     DOT = auto()  # .
+
+    # Reserved operators (not yet supported, lexed for diagnostics)
+    AMP = auto()  # &
+    PIPE = auto()  # |
+    CARET = auto()  # ^
+    TILDE = auto()  # ~
+    LSHIFT = auto()  # <<
+    RSHIFT = auto()  # >>
 
     FUTURE_EXTENSION = auto()  # placeholder for future tokens
 
@@ -330,21 +339,36 @@ class Lexer:
             if self._peek() == "=":
                 self._advance()
                 return Token(TokenKind.LE, "<=", start_line, start_col)
+            if self._peek() == "<":
+                self._advance()
+                return Token(TokenKind.LSHIFT, "<<", start_line, start_col)
             return Token(TokenKind.LT, c, start_line, start_col)
 
         if c == ">":
             if self._peek() == "=":
                 self._advance()
                 return Token(TokenKind.GE, ">=", start_line, start_col)
+            if self._peek() == ">":
+                self._advance()
+                return Token(TokenKind.RSHIFT, ">>", start_line, start_col)
             return Token(TokenKind.GT, c, start_line, start_col)
 
-        if c == "&" and self._peek() == "&":
-            self._advance()
-            return Token(TokenKind.ANDAND, "&&", start_line, start_col)
+        if c == "&":
+            if self._peek() == "&":
+                self._advance()
+                return Token(TokenKind.ANDAND, "&&", start_line, start_col)
+            return Token(TokenKind.AMP, c, start_line, start_col)
 
-        if c == "|" and self._peek() == "|":
-            self._advance()
-            return Token(TokenKind.OROR, "||", start_line, start_col)
+        if c == "|":
+            if self._peek() == "|":
+                self._advance()
+                return Token(TokenKind.OROR, "||", start_line, start_col)
+            return Token(TokenKind.PIPE, c, start_line, start_col)
+
+        if c == "^":
+            return Token(TokenKind.CARET, c, start_line, start_col)
+        if c == "~":
+            return Token(TokenKind.TILDE, c, start_line, start_col)
 
         if c == "+":
             return Token(TokenKind.PLUS, c, start_line, start_col)
@@ -352,6 +376,8 @@ class Lexer:
             return Token(TokenKind.STAR, c, start_line, start_col)
         if c == "/":
             return Token(TokenKind.SLASH, c, start_line, start_col)
+        if c == "%":
+            return Token(TokenKind.MODULO, c, start_line, start_col)
 
         raise LexerError(f"[LEX-0040] unexpected character {c!r} at {start_line}:{start_col}", self.filename, start_line,
                          start_col)

@@ -827,7 +827,7 @@ class ExpressionTypeChecker:
         right_ty = self._infer_expr(expr.right)
 
         # Arithmetic int ops -> int
-        if op in {"+", "-", "*", "/"}:
+        if op in {"+", "-", "*", "/", "%"}:
             return self._binary_expect_both_int(expr, left_ty, right_ty, result=self.int_type)
 
         # Comparison int ops -> bool

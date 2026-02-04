@@ -12,7 +12,7 @@ def test_lexer_tokens_include_literals_and_operators():
     module main;
 
     func main() -> int {
-        let a: int = 1 + 2 * 3 - 4 / 2;
+        let a: int = 1 + 2 * 3 - 4 / 2 % 3;
         let b: bool = true && false || !false;
         let c: byte = 'z';
         let d: string = "hi";
@@ -33,6 +33,7 @@ def test_lexer_tokens_include_literals_and_operators():
     assert TokenKind.MINUS in kinds
     assert TokenKind.STAR in kinds
     assert TokenKind.SLASH in kinds
+    assert TokenKind.MODULO in kinds
     assert TokenKind.LE in kinds
     assert TokenKind.GE in kinds
     assert TokenKind.EQEQ in kinds
@@ -40,6 +41,45 @@ def test_lexer_tokens_include_literals_and_operators():
     assert TokenKind.ANDAND in kinds
     assert TokenKind.OROR in kinds
     assert TokenKind.BANG in kinds
+
+
+def test_lexer_reserved_bitwise_operator_tokens():
+    src = "& | ^ ~ << >>"
+    tokens = Lexer.from_source(src).tokenize()
+    kinds = [t.kind for t in tokens if t.kind != TokenKind.EOF]
+
+    assert kinds == [
+        TokenKind.AMP,
+        TokenKind.PIPE,
+        TokenKind.CARET,
+        TokenKind.TILDE,
+        TokenKind.LSHIFT,
+        TokenKind.RSHIFT,
+    ]
+
+
+def test_lexer_amp_vs_andand():
+    tokens = Lexer.from_source("& &&").tokenize()
+    kinds = [t.kind for t in tokens if t.kind != TokenKind.EOF]
+    assert kinds == [TokenKind.AMP, TokenKind.ANDAND]
+
+
+def test_lexer_pipe_vs_oror():
+    tokens = Lexer.from_source("| ||").tokenize()
+    kinds = [t.kind for t in tokens if t.kind != TokenKind.EOF]
+    assert kinds == [TokenKind.PIPE, TokenKind.OROR]
+
+
+def test_lexer_lshift_vs_lt():
+    tokens = Lexer.from_source("<< < <=").tokenize()
+    kinds = [t.kind for t in tokens if t.kind != TokenKind.EOF]
+    assert kinds == [TokenKind.LSHIFT, TokenKind.LT, TokenKind.LE]
+
+
+def test_lexer_rshift_vs_gt():
+    tokens = Lexer.from_source(">> > >=").tokenize()
+    kinds = [t.kind for t in tokens if t.kind != TokenKind.EOF]
+    assert kinds == [TokenKind.RSHIFT, TokenKind.GT, TokenKind.GE]
 
 
 @pytest.mark.parametrize(

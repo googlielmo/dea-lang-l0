@@ -48,12 +48,16 @@ def test_arithmetic_ops_int_to_int(analyze_single):
     func k(a: int, b: int) -> int {
         return a / b;
     }
+
+    func m(a: int, b: int) -> int {
+        return a % b;
+    }
     """
 
     result = analyze_single("main", src)
     assert not result.has_errors()
 
-    for fname in ["f", "g", "h", "k"]:
+    for fname in ["f", "g", "h", "k", "m"]:
         expr = _get_single_return_expr(result, "main", fname)
         t = result.expr_types[id(expr)]
         assert isinstance(t, BuiltinType)
@@ -327,7 +331,7 @@ def test_cast_unknown_type_diagnostic(analyze_single):
     assert has_error_code(result.diagnostics, "TYP-0279")
 
 
-@pytest.mark.parametrize("op", ["+", "-", "*", "/"])
+@pytest.mark.parametrize("op", ["+", "-", "*", "/", "%"])
 def test_arithmetic_rejects_non_int(op, analyze_single):
     src = f"""
     module main;

@@ -502,21 +502,44 @@ class Parser:
     def _parse_expr(self) -> Expr:
         return self._parse_or_expr()
 
+    _RESERVED_BINARY_OPS = {
+        TokenKind.AMP: "'&' (bitwise AND)",
+        TokenKind.PIPE: "'|' (bitwise OR)",
+        TokenKind.CARET: "'^' (bitwise XOR)",
+        TokenKind.LSHIFT: "'<<' (left shift)",
+        TokenKind.RSHIFT: "'>>' (right shift)",
+    }
+
+    def _check_reserved_binary_op(self) -> None:
+        """Raise a diagnostic if the next token is a reserved binary operator."""
+        tok = self._peek()
+        desc = self._RESERVED_BINARY_OPS.get(tok.kind)
+        if desc is not None:
+            raise ParseError(
+                f"[PAR-0226] {desc} operator is not yet supported",
+                tok,
+                self.filename,
+            )
+
     def _parse_or_expr(self) -> Expr:
         start = self._span_start()
         expr = self._parse_and_expr()
+        self._check_reserved_binary_op()
         while self._match(TokenKind.OROR):
             op_tok = self.tokens[self.index - 1]
             right = self._parse_and_expr()
+            self._check_reserved_binary_op()
             expr = BinaryOp(op_tok.text, expr, right, span=self._extend_span(start))
         return expr
 
     def _parse_and_expr(self) -> Expr:
         start = self._span_start()
         expr = self._parse_equality_expr()
+        self._check_reserved_binary_op()
         while self._match(TokenKind.ANDAND):
             op_tok = self.tokens[self.index - 1]
             right = self._parse_equality_expr()
+            self._check_reserved_binary_op()
             expr = BinaryOp(op_tok.text, expr, right, span=self._extend_span(start))
         return expr
 
@@ -550,7 +573,7 @@ class Parser:
     def _parse_mul_expr(self) -> Expr:
         start = self._span_start()
         expr = self._parse_unary_expr()
-        while self._match(TokenKind.STAR, TokenKind.SLASH):
+        while self._match(TokenKind.STAR, TokenKind.SLASH, TokenKind.MODULO):
             op_tok = self.tokens[self.index - 1]
             right = self._parse_unary_expr()
             expr = BinaryOp(op_tok.text, expr, right, span=self._extend_span(start))
@@ -563,6 +586,14 @@ class Parser:
             op_tok = self.tokens[self.index - 1]
             operand = self._parse_unary_expr()
             return UnaryOp(op_tok.text, operand, span=self._extend_span(start))
+        # reserved prefix operator: ~ (bitwise NOT)
+        if self._check(TokenKind.TILDE):
+            tok = self._peek()
+            raise ParseError(
+                "[PAR-0226] '~' (bitwise NOT) operator is not yet supported",
+                tok,
+                self.filename,
+            )
         return self._parse_cast_expr()
 
     def _parse_cast_expr(self) -> Expr:
