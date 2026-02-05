@@ -90,6 +90,8 @@ Source (.l0) → Lexer → Parser → NameResolver → SignatureResolver
 | `l0_locals.py`         | Local variable scoping                                 |
 | `l0_symbols.py`        | Symbol table and symbol kinds                          |
 | `l0_types.py`          | Type representations                                   |
+| `l0_ast_printer.py`    | AST pretty-printing                                    |
+| `l0_logger.py`         | Logging infrastructure                                 |
 | `runtime/l0_runtime.h` | C kernel runtime (allocation, I/O, strings)            |
 
 ### Stage 2 Compiler (compiler/stage2_l0/)
@@ -99,7 +101,7 @@ The self-hosted compiler in L0, under active development:
 - `src/main.l0` - Compiler entry point
 - `src/tokens.l0` - Token type definitions
 - `src/lexer.l0` - Lexer implementation
-- `src/util/` - Utility libraries (vector, map, string, array)
+- `src/util/` - Utility libraries (`array.l0`, `linear_map.l0`, `text.l0`, `vector.l0`)
 - `tests/` - Unit tests
 
 ### Standard Library
@@ -108,6 +110,8 @@ Located in `compiler/stage1_py/l0/stdlib/`:
 
 - `std/io.l0` - print, println, input
 - `std/string.l0` - string utilities
+- `std/hash.l0` - hash functions
+- `std/math.l0` - math utilities
 - `std/rand.l0` - random numbers
 - `std/system.l0` - system calls, command line args
 - `std/assert.l0` - assertions
@@ -187,6 +191,7 @@ grep -r 'XXX-NNNN' --include='*.py' compiler/stage1_py/
   safety.").
 - Use backticks for L0 code snippets and type names in commit messages.
 - Do not include Co-Authored-By lines in commits.
+- Before committing, verify CLAUDE.md accuracy: check that file references are current, update with new modules/files added, and remove references to deleted files.
 
 ## Documentation
 
