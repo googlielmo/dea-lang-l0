@@ -23,6 +23,7 @@ DIAGNOSTIC_CODE_FAMILIES = {
         "LEX-0053",
         "LEX-0059",
         "LEX-0060",
+        "LEX-0061",
         "LEX-0070",
     ],
     "PAR": [

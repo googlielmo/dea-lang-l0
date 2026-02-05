@@ -14,11 +14,11 @@ class TokenKind(Enum):
     # Special
     EOF = auto()
 
-    IDENT = auto()  # identifier, e.g. i, name, etc
+    IDENT = auto()  # identifier, e.g. i, name, etc.
     UNDERSCORE = auto()  # "_"
     INT = auto()  # integer literal, e.g. 42, -7, etc.
-    BYTE = auto()  # octet literal, e.g. 13, 'a', etc.
-    STRING = auto()  # string literal, e.g. "hello world"
+    BYTE = auto()  # octet literal, e.g. 'a', '\n', etc.
+    STRING = auto()  # string literal, e.g. "hello world", etc.
 
     # Keywords
     MODULE = auto()
@@ -458,12 +458,13 @@ class Lexer:
         text = "".join(digits)
         if is_negative:
             text = "-" + text
+        if self._peek().isalpha() or self._peek() == "_":
+            raise LexerError(f"[LEX-0061] invalid character '{self._peek()}' after integer literal",
+                             self.filename, self.line, self.column)
         value = int(text)
         if value > 2 ** 31 - 1 or value < -2 ** 31:
             raise LexerError(f"[LEX-0060] integer literal {value} exceeds 32-bit signed range",
-                             self.filename,
-                             start_line,
-                             start_col)
+                             self.filename, start_line, start_col)
         return text
 
     def _skip_ws_and_comments(self) -> None:

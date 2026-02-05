@@ -902,6 +902,9 @@ class CEmitter:
 
     def emit_int_literal(self, value: int) -> str:
         """Emit C code for an integer literal."""
+        # Special-case the min 32-bit int to avoid negative literal issues
+        if value == -2147483648:
+            return "INT32_MIN"
         return str(value)
 
     def emit_byte_literal(self, value: str) -> str:
