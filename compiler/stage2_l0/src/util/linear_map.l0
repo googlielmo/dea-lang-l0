@@ -3,13 +3,14 @@
  * Copyright (c) 2025-2026 gwz
  */
 
-module util.map;
+module util.linear_map;
 
 import sys.rt;
 import sys.unsafe;
 
 import std.assert;
 import std.string;
+import std.hash;
 
 import util.vector;
 
@@ -58,32 +59,10 @@ func _lm_value_by_entry(self: LinearMapBase*, entry_ptr: LinearMapEntryBase*) ->
 }
 
 /* unsafe */
-func _lm_key_by_entry(self: LinearMapBase*, entry_ptr: LinearMapEntryBase*) -> void* {
+func _lm_key_by_entry(self: LinearMapBase*, entry_ptr: LinearMapEntryBase *) -> void* {
     let __ = self.key_size; // suppress unused warning
     let key_ptr = rt_array_element(entry_ptr, 1, sizeof(LinearMapEntryBase)); // get pointer to key
     return key_ptr;
-}
-
-/* unsafe */
-func _lm_key_by_index(self: LinearMapBase*, index: int) -> void* {
-    let entry_ptr = _lm_entry_by_index(self, index);
-    return rt_array_element(entry_ptr, 1, sizeof(LinearMapEntryBase)); // get pointer to key
-}
-
-/* unsafe */
-func _lm_value_by_index(self: LinearMapBase*, index: int) -> void* {
-    let value_ptr = _lm_entry_by_index(self, index);
-    return rt_array_element(value_ptr, 1, sizeof(LinearMapEntryBase) + self.key_size); // get pointer to value
-}
-
-func _lm_entry_by_hk(self: LinearMapBase*, hkey: int) -> LinearMapEntryBase*? {
-    for (let i: int = 0; i < self.entries.length; i = i + 1) {
-        let entry_ptr = _lm_entry_by_index(self, i);
-        if (entry_ptr.hash_key == hkey) {
-            return entry_ptr;
-        }
-    }
-    return null;
 }
 
 /* unsafe */
@@ -155,19 +134,19 @@ func lm_len(self: LinearMapBase*) -> int {
 }
 
 func lm_contains_key(self: LinearMapBase*, key_ptr: void*) -> bool {
-    let hkey = 0; // FIXME: rt_hash_bytes(key_ptr, self.key_size);
+    let hkey = rt_hash_data(key_ptr, self.key_size);
     let entry_ptr = _lm_entry_by_hk_key(self, hkey, key_ptr);
     return entry_ptr != null;
 }
 
 func lm_contains_value(self: LinearMapBase*, value_ptr: void*) -> bool {
-    let hval = 0; // FIXME: rt_hash_bytes(value_ptr, self.value_size);
+    let hval = rt_hash_data(value_ptr, self.value_size);
     let entry_ptr = _lm_entry_by_hv_value(self, hval, value_ptr);
     return entry_ptr != null;
 }
 
 func lm_remove(self: LinearMapBase*, key_ptr: void*) -> bool {
-    let hkey = 0; // FIXME: rt_hash_bytes(key_ptr, self.key_size);
+    let hkey = rt_hash_data(key_ptr, self.key_size);
     for (let i: int = 0; i < self.entries.length; i = i + 1) {
         let entry_ptr = _lm_entry_by_index(self, i);
         if (entry_ptr.hash_key == hkey) {
@@ -190,8 +169,8 @@ func lm_remove(self: LinearMapBase*, key_ptr: void*) -> bool {
 }
 
 func lm_set(self: LinearMapBase*, key_ptr: void*, value_ptr: void*) {
-    let hkey = 0; // FIXME: rt_hash_bytes(key_ptr, self.key_size);
-    let hval = 0; // FIXME: rt_hash_bytes(value_ptr, self.value_size);
+    let hkey = rt_hash_data(key_ptr, self.key_size);
+    let hval = rt_hash_data(value_ptr, self.value_size);
     let dest_value_ptr = _lm_entry_by_hk_key(self, hkey, key_ptr);
     if (dest_value_ptr != null) {
         _lm_set_entry(self, dest_value_ptr as LinearMapEntryBase*, hkey, key_ptr, hval, value_ptr);
@@ -203,7 +182,7 @@ func lm_set(self: LinearMapBase*, key_ptr: void*, value_ptr: void*) {
 }
 
 func lm_get(self: LinearMapBase*, key_ptr: void*) -> void*? {
-    let hkey = 0; // FIXME: rt_hash_bytes(key_ptr, self.key_size);
+    let hkey = rt_hash_data(key_ptr, self.key_size);
     let entry_ptr = _lm_entry_by_hk_key(self, hkey, key_ptr);
     if (entry_ptr != null) {
         let value_ptr = _lm_value_by_entry(self, entry_ptr as LinearMapEntryBase*);
@@ -217,10 +196,7 @@ func lm_get(self: LinearMapBase*, key_ptr: void*) -> void*? {
    ------------------------------------ */
 
 struct LinearMapStringStringEntry {
-    /* extends LinearMapEntryBase */
-    hash_key: int;
-    hash_value: int;
-    /* Payload */
+    /* Simple payload, no need for hash codes as they are expensive to compute vs string compare */
     key: string;
     value: string;
 }
@@ -240,13 +216,11 @@ func _lmss_entry_by_index(self: LinearMapStringString*, index: int) -> LinearMap
 }
 
 /* unsafe */
-func _lmss_find_by_key(self: LinearMapStringString*, hkey: int, key: string) -> int {
+func _lmss_find_by_key(self: LinearMapStringString*, key: string) -> int {
     for (let i: int = 0; i < self.base.entries.length; i = i + 1) {
         let entry_ptr = _lmss_entry_by_index(self, i);
-        if (entry_ptr.hash_key == hkey) {
-            if (eq_s(entry_ptr.key, key)) {
-                return i;
-            }
+        if (eq_s(entry_ptr.key, key)) {
+            return i;
         }
     }
     return -1;
@@ -257,7 +231,6 @@ func _lmss_find_by_key(self: LinearMapStringString*, hkey: int, key: string) -> 
    ------------------------------------ */
 
 func lmss_create(initial_capacity: int) -> LinearMapStringString* {
-    // Use sizeof(LinearMapStringStringEntry) directly to account for struct padding
     let entry_size = sizeof(LinearMapStringStringEntry);
     let base = new LinearMapBase(
         vec_create(entry_size, initial_capacity),
@@ -283,8 +256,7 @@ func lmss_len(self: LinearMapStringString*) -> int {
 }
 
 func lmss_set(self: LinearMapStringString*, key: string, value: string) {
-    let hkey = 0; // FIXME: rt_hash_string(key);
-    let index = _lmss_find_by_key(self, hkey, key);
+    let index = _lmss_find_by_key(self, key);
 
     if (index >= 0) {
         // Update existing entry: release old value, retain and set new
@@ -292,7 +264,6 @@ func lmss_set(self: LinearMapStringString*, key: string, value: string) {
         rt_string_release(entry_ptr.value);
         rt_string_retain(value);
         entry_ptr.value = value;
-        entry_ptr.hash_value = 0; // FIXME: rt_hash_string(value);
         return;
     }
 
@@ -302,15 +273,12 @@ func lmss_set(self: LinearMapStringString*, key: string, value: string) {
     _lm_grow(self.base);
     let new_index = self.base.entries.length - 1;
     let entry_ptr = _lmss_entry_by_index(self, new_index);
-    entry_ptr.hash_key = hkey;
-    entry_ptr.hash_value = 0; // FIXME: rt_hash_string(value);
     entry_ptr.key = key;
     entry_ptr.value = value;
 }
 
 func lmss_get(self: LinearMapStringString*, key: string) -> string? {
-    let hkey = 0; // FIXME: rt_hash_string(key);
-    let index = _lmss_find_by_key(self, hkey, key);
+    let index = _lmss_find_by_key(self, key);
     if (index >= 0) {
         let entry_ptr = _lmss_entry_by_index(self, index);
         return entry_ptr.value;
@@ -319,13 +287,11 @@ func lmss_get(self: LinearMapStringString*, key: string) -> string? {
 }
 
 func lmss_contains(self: LinearMapStringString*, key: string) -> bool {
-    let hkey = 0; // FIXME: rt_hash_string(key);
-    return _lmss_find_by_key(self, hkey, key) >= 0;
+    return _lmss_find_by_key(self, key) >= 0;
 }
 
 func lmss_remove(self: LinearMapStringString*, key: string) -> bool {
-    let hkey = 0; // FIXME: rt_hash_string(key);
-    let index = _lmss_find_by_key(self, hkey, key);
+    let index = _lmss_find_by_key(self, key);
 
     if (index < 0) {
         return false;
@@ -341,8 +307,6 @@ func lmss_remove(self: LinearMapStringString*, key: string) -> bool {
     if (index != last_index) {
         let last_entry_ptr = _lmss_entry_by_index(self, last_index);
         // Copy last entry to the removed slot
-        entry_ptr.hash_key = last_entry_ptr.hash_key;
-        entry_ptr.hash_value = last_entry_ptr.hash_value;
         entry_ptr.key = last_entry_ptr.key;
         entry_ptr.value = last_entry_ptr.value;
     }
@@ -368,10 +332,7 @@ func lmss_value_at(self: LinearMapStringString*, index: int) -> string {
    ------------------------------------ */
 
 struct LinearMapIntStringEntry {
-    /* extends LinearMapEntryBase */
-    hash_key: int;
-    hash_value: int;
-    /* Payload */
+    /* Simple payload, no need for hash codes as int key and string value are straightforward to compare */
     key: int;
     value: string;
 }
@@ -391,13 +352,11 @@ func _lmis_entry_by_index(self: LinearMapIntString*, index: int) -> LinearMapInt
 }
 
 /* unsafe */
-func _lmis_find_by_key(self: LinearMapIntString*, hkey: int, key: int) -> int {
+func _lmis_find_by_key(self: LinearMapIntString*, key: int) -> int {
     for (let i: int = 0; i < self.base.entries.length; i = i + 1) {
         let entry_ptr = _lmis_entry_by_index(self, i);
-        if (entry_ptr.hash_key == hkey) {
-            if (entry_ptr.key == key) {
-                return i;
-            }
+        if (entry_ptr.key == key) {
+            return i;
         }
     }
     return -1;
@@ -408,7 +367,6 @@ func _lmis_find_by_key(self: LinearMapIntString*, hkey: int, key: int) -> int {
    ------------------------------------ */
 
 func lmis_create(initial_capacity: int) -> LinearMapIntString* {
-    // Use sizeof(LinearMapIntStringEntry) directly to account for struct padding
     let entry_size = sizeof(LinearMapIntStringEntry);
     let base = new LinearMapBase(
         vec_create(entry_size, initial_capacity),
@@ -433,8 +391,7 @@ func lmis_len(self: LinearMapIntString*) -> int {
 }
 
 func lmis_set(self: LinearMapIntString*, key: int, value: string) {
-    let hkey = 0; // FIXME: rt_hash_int(key);
-    let index = _lmis_find_by_key(self, hkey, key);
+    let index = _lmis_find_by_key(self, key);
 
     if (index >= 0) {
         // Update existing entry: release old value, retain and set new
@@ -442,7 +399,6 @@ func lmis_set(self: LinearMapIntString*, key: int, value: string) {
         rt_string_release(entry_ptr.value);
         rt_string_retain(value);
         entry_ptr.value = value;
-        entry_ptr.hash_value = 0; // FIXME: rt_hash_string(value);
         return;
     }
 
@@ -451,15 +407,12 @@ func lmis_set(self: LinearMapIntString*, key: int, value: string) {
     _lm_grow(self.base);
     let new_index = self.base.entries.length - 1;
     let entry_ptr = _lmis_entry_by_index(self, new_index);
-    entry_ptr.hash_key = hkey;
-    entry_ptr.hash_value = 0; // FIXME: rt_hash_string(value);
     entry_ptr.key = key;
     entry_ptr.value = value;
 }
 
 func lmis_get(self: LinearMapIntString*, key: int) -> string? {
-    let hkey = 0; // FIXME: rt_hash_int(key);
-    let index = _lmis_find_by_key(self, hkey, key);
+    let index = _lmis_find_by_key(self, key);
     if (index >= 0) {
         let entry_ptr = _lmis_entry_by_index(self, index);
         return entry_ptr.value;
@@ -468,13 +421,11 @@ func lmis_get(self: LinearMapIntString*, key: int) -> string? {
 }
 
 func lmis_contains(self: LinearMapIntString*, key: int) -> bool {
-    let hkey = 0; // FIXME: rt_hash_int(key);
-    return _lmis_find_by_key(self, hkey, key) >= 0;
+    return _lmis_find_by_key(self, key) >= 0;
 }
 
 func lmis_remove(self: LinearMapIntString*, key: int) -> bool {
-    let hkey = 0; // FIXME: rt_hash_int(key);
-    let index = _lmis_find_by_key(self, hkey, key);
+    let index = _lmis_find_by_key(self, key);
 
     if (index < 0) {
         return false;
@@ -489,8 +440,6 @@ func lmis_remove(self: LinearMapIntString*, key: int) -> bool {
     if (index != last_index) {
         let last_entry_ptr = _lmis_entry_by_index(self, last_index);
         // Copy last entry to the removed slot
-        entry_ptr.hash_key = last_entry_ptr.hash_key;
-        entry_ptr.hash_value = last_entry_ptr.hash_value;
         entry_ptr.key = last_entry_ptr.key;
         entry_ptr.value = last_entry_ptr.value;
     }
