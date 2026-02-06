@@ -243,6 +243,16 @@ class Lexer:
             return Token(TokenKind.BYTE, text, start_line, start_col)
 
         # punctuation / operators with lookahead
+
+        if c == "-":
+            if self._peek() == ">":
+                self._advance()
+                return Token(TokenKind.ARROW_FUNC, "->", start_line, start_col)
+            elif self._peek().isdigit():
+                text = self._read_number(self._advance(), start_col, start_line, is_negative=True)
+                return Token(TokenKind.INT, text, start_line, start_col)
+            return Token(TokenKind.MINUS, c, start_line, start_col)
+
         if c == "(":
             return Token(TokenKind.LPAREN, c, start_line, start_col)
         if c == ")":
@@ -268,15 +278,6 @@ class Lexer:
             return Token(TokenKind.DOT, c, start_line, start_col)
         if c == "?":
             return Token(TokenKind.QUESTION, c, start_line, start_col)
-
-        if c == "-":
-            if self._peek() == ">":
-                self._advance()
-                return Token(TokenKind.ARROW_FUNC, "->", start_line, start_col)
-            elif self._peek().isdigit():
-                text = self._read_number(self._advance(), start_col, start_line, is_negative=True)
-                return Token(TokenKind.INT, text, start_line, start_col)
-            return Token(TokenKind.MINUS, c, start_line, start_col)
 
         if c == "=":
             nxt = self._peek()
