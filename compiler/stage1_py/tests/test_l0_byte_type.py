@@ -124,7 +124,7 @@ def test_lexer_byte_literal_unterminated_raises():
     with pytest.raises(LexerError) as excinfo:
         Lexer.from_source(src).tokenize()
 
-    assert "unterminated char literal" in excinfo.value.message
+    assert "LEX-0021" in excinfo.value.message
 
 
 def test_lexer_byte_literal_empty_raises():

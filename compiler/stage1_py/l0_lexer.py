@@ -234,67 +234,12 @@ class Lexer:
 
         # strings
         if c == '"':
-            chars: List[str] = []
-            while True:
-                ch = self._peek()
-
-                if ch == "\0" or ch == "\n":
-                    raise LexerError("[LEX-0010] unterminated string literal", self.filename, self.line, self.column)
-                if ch == "\\":
-                    chars.append(self._read_valid_char_escape())
-                    continue
-                if ch == '"':
-                    self._advance()
-                    break
-
-                chars.append(self._advance())
-
-            text = "".join(chars)
+            text = self._read_string_literal()
             return Token(TokenKind.STRING, text, start_line, start_col)
+
         # byte / char literals
         if c == "'":
-            chars: List[str] = []
-            ch = self._peek()
-
-            if ch == "\0" or ch == "\n":
-                raise LexerError("[LEX-0020] unterminated char literal", self.filename, self.line, self.column)
-
-            if ch == "\\":
-                chars.append(self._read_valid_char_escape())
-            else:
-                chars.append(self._advance())
-
-            if self._peek() != "'":
-                raise LexerError("[LEX-0021] unterminated char literal", self.filename, self.line, self.column)
-
-            self._advance()  # consume closing '
-
-            text = "".join(chars)
-
-            # validate that the char literal **represents a single byte**
-            if text.startswith("\\x"):
-                # Hex escape: \xH+ (variable length, C rules)
-                hex_digits = text[2:]
-                value = int(hex_digits, 16)
-
-                if value > 255:
-                    raise LexerError(
-                        f"[LEX-0031] character literal hex escape out of range (0-255): '\\x{hex_digits}' = {value}",
-                        self.filename, start_line, start_col
-                    )
-            elif text.startswith("\\") and len(text) > 1 and text[1] in OCT_CHARS:
-                # octal escape (range was checked during escape parsing)
-                pass
-            else:
-                utf8string = text.encode("utf-8").decode("unicode_escape").encode("utf-8")
-                if len(utf8string) != 1:
-                    raise LexerError("[LEX-0030] character literal must represent a single byte", self.filename, start_line, start_col)
-
-                # if text is a \u or \U escape, convert it to the \xXX form to be C99-compatible
-                if text.startswith("\\u") or text.startswith("\\U"):
-                    byte_value = utf8string[0]
-                    text = f"\\x{byte_value:02x}"
-
+            text = self._read_byte_literal(start_col, start_line)
             return Token(TokenKind.BYTE, text, start_line, start_col)
 
         # punctuation / operators with lookahead
@@ -396,6 +341,70 @@ class Lexer:
         raise LexerError(f"[LEX-0040] unexpected character {c!r} at {start_line}:{start_col}", self.filename, start_line,
                          start_col)
 
+    def _read_byte_literal(self, start_col: int, start_line: int) -> str:
+        chars: List[str] = []
+        ch = self._peek()
+
+        if ch == "\0" or ch == "\n":
+            raise LexerError("[LEX-0020] unterminated char literal", self.filename, self.line, self.column)
+
+        if ch == "\\":
+            chars.append(self._read_valid_char_escape())
+        else:
+            chars.append(self._advance())
+
+        if self._peek() != "'":
+            raise LexerError("[LEX-0021] invalid char literal, expected closing single quote", self.filename, self.line, self.column)
+
+        self._advance()  # consume closing '
+
+        text = "".join(chars)
+
+        # validate that the char literal **represents a single byte**
+        if text.startswith("\\x"):
+            # Hex escape: \xH+ (variable length, C rules)
+            hex_digits = text[2:]
+            value = int(hex_digits, 16)
+
+            if value > 255:
+                raise LexerError(
+                    f"[LEX-0031] character literal hex escape out of range (0-255): '\\x{hex_digits}' = {value}",
+                    self.filename, start_line, start_col
+                )
+        elif text.startswith("\\") and len(text) > 1 and text[1] in OCT_CHARS:
+            # octal escape (range was checked during escape parsing)
+            pass
+        else:
+            utf8string = text.encode("utf-8").decode("unicode_escape").encode("utf-8")
+            if len(utf8string) != 1:
+                raise LexerError("[LEX-0030] character literal must represent a single byte", self.filename, start_line,
+                                 start_col)
+
+            # if text is a \u or \U escape, convert it to the \xXX form to be C99-compatible
+            if text.startswith("\\u") or text.startswith("\\U"):
+                byte_value = utf8string[0]
+                text = f"\\x{byte_value:02x}"
+        return text
+
+    def _read_string_literal(self) -> str:
+        chars: List[str] = []
+        while True:
+            ch = self._peek()
+
+            if ch == "\0" or ch == "\n":
+                raise LexerError("[LEX-0010] unterminated string literal", self.filename, self.line, self.column)
+            if ch == "\\":
+                chars.append(self._read_valid_char_escape())
+                continue
+            if ch == '"':
+                self._advance()
+                break
+
+            chars.append(self._advance())
+
+        text = "".join(chars)
+        return text
+
     def _read_valid_char_escape(self) -> str:
         chars: List[str] = [self._advance()]
         esc = self._peek()
@@ -463,7 +472,7 @@ class Lexer:
                              self.filename, self.line, self.column)
         value = int(text)
         if value > 2 ** 31 - 1 or value < -2 ** 31:
-            raise LexerError(f"[LEX-0060] integer literal {value} exceeds 32-bit signed range",
+            raise LexerError(f"[LEX-0060] integer literal '{value}' exceeds 32-bit signed range",
                              self.filename, start_line, start_col)
         return text
 
