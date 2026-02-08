@@ -130,7 +130,7 @@ def compile_and_run(runtime_dir: Path):
 
 
 @pytest.fixture
-def analyze_single(temp_project: Path):
+def analyze_single(temp_project: Path, repo_root: Path):
     """Analyze a single L0 module from source string.
 
     Usage:
@@ -149,6 +149,7 @@ def analyze_single(temp_project: Path):
         file_path.write_text(dedent(src))
 
         driver = L0Driver()
+        driver.search_paths.add_system_root(repo_root / "l0" / "stdlib")
         driver.search_paths.add_project_root(temp_project)
         return driver.analyze(module_name)
 
