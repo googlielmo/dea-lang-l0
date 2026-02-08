@@ -31,37 +31,37 @@ for test_file in "$TESTS_DIR"/*.l0; do
         echo
         if ./l0c -P compiler/stage2_l0/src run "$test_file"; then
             echo "PASS"
-            ((passed++))
+            passed=$((passed + 1))
         else
             echo "FAIL"
-            ((failed++))
+            failed=$((failed + 1))
             failed_tests="$failed_tests $test_name"
         fi
         continue
     else
-        # otherwise, capture output to a temp file
-      if ./l0c -P compiler/stage2_l0/src run "$test_file" > /tmp/test_output_$$.txt 2>&1; then
-          echo "PASS"
-          ((passed++))
-      else
-          echo "FAIL"
-          ((failed++))
-          failed_tests="$failed_tests $test_name"
-      fi
+        # otherwise, capture output to a per-test temp file
+        if ./l0c -P compiler/stage2_l0/src run "$test_file" > "/tmp/test_output_$$_${test_name}.txt" 2>&1; then
+            echo "PASS"
+            passed=$((passed + 1))
+            rm -f "/tmp/test_output_$$_${test_name}.txt"
+        else
+            echo "FAIL"
+            failed=$((failed + 1))
+            failed_tests="$failed_tests $test_name"
+        fi
     fi
 done
 
 if [ $VERBOSE -eq 0 ] && [ $failed -gt 0 ]; then
     echo "======================================"
     echo "Failed test outputs:"
-    for test_file in $failed_tests; do
-        echo "Output for $test_file:"
-        cat /tmp/test_output_$$.txt
+    for test_name in $failed_tests; do
+        echo "Output for $test_name:"
+        cat "/tmp/test_output_$$_${test_name}.txt"
+        rm -f "/tmp/test_output_$$_${test_name}.txt"
         echo "--------------------------------------"
     done
 fi
-
-rm -f /tmp/test_output_$$.txt
 
 echo "======================================"
 echo "Passed: $passed"

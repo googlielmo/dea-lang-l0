@@ -9,22 +9,48 @@ import std.io;
 import std.string;
 import std.unit;
 
-import util.string;
+import util.text;
 import util.vector;
-import util.map;
+import util.linear_map;
 
 import tokens;
 
 /* -------------------------------------
-   Extra character classification functions
+   Character classification helpers
    ------------------------------------ */
 
-func is_ident_start(c: char) -> bool {
+func is_ident_start(c: byte) -> bool {
     return is_alpha(c) || c == '_';
 }
 
-func is_ident_part(c: char) -> bool {
+func is_ident_part(c: byte) -> bool {
     return is_alnum(c) || c == '_';
+}
+
+func is_escape_char(c: byte) -> bool {
+    return c == '\\' || c == '\'' || c == '"' || c == '?' || c == 'a' ||
+           c == 'b' || c == 'f' || c == 'n' || c == 'r' || c == 't' || c == 'v';
+}
+
+func is_octal_digit(c: byte) -> bool {
+    return c >= '0' && c <= '7';
+}
+
+func is_hex_digit(c: byte) -> bool {
+    return (c >= '0' && c <= '9') ||
+           (c >= 'a' && c <= 'f') ||
+           (c >= 'A' && c <= 'F');
+}
+
+func hex_char_to_int(c: byte) -> int {
+    if (c >= '0' && c <= '9') {
+        return c - '0';
+    } else if (c >= 'a' && c <= 'f') {
+        return 10 + (c - 'a');
+    } else if (c >= 'A' && c <= 'F') {
+        return 10 + (c - 'A');
+    }
+    return -1; // Should not reach here if input is valid hex digit
 }
 
 /* ------------------------------------
@@ -69,7 +95,7 @@ func ls_at_end(self: LexerState*) -> bool {
     return self.index >= self.length;
 }
 
-func ls_peek(self: LexerState*) -> char {
+func ls_peek(self: LexerState*) -> byte {
     if (ls_at_end(self)) {
         return '\0';
     }
@@ -97,8 +123,24 @@ func ls_advance(self: LexerState*) -> byte {
     return current_char;
 }
 
-// --- main API ---
+/* ------------------------------------
+   Auxiliary data structures
+   ------------------------------------ */
 
+// Struct to represent a valid byte or Unicode code point escape sequence and its corresponding value
+struct EscapedChar {
+    escape_str: string; // The full escape sequence as it appears in the source (e.g., "\\n", "\\x1B", etc.)
+    char_value: int;    // The actual character value represented by the escape sequence (e.g., 10 for "\\n", 27 for "\\x1B")
+}
+
+/* ------------------------------------
+   Main API
+   ------------------------------------ */
+
+/**
+ * Tokenizes the input source code and returns a vector of tokens.
+ * If a lexing error occurs, the error field in the LexerState will be set and null will be returned.
+ */
 func tokenize(self: LexerState*) -> TokenVector? {
     let tokens = tv_create();
     while (!ls_at_end(self)) {
@@ -112,6 +154,11 @@ func tokenize(self: LexerState*) -> TokenVector? {
     return tokens as TokenVector?;
 }
 
+/**
+ * Reads the next token from the input source code.
+ * Returns a Token if successful, or `null` if a lexing error occurs,
+ * in which case the error field in the LexerState will be set.
+ */
 func ls_next_token(self: LexerState*) -> Token? {
     ls_skip_whitespace_and_comments(self)?;
 
@@ -126,39 +173,422 @@ func ls_next_token(self: LexerState*) -> Token? {
     let c = ls_advance(self);
 
     // identifiers / keywords and underscore wildcard
-    if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_') {
-        let ident_str = "";
-        ident_str = concat_s(ident_str, byte_to_s(c as char));
+    if (is_ident_start(c)) {
+        let cb = cb_create();
+        cb_append(cb, c);
         while (true) {
-            let next_c = ls_peek(self);
-            if ((next_c >= 'a' && next_c <= 'z') || (next_c >= 'A' && next_c <= 'Z') || (next_c >= '0' && next_c <= '9') || next_c == '_') {
-                ident_str = concat_s(ident_str, byte_to_s(ls_advance(self)));
+            if (is_ident_part(ls_peek(self))) {
+                cb_append(cb, ls_advance(self));
             } else {
                 break;
             }
         }
+        let ident_str = cb_to_string(cb);
+        cb_free(cb);
         return ident_to_token(ident_str, start_index, start_line, start_column);
     }
 
-    // For now, return EOF as a placeholder
-    return Token(TT_EOF, start_index, start_line, start_column);
+    // numbers (only integers for now)
+    if (is_digit(c)) {
+        return ls_read_number(self, c, false, start_index, start_line, start_column);
+    }
+
+    if (c == '"') {
+        return ls_read_string_literal(self, start_index, start_line, start_column);
+    }
+
+    if (c == '\'') {
+        return ls_read_byte_literal(self, start_index, start_line, start_column);
+    }
+
+    // punctuation and operators with lookahead
+
+    if (c == '-') {
+        if (ls_peek(self) == '>') {
+            ls_advance(self);
+            return Token(TT_ARROW_FUNC, start_index, start_line, start_column);
+        }
+        else if (is_digit(ls_peek(self))) {
+            return ls_read_number(self, ls_advance(self), true, start_index, start_line, start_column);
+        }
+        return Token(TT_MINUS, start_index, start_line, start_column);
+    }
+
+    if (c == '(') {
+        return Token(TT_LPAREN, start_index, start_line, start_column);
+    }
+    if (c == ')') {
+        return Token(TT_RPAREN, start_index, start_line, start_column);
+    }
+    if (c == '{') {
+        return Token(TT_LBRACE, start_index, start_line, start_column);
+    }
+    if (c == '}') {
+        return Token(TT_RBRACE, start_index, start_line, start_column);
+    }
+    if (c == '[') {
+        return Token(TT_LBRACKET, start_index, start_line, start_column);
+    }
+    if (c == ']') {
+        return Token(TT_RBRACKET, start_index, start_line, start_column);
+    }
+    if (c == ',') {
+        return Token(TT_COMMA, start_index, start_line, start_column);
+    }
+    if (c == ';') {
+        return Token(TT_SEMI, start_index, start_line, start_column);
+    }
+    if (c == ':') {
+        if (ls_peek(self) == ':') {
+            ls_advance(self);
+            return Token(TT_DOUBLE_COLON, start_index, start_line, start_column);
+        }
+        return Token(TT_COLON, start_index, start_line, start_column);
+    }
+    if (c == '.') {
+        return Token(TT_DOT, start_index, start_line, start_column);
+    }
+    if (c == '?') {
+        return Token(TT_QUESTION, start_index, start_line, start_column);
+    }
+
+    if (c == '=') {
+        if (ls_peek(self) == '>') {
+            ls_advance(self);
+            return Token(TT_ARROW_MATCH, start_index, start_line, start_column);
+        }
+        else if (ls_peek(self) == '=') {
+            ls_advance(self);
+            return Token(TT_EQEQ, start_index, start_line, start_column);
+        }
+        return Token(TT_EQ, start_index, start_line, start_column);
+    }
+
+    if (c == '!') {
+        if (ls_peek(self) == '=') {
+            ls_advance(self);
+            return Token(TT_NE, start_index, start_line, start_column);
+        }
+        return Token(TT_BANG, start_index, start_line, start_column);
+    }
+
+    if (c == '<') {
+        if (ls_peek(self) == '=') {
+            ls_advance(self);
+            return Token(TT_LE, start_index, start_line, start_column);
+        }
+        if (ls_peek(self) == '<') {
+            ls_advance(self);
+            return Token(TT_LSHIFT, start_index, start_line, start_column);
+        }
+        return Token(TT_LT, start_index, start_line, start_column);
+    }
+
+    if (c == '>') {
+        if (ls_peek(self) == '=') {
+            ls_advance(self);
+            return Token(TT_GE, start_index, start_line, start_column);
+        }
+        if (ls_peek(self) == '>') {
+            ls_advance(self);
+            return Token(TT_RSHIFT, start_index, start_line, start_column);
+        }
+        return Token(TT_GT, start_index, start_line, start_column);
+    }
+
+    if (c == '&') {
+        if (ls_peek(self) == '&') {
+            ls_advance(self);
+            return Token(TT_ANDAND, start_index, start_line, start_column);
+        }
+        return Token(TT_AMP, start_index, start_line, start_column);
+    }
+
+    if (c == '|') {
+        if (ls_peek(self) == '|') {
+            ls_advance(self);
+            return Token(TT_OROR, start_index, start_line, start_column);
+        }
+        return Token(TT_PIPE, start_index, start_line, start_column);
+    }
+
+    if (c == '^') {
+        return Token(TT_CARET, start_index, start_line, start_column);
+    }
+    if (c == '~') {
+        return Token(TT_TILDE, start_index, start_line, start_column);
+    }
+
+    if (c == '+') {
+        return Token(TT_PLUS, start_index, start_line, start_column);
+    }
+    if (c == '*') {
+        return Token(TT_STAR, start_index, start_line, start_column);
+    }
+    if (c == '/') {
+        return Token(TT_SLASH, start_index, start_line, start_column);
+    }
+    if (c == '%') {
+        return Token(TT_MODULO, start_index, start_line, start_column);
+    }
+
+    // If we reach here, it's an unrecognized character
+    self.error = Error("LEX-0040", concat3_s("unexpected character '", byte_to_s(c), "'"));
+    return null;
 }
 
+/**
+ * Reads a byte literal from the input, starting after the opening single quote.
+ * Handles escape sequences and validates that the literal represents a single byte.
+ * Returns a Token of type TT_BYTE if successful, or `null` if a lexing error occurs,
+ * in which case the error field in the LexerState will be set.
+ */
+func ls_read_byte_literal(self: LexerState*, start_index: int, start_line: int, start_column: int) -> Token? {
+    let cb = cb_create();
+    let c = ls_peek(self);
+    let byte_value: byte = '\0';
+
+    if (c == '\\') {
+        let e = ls_read_valid_char_escape(self, true);
+        if (e == null) {
+            cb_free(cb);
+            return null; // Invalid escape sequence (error already set)
+        }
+        let esc = e as EscapedChar;
+        cb_append_s(cb, esc.escape_str);
+        // We know the following is safe because ls_read_valid_char_escape checks the range for single-byte escapes
+        byte_value = esc.char_value as byte;
+    } else if (c == '\0' || c == '\n') {
+        self.error = Error("LEX-0020", "unterminated byte literal");
+        return null;
+    } else {
+        byte_value = ls_advance(self);
+        cb_append(cb, byte_value);
+    }
+
+    if (ls_peek(self) != '\'') {
+        self.error = Error("LEX-0021", "invalid byte literal, expected closing single quote");
+        return null; // Invalid byte literal
+    }
+    ls_advance(self); // consume closing quote
+
+    let byte_str = cb_to_string(cb);
+    cb_free(cb);
+    return Token(TT_BYTE(byte_str, byte_value), start_index, start_line, start_column);
+}
+
+/**
+ * Reads a string literal from the input, starting after the opening double quote.
+ * Handles escape sequences and validates that the string is properly terminated.
+ * Returns a Token of type TT_STRING if successful, or `null` if a lexing error occurs,
+ * in which case the error field in the LexerState will be set.
+ */
+func ls_read_string_literal(self: LexerState*, start_index: int, start_line: int, start_column: int) -> Token? {
+    let cb = cb_create();
+    let vb = cb_create(); // For building the actual string value without escape sequences
+    while (true) {
+        let c = ls_peek(self);
+        if (c == '\0' || c == '\n') { // EOF or newline before closing quote
+            self.error = Error("LEX-0010", "unterminated string literal");
+            cb_free(cb);
+            cb_free(vb);
+            return null; // Unterminated string
+        }
+        if (c == '"') {
+            ls_advance(self); // consume closing quote
+            break; // End of string
+        }
+        if (c == '\\') {
+            let e = ls_read_valid_char_escape(self, false);
+            if (e == null) {
+                cb_free(cb);
+                cb_free(vb);
+                return null; // Invalid escape sequence (error already set)
+            }
+            let esc = e as EscapedChar;
+            cb_append_s(cb, esc.escape_str);
+            if (esc.char_value <= 127) {
+                cb_append(vb, esc.char_value as byte);
+            } else {
+                // FIXME handle Unicode code points > 127 directly in the future
+                cb_append_s(vb, esc.escape_str);
+            }
+            continue;
+        }
+        cb_append(cb, ls_peek(self));
+        cb_append(vb, ls_advance(self));
+    }
+    let lit_value = cb_to_string(cb);
+    let str_value = cb_to_string(vb);
+    cb_free(cb);
+    cb_free(vb);
+    return Token(TT_STRING(lit_value, str_value), start_index, start_line, start_column);
+}
+
+/**
+ * Reads a valid escape sequence from the input, starting after the backslash.
+ * Validates that the escape sequence is well-formed and returns both the original escape string and its
+ * corresponding character value.
+ * If `single_byte` is true, also validates that the resulting character value can fit in a single byte (0-255).
+ * Returns an EscapedChar struct if successful, or `null` if an invalid escape sequence is encountered,
+ * in which case the error field in the LexerState will be set.
+ */
+func ls_read_valid_char_escape(self: LexerState*, single_byte: bool) -> EscapedChar? {
+    let char_value: int = 0;
+    let cb = cb_create();
+    cb_append(cb, ls_advance(self)); // the backslash
+
+    let c = ls_peek(self);
+    if (is_escape_char(c)) {
+        cb_append(cb, ls_advance(self));
+    }
+    else if (c == 'x') {
+        // Hexadecimal escape sequence: \xH+ (at least 1 hex digit)
+        cb_append(cb, ls_advance(self)); // consume 'x'
+        let hex_digits = 0;
+        while (is_hex_digit(ls_peek(self))) {
+            let digit = ls_peek(self);
+            cb_append(cb, ls_advance(self));
+            hex_digits = hex_digits + 1;
+            char_value = char_value * 16 + hex_char_to_int(digit);
+        }
+        if (hex_digits < 1) {
+            self.error = Error("LEX-0050", "invalid hexadecimal escape sequence");
+            cb_free(cb);
+            return null;
+        }
+        if (single_byte && char_value > 255) {
+            self.error = Error("LEX-0031", concat3_s("character literal hexadecimal escape out of range (0-255): '\\x",
+                                           int_to_string_base(char_value, 16), "'"));
+            cb_free(cb);
+            return null;
+        }
+    }
+    else if (c == 'u' || c == 'U') {
+        // Unicode escape sequence: \uHHHH or \UHHHHHHHH (4 or 8 hex digits)
+        cb_append(cb, ls_advance(self)); // consume 'u' or 'U'
+        let hex_digits = 0;
+        let required_digits = 4;
+        if (c == 'U') required_digits = 8;
+        while (is_hex_digit(ls_peek(self)) && hex_digits < required_digits) {
+            let digit = ls_peek(self);
+            cb_append(cb, ls_advance(self));
+            hex_digits = hex_digits + 1;
+            char_value = char_value * 16 + hex_char_to_int(digit);
+        }
+        if (hex_digits != required_digits) {
+            let error_code = "LEX-0051"; // u
+            if (c == 'U') error_code = "LEX-0052"; // U
+            self.error = Error(error_code, concat3_s("invalid Unicode escape sequence, expected ",
+                                           int_to_string(required_digits), " hex digits"));
+            cb_free(cb);
+            return null;
+        }
+        if (char_value > 1114111) { // 0x10FFFF
+            self.error = Error("LEX-0054", "Unicode code point out of range (must be <= 0x10FFFF)");
+            cb_free(cb);
+            return null;
+        }
+        if (single_byte) {
+            if (char_value > 127) {
+                self.error = Error("LEX-0030", "character literal must represent a single byte");
+                cb_free(cb);
+                return null;
+            }
+            // For single-byte character literals, convert to the \xHH form
+            let hex_str = int_to_string_base(char_value, 16);
+            cb_clear(cb);
+            cb_append_s(cb, "\\x");
+            if (char_value < 16) {
+                cb_append(cb, '0'); // Pad with leading zero if needed
+            }
+            cb_append_s(cb, hex_str);
+        }
+    }
+    else if (is_octal_digit(c)) {
+        // Octal escape sequence: \ooo (up to 3 octal digits)
+        let octal_digits = 0;
+        while (octal_digits < 3 && is_octal_digit(ls_peek(self))) {
+            let digit = ls_peek(self);
+            cb_append(cb, ls_advance(self));
+            octal_digits = octal_digits + 1;
+            char_value = char_value * 8 + (digit - '0');
+            if (char_value > 255) {
+                self.error = Error("LEX-0053", "octal escape sequence out of range (must be <= 377)");
+                cb_free(cb);
+                return null;
+            }
+        }
+    }
+    else {
+        self.error = Error("LEX-0059", concat3_s("unknown escape sequence '\\", byte_to_s(c), "'"));
+        cb_free(cb);
+        return null;
+    }
+
+    let escape_str = cb_to_string(cb);
+    cb_free(cb);
+    return EscapedChar(escape_str, char_value);
+}
+
+/**
+ * Reads an integer literal from the input, starting with the first digit character.
+ * Validates that the literal is well-formed and does not contain invalid characters immediately following it.
+ * Also checks for integer overflow and ensures the value fits within a 32-bit signed integer range.
+ * Returns a Token of type TT_INT if successful, or `null` if a lexing error occurs, in which case the error field
+ * in the LexerState will be set.
+ */
+func ls_read_number(self: LexerState*, first_char: byte, is_negative: bool,
+                    start_index: int, start_line: int, start_column: int) -> Token? {
+    let cb = cb_create();
+    if (is_negative) {
+        cb_append(cb, '-');
+    }
+    cb_append(cb, first_char);
+    while (is_digit(ls_peek(self))) {
+        cb_append(cb, ls_advance(self));
+    }
+    let number_str = cb_to_string(cb);
+    cb_free(cb);
+
+    // Check for invalid characters immediately following the number (e.g., "123abc")
+    if (is_ident_start(ls_peek(self))) {
+        self.error = Error("LEX-0061", concat3_s("invalid character '", byte_to_s(ls_peek(self)), "' after integer literal"));
+        return null;
+    }
+
+    // Check for integer overflow
+    let number_value : int? = string_to_int(number_str);
+    if (number_value == null) {
+        self.error = Error("LEX-0060", concat3_s("integer literal '", number_str, "' exceeds 32-bit signed range"));
+        return null;
+    }
+
+    return Token(TT_INT(number_str, number_value as int), start_index, start_line, start_column);
+}
+
+/**
+ * Skips over any whitespace characters and comments in the input until it reaches a non-whitespace, non-comment
+ * character or the end of the input.
+ * Handles both line comments and block comments.
+ * Returns std.unit::present() if successful, or `null` if an unterminated block comment is encountered,
+ * in which case the error field in the LexerState will be set.
+ */
 func ls_skip_whitespace_and_comments(self: LexerState*) -> Unit? {
     while (true) {
         let c = ls_peek(self);
-        if (c == ' ' || c == '\r' || c == '\t' || c == '\n') {
+        if (is_space(c)) {
             ls_advance(self);
             continue;
         } else if (c == '/') {
             if (ls_peek_next(self) == '/') {
-                // Single-line comment
+                // line comment
                 while (ls_peek(self) != '\n' && !ls_at_end(self)) {
                     ls_advance(self);
                 }
                 continue;
             } else if (ls_peek_next(self) == '*') {
-                // Multi-line comment
+                // block comment
                 ls_advance(self); // consume '/'
                 ls_advance(self); // consume '*'
                 while (true) {

@@ -9,18 +9,18 @@ import std.io;
 import std.string;
 import std.unit;
 
-import util.string;
+import util.text;
 import util.vector;
-import util.map;
+import util.linear_map;
 
 enum TokenType {
     TT_EOF;
 
-    TT_IDENT(text: string);
-    TT_UNDERSCORE;
-    TT_INT(text: string, value: int);
-    TT_BYTE(text: string, value: byte);
-    TT_STRING(text: string, value: string);
+    TT_IDENT(text: string);                 // identifier, e.g. i, name, etc.
+    TT_UNDERSCORE;                          // "_"
+    TT_INT(text: string, value: int);       // integer literal, e.g. 42, -7, etc.
+    TT_BYTE(text: string, value: byte);     // octet/byte literal, e.g. 'a', '\n', etc.
+    TT_STRING(text: string, value: string); // string literal, e.g. "hello world", etc.
 
     // Keywords
     TT_MODULE;
@@ -41,40 +41,49 @@ enum TokenType {
     TT_CONTINUE;
     TT_TRUE;
     TT_FALSE;
-    TT_SIZEOF;
     TT_NULL;
     TT_AS;
     TT_NEW;
     TT_DROP;
 
     // Punctuation / operators
-    TT_LBRACE;      // {
-    TT_RBRACE;      // }
-    TT_LPAREN;      // (
-    TT_RPAREN;      // )
-    TT_LBRACKET;    // [
-    TT_RBRACKET;    // ]
-    TT_COMMA;       // ,
-    TT_SEMI;        // ;
-    TT_COLON;       // :
-    TT_ARROW_FUNC;  // ->
-    TT_ARROW_MATCH; // =>
-    TT_EQ;          // =
-    TT_PLUS;        // +
-    TT_MINUS;       // -
-    TT_STAR;        // *
-    TT_SLASH;       // /
-    TT_LT;          // <
-    TT_GT;          // >
-    TT_LE;          // <
-    TT_GE;          // <=
-    TT_EQEQ;        // ==
-    TT_NE;          // !=
-    TT_ANDAND;      // &&
-    TT_OROR;        // ||
-    TT_BANG;        // !
-    TT_QUESTION;    // ?
-    TT_DOT;         // .
+    TT_LBRACE;          // {
+    TT_RBRACE;          // }
+    TT_LPAREN;          // (
+    TT_RPAREN;          // )
+    TT_LBRACKET;        // [
+    TT_RBRACKET;        // ]
+    TT_COMMA;           // ,
+    TT_SEMI;            // ;
+    TT_COLON;           // :
+    TT_DOUBLE_COLON;    // ::
+    TT_ARROW_FUNC;      // ->
+    TT_ARROW_MATCH;     // =>
+    TT_EQ;              // =
+    TT_PLUS;            // +
+    TT_MINUS;           // -
+    TT_STAR;            // *
+    TT_SLASH;           // /
+    TT_MODULO;          // %
+    TT_LT;              // <
+    TT_GT;              // >
+    TT_LE;              // <
+    TT_GE;              // <=
+    TT_EQEQ;            // ==
+    TT_NE;              // !=
+    TT_ANDAND;          // &&
+    TT_OROR;            // ||
+    TT_BANG;            // !
+    TT_QUESTION;        // ?
+    TT_DOT;             // .
+
+    // Reserved operators
+    TT_AMP;             // &
+    TT_PIPE;            // |
+    TT_CARET;           // ^
+    TT_TILDE;           // ~
+    TT_LSHIFT;          // <<
+    TT_RSHIFT;          // >>
 
     TT_FUTURE_EXTENSION;  // placeholder for future tokens
 }
@@ -114,7 +123,6 @@ func token_to_string(token: Token) -> string {
         TT_CONTINUE => { return "continue"; }
         TT_TRUE => { return "true"; }
         TT_FALSE => { return "false"; }
-        TT_SIZEOF => { return "sizeof"; }
         TT_NULL => { return "null"; }
         TT_AS => { return "as"; }
         TT_NEW => { return "new"; }
@@ -130,6 +138,7 @@ func token_to_string(token: Token) -> string {
         TT_COMMA => { return ","; }
         TT_SEMI => { return ";"; }
         TT_COLON => { return ":"; }
+        TT_DOUBLE_COLON => { return "::"; }
         TT_ARROW_FUNC => { return "->"; }
         TT_ARROW_MATCH => { return "=>"; }
         TT_EQ => { return "="; }
@@ -137,6 +146,7 @@ func token_to_string(token: Token) -> string {
         TT_MINUS => { return "-"; }
         TT_STAR => { return "*"; }
         TT_SLASH => { return "/"; }
+        TT_MODULO => { return "%"; }
         TT_LT => { return "<"; }
         TT_GT => { return ">"; }
         TT_LE => { return "<="; }
@@ -148,6 +158,13 @@ func token_to_string(token: Token) -> string {
         TT_BANG => { return "!"; }
         TT_QUESTION => { return "?"; }
         TT_DOT => { return "."; }
+
+        TT_AMP => { return "&"; }
+        TT_PIPE => { return "|"; }
+        TT_CARET => { return "^"; }
+        TT_TILDE => { return "~"; }
+        TT_LSHIFT => { return "<<"; }
+        TT_RSHIFT => { return ">>"; }
 
         TT_FUTURE_EXTENSION => { return "<future-extension>"; }
     }
@@ -173,11 +190,14 @@ func is_reserved_keyword(token: Token) -> bool {
         TT_CONTINUE => { return true; }
         TT_TRUE => { return true; }
         TT_FALSE => { return true; }
-        TT_SIZEOF => { return true; }
         TT_NULL => { return true; }
         TT_AS => { return true; }
         TT_NEW => { return true; }
         TT_DROP => { return true; }
+        TT_STRING(t, v) => { return true; }
+        TT_INT(t, v) => { return true; }
+        TT_BYTE(t, v) => { return true; }
+        TT_FUTURE_EXTENSION => { return true; }
         _ => { return false; }
     }
 }
@@ -237,9 +257,6 @@ func ident_to_token(ident: string, index: int, line: int, col: int) -> Token {
     if (eq_s(ident, "false")) {
         return Token(TT_FALSE, index, line, col);
     }
-    if (eq_s(ident, "sizeof")) {
-        return Token(TT_SIZEOF, index, line, col);
-    }
     if (eq_s(ident, "null")) {
         return Token(TT_NULL, index, line, col);
     }
@@ -251,6 +268,15 @@ func ident_to_token(ident: string, index: int, line: int, col: int) -> Token {
     }
     if (eq_s(ident, "drop")) {
         return Token(TT_DROP, index, line, col);
+    }
+    if (eq_s(ident, "_")) {
+        return Token(TT_UNDERSCORE, index, line, col);
+    }
+    if (eq_s(ident, "tiny") || eq_s(ident, "short") || eq_s(ident, "long") ||
+        eq_s(ident, "ushort") || eq_s(ident, "uint") || eq_s(ident, "ulong") ||
+        eq_s(ident, "float") || eq_s(ident, "double") || eq_s(ident, "in") ||
+        eq_s(ident, "const") ) {
+        return Token(TT_FUTURE_EXTENSION, index, line, col);
     }
     return Token(TT_IDENT(ident), index, line, col);
 }

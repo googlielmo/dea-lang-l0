@@ -38,8 +38,10 @@ func arr_create(element_size: int, length: int) -> ArrayBase* {
         /* Avoid zero-size allocations, which are platform-dependent */
         initial_capacity = 1;
     }
-    let new_data = rt_alloc(element_size * initial_capacity);
-    assert(new_data != null, "Failed to allocate memory for array creation");
+    let new_data_opt = rt_alloc(element_size * initial_capacity);
+    assert(new_data_opt != null, "Failed to allocate memory for array creation");
+    let new_data = new_data_opt as void*;
+    rt_memset(new_data, 0, element_size * initial_capacity);
     let self = new ArrayBase(
         length,
         element_size,
@@ -54,12 +56,18 @@ func arr_check(self: ArrayBase*, index: int) {
 
 func arr_resize(self: ArrayBase*, new_length: int) {
     assert(new_length >= 0, "New length must be non-negative for array resize");
+    let old_capacity = self.capacity;
     let new_capacity = new_length;
     if (new_capacity == 0) {
         new_capacity = 1;
     }
     let new_data = rt_realloc(self.data, self.element_size * new_capacity) as void*;
     assert(new_data != null, "Failed to realloc memory for array resize");
+    if (new_capacity > old_capacity) {
+        let start_ptr = rt_array_element(new_data, self.element_size, old_capacity);
+        let new_bytes = (new_capacity - old_capacity) * self.element_size;
+        rt_memset(start_ptr, 0, new_bytes);
+    }
     self.capacity = new_length;
     self.data = new_data;
 }

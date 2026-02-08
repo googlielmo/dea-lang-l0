@@ -113,6 +113,13 @@ func cb_append(self: CharBuffer*, c: byte) {
     *dest = c;
 }
 
+func cb_append_s(self: CharBuffer*, s: string) {
+    for (let i: int = 0; i < len_s(s); i = i + 1) {
+        let c = char_at_s(s, i);
+        cb_append(self, c);
+    }
+}
+
 func cb_size(self: CharBuffer*) -> int {
     return vec_size(self.chars);
 }
