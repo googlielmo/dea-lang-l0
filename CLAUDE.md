@@ -159,6 +159,21 @@ func safe_div(a: int, b: int) -> int? {
     if (b == 0) { return null; }
     return (a / b) as int?;
 }
+
+// With statement (deterministic cleanup)
+with (let f = open("a") => close(f),
+      let g = open("b") => close(g)) {
+    work(f, g);
+}
+// Or with cleanup block (programmer controls order)
+with (let f = open("file"),
+      let buf = alloc(1024)) {
+    write(f, buf);
+} cleanup {
+    flush(f);
+    free(buf);
+    close(f);
+}
 ```
 
 Types: `int`, `uint`, `byte`, `ubyte`, `bool`, `string`, `void`, `T*` (pointer), `T?` (optional)

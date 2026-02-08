@@ -8,7 +8,7 @@ from enum import Enum, auto
 from typing import Dict, Optional, Tuple
 
 from l0_ast import Node, TypeRef, FuncDecl, Module, Stmt, Block, LetStmt, IfStmt, WhileStmt, MatchArm, MatchStmt, \
-    Pattern, WildcardPattern, VariantPattern
+    Pattern, WildcardPattern, VariantPattern, WithStmt
 
 
 class LocalKind(Enum):
@@ -154,6 +154,10 @@ class LocalScopeResolver:
                 self._visit_match_arm(arm, scope)
             return
 
+        if isinstance(stmt, WithStmt):
+            self._visit_with_stmt(stmt, scope)
+            return
+
         if isinstance(stmt, Block):
             # Register a new scope for this block.
             block_scope = Scope(parent=scope)
@@ -163,6 +167,29 @@ class LocalScopeResolver:
 
         # ReturnStmt, AssignStmt, ExprStmt and others do not introduce scopes
         # or new bindings; nothing to do here.
+
+    def _visit_with_stmt(self, stmt: WithStmt, parent_scope: Scope) -> None:
+        # The with header creates a scope for variables declared by items.
+        # Items are sequential: item N sees names from items 0..N-1.
+        header_scope = Scope(parent=parent_scope)
+
+        for item in stmt.items:
+            # Visit init statement in the header scope
+            self._visit_stmt(item.init, header_scope)
+            # Cleanup expressions are visited in header scope too (they see
+            # all items declared so far including the current one)
+            # No new bindings from cleanup
+
+        # Body gets a nested scope under the header scope
+        body_scope = Scope(parent=header_scope)
+        self._block_scopes[id(stmt.body)] = body_scope
+        self._visit_block(stmt.body, body_scope)
+
+        # Cleanup body (if present) is resolved in the header scope (not body scope)
+        if stmt.cleanup_body is not None:
+            cleanup_scope = Scope(parent=header_scope)
+            self._block_scopes[id(stmt.cleanup_body)] = cleanup_scope
+            self._visit_block(stmt.cleanup_body, cleanup_scope)
 
     def _visit_match_arm(self, arm: MatchArm, parent_scope: Scope) -> None:
         # Each arm has its own scope, child of the parent scope in which

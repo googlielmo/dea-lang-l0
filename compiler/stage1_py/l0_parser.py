@@ -9,7 +9,7 @@ from l0_ast import (
     TypeAliasDecl, LetDecl, Module, Stmt, Block, LetStmt, AssignStmt, ExprStmt, IfStmt, WhileStmt, ReturnStmt, DropStmt,
     MatchArm, MatchStmt, Pattern, WildcardPattern, VariantPattern, Expr, IntLiteral, ByteLiteral, StringLiteral,
     BoolLiteral, NullLiteral, VarRef, UnaryOp, BinaryOp, CallExpr, IndexExpr, FieldAccessExpr, ParenExpr, CastExpr,
-    TryExpr, TypeExpr, NewExpr, BreakStmt, ContinueStmt, ForStmt)
+    TryExpr, TypeExpr, NewExpr, BreakStmt, ContinueStmt, ForStmt, WithItem, WithStmt)
 from l0_lexer import TokenKind, Token, Lexer, is_reserved_keyword
 
 
@@ -319,6 +319,8 @@ class Parser:
             return self._parse_while_stmt()
         elif self._check(TokenKind.FOR):
             return self._parse_for_stmt()
+        elif self._check(TokenKind.WITH):
+            return self._parse_with_stmt()
 
         simple_stmt = self._parse_simple_stmt()
 
@@ -458,6 +460,39 @@ class Parser:
             raise ParseError("[PAR-0177] match statement must have at least one arm", self._peek(), self.filename)
 
         return MatchStmt(expr, arms, span=self._extend_span(start))
+
+    def _parse_with_item(self) -> WithItem:
+        start = self._span_start()
+        init = self._parse_simple_stmt()
+        cleanup = None
+        if self._match(TokenKind.ARROW_MATCH):
+            cleanup = self._parse_simple_stmt()
+        return WithItem(init, cleanup, span=self._extend_span(start))
+
+    def _parse_with_stmt(self) -> WithStmt:
+        start = self._span_start()
+        self._expect(TokenKind.WITH, "[PAR-0500] expected 'with'")
+        self._expect(TokenKind.LPAREN, "[PAR-0501] expected '(' after 'with'")
+        items = []
+        while True:
+            items.append(self._parse_with_item())
+            if not self._match(TokenKind.COMMA):
+                break
+        self._expect(TokenKind.RPAREN, "[PAR-0502] expected ')' after with items")
+        body = self._parse_block()
+        cleanup_body = None
+        if self._match(TokenKind.CLEANUP):
+            cleanup_body = self._parse_block()
+        # Validate constraints
+        has_arrows = any(it.cleanup is not None for it in items)
+        has_bare = any(it.cleanup is None for it in items)
+        if has_arrows and has_bare:
+            raise ParseError("[PAR-0503] with: all items must use '=>' or none", self._peek(), self.filename)
+        if has_arrows and cleanup_body is not None:
+            raise ParseError("[PAR-0504] with: cannot have both '=>' and cleanup block", self._peek(), self.filename)
+        if not has_arrows and cleanup_body is None:
+            raise ParseError("[PAR-0505] with: cleanup block required when '=>' is not used", self._peek(), self.filename)
+        return WithStmt(items, body, cleanup_body, span=self._extend_span(start))
 
     def _parse_pattern(self) -> Pattern:
         start = self._span_start()

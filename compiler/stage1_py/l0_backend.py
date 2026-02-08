@@ -27,7 +27,7 @@ from l0_ast import (
     Stmt, Block, LetStmt, AssignStmt, ExprStmt, IfStmt, WhileStmt, ReturnStmt, DropStmt, MatchStmt, Expr, IntLiteral,
     StringLiteral, BoolLiteral, VarRef, UnaryOp, BinaryOp, CallExpr, IndexExpr, FieldAccessExpr,
     ParenExpr, CastExpr, VariantPattern, WildcardPattern, NullLiteral, TypeExpr, TryExpr, NewExpr, BreakStmt,
-    ContinueStmt, ForStmt, ByteLiteral,
+    ContinueStmt, ForStmt, ByteLiteral, WithStmt,
 )
 from l0_c_emitter import CEmitter
 from l0_internal_error import InternalCompilerError, ICELocation
@@ -729,10 +729,23 @@ class Backend:
     def _emit_cleanup_for_return(self, returned_var: Optional[str] = None) -> None:
         """
         Emit cleanup for return statement.
-        Walks up scope chain and cleans ALL owned variables (except return value).
+        Walks up scope chain, executes any with-statement cleanup data,
+        then cleans ALL owned variables (except return value).
+        The with-cleanup runs first because user cleanup code may reference
+        variables whose owned resources (e.g. string refcounts) are released
+        by the automatic owned-var cleanup.
         """
         scope = self._current_scope
         while scope is not None:
+            if (
+                (scope.with_cleanup_block is not None or scope.with_cleanup_inline)
+                and not scope.with_cleanup_in_progress
+            ):
+                scope.with_cleanup_in_progress = True
+                try:
+                    self._emit_with_cleanup_from_scope(scope, self.current_module)
+                finally:
+                    scope.with_cleanup_in_progress = False
             for var_name, var_type in reversed(scope.owned_vars):
                 if var_name == returned_var:
                     continue  # Don't clean the return value
@@ -743,7 +756,10 @@ class Backend:
     def _emit_cleanup_for_loop_exit(self) -> None:
         """
         Emit cleanup for break/continue.
-        Walks from current scope up to and including the innermost loop body scope.
+        Walks from current scope up to and including the innermost loop body scope,
+        executing any with-statement cleanup data along the way.
+        The with-cleanup runs before owned-var cleanup (see
+        ``_emit_cleanup_for_return`` for rationale).
         """
         if not self._loop_scope_stack:
             # Shouldn't happen if semantic analysis caught it
@@ -753,6 +769,15 @@ class Backend:
 
         scope = self._current_scope
         while scope is not None:
+            if (
+                (scope.with_cleanup_block is not None or scope.with_cleanup_inline)
+                and not scope.with_cleanup_in_progress
+            ):
+                scope.with_cleanup_in_progress = True
+                try:
+                    self._emit_with_cleanup_from_scope(scope, self.current_module)
+                finally:
+                    scope.with_cleanup_in_progress = False
             for var_name, var_type in reversed(scope.owned_vars):
                 if self._has_owned_fields(var_type):
                     self._emit_value_cleanup(var_name, var_type)
@@ -770,6 +795,30 @@ class Backend:
         for var_name, var_type in reversed(scope.owned_vars):
             if self._has_owned_fields(var_type):
                 self._emit_value_cleanup(var_name, var_type)
+
+    def _emit_with_cleanup_from_scope(self, scope: ScopeContext, module_name: str) -> None:
+        """Emit with-statement cleanup for a scope."""
+        if scope.with_cleanup_block is None and not scope.with_cleanup_inline:
+            return
+
+        old_with_cleanup_in_progress = scope.with_cleanup_in_progress
+        scope.with_cleanup_in_progress = True
+        try:
+            # Wrap in a nested block so cleanup declarations get their own C scope
+            # (mirrors L0 scoping rules and isolates inline cleanup statements).
+            self.emitter.emit_block_start()
+            cleanup_scope = self._push_scope()
+            if scope.with_cleanup_block is not None:
+                self._emit_block_sequence(scope.with_cleanup_block, module_name)
+            else:
+                for stmt in scope.with_cleanup_inline or []:
+                    self._emit_stmt(stmt, module_name)
+            if not self._next_stmt_unreachable:
+                self._emit_cleanup_at_scope_exit(cleanup_scope)
+            self._pop_scope()
+            self.emitter.emit_block_end()
+        finally:
+            scope.with_cleanup_in_progress = old_with_cleanup_in_progress
 
     def _emit_value_cleanup(self, c_expr: str, ty: Type) -> None:
         """
@@ -882,6 +931,10 @@ class Backend:
 
         elif isinstance(stmt, MatchStmt):
             self._emit_match(stmt, module_name)
+            return None
+
+        elif isinstance(stmt, WithStmt):
+            self._emit_with(stmt, module_name)
             return None
 
         elif isinstance(stmt, Block):
@@ -1252,6 +1305,62 @@ class Backend:
             # Pattern variables are borrowed from scrutinee, not owned,
             # thus add_declared() is used, not add_owned().
             arm_scope.add_declared(c_pat_var, field_type)
+
+    def _emit_with(self, stmt: WithStmt, module_name: str) -> None:
+        """
+        Emit a with statement.
+
+        Inline => form (LIFO cleanup):
+            Emit init statements, then body, then cleanup statements in reverse order.
+
+        Cleanup block form:
+            Emit init statements, then body, then cleanup block statements.
+
+        Cleanup is emitted at block end and before every early exit
+        (return, break, continue). The scope stores cleanup data so
+        ``_emit_cleanup_for_return`` and ``_emit_cleanup_for_loop_exit``
+        can emit it before leaving.
+
+        The body and cleanup block are each emitted as real nested C blocks
+        so that any declarations inside them do not collide with the header
+        scope (e.g., legal L0 shadowing like ``let x`` in both the header
+        and body).
+        """
+        self.emitter.emit_block_start()
+        with_scope = self._push_scope()
+
+        # Emit all init statements in the header scope
+        for item in stmt.items:
+            self._emit_stmt(item.init, module_name)
+
+        if stmt.cleanup_body is not None:
+            with_scope.with_cleanup_block = stmt.cleanup_body
+        else:
+            with_scope.with_cleanup_inline = [
+                item.cleanup for item in reversed(stmt.items)
+                if item.cleanup is not None
+            ]
+
+        # Emit body as a nested block so its declarations get their own
+        # C scope (mirrors L0 scoping rules).
+        self.emitter.emit_block_start()
+        body_scope = self._push_scope()
+        self._emit_block_sequence(stmt.body, module_name)
+        if not self._next_stmt_unreachable:
+            self._emit_cleanup_at_scope_exit(body_scope)
+        body_unreachable = self._next_stmt_unreachable
+        self._pop_scope()
+        self.emitter.emit_block_end()
+
+        # Emit cleanup at normal exit (only if code is reachable).
+        # User cleanup runs before automatic owned-var cleanup so that
+        # cleanup code can still reference the with-header variables.
+        if not body_unreachable:
+            self._emit_with_cleanup_from_scope(with_scope, module_name)
+            self._emit_cleanup_at_scope_exit(with_scope)
+
+        self._pop_scope()
+        self.emitter.emit_block_end()
 
     def _emit_drop(self, stmt: DropStmt, module_name: str) -> None:
         """

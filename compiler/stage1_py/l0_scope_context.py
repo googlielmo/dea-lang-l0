@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 from typing import List, Optional, Tuple
 
 from l0_types import Type
+from l0_ast import Block, Stmt
 
 
 @dataclass
@@ -19,6 +20,10 @@ class ScopeContext:
     owned_vars: List[Tuple[str, Type]] = field(default_factory=list)  # Variables needing cleanup
     declared_vars: List[Tuple[str, Type]] = field(default_factory=list)  # All variables (for type lookup)
     parent: Optional['ScopeContext'] = None
+    # with-statement cleanup data, set by _emit_with for early-exit handling.
+    with_cleanup_inline: Optional[List[Stmt]] = None
+    with_cleanup_block: Optional[Block] = None
+    with_cleanup_in_progress: bool = False
 
     def add_owned(self, var_name: str, var_type: Type) -> None:
         """Mark a variable as owned (needs cleanup) and declared."""

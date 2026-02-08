@@ -12,7 +12,7 @@ from l0_ast import (
     ReturnStmt, MatchArm, MatchStmt, Expr, IntLiteral, StringLiteral, BoolLiteral, NullLiteral, VarRef,
     UnaryOp, BinaryOp, CallExpr, IndexExpr, FieldAccessExpr, ParenExpr, CastExpr, VariantPattern,
     TryExpr, TypeExpr, DropStmt, NewExpr, WildcardPattern, BreakStmt, ContinueStmt, ForStmt, ByteLiteral,
-    TypeAliasDecl)
+    TypeAliasDecl, WithStmt)
 from l0_compilation import CompilationUnit
 from l0_diagnostics import diag_from_node
 from l0_locals import FunctionEnv
@@ -581,6 +581,25 @@ class ExpressionTypeChecker:
                 # A match guarantees a return if it is exhaustive AND all arms return.
                 self._return_paths = is_exhaustive and all_arms_return
 
+            return None
+
+        if isinstance(stmt, WithStmt):
+            # Type-check items sequentially in a new scope
+            self._push_scope()
+            try:
+                for item in stmt.items:
+                    self._check_stmt(item.init)
+                    if item.cleanup is not None:
+                        self._check_stmt(item.cleanup)
+
+                # Body in a nested scope
+                self._check_block(stmt.body, check_return_paths=check_return_paths)
+
+                # Cleanup body in the item scope (not body scope)
+                if stmt.cleanup_body is not None:
+                    self._check_block(stmt.cleanup_body)
+            finally:
+                self._pop_scope()
             return None
 
         # Handle standalone block statements (nested blocks)

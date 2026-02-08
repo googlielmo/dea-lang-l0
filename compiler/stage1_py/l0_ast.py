@@ -179,6 +179,18 @@ class MatchStmt(Stmt):
 
 
 @dataclass
+class WithItem(Node):
+    init: Stmt            # any SimpleStmt
+    cleanup: Optional[Stmt]  # any SimpleStmt, or None if using cleanup block
+
+@dataclass
+class WithStmt(Stmt):
+    items: List["WithItem"]
+    body: Block
+    cleanup_body: Optional[Block]
+
+
+@dataclass
 class BreakStmt(Stmt):
     pass
 

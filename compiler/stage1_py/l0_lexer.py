@@ -44,6 +44,8 @@ class TokenKind(Enum):
 
     NEW = auto()
     DROP = auto()
+    WITH = auto()
+    CLEANUP = auto()
 
     # Punctuation / operators
     LBRACE = auto()  # {
@@ -110,6 +112,8 @@ KEYWORDS = {
     "as": TokenKind.AS,
     "new": TokenKind.NEW,
     "drop": TokenKind.DROP,
+    "with": TokenKind.WITH,
+    "cleanup": TokenKind.CLEANUP,
     "void": TokenKind.IDENT,
     "bool": TokenKind.IDENT,
     "string": TokenKind.IDENT,

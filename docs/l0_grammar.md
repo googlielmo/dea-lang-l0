@@ -44,7 +44,7 @@ Reserved keywords (not valid as identifiers):
 
 ```text
 module import func struct enum type extern let const
-return match if else while for break continue in
+return match if else while for break continue in with cleanup
 true false sizeof null as new drop void bool string
 byte short int long ubyte ushort uint ulong float double
 ```
@@ -183,6 +183,7 @@ Stmt            ::=     Block
                   |     MatchStmt
                   |     WhileStmt
                   |     ForStmt
+                  |     WithStmt
                   |     SimpleStmt ";"
 
 SimpleStmt      ::=     LetStmt
@@ -250,6 +251,28 @@ WildcardPattern     ::=     "_"
 ```
 
 No literal patterns, nested patterns, or or-patterns in L<sub>0</sub>.
+
+### 5.6 With (deterministic resource cleanup)
+
+```ebnf
+WithStmt        ::=     "with" "(" WithItemList ")" Block
+                  |     "with" "(" WithItemList ")" Block "cleanup" Block
+
+WithItemList    ::=     WithItem ( "," WithItem )*
+
+WithItem        ::=     SimpleStmt "=>" SimpleStmt       (* inline cleanup *)
+                  |     SimpleStmt                        (* cleanup-block form *)
+```
+
+Constraints enforced by the parser:
+
+* All items must use `=>` (inline form) or none (cleanup-block form); mixing is rejected.
+* The inline form (`=>`) and the `cleanup` block are mutually exclusive.
+* When no items use `=>`, a trailing `cleanup` block is required.
+
+Inline cleanup statements are executed in LIFO (reverse declaration) order.
+Cleanup is guaranteed to run at block end and before any early exit
+(`return`, `break`, `continue`) from the body.
 
 ## 6. Expressions
 
