@@ -611,7 +611,7 @@ def test_codegen_byte_arithmetic(tmp_path):
 def run_c_compiler(c_file: Path, out_file: Path) -> CompletedProcess[str]:
     runtime_dir = Path(__file__).parent.parent / "runtime"
     return subprocess.run(
-        ["gcc", "-Wall", "-Wextra", "-std=c99", "-pedantic-errors", f"-I{runtime_dir}", "-o", str(out_file), str(c_file)],
+        ["gcc", "-std=c99", "-Wall", "-Wextra", "-Wno-unused", "-pedantic-errors", "-Wno-parentheses", f"-I{runtime_dir}", "-o", str(out_file), str(c_file)],
         capture_output=True,
         text=True,
     )
