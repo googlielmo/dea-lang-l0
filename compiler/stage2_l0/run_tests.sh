@@ -1,4 +1,9 @@
 #!/bin/bash
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+# Copyright (c) 2026 gwz
+#
+
 # Run all tests in compiler/stage2_l0/tests/
 
 set -e

@@ -327,11 +327,11 @@ The authoritative status file is [project_status.md](docs/project_status.md).
 
 This project is dual-licensed under the following terms:
 
-- MIT License (see [LICENSE](LICENSE))
-- Apache License 2.0 (see [LICENSE.APACHE](LICENSE.APACHE))
+- MIT License (see [LICENSE-MIT](LICENSE-MIT))
+- Apache License 2.0 (see [LICENSE-APACHE](LICENSE-APACHE))
 
 You may use this software under either license at your option.
 
 ## Author
 
-Created and maintained by gwz ([@googlielmo](https://github.com/googlielmo)).
+Created and maintained by `gwz` ([@googlielmo](https://github.com/googlielmo)).
