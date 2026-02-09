@@ -82,6 +82,31 @@ def test_lexer_rshift_vs_gt():
     assert kinds == [TokenKind.RSHIFT, TokenKind.GT, TokenKind.GE]
 
 
+def test_lexer_minus_context_sensitive():
+    """Minus is absorbed into INT only when it cannot be binary."""
+    cases = [
+        # (source, expected_token_kinds)
+        ("x-1",   [TokenKind.IDENT, TokenKind.MINUS, TokenKind.INT]),
+        ("1-1",   [TokenKind.INT, TokenKind.MINUS, TokenKind.INT]),
+        ("-1",    [TokenKind.INT]),
+        ("(-1)",  [TokenKind.LPAREN, TokenKind.INT, TokenKind.RPAREN]),
+        ("f(-1)", [TokenKind.IDENT, TokenKind.LPAREN, TokenKind.INT, TokenKind.RPAREN]),
+        ("3+-1",  [TokenKind.INT, TokenKind.PLUS, TokenKind.INT]),
+        ("x - 1", [TokenKind.IDENT, TokenKind.MINUS, TokenKind.INT]),
+    ]
+    for src, expected in cases:
+        tokens = Lexer.from_source(src).tokenize()
+        kinds = [t.kind for t in tokens if t.kind != TokenKind.EOF]
+        assert kinds == expected, f"Failed for {src!r}: got {kinds}"
+
+
+def test_lexer_negative_int_token_text():
+    """Absorbed negative INT tokens have minus in text."""
+    tokens = Lexer.from_source("-42").tokenize()
+    assert tokens[0].kind == TokenKind.INT
+    assert tokens[0].text == "-42"
+
+
 @pytest.mark.parametrize(
     ("src", "code"),
     [

@@ -155,6 +155,19 @@ def is_reserved_keyword(word: str) -> bool:
     return word in KEYWORDS
 
 
+# Tokens that can end an expression — minus after these is binary, not unary.
+_EXPR_ENDING_TOKENS = frozenset({
+    TokenKind.IDENT,
+    TokenKind.INT,
+    TokenKind.BYTE,
+    TokenKind.STRING,
+    TokenKind.TRUE,
+    TokenKind.FALSE,
+    TokenKind.NULL,
+    TokenKind.RPAREN,
+    TokenKind.RBRACKET,
+})
+
 # Constants for escape sequence validation
 OCT_CHARS = "01234567"
 HEX_CHARS = "0123456789abcdefABCDEF"
@@ -168,6 +181,7 @@ class Lexer:
         self.index = 0
         self.line = 1
         self.column = 1
+        self._prev_kind: TokenKind | None = None
 
     @classmethod
     def from_source(cls, source: str) -> "Lexer":
@@ -206,6 +220,7 @@ class Lexer:
         while True:
             tok = self._next_token()
             tokens.append(tok)
+            self._prev_kind = tok.kind
             if tok.kind is TokenKind.EOF:
                 break
         return tokens
@@ -252,7 +267,7 @@ class Lexer:
             if self._peek() == ">":
                 self._advance()
                 return Token(TokenKind.ARROW_FUNC, "->", start_line, start_col)
-            elif self._peek().isdigit():
+            elif self._peek().isdigit() and self._prev_kind not in _EXPR_ENDING_TOKENS:
                 text = self._read_number(self._advance(), start_col, start_line, is_negative=True)
                 return Token(TokenKind.INT, text, start_line, start_col)
             return Token(TokenKind.MINUS, c, start_line, start_col)
