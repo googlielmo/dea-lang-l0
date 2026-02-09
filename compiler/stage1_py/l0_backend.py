@@ -740,6 +740,19 @@ class Backend:
     # Cleanup helpers
     # -------------------------------------------------------------------------
 
+    def _scope_chain_has_cleanup(self) -> bool:
+        """Return True if any scope in the chain has with-cleanup or owned vars."""
+        scope = self._current_scope
+        while scope is not None:
+            if ((scope.with_cleanup_block is not None or scope.with_cleanup_inline)
+                    and not scope.with_cleanup_in_progress):
+                return True
+            for _, var_type in scope.owned_vars:
+                if self._has_owned_fields(var_type):
+                    return True
+            scope = scope.parent
+        return False
+
     def _emit_cleanup_for_return(self, returned_var: Optional[str] = None) -> None:
         """
         Emit cleanup for return statement.
@@ -999,21 +1012,32 @@ class Backend:
         return None
 
     def _emit_return(self, stmt: ReturnStmt) -> Any:
-        # Emit cleanup for ALL scopes before returning
-        if self._current_scope is not None:
+        if stmt.value is None:
+            if self._current_scope is not None:
+                self._emit_cleanup_for_return()
+            self.emitter.emit_return_stmt(None)
+        else:
             returned_var = None
-            if stmt.value and isinstance(stmt.value, VarRef):
+            if isinstance(stmt.value, VarRef):
                 returned_var = self.emitter.mangle_identifier(stmt.value.name)
 
-            # Clean all owned variables in scope chain (except return value)
-            self._emit_cleanup_for_return(returned_var)
-
-        if stmt.value is not None:
-            # Use _emit_expr_with_expected_type for type conversion
-            c_value = self._emit_expr_with_expected_type(stmt.value, self._current_func_result)
-            self.emitter.emit_return_stmt(c_value)
-        else:
-            self.emitter.emit_return_stmt(None)
+            needs_cleanup = (self._current_scope is not None
+                             and self._scope_chain_has_cleanup())
+            if needs_cleanup:
+                # Evaluate return expression BEFORE cleanup to avoid UAF
+                c_value = self._emit_expr_with_expected_type(
+                    stmt.value, self._current_func_result)
+                ret_tmp = self.emitter.fresh_tmp("ret")
+                c_ret_type = self.emitter.emit_type(self._current_func_result)
+                self.emitter.emit_temp_decl(c_ret_type, ret_tmp, c_value)
+                self._emit_cleanup_for_return(returned_var)
+                self.emitter.emit_return_stmt(ret_tmp)
+            else:
+                if self._current_scope is not None:
+                    self._emit_cleanup_for_return(returned_var)
+                c_value = self._emit_expr_with_expected_type(
+                    stmt.value, self._current_func_result)
+                self.emitter.emit_return_stmt(c_value)
 
         # Mark subsequent code as unreachable
         self._next_stmt_unreachable = True
@@ -2068,11 +2092,28 @@ class Backend:
 
             ret_none = self.emitter.emit_null_literal(self._current_func_result)
 
+            needs_cleanup = (self._current_scope is not None
+                             and self._scope_chain_has_cleanup())
+
             if self.emitter.is_niche_nullable(src_ty):
-                self.emitter.emit_try_check_niche(tmp, ret_none)
+                if needs_cleanup:
+                    self.emitter.emit_if_header(f"{tmp} == NULL")
+                    self.emitter.emit_block_start()
+                    self._emit_cleanup_for_return()
+                    self.emitter.emit_return_stmt(ret_none)
+                    self.emitter.emit_block_end()
+                else:
+                    self.emitter.emit_try_check_niche(tmp, ret_none)
                 return tmp  # unwraps to the pointer itself
 
-            self.emitter.emit_try_check_value(tmp, ret_none)
+            if needs_cleanup:
+                self.emitter.emit_if_header(f"!{tmp}.has_value")
+                self.emitter.emit_block_start()
+                self._emit_cleanup_for_return()
+                self.emitter.emit_return_stmt(ret_none)
+                self.emitter.emit_block_end()
+            else:
+                self.emitter.emit_try_check_value(tmp, ret_none)
             if is_statement:
                 return f"(void)({self.emitter.emit_try_extract_value(tmp)})"  # no-op in statement context
             return self.emitter.emit_try_extract_value(tmp)

@@ -507,7 +507,7 @@ def test_codegen_with_cleanup_block_shadowing_compiles(codegen_single, compile_a
 
 
 def test_codegen_with_early_return_runs_cleanup(codegen_single):
-    """Early return from with body should emit cleanup before returning."""
+    """Early return from with body evaluates expression, then emits cleanup."""
     c_code, diags = codegen_single("main", """
         module main;
         func helper() -> int {
@@ -531,15 +531,15 @@ def test_codegen_with_early_return_runs_cleanup(codegen_single):
 
 
 def test_codegen_with_early_return_compiles_and_runs(codegen_single, compile_and_run, tmp_path):
-    """Early return from with body runs cleanup; result reflects cleanup effect."""
+    """Early return evaluates expression before cleanup; returns pre-cleanup value."""
     c_code, diags = codegen_single("main", """
         module main;
         func helper() -> int {
-            let result: int = 1;
-            with (let x: int = 0 => result = x) {
+            let result: int = 0;
+            with (let x: int = 1 => result = x) {
                 return result;
             }
-            return 1;
+            return 2;
         }
         func main() -> int {
             return helper();
@@ -547,7 +547,7 @@ def test_codegen_with_early_return_compiles_and_runs(codegen_single, compile_and
     """)
     assert c_code is not None, [d.message for d in diags]
     success, stdout, stderr = compile_and_run(c_code, tmp_path)
-    assert success, f"Program should exit 0 (early-return cleanup sets result=0): stderr={stderr}"
+    assert success, f"Program should exit 0 (return value should be pre-cleanup result=0): stderr={stderr}"
 
 
 def test_codegen_with_nested_early_return_cleanup_order(codegen_single):
@@ -572,13 +572,16 @@ def test_codegen_with_nested_early_return_cleanup_order(codegen_single):
     func_start = c_code.find("l0_main_helper")
     assert func_start > 0
     func_body = c_code[func_start:]
+    # Temp assignment should appear before cleanup calls
+    pos_tmp = func_body.find("l0_ret_")
     pos_inner = func_body.find("cleanup_inner(")
     pos_outer = func_body.find("cleanup_outer(")
-    pos_return = func_body.find("return")
+    pos_return = func_body.find("return l0_ret_")
+    assert pos_tmp > 0, "Expected temp var for return expression"
     assert pos_inner > 0
     assert pos_outer > 0
     assert pos_return > 0
-    assert pos_inner < pos_outer < pos_return
+    assert pos_tmp < pos_inner < pos_outer < pos_return
 
 
 def test_codegen_with_break_runs_cleanup(codegen_single):
@@ -779,3 +782,92 @@ def test_codegen_with_inline_cleanup_mixed_order(codegen_single):
     assert pos_mark > 0
     assert pos_result1 > 0
     assert pos_result2 < pos_mark < pos_result1
+
+
+# ============================================================================
+# Codegen tests: return expression evaluation order
+# ============================================================================
+
+
+def test_codegen_with_return_expr_evaluated_before_cleanup(codegen_single):
+    """Return expression is evaluated into a temp before with-cleanup runs."""
+    c_code, diags = codegen_single("main", """
+        module main;
+        extern func build(x: int) -> int;
+        extern func destroy(x: int);
+        func helper() -> int {
+            with (let r: int = 42 => destroy(r)) {
+                return build(r);
+            }
+            return 0;
+        }
+        func main() -> int {
+            return helper();
+        }
+    """)
+    assert c_code is not None, [d.message for d in diags]
+    func_start = c_code.find("l0_main_helper")
+    assert func_start > 0
+    func_body = c_code[func_start:]
+    pos_build = func_body.find("build(")
+    pos_destroy = func_body.find("destroy(")
+    assert pos_build > 0, "Expected build() call in generated code"
+    assert pos_destroy > 0, "Expected destroy() call in generated code"
+    assert pos_build < pos_destroy, "build() must be called before destroy()"
+
+
+def test_codegen_return_string_expr_evaluated_before_arc_cleanup(codegen_single):
+    """Return expression with local string: expression evaluated before rt_string_release."""
+    c_code, diags = codegen_single("main", """
+        module main;
+        import std.string;
+        func helper() -> int {
+            let s: string = "hello";
+            return len_s(s);
+        }
+        func main() -> int {
+            return helper();
+        }
+    """)
+    assert c_code is not None, [d.message for d in diags]
+    func_start = c_code.find("l0_main_helper")
+    assert func_start > 0
+    func_body = c_code[func_start:]
+    pos_len = func_body.find("len_s(")
+    pos_release = func_body.find("rt_string_release(")
+    assert pos_len > 0, "Expected len_s() call in generated code"
+    assert pos_release > 0, "Expected rt_string_release() call in generated code"
+    assert pos_len < pos_release, "len_s() must be called before rt_string_release()"
+
+
+def test_codegen_try_operator_emits_cleanup_on_early_return(codegen_single):
+    """Try operator (?) emits cleanup in the null-check branch when cleanup exists."""
+    c_code, diags = codegen_single("main", """
+        module main;
+        func may_fail() -> int? {
+            return null;
+        }
+        func helper() -> int? {
+            let s: string = "hello";
+            let x: int = may_fail()?;
+            return x as int?;
+        }
+        func main() -> int {
+            let r: int? = helper();
+            return 0;
+        }
+    """)
+    assert c_code is not None, [d.message for d in diags]
+    func_start = c_code.find("l0_main_helper")
+    assert func_start > 0
+    func_body = c_code[func_start:]
+    # Find the try-check if-block
+    pos_has_value = func_body.find("has_value")
+    assert pos_has_value > 0, "Expected has_value check for try operator"
+    # After the has_value check, there should be cleanup before return
+    check_region = func_body[pos_has_value:]
+    pos_release = check_region.find("rt_string_release(")
+    pos_return = check_region.find("return")
+    assert pos_release > 0, "Expected rt_string_release in try null-check branch"
+    assert pos_return > 0, "Expected return in try null-check branch"
+    assert pos_release < pos_return, "rt_string_release must come before return in null branch"
