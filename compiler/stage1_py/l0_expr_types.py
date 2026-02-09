@@ -9,8 +9,8 @@ from typing import Dict, Optional, List
 from l0_analysis import AnalysisResult, VarRefResolution
 from l0_ast import (
     Node, Stmt, Block, LetStmt, AssignStmt, ExprStmt, IfStmt, WhileStmt,
-    ReturnStmt, MatchArm, MatchStmt, Expr, IntLiteral, StringLiteral, BoolLiteral, NullLiteral, VarRef,
-    UnaryOp, BinaryOp, CallExpr, IndexExpr, FieldAccessExpr, ParenExpr, CastExpr, VariantPattern,
+    ReturnStmt, MatchArm, MatchStmt, CaseArm, CaseElse, CaseStmt, Expr, IntLiteral, StringLiteral, BoolLiteral,
+    NullLiteral, VarRef, UnaryOp, BinaryOp, CallExpr, IndexExpr, FieldAccessExpr, ParenExpr, CastExpr, VariantPattern,
     TryExpr, TypeExpr, DropStmt, NewExpr, WildcardPattern, BreakStmt, ContinueStmt, ForStmt, ByteLiteral,
     TypeAliasDecl, WithStmt)
 from l0_compilation import CompilationUnit
@@ -445,6 +445,76 @@ class ExpressionTypeChecker:
                 return None
             finally:
                 self._pop_scope()
+
+        if isinstance(stmt, CaseStmt):
+            scrutinee_ty = self._infer_expr(stmt.expr)
+            allowed_case_types = {"int", "byte", "bool", "string"}
+
+            if not (isinstance(scrutinee_ty, BuiltinType) and scrutinee_ty.name in allowed_case_types):
+                self._error(
+                    stmt,
+                    f"[TYP-0106] 'case' scrutinee must have type 'int', 'byte', 'bool', or 'string', "
+                    f"got '{format_type(scrutinee_ty)}'",
+                )
+                scrutinee_ty = None
+
+            seen_literals: Dict[object, Expr] = {}
+            all_arms_return = len(stmt.arms) + (1 if stmt.else_arm is not None else 0) > 0
+
+            for arm in stmt.arms:
+                literal_info = self._case_literal_info(arm.literal)
+                if literal_info is None:
+                    self._error(arm, "[TYP-0107] 'case' arm literal must be int, byte, bool, or string")
+                else:
+                    literal_ty, literal_value = literal_info
+                    if scrutinee_ty is not None and literal_ty != scrutinee_ty:
+                        self._error(
+                            arm.literal,
+                            f"[TYP-0107] 'case' arm literal type '{format_type(literal_ty)}' "
+                            f"does not match scrutinee type '{format_type(scrutinee_ty)}'",
+                        )
+                    else:
+                        if literal_value in seen_literals:
+                            self._error(
+                                arm.literal,
+                                "[TYP-0108] duplicate literal value in 'case' statement",
+                            )
+                        else:
+                            seen_literals[literal_value] = arm.literal
+
+                self._push_scope()
+                try:
+                    this_arm_returns = False
+                    check_or_not = check_return_paths
+                    if isinstance(arm.body, Block):
+                        self._check_block(arm.body, check_return_paths=check_or_not, push_new_scope=False)
+                    else:
+                        self._check_stmt(arm.body, check_return_paths=check_or_not)
+                    if check_return_paths:
+                        this_arm_returns = self._return_paths
+                    all_arms_return = all_arms_return and this_arm_returns
+                finally:
+                    self._pop_scope()
+
+            if stmt.else_arm is not None:
+                self._push_scope()
+                try:
+                    this_arm_returns = False
+                    check_or_not = check_return_paths
+                    if isinstance(stmt.else_arm.body, Block):
+                        self._check_block(stmt.else_arm.body, check_return_paths=check_or_not, push_new_scope=False)
+                    else:
+                        self._check_stmt(stmt.else_arm.body, check_return_paths=check_or_not)
+                    if check_return_paths:
+                        this_arm_returns = self._return_paths
+                    all_arms_return = all_arms_return and this_arm_returns
+                finally:
+                    self._pop_scope()
+
+            if check_return_paths:
+                self._return_paths = stmt.else_arm is not None and all_arms_return
+
+            return None
 
         if isinstance(stmt, MatchStmt):
             # Type the scrutinee
@@ -1534,6 +1604,114 @@ class ExpressionTypeChecker:
 
     def _is_string(self, typ: NullType | Type) -> bool:
         return isinstance(typ, BuiltinType) and typ.name == "string"
+
+    def _case_literal_info(self, expr: Expr) -> Optional[tuple[Type, object]]:
+        if isinstance(expr, IntLiteral):
+            return self.int_type, expr.value
+        if isinstance(expr, ByteLiteral):
+            decoded = self._decode_escaped_text(expr.value, expr)
+            if decoded is None:
+                return None
+            encoded = decoded.encode("utf-8")
+            value = encoded[0] if encoded else 0
+            return self.byte_type, value
+        if isinstance(expr, BoolLiteral):
+            return self.bool_type, expr.value
+        if isinstance(expr, StringLiteral):
+            decoded = self._decode_escaped_text(expr.value, expr)
+            if decoded is None:
+                return None
+            return self.string_type, decoded
+        return None
+
+    def _decode_escaped_text(self, text: str, node: Node) -> Optional[str]:
+        out_chars: List[str] = []
+        i = 0
+        hex_chars = "0123456789abcdefABCDEF"
+        oct_chars = "01234567"
+        escape_map = {
+            "\\": "\\",
+            "'": "'",
+            '"': '"',
+            "?": "?",
+            "a": "\a",
+            "b": "\b",
+            "f": "\f",
+            "n": "\n",
+            "r": "\r",
+            "t": "\t",
+            "v": "\v",
+        }
+
+        while i < len(text):
+            ch = text[i]
+            if ch != "\\":
+                out_chars.append(ch)
+                i += 1
+                continue
+
+            i += 1
+            if i >= len(text):
+                out_chars.append("\\")
+                break
+
+            esc = text[i]
+            if esc in escape_map:
+                out_chars.append(escape_map[esc])
+                i += 1
+                continue
+
+            if esc == "x":
+                i += 1
+                start = i
+                while i < len(text) and text[i] in hex_chars:
+                    i += 1
+                hex_digits = text[start:i]
+                if hex_digits:
+                    out_chars.append(chr(int(hex_digits, 16)))
+                else:
+                    out_chars.append("x")
+                continue
+
+            if esc == "u":
+                digits = text[i + 1:i + 5]
+                if len(digits) != 4 or any(ch not in hex_chars for ch in digits):
+                    self._error(node, "[TYP-0109] invalid unicode escape in 'case' literal")
+                    return None
+                value = int(digits, 16)
+                if value > 0x10FFFF:
+                    self._error(node, "[TYP-0109] unicode escape out of range in 'case' literal")
+                    return None
+                out_chars.append(chr(value))
+                i += 5
+                continue
+
+            if esc == "U":
+                digits = text[i + 1:i + 9]
+                if len(digits) != 8 or any(ch not in hex_chars for ch in digits):
+                    self._error(node, "[TYP-0109] invalid unicode escape in 'case' literal")
+                    return None
+                value = int(digits, 16)
+                if value > 0x10FFFF:
+                    self._error(node, "[TYP-0109] unicode escape out of range in 'case' literal")
+                    return None
+                out_chars.append(chr(value))
+                i += 9
+                continue
+
+            if esc in oct_chars:
+                start = i
+                i += 1
+                while i < len(text) and text[i] in oct_chars and i - start < 3:
+                    i += 1
+                oct_digits = text[start:i]
+                out_chars.append(chr(int(oct_digits, 8)))
+                continue
+
+            out_chars.append(esc)
+            i += 1
+
+        return "".join(out_chars)
 
     def _is_void(self, typ: Type) -> bool:
         return isinstance(typ, BuiltinType) and typ.name == "void"

@@ -7,9 +7,10 @@ from typing import List, Optional
 from l0_ast import (
     Span, TypeRef, Import, TopLevelDecl, Param, FuncDecl, FieldDecl, StructDecl, EnumVariant, EnumDecl,
     TypeAliasDecl, LetDecl, Module, Stmt, Block, LetStmt, AssignStmt, ExprStmt, IfStmt, WhileStmt, ReturnStmt, DropStmt,
-    MatchArm, MatchStmt, Pattern, WildcardPattern, VariantPattern, Expr, IntLiteral, ByteLiteral, StringLiteral,
-    BoolLiteral, NullLiteral, VarRef, UnaryOp, BinaryOp, CallExpr, IndexExpr, FieldAccessExpr, ParenExpr, CastExpr,
-    TryExpr, TypeExpr, NewExpr, BreakStmt, ContinueStmt, ForStmt, WithItem, WithStmt)
+    MatchArm, MatchStmt, CaseArm, CaseElse, CaseStmt, Pattern, WildcardPattern, VariantPattern, Expr, IntLiteral,
+    ByteLiteral, StringLiteral, BoolLiteral, NullLiteral, VarRef, UnaryOp, BinaryOp, CallExpr, IndexExpr,
+    FieldAccessExpr, ParenExpr, CastExpr, TryExpr, TypeExpr, NewExpr, BreakStmt, ContinueStmt, ForStmt,
+    WithItem, WithStmt)
 from l0_lexer import TokenKind, Token, Lexer, is_reserved_keyword
 
 
@@ -315,6 +316,8 @@ class Parser:
             return self._parse_if_stmt()
         elif self._check(TokenKind.MATCH):
             return self._parse_match_stmt()
+        elif self._check(TokenKind.CASE):
+            return self._parse_case_stmt()
         elif self._check(TokenKind.WHILE):
             return self._parse_while_stmt()
         elif self._check(TokenKind.FOR):
@@ -487,12 +490,73 @@ class Parser:
         has_arrows = any(it.cleanup is not None for it in items)
         has_bare = any(it.cleanup is None for it in items)
         if has_arrows and has_bare:
-            raise ParseError("[PAR-0503] with: all items must use '=>' or none", self._peek(), self.filename)
+            raise ParseError("[PAR-0503] 'with': all items must use '=>' or none", self._peek(), self.filename)
         if has_arrows and cleanup_body is not None:
-            raise ParseError("[PAR-0504] with: cannot have both '=>' and cleanup block", self._peek(), self.filename)
+            raise ParseError("[PAR-0504] 'with': cannot have both '=>' and cleanup block", self._peek(), self.filename)
         if not has_arrows and cleanup_body is None:
-            raise ParseError("[PAR-0505] with: cleanup block required when '=>' is not used", self._peek(), self.filename)
+            raise ParseError("[PAR-0505] 'with': cleanup block required when '=>' is not used", self._peek(),
+                             self.filename)
         return WithStmt(items, body, cleanup_body, span=self._extend_span(start))
+
+    def _parse_case_stmt(self) -> CaseStmt:
+        start = self._span_start()
+        self._expect(TokenKind.CASE, "[PAR-0230] expected 'case'")
+        self._expect(TokenKind.LPAREN, "[PAR-0231] expected '('")
+        expr = self._parse_expr()
+        self._expect(TokenKind.RPAREN, "[PAR-0232] expected ')'")
+        self._expect(TokenKind.LBRACE, "[PAR-0233] expected '{' after 'case' expression")
+        arms: List[CaseArm] = []
+        else_arm: Optional[CaseElse] = None
+        seen_else = False
+
+        while not self._check(TokenKind.RBRACE):
+            if self._match(TokenKind.ELSE):
+                if seen_else:
+                    raise ParseError("[PAR-0236] duplicate 'else' arm in 'case' statement", self._peek(), self.filename)
+                else_start = self._span_start()
+                if self._match(TokenKind.ARROW_MATCH):
+                    raise ParseError("[PAR-0237] '=>' not allowed in 'else' arm", self._peek(), self.filename)
+                body = self._parse_stmt()
+                else_arm = CaseElse(body, span=self._extend_span(else_start))
+                seen_else = True
+                continue
+            else:
+                if seen_else:
+                    raise ParseError("[PAR-0234] value arm cannot appear after 'else' in 'case' statement",
+                                     self._peek(), self.filename)
+                arm_start = self._span_start()
+                literal = self._parse_case_literal()
+                self._expect(TokenKind.ARROW_MATCH, "[PAR-0235] expected '=>' in 'case' arm")
+                body = self._parse_stmt()
+                arms.append(CaseArm(literal, body, span=self._extend_span(arm_start)))
+                continue
+
+        self._expect(TokenKind.RBRACE, "[PAR-0239] expected '}' after 'case' statement")
+
+        if len(arms) == 0 and else_arm is None:
+            raise ParseError("[PAR-0240] 'case' statement must have at least one arm", self._peek(), self.filename)
+
+        return CaseStmt(expr, arms, else_arm, span=self._extend_span(start))
+
+    def _parse_case_literal(self) -> Expr:
+        start = self._span_start()
+        if self._match(TokenKind.MINUS):
+            tok = self._peek()
+            if self._match(TokenKind.INT):
+                return IntLiteral(-int(tok.text), span=self._extend_span(start))
+            raise ParseError("[PAR-0241] expected integer literal after '-'", tok, self.filename)
+        tok = self._peek()
+        if self._match(TokenKind.INT):
+            return IntLiteral(int(tok.text), span=self._extend_span(start))
+        if self._match(TokenKind.BYTE):
+            return ByteLiteral(tok.text, span=self._extend_span(start))
+        if self._match(TokenKind.STRING):
+            return StringLiteral(tok.text, span=self._extend_span(start))
+        if self._match(TokenKind.TRUE):
+            return BoolLiteral(True, span=self._extend_span(start))
+        if self._match(TokenKind.FALSE):
+            return BoolLiteral(False, span=self._extend_span(start))
+        raise ParseError("[PAR-0241] expected literal in 'case' arm", tok, self.filename)
 
     def _parse_pattern(self) -> Pattern:
         start = self._span_start()
@@ -648,7 +712,7 @@ class Parser:
                 args: List[Expr] = []
                 if not self._check(TokenKind.RPAREN):
                     while True:
-                        args.append(self._parse_call_argument()) # account for type expressions in argument position
+                        args.append(self._parse_call_argument())  # account for type expressions in argument position
                         if not self._match(TokenKind.COMMA):
                             break
                 self._expect(TokenKind.RPAREN, "[PAR-0210] expected ')' after arguments")

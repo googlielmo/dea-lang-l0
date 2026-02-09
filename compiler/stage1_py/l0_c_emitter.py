@@ -1123,6 +1123,16 @@ class CEmitter:
         """Emit a continue statement."""
         self.out.emit("continue;")
 
+    def emit_label(self, label: str) -> None:
+        """Emit a C label (for goto targets)."""
+        self.out.dedent()
+        self.out.emit(f"{label}:;")
+        self.out.indent()
+
+    def emit_goto(self, label: str) -> None:
+        """Emit a goto statement."""
+        self.out.emit(f"goto {label};")
+
     def emit_block_start(self) -> None:
         """Emit opening brace for a block."""
         self.out.emit("{")

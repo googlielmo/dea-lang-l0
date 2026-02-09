@@ -21,7 +21,7 @@ have been completed so far.
     * `module` + `import` (dotted names).
     * `struct`, `enum`, `type` alias.
     * `func` and `extern func` with `->`.
-    * Statements: `let`, `if/else`, `while`, `return`, `match` (statement-only).
+    * Statements: `let`, `if/else`, `while`, `return`, `match` (statement-only), `case` (scalar/string dispatch).
     * Patterns: `Variant(...)`, `_`.
     * Bare variant syntax: `Variant` is accepted as alias for `Variant()` (zero-arg only).
     * Expressions with full precedence rules:
@@ -237,7 +237,8 @@ Uses the exact same logic as `SignatureResolver`:
 
 **9. Nullable dereference semantics**
 
-* Dereferencing `ptr: T*?` is an error (diagnostic emitted). The canonical way to use nullable pointers is via explicit null checks:
+* Dereferencing `ptr: T*?` is an error (diagnostic emitted). The canonical way to use nullable pointers is via explicit
+  null checks:
   ```l0
   let ptr: T*? = ...;
   if ptr != null {
@@ -296,6 +297,7 @@ The C backend is implemented and can emit a single, portable C99 translation uni
 
 * Lowers:
     * `match` → `switch` on tag with per-arm bindings.
+    * `case` → `switch` on scalars or `rt_string_equals` chain for strings.
     * Calls → mangled C function names (externs are not mangled).
     * String literals → C-escaped strings.
     * Nullable → currently represented with C pointers/null checks.

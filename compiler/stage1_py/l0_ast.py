@@ -191,6 +191,24 @@ class WithStmt(Stmt):
 
 
 @dataclass
+class CaseArm(Node):
+    literal: "Expr"
+    body: Stmt
+
+
+@dataclass
+class CaseElse(Node):
+    body: Stmt
+
+
+@dataclass
+class CaseStmt(Stmt):
+    expr: "Expr"
+    arms: List[CaseArm]
+    else_arm: Optional[CaseElse]
+
+
+@dataclass
 class BreakStmt(Stmt):
     pass
 

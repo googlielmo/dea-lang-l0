@@ -31,6 +31,7 @@ class TokenKind(Enum):
     LET = auto()
     RETURN = auto()
     MATCH = auto()
+    CASE = auto()
     IF = auto()
     ELSE = auto()
     WHILE = auto()
@@ -100,6 +101,7 @@ KEYWORDS = {
     "let": TokenKind.LET,
     "return": TokenKind.RETURN,
     "match": TokenKind.MATCH,
+    "case": TokenKind.CASE,
     "if": TokenKind.IF,
     "else": TokenKind.ELSE,
     "while": TokenKind.WHILE,

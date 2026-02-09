@@ -24,10 +24,10 @@ from typing import List, Optional, Dict, Set, NoReturn, Tuple, Any
 from l0_analysis import AnalysisResult, VarRefResolution
 from l0_ast import (
     FuncDecl, StructDecl, EnumDecl, EnumVariant, LetDecl,
-    Stmt, Block, LetStmt, AssignStmt, ExprStmt, IfStmt, WhileStmt, ReturnStmt, DropStmt, MatchStmt, Expr, IntLiteral,
-    StringLiteral, BoolLiteral, VarRef, UnaryOp, BinaryOp, CallExpr, IndexExpr, FieldAccessExpr,
-    ParenExpr, CastExpr, VariantPattern, WildcardPattern, NullLiteral, TypeExpr, TryExpr, NewExpr, BreakStmt,
-    ContinueStmt, ForStmt, ByteLiteral, WithStmt,
+    Stmt, Block, LetStmt, AssignStmt, ExprStmt, IfStmt, WhileStmt, ReturnStmt, DropStmt, MatchStmt, CaseStmt, CaseArm,
+    CaseElse, Expr, IntLiteral, StringLiteral, BoolLiteral, VarRef, UnaryOp, BinaryOp, CallExpr, IndexExpr,
+    FieldAccessExpr, ParenExpr, CastExpr, VariantPattern, WildcardPattern, NullLiteral, TypeExpr, TryExpr, NewExpr,
+    BreakStmt, ContinueStmt, ForStmt, ByteLiteral, WithStmt,
 )
 from l0_c_emitter import CEmitter
 from l0_internal_error import InternalCompilerError, ICELocation
@@ -74,12 +74,26 @@ class Backend:
     # Stack of loop scopes (for break/continue)
     _loop_scope_stack: List[ScopeContext] = field(default_factory=list)
 
+    # Nesting depth inside C switch statements (match/case)
+    _switch_depth: int = 0
+
+    # Stack of (break_label, continue_label) for loops — used for goto case inside switch
+    _loop_label_stack: List[Tuple[str, str]] = field(default_factory=list)
+
+    # Counter for generating unique labels
+    _label_counter: int = 0
+
     # Track if next statement is unreachable (after return)
     _next_stmt_unreachable: bool = False
 
     def __post_init__(self):
         """Initialize emitter with analysis data."""
         self.emitter.set_analysis(self.analysis)
+
+    def _fresh_label(self, prefix: str) -> str:
+        """Generate a unique C label name."""
+        self._label_counter += 1
+        return f"__{prefix}_{self._label_counter}"
 
     def _push_scope(self) -> ScopeContext:
         """Enter a new scope."""
@@ -937,6 +951,10 @@ class Backend:
             self._emit_with(stmt, module_name)
             return None
 
+        elif isinstance(stmt, CaseStmt):
+            self._emit_case(stmt, module_name)
+            return None
+
         elif isinstance(stmt, Block):
             # { stmt... }
             return self._emit_block(stmt, module_name)
@@ -944,14 +962,22 @@ class Backend:
         elif isinstance(stmt, BreakStmt):
             # break;
             self._emit_cleanup_for_loop_exit()
-            self.emitter.emit_break_stmt()
+            if self._switch_depth > 0:
+                break_label, _ = self._loop_label_stack[-1]
+                self.emitter.emit_goto(break_label)
+            else:
+                self.emitter.emit_break_stmt()
             self._next_stmt_unreachable = True
             return None
 
         elif isinstance(stmt, ContinueStmt):
             # continue;
             self._emit_cleanup_for_loop_exit()
-            self.emitter.emit_continue_stmt()
+            if self._switch_depth > 0:
+                _, continue_label = self._loop_label_stack[-1]
+                self.emitter.emit_goto(continue_label)
+            else:
+                self.emitter.emit_continue_stmt()
             self._next_stmt_unreachable = True
             return None
 
@@ -994,21 +1020,38 @@ class Backend:
         return None
 
     def _emit_while(self, stmt: WhileStmt, module_name: str) -> Any:
+        break_label = self._fresh_label("lbrk")
+        continue_label = self._fresh_label("lcont")
+        self._loop_label_stack.append((break_label, continue_label))
+
         c_cond = self._emit_expr(stmt.cond)
         self.emitter.emit_while_header(c_cond)
+        self.emitter.emit_block_start()
 
         loop_scope = self._push_scope()
         self._loop_scope_stack.append(loop_scope)
 
-        self._emit_block(stmt.body, module_name)
+        self._emit_block_sequence(stmt.body, module_name)
+
+        if not self._next_stmt_unreachable:
+            self._emit_cleanup_at_scope_exit(loop_scope)
+
+        self.emitter.emit_label(continue_label)
 
         self._loop_scope_stack.pop()
         self._pop_scope()
+        self.emitter.emit_block_end()
 
+        self.emitter.emit_label(break_label)
+        self._loop_label_stack.pop()
         self._next_stmt_unreachable = False
         return None
 
     def _emit_for(self, stmt: ForStmt, module_name: str) -> Any:
+        break_label = self._fresh_label("lbrk")
+        continue_label = self._fresh_label("lcont")
+        self._loop_label_stack.append((break_label, continue_label))
+
         outer_scope = self._push_scope()
 
         self.emitter.emit_for_loop_start()
@@ -1029,6 +1072,8 @@ class Backend:
 
         self._emit_block_sequence(stmt.body, module_name)
 
+        self.emitter.emit_label(continue_label)
+
         if stmt.update and not self._next_stmt_unreachable:
             self._emit_stmt(stmt.update, module_name)
 
@@ -1046,6 +1091,8 @@ class Backend:
         self._pop_scope()  # Pop outer_scope
         self.emitter.emit_for_loop_end()
 
+        self.emitter.emit_label(break_label)
+        self._loop_label_stack.pop()
         self._next_stmt_unreachable = False
         return None
 
@@ -1213,7 +1260,15 @@ class Backend:
         c_scrutinee_expr = self._emit_expr(stmt.expr)
 
         self.emitter.emit_block_start()
+        outer_scope = self._push_scope()
         self.emitter.emit_match_scrutinee_decl(c_scrutinee_type, c_scrutinee_expr)
+
+        # Track _scrutinee for cleanup only for rvalue expressions with owned types
+        if not self._is_place_expr(stmt.expr):
+            if self.is_arc_type(scrutinee_expr_type) or self._has_owned_fields(scrutinee_expr_type):
+                outer_scope.add_owned("_scrutinee", scrutinee_expr_type)
+
+        self._switch_depth += 1
         self.emitter.emit_match_switch_start("_scrutinee")
 
         arms_unreachable = 0
@@ -1257,11 +1312,165 @@ class Backend:
             self.emitter.emit_block_end()
 
         self.emitter.emit_switch_end()
+        self._switch_depth -= 1
 
         # Code after match is unreachable only if ALL arms are unreachable
         self._next_stmt_unreachable = (arms_unreachable == len(stmt.arms))
 
+        if not self._next_stmt_unreachable:
+            self._emit_cleanup_at_scope_exit(outer_scope)
+        self._pop_scope()
         self.emitter.emit_block_end()
+
+    def _emit_case(self, stmt: CaseStmt, module_name: str) -> None:
+        """
+        Emit a case statement as a scalar switch or string if/else chain.
+        """
+        scrutinee_expr_type = self.analysis.expr_types.get(id(stmt.expr))
+        if not scrutinee_expr_type:
+            self.ice("[ICE-1193] missing inferred type for case scrutinee", node=stmt.expr)
+
+        c_scrutinee_type = self.emitter.emit_type(scrutinee_expr_type)
+        c_scrutinee_expr = self._emit_expr(stmt.expr)
+
+        total_arms = len(stmt.arms) + (1 if stmt.else_arm is not None else 0)
+        arms_unreachable = 0
+
+        self.emitter.emit_block_start()
+        outer_scope = self._push_scope()
+        self.emitter.emit_match_scrutinee_decl(c_scrutinee_type, c_scrutinee_expr)
+
+        # Track _scrutinee for cleanup only for rvalue expressions with owned types
+        if not self._is_place_expr(stmt.expr):
+            if self.is_arc_type(scrutinee_expr_type) or self._has_owned_fields(scrutinee_expr_type):
+                outer_scope.add_owned("_scrutinee", scrutinee_expr_type)
+
+        if isinstance(scrutinee_expr_type, BuiltinType) and scrutinee_expr_type.name == "string":
+            if not stmt.arms and stmt.else_arm is not None:
+                arm_scope = self._push_scope()
+                self._next_stmt_unreachable = False
+                self._emit_stmt(stmt.else_arm.body, module_name)
+
+                if not self._next_stmt_unreachable:
+                    self._emit_cleanup_at_scope_exit(arm_scope)
+
+                if self._next_stmt_unreachable:
+                    arms_unreachable += 1
+
+                self._pop_scope()
+            else:
+                for index, arm in enumerate(stmt.arms):
+                    c_literal = self._emit_case_literal(arm.literal)
+                    condition = f"rt_string_equals(_scrutinee, {c_literal})"
+                    if index == 0:
+                        self.emitter.emit_if_header(condition)
+                    else:
+                        self.emitter.emit_else()
+                        self.emitter.emit_if_header(condition)
+
+                    self.emitter.emit_block_start()
+
+                    arm_scope = self._push_scope()
+                    self._next_stmt_unreachable = False
+                    self._emit_stmt(arm.body, module_name)
+
+                    if not self._next_stmt_unreachable:
+                        self._emit_cleanup_at_scope_exit(arm_scope)
+
+                    if self._next_stmt_unreachable:
+                        arms_unreachable += 1
+
+                    self._pop_scope()
+
+                    self.emitter.emit_block_end()
+
+                if stmt.else_arm is not None:
+                    self.emitter.emit_else()
+                    self.emitter.emit_block_start()
+
+                    arm_scope = self._push_scope()
+                    self._next_stmt_unreachable = False
+                    self._emit_stmt(stmt.else_arm.body, module_name)
+
+                    if not self._next_stmt_unreachable:
+                        self._emit_cleanup_at_scope_exit(arm_scope)
+
+                    if self._next_stmt_unreachable:
+                        arms_unreachable += 1
+
+                    self._pop_scope()
+
+                    self.emitter.emit_block_end()
+        else:
+            self._switch_depth += 1
+            self.emitter.emit_switch_start("_scrutinee")
+
+            for arm in stmt.arms:
+                self.emitter.emit_case_label(self._emit_case_literal(arm.literal))
+                self.emitter.emit_block_start()
+
+                arm_scope = self._push_scope()
+                self._next_stmt_unreachable = False
+                self._emit_stmt(arm.body, module_name)
+
+                if not self._next_stmt_unreachable:
+                    self._emit_cleanup_at_scope_exit(arm_scope)
+
+                if self._next_stmt_unreachable:
+                    arms_unreachable += 1
+
+                self._pop_scope()
+
+                self.emitter.emit_break_stmt()
+                self.emitter.emit_block_end()
+
+            if stmt.else_arm is not None:
+                self.emitter.emit_default_label()
+                self.emitter.emit_block_start()
+
+                arm_scope = self._push_scope()
+                self._next_stmt_unreachable = False
+                self._emit_stmt(stmt.else_arm.body, module_name)
+
+                if not self._next_stmt_unreachable:
+                    self._emit_cleanup_at_scope_exit(arm_scope)
+
+                if self._next_stmt_unreachable:
+                    arms_unreachable += 1
+
+                self._pop_scope()
+
+                self.emitter.emit_break_stmt()
+                self.emitter.emit_block_end()
+
+            self.emitter.emit_switch_end()
+            self._switch_depth -= 1
+
+        if total_arms == 0:
+            self._next_stmt_unreachable = False
+        else:
+            # Without else, some value may not match any arm, so code after is always reachable
+            self._next_stmt_unreachable = (
+                stmt.else_arm is not None
+                and arms_unreachable == total_arms
+            )
+
+        if not self._next_stmt_unreachable:
+            self._emit_cleanup_at_scope_exit(outer_scope)
+        self._pop_scope()
+        self.emitter.emit_block_end()
+
+    def _emit_case_literal(self, expr: Expr) -> str:
+        if isinstance(expr, IntLiteral):
+            return self.emitter.emit_int_literal(expr.value)
+        if isinstance(expr, ByteLiteral):
+            return self.emitter.emit_byte_literal(expr.value)
+        if isinstance(expr, BoolLiteral):
+            return self.emitter.emit_bool_literal(expr.value)
+        if isinstance(expr, StringLiteral):
+            return self.emitter.emit_string_literal(expr.value)
+
+        self.ice("[ICE-1194] unsupported case literal type", node=expr)
 
     def _emit_pattern_bindings(
             self,

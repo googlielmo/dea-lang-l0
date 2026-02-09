@@ -8,7 +8,7 @@ from enum import Enum, auto
 from typing import Dict, Optional, Tuple
 
 from l0_ast import Node, TypeRef, FuncDecl, Module, Stmt, Block, LetStmt, IfStmt, WhileStmt, MatchArm, MatchStmt, \
-    Pattern, WildcardPattern, VariantPattern, WithStmt
+    CaseArm, CaseElse, CaseStmt, Pattern, WildcardPattern, VariantPattern, WithStmt
 
 
 class LocalKind(Enum):
@@ -158,6 +158,13 @@ class LocalScopeResolver:
             self._visit_with_stmt(stmt, scope)
             return
 
+        if isinstance(stmt, CaseStmt):
+            for arm in stmt.arms:
+                self._visit_case_arm(arm, scope)
+            if stmt.else_arm is not None:
+                self._visit_case_else(stmt.else_arm, scope)
+            return
+
         if isinstance(stmt, Block):
             # Register a new scope for this block.
             block_scope = Scope(parent=scope)
@@ -203,6 +210,24 @@ class LocalScopeResolver:
 
         # Visit the arm body in this scope.
         self._visit_block(arm.body, arm_scope)
+
+    def _visit_case_arm(self, arm: CaseArm, parent_scope: Scope) -> None:
+        arm_scope = Scope(parent=parent_scope)
+
+        if isinstance(arm.body, Block):
+            self._block_scopes[id(arm.body)] = arm_scope
+            self._visit_block(arm.body, arm_scope)
+        else:
+            self._visit_stmt(arm.body, arm_scope)
+
+    def _visit_case_else(self, arm: CaseElse, parent_scope: Scope) -> None:
+        arm_scope = Scope(parent=parent_scope)
+
+        if isinstance(arm.body, Block):
+            self._block_scopes[id(arm.body)] = arm_scope
+            self._visit_block(arm.body, arm_scope)
+        else:
+            self._visit_stmt(arm.body, arm_scope)
 
     def _bind_pattern_vars(self, pattern: Pattern, scope: Scope) -> None:
         if isinstance(pattern, VariantPattern):

@@ -44,7 +44,7 @@ Reserved keywords (not valid as identifiers):
 
 ```text
 module import func struct enum type extern let const
-return match if else while for break continue in with cleanup
+return match case if else while for break continue in with cleanup
 true false sizeof null as new drop void bool string
 byte short int long ubyte ushort uint ulong float double
 ```
@@ -181,6 +181,7 @@ Block           ::=     "{" Stmt* "}"
 Stmt            ::=     Block
                   |     IfStmt
                   |     MatchStmt
+                  |     CaseStmt
                   |     WhileStmt
                   |     ForStmt
                   |     WithStmt
@@ -237,6 +238,18 @@ ReturnStmt      ::=     "return" ( Expr )?
 MatchStmt       ::=     "match" "(" Expr ")" "{" ( MatchArm )+ "}"
 
 MatchArm        ::=     Pattern "=>" Block
+```
+
+### 5.6 Case (scalar/string dispatch)
+
+```ebnf
+CaseStmt        ::=     "case" "(" Expr ")" "{" CaseArm* ElseArm? "}"
+
+CaseArm         ::=     CaseLiteral "=>" Stmt
+
+ElseArm         ::=     "else" Stmt
+
+CaseLiteral     ::=     ( "-" )? IntLiteral | ByteLiteral | StringLiteral | BoolLiteral
 ```
 
 Patterns (L<sub>0</sub> subset):
