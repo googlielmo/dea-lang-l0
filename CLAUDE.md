@@ -84,15 +84,21 @@ Source (.l0) → Lexer → Parser → NameResolver → SignatureResolver
 | `l0_compilation.py`    | Compilation unit (closed set of modules)               |
 | `l0_context.py`        | Cross-cutting compiler options                         |
 | `l0_diagnostics.py`    | Error/warning reporting                                |
+| `l0_analysis.py`       | Analysis pipeline orchestration                        |
 | `l0_expr_types.py`     | Expression type inference and checking                 |
 | `l0_signatures.py`     | Function/struct type resolution                        |
 | `l0_name_resolver.py`  | Module-level symbol binding                            |
+| `l0_resolve.py`        | Name and type resolution utilities                     |
 | `l0_locals.py`         | Local variable scoping                                 |
+| `l0_scope_context.py`  | Scope context management                               |
 | `l0_symbols.py`        | Symbol table and symbol kinds                          |
 | `l0_types.py`          | Type representations                                   |
 | `l0_ast_printer.py`    | AST pretty-printing                                    |
 | `l0_logger.py`         | Logging infrastructure                                 |
+| `l0_paths.py`          | Path handling utilities                                |
+| `l0_internal_error.py` | Internal compiler error handling                       |
 | `runtime/l0_runtime.h` | C kernel runtime (allocation, I/O, strings)            |
+| `runtime/l0_siphash.h` | SipHash implementation for hash functions              |
 
 ### Stage 2 Compiler (compiler/stage2_l0/)
 
@@ -108,7 +114,7 @@ The self-hosted compiler in L0, under active development:
 
 Located in `compiler/stage1_py/l0/stdlib/`:
 
-- `std/io.l0` - print, println, input
+- `std/io.l0` - line input, printing, whole file I/O
 - `std/string.l0` - string utilities
 - `std/hash.l0` - hash functions
 - `std/math.l0` - math utilities
@@ -148,6 +154,15 @@ func eval(e: Expr*) -> int {
     }
 }
 
+// Case statement (scalar/string dispatch)
+func classify(value: int) -> int {
+    case (value) {
+        0 => { printl_s("zero!"); return 0; }
+        1 => return 1;
+        else return -1;
+    }
+}
+
 // Qualified names for disambiguation
 import shapes;
 import colors;           // both export `Red`
@@ -183,6 +198,7 @@ Types: `int`, `uint`, `byte`, `ubyte`, `bool`, `string`, `void`, `T*` (pointer),
 - No `&` (address-of) operator - pointers come from runtime/heap allocation
 - Assignment is a statement, not an expression
 - `match` is statement-only (no expression match)
+- `case` is statement-only (no expression case)
 - No generics, traits, or macros in Stage 1
 - Auto-dereference: `ptr.field` works without explicit `(*ptr).field`
 - Qualified names use a single `module::Name` form only. Multi-segment paths like `color::Color::Red` are parsed but
