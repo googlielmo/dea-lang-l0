@@ -33,6 +33,7 @@ enum TokenType {
     TT_LET;
     TT_RETURN;
     TT_MATCH;
+    TT_CASE;
     TT_IF;
     TT_ELSE;
     TT_WHILE;
@@ -43,8 +44,11 @@ enum TokenType {
     TT_FALSE;
     TT_NULL;
     TT_AS;
+
     TT_NEW;
     TT_DROP;
+    TT_WITH;
+    TT_CLEANUP;
 
     // Punctuation / operators
     TT_LBRACE;          // {
@@ -115,6 +119,7 @@ func token_to_string(token: Token) -> string {
         TT_LET => { return "let"; }
         TT_RETURN => { return "return"; }
         TT_MATCH => { return "match"; }
+        TT_CASE => { return "case"; }
         TT_IF => { return "if"; }
         TT_ELSE => { return "else"; }
         TT_WHILE => { return "while"; }
@@ -127,6 +132,8 @@ func token_to_string(token: Token) -> string {
         TT_AS => { return "as"; }
         TT_NEW => { return "new"; }
         TT_DROP => { return "drop"; }
+        TT_WITH => { return "with"; }
+        TT_CLEANUP => { return "cleanup"; }
 
         // Punctuation / operators
         TT_LBRACE => { return "{"; }
@@ -182,6 +189,7 @@ func is_reserved_keyword(token: Token) -> bool {
         TT_LET => { return true; }
         TT_RETURN => { return true; }
         TT_MATCH => { return true; }
+        TT_CASE => { return true; }
         TT_IF => { return true; }
         TT_ELSE => { return true; }
         TT_WHILE => { return true; }
@@ -194,6 +202,8 @@ func is_reserved_keyword(token: Token) -> bool {
         TT_AS => { return true; }
         TT_NEW => { return true; }
         TT_DROP => { return true; }
+        TT_WITH => { return true; }
+        TT_CLEANUP => { return true; }
         TT_STRING(t, v) => { return true; }
         TT_INT(t, v) => { return true; }
         TT_BYTE(t, v) => { return true; }
@@ -203,74 +213,33 @@ func is_reserved_keyword(token: Token) -> bool {
 }
 
 func ident_to_token(ident: string, index: int, line: int, col: int) -> Token {
-    if (eq_s(ident, "module")) {
-        return Token(TT_MODULE, index, line, col);
-    }
-    if (eq_s(ident, "import")) {
-        return Token(TT_IMPORT, index, line, col);
-    }
-    if (eq_s(ident, "func")) {
-        return Token(TT_FUNC, index, line, col);
-    }
-    if (eq_s(ident, "struct")) {
-        return Token(TT_STRUCT, index, line, col);
-    }
-    if (eq_s(ident, "enum")) {
-        return Token(TT_ENUM, index, line, col);
-    }
-    if (eq_s(ident, "type")) {
-        return Token(TT_TYPE, index, line, col);
-    }
-    if (eq_s(ident, "extern")) {
-        return Token(TT_EXTERN, index, line, col);
-    }
-    if (eq_s(ident, "let")) {
-        return Token(TT_LET, index, line, col);
-    }
-    if (eq_s(ident, "return")) {
-        return Token(TT_RETURN, index, line, col);
-    }
-    if (eq_s(ident, "match")) {
-        return Token(TT_MATCH, index, line, col);
-    }
-    if (eq_s(ident, "if")) {
-        return Token(TT_IF, index, line, col);
-    }
-    if (eq_s(ident, "else")) {
-        return Token(TT_ELSE, index, line, col);
-    }
-    if (eq_s(ident, "while")) {
-        return Token(TT_WHILE, index, line, col);
-    }
-    if (eq_s(ident, "for")) {
-        return Token(TT_FOR, index, line, col);
-    }
-    if (eq_s(ident, "break")) {
-        return Token(TT_BREAK, index, line, col);
-    }
-    if (eq_s(ident, "continue")) {
-        return Token(TT_CONTINUE, index, line, col);
-    }
-    if (eq_s(ident, "true")) {
-        return Token(TT_TRUE, index, line, col);
-    }
-    if (eq_s(ident, "false")) {
-        return Token(TT_FALSE, index, line, col);
-    }
-    if (eq_s(ident, "null")) {
-        return Token(TT_NULL, index, line, col);
-    }
-    if (eq_s(ident, "as")) {
-        return Token(TT_AS, index, line, col);
-    }
-    if (eq_s(ident, "new")) {
-        return Token(TT_NEW, index, line, col);
-    }
-    if (eq_s(ident, "drop")) {
-        return Token(TT_DROP, index, line, col);
-    }
-    if (eq_s(ident, "_")) {
-        return Token(TT_UNDERSCORE, index, line, col);
+    case (ident) {
+         "module" => return Token(TT_MODULE, index, line, col);
+         "import" => return Token(TT_IMPORT, index, line, col);
+         "func" => return Token(TT_FUNC, index, line, col);
+         "struct" => return Token(TT_STRUCT, index, line, col);
+         "enum" => return Token(TT_ENUM, index, line, col);
+         "type" => return Token(TT_TYPE, index, line, col);
+         "extern" => return Token(TT_EXTERN, index, line, col);
+         "let" => return Token(TT_LET, index, line, col);
+         "return" => return Token(TT_RETURN, index, line, col);
+         "match" => return Token(TT_MATCH, index, line, col);
+         "case" => return Token(TT_CASE, index, line, col);
+         "if" => return Token(TT_IF, index, line, col);
+         "else" => return Token(TT_ELSE, index, line, col);
+         "while" => return Token(TT_WHILE, index, line, col);
+         "for" => return Token(TT_FOR, index, line, col);
+         "break" => return Token(TT_BREAK, index, line, col);
+         "continue" => return Token(TT_CONTINUE, index, line, col);
+         "true" => return Token(TT_TRUE, index, line, col);
+         "false" => return Token(TT_FALSE, index, line, col);
+         "null" => return Token(TT_NULL, index, line, col);
+         "as" => return Token(TT_AS, index, line, col);
+         "new" => return Token(TT_NEW, index, line, col);
+         "drop" => return Token(TT_DROP, index, line, col);
+         "with" => return Token(TT_WITH, index, line, col);
+         "cleanup" => return Token(TT_CLEANUP, index, line, col);
+         "_" => return Token(TT_UNDERSCORE, index, line, col);
     }
     if (eq_s(ident, "tiny") || eq_s(ident, "short") || eq_s(ident, "long") ||
         eq_s(ident, "ushort") || eq_s(ident, "uint") || eq_s(ident, "ulong") ||
@@ -279,6 +248,21 @@ func ident_to_token(ident: string, index: int, line: int, col: int) -> Token {
         return Token(TT_FUTURE_EXTENSION, index, line, col);
     }
     return Token(TT_IDENT(ident), index, line, col);
+}
+
+func is_expr_ending_token_type(token_type: TokenType) -> bool {
+    match (token_type) {
+        TT_IDENT(t) => { return true; }
+        TT_INT(t, v) => { return true; }
+        TT_BYTE(t, v) => { return true; }
+        TT_STRING(t, v) => { return true; }
+        TT_TRUE => { return true; }
+        TT_FALSE => { return true; }
+        TT_NULL => { return true; }
+        TT_RPAREN => { return true; }
+        TT_RBRACKET => { return true; }
+        _ => { return false; }
+    }
 }
 
 // ------------------------------------
