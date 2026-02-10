@@ -73,7 +73,7 @@ def test_codegen_string_refcounts_and_cleanup_order(codegen_single):
     if c_code is None:
         return
 
-    assert "rt_string_retain(b);" in c_code
+    assert "rt_string_retain(l0_copy_" in c_code
 
     b_release = c_code.find("rt_string_release(b);")
     a_release = c_code.find("rt_string_release(a);")
@@ -107,6 +107,160 @@ def test_codegen_struct_cleanup_order_for_owned_fields(codegen_single):
     second_release = c_code.find("rt_string_release(p->second);")
     assert first_release != -1 and second_release != -1
     assert first_release < second_release
+
+
+def test_codegen_optional_string_cleanup_guards_and_order(codegen_single):
+    c_code, _ = codegen_single(
+        "main",
+        """
+        module main;
+
+        import std.string;
+        extern func log(x: int) -> void;
+
+        struct OptBox { value: string?; }
+
+        enum OptEnum {
+            None;
+            Some(value: string?);
+        }
+
+        func fallthrough() -> void {
+            let s: string = concat_s("raw", "-value");
+            let wrapped: string? = s;
+            let v: string? = concat_s("fall", "through") as string?;
+            let box: OptBox = OptBox(v);
+            let en: OptEnum = Some(v);
+            let box2: OptBox = OptBox(wrapped);
+        }
+
+        func early_return(flag: bool) -> string? {
+            let v: string? = concat_s("re", "turn") as string?;
+            if (flag) {
+                return v;
+            }
+            return null;
+        }
+
+        func loop_exit() -> void {
+            let i: int = 0;
+            while (i < 3) {
+                let v: string? = concat_s("lo", "op") as string?;
+                let box: OptBox = OptBox(v);
+                if (i == 1) { break; }
+                if (i == 2) {
+                    i = i + 1;
+                    continue;
+                }
+                i = i + 1;
+            }
+        }
+
+        func with_cleanup() -> void {
+            with (let v: string? = concat_s("wi", "th") as string?) {
+                log(1);
+            } cleanup {
+                log(2);
+            }
+        }
+
+        func main() -> int {
+            fallthrough();
+            with_cleanup();
+            return 0;
+        }
+        """,
+    )
+
+    if c_code is None:
+        return
+
+    fallthrough_func = c_code.find("l0_main_fallthrough")
+    assert fallthrough_func != -1
+
+    wrapped_retain = c_code.find("rt_string_retain(", fallthrough_func)
+    assert wrapped_retain != -1
+
+    assert "if ((v).has_value) {" in c_code
+    assert "rt_string_release((v).value);" in c_code
+    assert "if (((box).value).has_value) {" in c_code
+    assert "rt_string_release(((box).value).value);" in c_code
+
+    box2_init = c_code.find("struct l0_main_OptBox box2", fallthrough_func)
+    box2_retain = c_code.rfind("rt_string_retain((l0_copy_", fallthrough_func, box2_init)
+    assert box2_init != -1 and box2_retain != -1
+
+    enum_init = c_code.find("struct l0_main_OptEnum en", fallthrough_func)
+    enum_retain = c_code.rfind("rt_string_retain((l0_copy_", fallthrough_func, enum_init)
+    assert enum_init != -1 and enum_retain != -1
+
+    early_return_guard = c_code.find("if ((v).has_value) {", c_code.find("l0_main_early_return"))
+    early_return_release = c_code.find("rt_string_release((v).value);", c_code.find("l0_main_early_return"))
+    assert early_return_guard != -1 and early_return_release != -1
+    assert early_return_guard < early_return_release
+
+    with_cleanup_func = c_code.find("l0_main_with_cleanup")
+    assert with_cleanup_func != -1
+
+    cleanup_log = c_code.find("log(2);", with_cleanup_func)
+    release_call = c_code.find("rt_string_release((v).value);", cleanup_log)
+    assert cleanup_log != -1 and release_call != -1
+    assert cleanup_log < release_call
+
+
+def test_codegen_enum_copy_from_place_retain_uses_data_field(codegen_single):
+    c_code, _ = codegen_single(
+        "main",
+        '''
+        module main;
+
+        enum E {
+            One(value: string);
+            Two;
+        }
+
+        func main() -> int {
+            let a: E = One("hello");
+            let b: E = a;
+            return 0;
+        }
+        ''',
+    )
+
+    if c_code is None:
+        return
+
+    assert ".data.One.value" in c_code
+    assert ".payload.One.value" not in c_code
+
+
+def test_codegen_enum_copy_from_place_with_owned_payload_compiles(codegen_single, compile_and_run, tmp_path):
+    c_code, _ = codegen_single(
+        "main",
+        '''
+        module main;
+
+        enum E {
+            One(value: string);
+            Two;
+        }
+
+        func main() -> int {
+            let a: E = One("hello");
+            let b: E = a;
+            match (b) {
+                One(value) => { return 0; }
+                Two => { return 1; }
+            }
+        }
+        ''',
+    )
+
+    if c_code is None:
+        return
+
+    ok, _stdout, stderr = compile_and_run(c_code, tmp_path)
+    assert ok, stderr
 
 
 def test_codegen_line_directives_and_mangling(codegen_single):

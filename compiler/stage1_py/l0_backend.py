@@ -897,6 +897,11 @@ class Backend:
                 for vi in enum_info.variants.values()
             )
 
+        if isinstance(ty, NullableType):
+            if isinstance(ty.inner, PointerType):
+                return False
+            return self._has_owned_fields(ty.inner)
+
         # Pointers, ints, bools, etc. don't need cleanup
         return False
 
@@ -1166,8 +1171,7 @@ class Backend:
         c_target = self._emit_lvalue_with_caching(stmt.target)
 
         # Use _emit_expr_with_expected_type for type conversion
-        c_value = self._emit_expr_with_expected_type(stmt.value, dst_ty)
-
+        c_value = self._emit_owned_expr_with_expected_type(stmt.value, dst_ty)
         if c_target is None or c_value is None:
             self.ice("[ICE-1241] failed to emit assignment", node=stmt)
 
@@ -1178,9 +1182,6 @@ class Backend:
             self.emitter.emit_assignment(c_target, temp)
         else:
             self.emitter.emit_assignment(c_target, c_value)
-
-        if self.is_arc_type(dst_ty) and self._is_place_expr(stmt.value):
-            self.emitter.emit_string_retain(c_target)
 
         return None
 
@@ -1261,16 +1262,79 @@ class Backend:
         c_type = self.emitter.emit_type(var_ty)
 
         # Use _emit_expr_with_expected_type for type conversion
-        c_init = self._emit_expr_with_expected_type(stmt.value, var_ty)
+        c_init = self._emit_owned_expr_with_expected_type(stmt.value, var_ty)
         self.emitter.emit_let_decl(c_type, c_var_name, c_init)
-
-        if self.is_arc_type(var_ty) and self._is_place_expr(stmt.value):
-            self.emitter.emit_string_retain(c_var_name)
 
         # Track ALL variables in scope
         if self._current_scope is not None:
             self._current_scope.add_owned(c_var_name, var_ty)
         return None
+
+    def _emit_retain_for_copied_value(self, c_expr: str, ty: Type) -> None:
+        """
+        Emit retain operations for a copied owned value.
+
+        Used when copying from place expressions so source and destination own
+        independent references.
+        """
+        if self.is_arc_type(ty):
+            self.emitter.emit_string_retain(c_expr)
+            return
+
+        if isinstance(ty, NullableType):
+            if self.emitter.is_niche_nullable(ty):
+                return
+            if not self._has_owned_fields(ty.inner):
+                return
+
+            self.emitter.emit_if_header(f"({c_expr}).has_value")
+            self.emitter.emit_block_start()
+            self._emit_retain_for_copied_value(f"({c_expr}).value", ty.inner)
+            self.emitter.emit_block_end()
+            return
+
+        if isinstance(ty, StructType):
+            info = self.analysis.struct_infos.get((ty.module, ty.name))
+            if info is None:
+                return
+            for field in info.fields:
+                self._emit_retain_for_copied_value(f"({c_expr}).{field.name}", field.type)
+            return
+
+        if isinstance(ty, EnumType):
+            enum_info = self.analysis.enum_infos.get((ty.module, ty.name))
+            if enum_info is None:
+                return
+
+            self.emitter.emit_switch_start(f"({c_expr}).tag")
+            for variant_name, variant_info in enum_info.variants.items():
+                c_tag = self.emitter.emit_enum_tag(ty, variant_name)
+                self.emitter.emit_case_label(c_tag)
+                self.emitter.emit_block_start()
+
+                variant_decl = self.find_variant_decl(ty.module, ty.name, variant_name)
+                if variant_decl is None:
+                    self.ice(f"[ICE-1304] missing variant decl for {ty.module}.{ty.name}.{variant_name}")
+
+                for field, field_ty in zip(variant_decl.fields, variant_info.field_types):
+                    field_expr = f"({c_expr}).data.{variant_name}.{field.name}"
+                    self._emit_retain_for_copied_value(field_expr, field_ty)
+
+                self.emitter.emit_break_stmt()
+                self.emitter.emit_block_end()
+            self.emitter.emit_switch_end()
+
+    def _emit_copy_expr_with_retains(self, c_expr: str, ty: Type) -> str:
+        """
+        Materialize copied values in a temp and emit retain logic when needed.
+        """
+        if not self._has_owned_fields(ty):
+            return c_expr
+
+        temp = self.emitter.fresh_tmp("copy")
+        self.emitter.emit_temp_decl(self.emitter.emit_type(ty), temp, c_expr)
+        self._emit_retain_for_copied_value(temp, ty)
+        return temp
 
     def _emit_match(self, stmt: MatchStmt, module_name: str) -> None:
         """
@@ -1739,7 +1803,7 @@ class Backend:
         # Prepare field initializers as (name, value) tuples
         field_inits = []
         for field, arg in zip(info.fields, expr.args):
-            c_arg = self._emit_expr_with_expected_type(arg, field.type)
+            c_arg = self._emit_owned_expr_with_expected_type(arg, field.type)
             field_inits.append((field.name, c_arg))
 
         # Delegate C-specific formatting to emitter
@@ -1749,7 +1813,8 @@ class Backend:
         """
         Emit enum variant constructor as C tagged union initializer.
 
-        Int(42) -> { .tag = Expr_Int, .data = { .Int = { .value = 42 } } }
+        Example:
+            Int(42) -> (struct l0_modulename_Int){ .tag = l0_modulename_Int_Int, .data.Int.value = 42 }
         """
         assert isinstance(expr.callee, VarRef)
         variant_name = expr.callee.name
@@ -1777,7 +1842,7 @@ class Backend:
         # Prepare payload initializers as (name, value) tuples
         payload_inits = []
         for idx, (field, arg) in enumerate(zip(variant_decl.fields, expr.args)):
-            c_arg = self._emit_expr_with_expected_type(arg, variant_info.field_types[idx])
+            c_arg = self._emit_owned_expr_with_expected_type(arg, variant_info.field_types[idx])
             payload_inits.append((field.name, c_arg))
 
         # Delegate C-specific formatting to emitter
@@ -1815,7 +1880,7 @@ class Backend:
             # Designated init by field order (positional args)
             inits: List[Tuple[str, str]] = []
             for field, arg in zip(info.fields, expr.args):
-                c_arg = self._emit_expr_with_expected_type(arg, field.type)
+                c_arg = self._emit_owned_expr_with_expected_type(arg, field.type)
                 inits.append((field.name, c_arg))
             self.emitter.emit_struct_init_from_fields(tmp, base_ty, inits)
 
@@ -1849,7 +1914,7 @@ class Backend:
                         node=expr)
                 payload_inits: List[Tuple[str, str]] = []
                 for idx, (field, arg) in enumerate(zip(variant_decl.fields, expr.args)):
-                    c_arg = self._emit_expr_with_expected_type(arg, vinfo.field_types[idx])
+                    c_arg = self._emit_owned_expr_with_expected_type(arg, vinfo.field_types[idx])
                     payload_inits.append((field.name, c_arg))
                 self.emitter.emit_enum_variant_init(tmp, base_ty, variant_name, payload_inits)
 
@@ -1876,20 +1941,12 @@ class Backend:
     # Expression emission
     # -------------------------------------------------------------------------
 
-    def _emit_expr_with_expected_type(self, e: Expr, expected: Type) -> str:
-        """Emit expression with implicit type conversion to expected type if needed."""
+    def _convert_expr_with_expected_type(self, c_expr: str, natural_ty: Optional[Type], expected: Type) -> str:
+        """Convert a pre-emitted expression into the expected type when required."""
+        if natural_ty is None:
+            return c_expr
 
-        # Special case: null literal
-        if isinstance(e, NullLiteral):
-            if isinstance(expected, (NullableType, PointerType)):
-                return self.emitter.emit_null_literal(expected)
-            self.ice(f"[ICE-1090] invalid expected type for null literal: '{format_type(expected)}'", node=e)
-
-        # Get natural type of expression
-        natural_ty = self.analysis.expr_types.get(id(e))
-        c_expr = self._emit_expr(e)
-
-        if natural_ty is None or self._types_equal(natural_ty, expected):
+        if self._types_equal(natural_ty, expected):
             return c_expr
 
         # T → T? (wrap in Some)
@@ -1905,6 +1962,48 @@ class Backend:
 
         # No type conversion needed
         return c_expr
+
+    def _emit_expr_with_expected_type(self, e: Expr, expected: Type) -> str:
+        """Emit expression with implicit type conversion to expected type if needed."""
+
+        # Special case: null literal
+        if isinstance(e, NullLiteral):
+            if isinstance(expected, (NullableType, PointerType)):
+                return self.emitter.emit_null_literal(expected)
+            self.ice(f"[ICE-1090] invalid expected type for null literal: '{format_type(expected)}'", node=e)
+
+        natural_ty = self.analysis.expr_types.get(id(e))
+        c_expr = self._emit_expr(e)
+        return self._convert_expr_with_expected_type(c_expr, natural_ty, expected)
+
+    def _emit_owned_expr_with_expected_type(self, e: Expr, expected: Type) -> str:
+        """
+        Emit expression for contexts that create a new owner.
+
+        This applies retain-on-copy when a place expression is copied into an
+        owned destination, while delegating regular type conversion to
+        `_emit_expr_with_expected_type`.
+        """
+        natural_ty = self.analysis.expr_types.get(id(e))
+
+        if isinstance(e, NullLiteral):
+            return self._emit_expr_with_expected_type(e, expected)
+
+        c_expr = self._emit_expr(e)
+
+        if natural_ty is None or not self._is_place_expr(e):
+            return self._convert_expr_with_expected_type(c_expr, natural_ty, expected)
+
+        if self._types_equal(natural_ty, expected):
+            return self._emit_copy_expr_with_retains(c_expr, expected)
+
+        if isinstance(expected, NullableType) and self._types_equal(expected.inner, natural_ty):
+            if self.emitter.is_niche_nullable(expected):
+                return c_expr
+            retained_inner = self._emit_copy_expr_with_retains(c_expr, expected.inner)
+            return self.emitter.emit_some_value_for_nullable(expected, retained_inner)
+
+        return self._convert_expr_with_expected_type(c_expr, natural_ty, expected)
 
     def _emit_expr(self, expr: Expr, *, is_statement: bool = False) -> str:
         """Emit an expression and return the C code as a string."""
@@ -2063,6 +2162,9 @@ class Backend:
                 # value-optional: construct wrapper
                 if isinstance(expr.expr, NullLiteral):
                     return self.emitter.emit_null_literal(dst_ty)
+                if self._is_place_expr(expr.expr) and self._has_owned_fields(dst_ty.inner):
+                    retained = self._emit_copy_expr_with_retains(c_inner, dst_ty.inner)
+                    return self.emitter.emit_some_value_for_nullable(dst_ty, retained)
                 return self.emitter.emit_some_value_for_nullable(dst_ty, c_inner)
 
             # Checked unwrap cast (T? -> T): emit a runtime check + abort on empty.

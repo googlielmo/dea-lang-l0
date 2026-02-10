@@ -81,6 +81,53 @@ func test_opt_i() -> int? {
     return val;
 }
 
+struct OptBox {
+    value: string?;
+}
+
+enum OptEnum {
+    None;
+    Some(value: string?);
+}
+
+func test_opt_cleanup_fallthrough() -> void {
+    let v: string? = "fallthrough" as string?;
+    let box: OptBox = OptBox(v);
+    let en: OptEnum = Some(v);
+}
+
+func test_opt_cleanup_return(flag: bool) -> string? {
+    let v: string? = "return" as string?;
+    if (flag) {
+        return v;
+    }
+    return null;
+}
+
+func test_opt_cleanup_loop() -> void {
+    let i: int = 0;
+    while (i < 3) {
+        let v: string? = "loop" as string?;
+        let box: OptBox = OptBox(v);
+        if (i == 1) {
+            break;
+        }
+        if (i == 2) {
+            i = i + 1;
+            continue;
+        }
+        i = i + 1;
+    }
+}
+
+func test_opt_cleanup_with() -> void {
+    with (let v: string? = "with" as string?) {
+        printl_s("with");
+    } cleanup {
+        printl_s("cleanup");
+    }
+}
+
 func main() -> int {
     printl_i(test_let());
     printl_i(test_let_type_inf());

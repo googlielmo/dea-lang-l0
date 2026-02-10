@@ -125,6 +125,10 @@ class CEmitter:
                 for vi in enum_info.variants.values():
                     if any(self.has_owned_fields(ft) for ft in vi.field_types):
                         return True
+        if isinstance(ty, NullableType):
+            if isinstance(ty.inner, PointerType):
+                return False
+            return self.has_owned_fields(ty.inner)
         return False
 
     def find_variant_decl(
@@ -722,6 +726,17 @@ class CEmitter:
         if self.is_arc_type(ty):
             self.out.emit(f"rt_string_release({c_expr});")
 
+        elif isinstance(ty, NullableType):
+            if isinstance(ty.inner, PointerType):
+                return
+            if not self.has_owned_fields(ty.inner):
+                return
+            self.out.emit(f"if (({c_expr}).has_value) {{")
+            self.out.indent()
+            self.emit_value_cleanup(f"({c_expr}).value", ty.inner)
+            self.out.dedent()
+            self.out.emit("}")
+
         elif isinstance(ty, StructType):
             info = self.analysis.struct_infos.get((ty.module, ty.name))
             if info is None:
@@ -877,6 +892,17 @@ class CEmitter:
         if self.is_arc_type(field_type):
             # Release string fields
             self.out.emit(f"rt_string_release({field_expr});")
+
+        elif isinstance(field_type, NullableType):
+            if isinstance(field_type.inner, PointerType):
+                return
+            if not self.has_owned_fields(field_type.inner):
+                return
+            self.out.emit(f"if (({field_expr}).has_value) {{")
+            self.out.indent()
+            self._emit_field_cleanup(f"({field_expr}).value", field_type.inner)
+            self.out.dedent()
+            self.out.emit("}")
 
         elif isinstance(field_type, StructType):
             # Nested struct by value: recursively clean up
