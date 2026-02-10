@@ -208,6 +208,102 @@ def test_codegen_optional_string_cleanup_guards_and_order(codegen_single):
     assert cleanup_log < release_call
 
 
+def test_codegen_enum_cleanup_emits_switch_for_value_and_pointer_paths(codegen_single):
+    c_code, _ = codegen_single(
+        "main",
+        """
+        module main;
+
+        enum E {
+            A(value: string);
+            B;
+        }
+
+        func cleanup_value() -> void {
+            let e: E = A("x");
+        }
+
+        func cleanup_pointer() -> void {
+            let p: E* = new E::A("y");
+            drop p;
+        }
+
+        func main() -> int {
+            cleanup_value();
+            cleanup_pointer();
+            return 0;
+        }
+        """,
+    )
+
+    if c_code is None:
+        return
+
+    assert "switch ((e).tag)" in c_code
+    assert "rt_string_release((e).data.A.value);" in c_code
+    assert "if (p != NULL) {" in c_code
+    assert "switch (p->tag)" in c_code
+    assert "rt_string_release(p->data.A.value);" in c_code
+
+
+def test_codegen_nested_struct_and_enum_cleanup_recurses_from_single_path(codegen_single):
+    c_code, _ = codegen_single(
+        "main",
+        """
+        module main;
+
+        struct Inner {
+            value: string;
+        }
+
+        enum E {
+            Has(inner: Inner);
+            Empty;
+        }
+
+        struct Outer {
+            e: E;
+        }
+
+        func main() -> int {
+            let o: Outer = Outer(Has(Inner("z")));
+            return 0;
+        }
+        """,
+    )
+
+    if c_code is None:
+        return
+
+    assert "switch (((o).e).tag)" in c_code
+    assert "rt_string_release((((o).e).data.Has.inner).value);" in c_code
+
+
+def test_codegen_enum_cleanup_emits_all_variant_field_cleanups(codegen_single):
+    c_code, _ = codegen_single(
+        "main",
+        """
+        module main;
+
+        enum E {
+            Pair(left: string, right: string);
+            Empty;
+        }
+
+        func main() -> int {
+            let e: E = Pair("l", "r");
+            return 0;
+        }
+        """,
+    )
+
+    if c_code is None:
+        return
+
+    assert "rt_string_release((e).data.Pair.left);" in c_code
+    assert "rt_string_release((e).data.Pair.right);" in c_code
+
+
 def test_codegen_enum_copy_from_place_retain_uses_data_field(codegen_single):
     c_code, _ = codegen_single(
         "main",

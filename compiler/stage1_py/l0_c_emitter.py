@@ -16,6 +16,7 @@ from l0_ast import (
     EnumDecl, EnumVariant, FuncDecl, LetDecl, StructDecl,
 )
 from l0_internal_error import InternalCompilerError, ICELocation
+from l0_signatures import EnumInfo, StructInfo
 from l0_types import Type, BuiltinType, StructType, EnumType, PointerType, NullableType, FuncType, format_type
 
 
@@ -699,30 +700,35 @@ class CEmitter:
             c_expr: C expression for the value (e.g., "x__v", "obj.field")
             ty: The type of the value being cleaned up
         """
+        self._emit_cleanup_by_type(c_expr, ty)
+
+    def _emit_cleanup_by_type(self, c_expr: str, ty: Type) -> None:
         if self.analysis.is_arc_type(ty):
             self.out.emit(f"rt_string_release({c_expr});")
+            return
 
-        elif isinstance(ty, NullableType):
+        if isinstance(ty, NullableType):
             if isinstance(ty.inner, PointerType):
                 return
             if not self.analysis.has_arc_data(ty.inner):
                 return
             self.out.emit(f"if (({c_expr}).has_value) {{")
             self.out.indent()
-            self.emit_value_cleanup(f"({c_expr}).value", ty.inner)
+            self._emit_cleanup_by_type(f"({c_expr}).value", ty.inner)
             self.out.dedent()
             self.out.emit("}")
+            return
 
-        elif isinstance(ty, StructType):
-            info = self.analysis.struct_infos.get((ty.module, ty.name))
+        if isinstance(ty, StructType):
+            info = self._get_struct_info(ty, strict=False)
             if info is None:
                 return
 
             for field_ in info.fields:
-                field_expr = f"({c_expr}).{field_.name}"
-                self._emit_field_cleanup(field_expr, field_.type)
+                self._emit_cleanup_by_type(f"({c_expr}).{field_.name}", field_.type)
+            return
 
-        elif isinstance(ty, EnumType):
+        if isinstance(ty, EnumType):
             self._emit_enum_value_cleanup(c_expr, ty)
 
     def _emit_enum_value_cleanup(self, c_expr: str, enum_type: EnumType) -> None:
@@ -730,46 +736,47 @@ class CEmitter:
         Emit cleanup code for an enum by-value variable.
         Switches on tag to clean up only the active variant's owned fields.
         """
-        enum_info = self.analysis.enum_infos.get((enum_type.module, enum_type.name))
+        self._emit_enum_cleanup_switch(
+            enum_type,
+            f"({c_expr}).tag",
+            lambda variant_name, field_name: f"({c_expr}).data.{variant_name}.{field_name}",
+            missing_info_is_ice=False,
+        )
+
+    def _emit_enum_cleanup_switch(
+        self,
+        enum_type: EnumType,
+        c_tag_expr: str,
+        field_expr_for_variant_field,
+        *,
+        missing_info_is_ice: bool,
+    ) -> None:
+        enum_info = self._get_enum_info(enum_type, strict=missing_info_is_ice)
         if enum_info is None:
             return
 
         c_enum_name = self.mangle_enum_name(enum_type.module, enum_type.name)
 
-        # Check if any variant owns ARC fields
-        has_arc_data = any(
-            any(self.analysis.has_arc_data(ft) for ft in vi.field_types)
-            for vi in enum_info.variants.values()
-        )
-
-        if not has_arc_data:
+        if not self._enum_has_arc_data(enum_info):
             return
 
-        # Emit switch on tag
-        self.out.emit(f"switch (({c_expr}).tag) {{")
+        self.out.emit(f"switch ({c_tag_expr}) {{")
 
         for variant_name, variant_info in enum_info.variants.items():
-            tag_value = f"{c_enum_name}_{variant_name}"
-
-            variant_has_arc_data = any(
-                self.analysis.has_arc_data(ft) for ft in variant_info.field_types
-            )
-
-            if not variant_has_arc_data:
+            if not any(self.analysis.has_arc_data(ft) for ft in variant_info.field_types):
                 continue
 
+            tag_value = f"{c_enum_name}_{variant_name}"
             self.out.emit(f"case {tag_value}: {{")
             self.out.indent()
 
-            # Find variant decl from context
-            variant_decl = self.find_variant_decl(
-                enum_type.module, enum_type.name, variant_name
-            )
-
-            if variant_decl and len(variant_decl.fields) == len(variant_info.field_types):
-                for field_decl, field_type in zip(variant_decl.fields, variant_info.field_types):
-                    field_expr = f"({c_expr}).data.{variant_name}.{field_decl.name}"
-                    self._emit_field_cleanup(field_expr, field_type)
+            for field_name, field_type in self._iter_variant_cleanup_fields(
+                enum_type,
+                variant_name,
+                variant_info.field_types,
+            ):
+                field_expr = field_expr_for_variant_field(variant_name, field_name)
+                self._emit_field_cleanup(field_expr, field_type)
 
             self.out.emit("break;")
             self.out.dedent()
@@ -778,14 +785,50 @@ class CEmitter:
         self.out.emit("default: break;")
         self.out.emit("}")
 
+    def _iter_variant_cleanup_fields(
+        self,
+        enum_type: EnumType,
+        variant_name: str,
+        variant_field_types: List[Type],
+    ) -> List[Tuple[str, Type]]:
+        variant_decl = self.find_variant_decl(
+            enum_type.module,
+            enum_type.name,
+            variant_name,
+        )
+        if variant_decl is None:
+            return []
+        if len(variant_decl.fields) != len(variant_field_types):
+            return []
+        return [
+            (field_decl.name, field_type)
+            for field_decl, field_type in zip(variant_decl.fields, variant_field_types)
+        ]
+
+    def _enum_has_arc_data(self, enum_info: EnumInfo) -> bool:
+        return any(
+            any(self.analysis.has_arc_data(ft) for ft in variant_info.field_types)
+            for variant_info in enum_info.variants.values()
+        )
+
+    def _get_struct_info(self, struct_type: StructType, *, strict: bool) -> Optional[StructInfo]:
+        info = self.analysis.struct_infos.get((struct_type.module, struct_type.name))
+        if info is None and strict:
+            self.ice(f"[ICE-1270] missing StructInfo for {struct_type.module}.{struct_type.name}", None)
+        return info
+
+    def _get_enum_info(self, enum_type: EnumType, *, strict: bool) -> Optional[EnumInfo]:
+        info = self.analysis.enum_infos.get((enum_type.module, enum_type.name))
+        if info is None and strict:
+            self.ice(f"[ICE-1080] missing EnumInfo for {enum_type.module}.{enum_type.name}", None)
+        return info
+
     def emit_struct_cleanup(self, c_ptr_expr: str, struct_type: StructType) -> None:
         """
         Emit cleanup code for all owned fields in a struct.
         Recursively handles nested structs (by-value fields).
         """
-        info = self.analysis.struct_infos.get((struct_type.module, struct_type.name))
-        if info is None:
-            self.ice(f"[ICE-1270] missing StructInfo for {struct_type.module}.{struct_type.name}", None)
+        info = self._get_struct_info(struct_type, strict=True)
 
         self.out.emit(f"if ({c_ptr_expr} != NULL) {{")
         self.out.indent()
@@ -802,56 +845,18 @@ class CEmitter:
         Emit cleanup code for owned fields in an enum's active variant.
         Uses switch on tag to only clean up the fields that are actually present.
         """
-        enum_info = self.analysis.enum_infos.get((enum_type.module, enum_type.name))
-        if enum_info is None:
-            self.ice(f"[ICE-1080] missing EnumInfo for {enum_type.module}.{enum_type.name}", None)
-
-        c_enum_name = self.mangle_enum_name(enum_type.module, enum_type.name)
-
-        # Check if any variant has owned ARC fields
-        has_arc_data = any(
-            any(self.analysis.has_arc_data(ft) for ft in vi.field_types)
-            for vi in enum_info.variants.values()
-        )
-
-        if not has_arc_data:
+        enum_info = self._get_enum_info(enum_type, strict=True)
+        if not self._enum_has_arc_data(enum_info):
             return
 
-        # Emit switch on tag
         self.out.emit(f"if ({c_ptr_expr} != NULL) {{")
         self.out.indent()
-
-        self.out.emit(f"switch ({c_ptr_expr}->tag) {{")
-
-        for variant_name, variant_info in enum_info.variants.items():
-            tag_value = f"{c_enum_name}_{variant_name}"
-
-            variant_has_arc_data = any(
-                self.analysis.has_arc_data(ft) for ft in variant_info.field_types
-            )
-
-            if not variant_has_arc_data:
-                continue
-
-            self.out.emit(f"case {tag_value}: {{")
-            self.out.indent()
-
-            # Find variant decl from context
-            variant_decl = self.find_variant_decl(
-                enum_type.module, enum_type.name, variant_name
-            )
-
-            if variant_decl and len(variant_decl.fields) == len(variant_info.field_types):
-                for field_decl, field_type in zip(variant_decl.fields, variant_info.field_types):
-                    field_expr = f"{c_ptr_expr}->data.{variant_name}.{field_decl.name}"
-                    self._emit_field_cleanup(field_expr, field_type)
-
-            self.out.emit("break;")
-            self.out.dedent()
-            self.out.emit("}")
-
-        self.out.emit("default: break;")
-        self.out.emit("}")
+        self._emit_enum_cleanup_switch(
+            enum_type,
+            f"{c_ptr_expr}->tag",
+            lambda variant_name, field_name: f"{c_ptr_expr}->data.{variant_name}.{field_name}",
+            missing_info_is_ice=True,
+        )
 
         self.out.dedent()
         self.out.emit("}")
@@ -865,38 +870,7 @@ class CEmitter:
         - enum by value: recursively clean up active variant
         - pointer: no auto-cleanup (user's responsibility)
         """
-        if self.analysis.is_arc_type(field_type):
-            # Release string fields
-            self.out.emit(f"rt_string_release({field_expr});")
-
-        elif isinstance(field_type, NullableType):
-            if isinstance(field_type.inner, PointerType):
-                return
-            if not self.analysis.has_arc_data(field_type.inner):
-                return
-            self.out.emit(f"if (({field_expr}).has_value) {{")
-            self.out.indent()
-            self._emit_field_cleanup(f"({field_expr}).value", field_type.inner)
-            self.out.dedent()
-            self.out.emit("}")
-
-        elif isinstance(field_type, StructType):
-            # Nested struct by value: recursively clean up
-            info = self.analysis.struct_infos.get((field_type.module, field_type.name))
-            if info is None:
-                return
-
-            for nested_field in info.fields:
-                nested_expr = f"({field_expr}).{nested_field.name}"
-                self._emit_field_cleanup(nested_expr, nested_field.type)
-
-        elif isinstance(field_type, EnumType):
-            # Nested enum by value: switch on tag and clean up active variant
-            self._emit_enum_value_cleanup(field_expr, field_type)
-
-        elif isinstance(field_type, PointerType):
-            # Pointer fields: NOT auto-dropped in Stage 1
-            pass
+        self._emit_cleanup_by_type(field_expr, field_type)
 
     # ============================================================================
     # Expression Emission (C syntax for expressions)
