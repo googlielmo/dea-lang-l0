@@ -47,13 +47,14 @@ module demo;
 enum Expr {
     Int(value: int);
     Add(left: Expr*, right: Expr*);
+    Comment(text: string);
 }
 
 func eval(e: Expr*) -> int {
     match (*e) {
         Int(value) => { return value; }
         Add(left, right) => { return eval(left) + eval(right); }
-        // no default case: all variants handled (exhaustive)
+        _ => { return 0; } // wildcard pattern matches anything else
     }
 }
 
@@ -61,6 +62,22 @@ func add_opt(a: int?, b: int?) -> int? {
     let x: int = a?;    // propagate `null` if `a` is null
     let y: int = b?;    // propagate `null` if `b` is null
     return (x + y) as int?;
+}
+
+func process_config(path: string) -> int {
+    with (let f = open(path, "r") => close(f)) { // `with` ensures `f` is closed when the block exits
+        case (f.read_config_line()) {
+            "" => { printl_s("Empty file"); return -1; }
+            "enable_feature" => {
+                printl_s("Feature enabled");
+                return 1;
+            }
+            else {
+                printl_ss("Unknown config:", line);
+                return 0;
+            }
+        }
+    }
 }
 ```
 
