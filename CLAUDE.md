@@ -67,38 +67,38 @@ Tests require pytest >= 9.0.2 and a C compiler (GCC/Clang) for codegen tests.
 
 ```
 Source (.l0) → Lexer → Parser → NameResolver → SignatureResolver
-             → LocalScopeResolver → ExpressionTypeChecker → CBackend → C99 → gcc/clang
+             → LocalScopeResolver → ExpressionTypeChecker → Backend (`l0_backend.py`) → C99 → gcc/clang
 ```
 
 ### Key Files (compiler/stage1_py/)
 
-| File                   | Purpose                                                |
-|------------------------|--------------------------------------------------------|
-| `l0c.py`               | CLI driver, argument parsing, orchestrates compilation |
-| `l0_lexer.py`          | Tokenization (keywords, operators, literals)           |
-| `l0_parser.py`         | Recursive-descent parser producing AST                 |
-| `l0_ast.py`            | AST node dataclasses                                   |
-| `l0_driver.py`         | Module loading, import resolution, caching             |
-| `l0_backend.py`        | Code generation orchestration (language-agnostic)      |
-| `l0_c_emitter.py`      | C99 code emission                                      |
-| `l0_compilation.py`    | Compilation unit (closed set of modules)               |
-| `l0_context.py`        | Cross-cutting compiler options                         |
-| `l0_diagnostics.py`    | Error/warning reporting                                |
-| `l0_analysis.py`       | Analysis pipeline orchestration                        |
-| `l0_expr_types.py`     | Expression type inference and checking                 |
-| `l0_signatures.py`     | Function/struct type resolution                        |
-| `l0_name_resolver.py`  | Module-level symbol binding                            |
-| `l0_resolve.py`        | Name and type resolution utilities                     |
-| `l0_locals.py`         | Local variable scoping                                 |
-| `l0_scope_context.py`  | Scope context management                               |
-| `l0_symbols.py`        | Symbol table and symbol kinds                          |
-| `l0_types.py`          | Type representations                                   |
-| `l0_ast_printer.py`    | AST pretty-printing                                    |
-| `l0_logger.py`         | Logging infrastructure                                 |
-| `l0_paths.py`          | Path handling utilities                                |
-| `l0_internal_error.py` | Internal compiler error handling                       |
-| `runtime/l0_runtime.h` | C kernel runtime (allocation, I/O, strings)            |
-| `runtime/l0_siphash.h` | SipHash implementation for hash functions              |
+| File                   | Purpose                                                        |
+|------------------------|----------------------------------------------------------------|
+| `l0c.py`               | CLI driver, argument parsing, orchestrates compilation         |
+| `l0_lexer.py`          | Tokenization (keywords, operators, literals)                   |
+| `l0_parser.py`         | Recursive-descent parser producing AST                         |
+| `l0_ast.py`            | AST node dataclasses                                           |
+| `l0_driver.py`         | Module loading, import resolution, caching                     |
+| `l0_backend.py`        | Code generation orchestration (language-agnostic)              |
+| `l0_c_emitter.py`      | C99 code emission                                              |
+| `l0_compilation.py`    | Compilation unit (closed set of modules)                       |
+| `l0_context.py`        | Cross-cutting compiler options                                 |
+| `l0_diagnostics.py`    | Error/warning reporting                                        |
+| `l0_analysis.py`       | Analysis pipeline orchestration, ARC management, type analysis |
+| `l0_expr_types.py`     | Expression type inference and checking                         |
+| `l0_signatures.py`     | Function/struct type resolution                                |
+| `l0_name_resolver.py`  | Module-level symbol binding                                    |
+| `l0_resolve.py`        | Name and type resolution utilities                             |
+| `l0_locals.py`         | Local variable scoping                                         |
+| `l0_scope_context.py`  | Scope context management                                       |
+| `l0_symbols.py`        | Symbol table and symbol kinds                                  |
+| `l0_types.py`          | Type representations                                           |
+| `l0_ast_printer.py`    | AST pretty-printing                                            |
+| `l0_logger.py`         | Logging infrastructure                                         |
+| `l0_paths.py`          | Path handling utilities                                        |
+| `l0_internal_error.py` | Internal compiler error handling                               |
+| `runtime/l0_runtime.h` | C kernel runtime (allocation, I/O, strings)                    |
+| `runtime/l0_siphash.h` | SipHash implementation for hash functions                      |
 
 ### Stage 2 Compiler (compiler/stage2_l0/)
 
@@ -206,7 +206,8 @@ Types: `int`, `uint`, `byte`, `ubyte`, `bool`, `string`, `void`, `T*` (pointer),
 
 ## Diagnostic Codes
 
-Every diagnostic message uses a unique code in the format `[XXX-NNNN]` (e.g., `[TYP-0158]`, `[SIG-0018]`, `[PAR-0401]`). Before adding a new diagnostic code, grep `compiler/stage1_py/` to confirm it is unused:
+Every diagnostic message uses a unique code in the format `[XXX-NNNN]` (e.g., `[TYP-0158]`, `[SIG-0018]`, `[PAR-0401]`).
+Before adding a new diagnostic code, grep `compiler/stage1_py/` to confirm it is unused:
 
 ```bash
 grep -r 'XXX-NNNN' --include='*.py' compiler/stage1_py/
@@ -222,7 +223,8 @@ grep -r 'XXX-NNNN' --include='*.py' compiler/stage1_py/
   safety.").
 - Use backticks for L0 code snippets and type names in commit messages.
 - Do not include Co-Authored-By lines in commits.
-- Before committing, verify CLAUDE.md accuracy: check that file references are current, update with new modules/files added, and remove references to deleted files.
+- Before committing, verify CLAUDE.md accuracy: check that file references are current, update with new modules/files
+  added, and remove references to deleted files.
 
 ## Documentation
 

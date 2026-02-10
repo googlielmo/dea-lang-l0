@@ -2,7 +2,7 @@
 
 ## Overview
 
-The C backend (`l0_codegen.py`) takes a fully-analyzed `AnalysisResult` and emits portable C (C99) code.
+The C backend (`l0_backend.py` + `l0_c_emitter.py`) takes a fully-analyzed `AnalysisResult` and emits portable C (C99) code.
 
 ## Design Principles
 
@@ -163,6 +163,11 @@ Most expressions map directly:
 - Calls: `f(x, y)` → `l0_main_f(x, y)` (with mangled names)
 - Field access: `p.x` → `p.x` or `p->x` depending on pointer type
 - Cast: `x as T` → `((T)(x))` for primitive types, or appropriate struct wrapping/unwrapping for nullable types.
+
+Ownership-sensitive lowering is handled with explicit APIs:
+
+- `_emit_expr_with_expected_type` performs emission + pure type conversion.
+- `_emit_owned_expr_with_expected_type` is used at ownership-creating sites (`let`, assignment, constructors) and applies retain-on-copy for place expressions via `_emit_copy_expr_with_retains`.
 
 ### Struct/enum constructors
 
@@ -339,15 +344,15 @@ Currently, assumes direct function names. Need to:
 
 # L0 C Backend Implementation
 
-**C Code Generator** (`l0_codegen.py`) - Emits C99 code from analyzed programs
+**C backend** (`l0_backend.py` + `l0_c_emitter.py`) - Emits C99 code from analyzed programs
 
 ## Backend Usage
 
-The `CBackend` class takes an `AnalysisResult` and produces C source code:
+The `Backend` class takes an `AnalysisResult` and produces C source code:
 
 ```python
 from l0_driver import L0Driver
-from l0_codegen import CBackend
+from l0_backend import Backend
 
 # Analyze L0 program
 driver = L0Driver()
@@ -355,7 +360,7 @@ result = driver.analyze("my_module")
 
 # Generate C code
 if not result.has_errors():
-    backend = CBackend(result)
+    backend = Backend(result)
     c_code = backend.generate()
     print(c_code)
 ```

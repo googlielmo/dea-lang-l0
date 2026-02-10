@@ -14,7 +14,7 @@ globals.
       |
       v
   Lexer.tokenize() --> tokens -->  Parser.parse_module()  --> AST -->  NameResolver.resolve()  -->
-      --> scoped envs -->  ExpressionTypeChecker.check()  --> typed envs -->  CBackend.generate()  -->
+      --> scoped envs -->  ExpressionTypeChecker.check()  --> typed envs -->  Backend.generate()  -->
       --> C99 -->  system C compiler --> executable
 ```
 
@@ -35,8 +35,8 @@ globals.
   and semantic passes.
 * **Driver (`l0_driver.py`, `l0_compilation.py`)**: Orchestrates the pipeline for a module: reading files, invoking
   passes, and coordinating code generation.
-* **C backend (`l0_codegen.py`)**: Emits a single portable C99 translation unit from the analyzed program (current Stage
-  1 backend).
+* **C backend (`l0_backend.py` + `l0_c_emitter.py`)**: Emits a single portable C99 translation unit from the analyzed
+  program (current Stage 1 backend).
 
 ## Module and File Layout
 
