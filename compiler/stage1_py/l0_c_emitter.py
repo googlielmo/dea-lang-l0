@@ -47,7 +47,7 @@ class CCodeBuilder:
         self.lines.append(line)
 
     def to_string(self) -> str:
-        return "\n".join(self.lines) + "\n" # Ensure trailing newline
+        return "\n".join(self.lines) + "\n"  # Ensure trailing newline
 
 
 @dataclass
@@ -106,30 +106,6 @@ class CEmitter:
     # ============================================================================
     # Type Queries
     # ============================================================================
-
-    def is_arc_type(self, ty: Type) -> bool:
-        """Check if type needs ARC (reference counting). Currently only string."""
-        return isinstance(ty, BuiltinType) and ty.name == "string"
-
-    def has_owned_fields(self, ty: Type) -> bool:
-        """Check if a type has fields that need cleanup."""
-        if self.is_arc_type(ty):
-            return True
-        if isinstance(ty, StructType):
-            info = self.analysis.struct_infos.get((ty.module, ty.name))
-            if info:
-                return any(self.has_owned_fields(f.type) for f in info.fields)
-        if isinstance(ty, EnumType):
-            enum_info = self.analysis.enum_infos.get((ty.module, ty.name))
-            if enum_info:
-                for vi in enum_info.variants.values():
-                    if any(self.has_owned_fields(ft) for ft in vi.field_types):
-                        return True
-        if isinstance(ty, NullableType):
-            if isinstance(ty.inner, PointerType):
-                return False
-            return self.has_owned_fields(ty.inner)
-        return False
 
     def find_variant_decl(
             self, module_name: str, enum_name: str, variant_name: str
@@ -723,13 +699,13 @@ class CEmitter:
             c_expr: C expression for the value (e.g., "x__v", "obj.field")
             ty: The type of the value being cleaned up
         """
-        if self.is_arc_type(ty):
+        if self.analysis.is_arc_type(ty):
             self.out.emit(f"rt_string_release({c_expr});")
 
         elif isinstance(ty, NullableType):
             if isinstance(ty.inner, PointerType):
                 return
-            if not self.has_owned_fields(ty.inner):
+            if not self.analysis.has_arc_data(ty.inner):
                 return
             self.out.emit(f"if (({c_expr}).has_value) {{")
             self.out.indent()
@@ -760,13 +736,13 @@ class CEmitter:
 
         c_enum_name = self.mangle_enum_name(enum_type.module, enum_type.name)
 
-        # Check if any variant has owned fields
-        has_owned = any(
-            any(self.has_owned_fields(ft) for ft in vi.field_types)
+        # Check if any variant owns ARC fields
+        has_arc_data = any(
+            any(self.analysis.has_arc_data(ft) for ft in vi.field_types)
             for vi in enum_info.variants.values()
         )
 
-        if not has_owned:
+        if not has_arc_data:
             return
 
         # Emit switch on tag
@@ -775,11 +751,11 @@ class CEmitter:
         for variant_name, variant_info in enum_info.variants.items():
             tag_value = f"{c_enum_name}_{variant_name}"
 
-            variant_has_owned = any(
-                self.has_owned_fields(ft) for ft in variant_info.field_types
+            variant_has_arc_data = any(
+                self.analysis.has_arc_data(ft) for ft in variant_info.field_types
             )
 
-            if not variant_has_owned:
+            if not variant_has_arc_data:
                 continue
 
             self.out.emit(f"case {tag_value}: {{")
@@ -832,13 +808,13 @@ class CEmitter:
 
         c_enum_name = self.mangle_enum_name(enum_type.module, enum_type.name)
 
-        # Check if any variant has owned fields
-        has_owned = any(
-            any(self.has_owned_fields(ft) for ft in vi.field_types)
+        # Check if any variant has owned ARC fields
+        has_arc_data = any(
+            any(self.analysis.has_arc_data(ft) for ft in vi.field_types)
             for vi in enum_info.variants.values()
         )
 
-        if not has_owned:
+        if not has_arc_data:
             return
 
         # Emit switch on tag
@@ -850,11 +826,11 @@ class CEmitter:
         for variant_name, variant_info in enum_info.variants.items():
             tag_value = f"{c_enum_name}_{variant_name}"
 
-            variant_has_owned = any(
-                self.has_owned_fields(ft) for ft in variant_info.field_types
+            variant_has_arc_data = any(
+                self.analysis.has_arc_data(ft) for ft in variant_info.field_types
             )
 
-            if not variant_has_owned:
+            if not variant_has_arc_data:
                 continue
 
             self.out.emit(f"case {tag_value}: {{")
@@ -889,14 +865,14 @@ class CEmitter:
         - enum by value: recursively clean up active variant
         - pointer: no auto-cleanup (user's responsibility)
         """
-        if self.is_arc_type(field_type):
+        if self.analysis.is_arc_type(field_type):
             # Release string fields
             self.out.emit(f"rt_string_release({field_expr});")
 
         elif isinstance(field_type, NullableType):
             if isinstance(field_type.inner, PointerType):
                 return
-            if not self.has_owned_fields(field_type.inner):
+            if not self.analysis.has_arc_data(field_type.inner):
                 return
             self.out.emit(f"if (({field_expr}).has_value) {{")
             self.out.indent()

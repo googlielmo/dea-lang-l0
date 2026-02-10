@@ -24,8 +24,8 @@ from typing import List, Optional, Dict, Set, NoReturn, Tuple, Any
 from l0_analysis import AnalysisResult, VarRefResolution
 from l0_ast import (
     FuncDecl, StructDecl, EnumDecl, EnumVariant, LetDecl,
-    Stmt, Block, LetStmt, AssignStmt, ExprStmt, IfStmt, WhileStmt, ReturnStmt, DropStmt, MatchStmt, CaseStmt, CaseArm,
-    CaseElse, Expr, IntLiteral, StringLiteral, BoolLiteral, VarRef, UnaryOp, BinaryOp, CallExpr, IndexExpr,
+    Stmt, Block, LetStmt, AssignStmt, ExprStmt, IfStmt, WhileStmt, ReturnStmt, DropStmt, MatchStmt, CaseStmt, Expr,
+    IntLiteral, StringLiteral, BoolLiteral, VarRef, UnaryOp, BinaryOp, CallExpr, IndexExpr,
     FieldAccessExpr, ParenExpr, CastExpr, VariantPattern, WildcardPattern, NullLiteral, TypeExpr, TryExpr, NewExpr,
     BreakStmt, ContinueStmt, ForStmt, ByteLiteral, WithStmt,
 )
@@ -33,11 +33,11 @@ from l0_c_emitter import CEmitter
 from l0_internal_error import InternalCompilerError, ICELocation
 from l0_logger import log_debug, log_stage
 from l0_name_resolver import Symbol, SymbolKind
+from l0_resolve import resolve_symbol, resolve_type_ref
 from l0_scope_context import ScopeContext
 from l0_types import (
-    L0_PRIMITIVE_TYPES, Type, BuiltinType, StructType, EnumType, PointerType, NullableType, FuncType, format_type,
+    Type, BuiltinType, StructType, EnumType, PointerType, NullableType, FuncType, format_type,
 )
-from l0_resolve import resolve_symbol, resolve_type_ref
 
 
 @dataclass
@@ -66,7 +66,6 @@ class Backend:
 
     # Current function return type (for return statement type checking)
     _current_func_result: Optional[Type] = None
-
 
     # Scope tracking for string cleanup
     _current_scope: Optional[ScopeContext] = None
@@ -123,11 +122,6 @@ class Backend:
         if isinstance(a, EnumType) and isinstance(b, EnumType):
             return a.module == b.module and a.name == b.name
         return False
-
-    def is_arc_type(self, ty: Type) -> bool:
-        """Check if a type is automatically reference-counted (ARC).
-         Currently only 'string' is ARC."""
-        return isinstance(ty, BuiltinType) and ty.name == "string"
 
     def _is_int_assignable(self, typ) -> bool:
         return typ in (BuiltinType("int"), BuiltinType("byte"))
@@ -438,7 +432,6 @@ class Backend:
                     self.emitter.current_module = module_name
                     self.emitter.emit_enum(module_name, enum_decl, enum_info)
 
-
         # Value-optionals of user-defined structs/enums (if any)
         self.emitter.emit_section_comment("Optional wrapper types (late)")
         self.emitter.emit_optional_wrappers(early=False)
@@ -501,7 +494,6 @@ class Backend:
                         module_has_lets = True
                     self._emit_let_declaration(module.name, decl)
 
-
     def _emit_let_declaration(self, module_name: str, decl: LetDecl) -> None:
         """Emit a single top-level let declaration as a static variable."""
         # Get the resolved type
@@ -533,8 +525,9 @@ class Backend:
             return self._emit_const_constructor(expr, expected_type)
         elif isinstance(expr, NewExpr):
             # Heap allocation not allowed in top-level let initializers
-            self.ice(f"[ICE-1180] new expressions not allowed in top-level let initializers (use value construction instead)",
-                     node=expr)
+            self.ice(
+                f"[ICE-1180] new expressions not allowed in top-level let initializers (use value construction instead)",
+                node=expr)
         else:
             # Unsupported initializer
             self.ice(f"[ICE-1181] unsupported top-level let initializer: {type(expr).__name__}", node=expr)
@@ -614,7 +607,8 @@ class Backend:
         # Get field names from AST
         variant_decl = self.find_variant_decl(enum_type.module, enum_type.name, variant_name)
         if variant_decl is None:
-            self.ice(f"[ICE-1052] missing variant decl for {enum_type.module}.{enum_type.name}.{variant_name}", node=expr)
+            self.ice(f"[ICE-1052] missing variant decl for {enum_type.module}.{enum_type.name}.{variant_name}",
+                     node=expr)
 
         if len(variant_decl.fields) != len(expr.args):
             self.ice(f"[ICE-1053] arity mismatch in variant constructor {variant_name}", node=expr)
@@ -646,7 +640,6 @@ class Backend:
                 if isinstance(decl, FuncDecl):
                     self._emit_function_declaration(module.name, decl)
 
-
     def _emit_function_declaration(self, module_name: str, decl: FuncDecl) -> None:
         """Emit a single function declaration."""
         func_type = self.analysis.func_types.get((module_name, decl.name))
@@ -668,7 +661,6 @@ class Backend:
             for decl in module.decls:
                 if isinstance(decl, FuncDecl) and not decl.is_extern:
                     self._emit_function_definition(module.name, decl)
-
 
     def _emit_function_definition(self, module_name: str, decl: FuncDecl) -> None:
         """Emit a complete function definition with body."""
@@ -748,7 +740,7 @@ class Backend:
                     and not scope.with_cleanup_in_progress):
                 return True
             for _, var_type in scope.owned_vars:
-                if self._has_owned_fields(var_type):
+                if self.analysis.has_arc_data(var_type):
                     return True
             scope = scope.parent
         return False
@@ -765,8 +757,8 @@ class Backend:
         scope = self._current_scope
         while scope is not None:
             if (
-                (scope.with_cleanup_block is not None or scope.with_cleanup_inline)
-                and not scope.with_cleanup_in_progress
+                    (scope.with_cleanup_block is not None or scope.with_cleanup_inline)
+                    and not scope.with_cleanup_in_progress
             ):
                 scope.with_cleanup_in_progress = True
                 try:
@@ -776,7 +768,7 @@ class Backend:
             for var_name, var_type in reversed(scope.owned_vars):
                 if var_name == returned_var:
                     continue  # Don't clean the return value
-                if self._has_owned_fields(var_type):
+                if self.analysis.has_arc_data(var_type):
                     self._emit_value_cleanup(var_name, var_type)
             scope = scope.parent
 
@@ -797,8 +789,8 @@ class Backend:
         scope = self._current_scope
         while scope is not None:
             if (
-                (scope.with_cleanup_block is not None or scope.with_cleanup_inline)
-                and not scope.with_cleanup_in_progress
+                    (scope.with_cleanup_block is not None or scope.with_cleanup_inline)
+                    and not scope.with_cleanup_in_progress
             ):
                 scope.with_cleanup_in_progress = True
                 try:
@@ -806,7 +798,7 @@ class Backend:
                 finally:
                     scope.with_cleanup_in_progress = False
             for var_name, var_type in reversed(scope.owned_vars):
-                if self._has_owned_fields(var_type):
+                if self.analysis.has_arc_data(var_type):
                     self._emit_value_cleanup(var_name, var_type)
 
             if scope is loop_scope:
@@ -820,7 +812,7 @@ class Backend:
         Only cleans variables declared in THIS scope that have owned fields.
         """
         for var_name, var_type in reversed(scope.owned_vars):
-            if self._has_owned_fields(var_type):
+            if self.analysis.has_arc_data(var_type):
                 self._emit_value_cleanup(var_name, var_type)
 
     def _emit_with_cleanup_from_scope(self, scope: ScopeContext, module_name: str) -> None:
@@ -873,37 +865,6 @@ class Backend:
         Uses switch on tag to only clean up the fields that are actually present.
         """
         self.emitter.emit_enum_cleanup(c_ptr_expr, enum_type)
-
-    def _has_owned_fields(self, ty: Type) -> bool:
-        """
-        Check if a type has any owned fields that need cleanup.
-        Used to optimize away unnecessary switch statements.
-        """
-        if self.is_arc_type(ty):
-            return True
-
-        if isinstance(ty, StructType):
-            info = self.analysis.struct_infos.get((ty.module, ty.name))
-            if info is None:
-                return False
-            return any(self._has_owned_fields(f.type) for f in info.fields)
-
-        if isinstance(ty, EnumType):
-            enum_info = self.analysis.enum_infos.get((ty.module, ty.name))
-            if enum_info is None:
-                return False
-            return any(
-                any(self._has_owned_fields(ft) for ft in vi.field_types)
-                for vi in enum_info.variants.values()
-            )
-
-        if isinstance(ty, NullableType):
-            if isinstance(ty.inner, PointerType):
-                return False
-            return self._has_owned_fields(ty.inner)
-
-        # Pointers, ints, bools, etc. don't need cleanup
-        return False
 
     # -------------------------------------------------------------------------
     # Statement emission
@@ -1175,7 +1136,7 @@ class Backend:
         if c_target is None or c_value is None:
             self.ice("[ICE-1241] failed to emit assignment", node=stmt)
 
-        if self._has_owned_fields(dst_ty):
+        if self.analysis.has_arc_data(dst_ty):
             temp = self.emitter.fresh_tmp("tmp")
             self.emitter.emit_temp_decl(self.emitter.emit_type(dst_ty), temp, c_value)
             self._emit_value_cleanup(c_target, dst_ty)
@@ -1277,14 +1238,14 @@ class Backend:
         Used when copying from place expressions so source and destination own
         independent references.
         """
-        if self.is_arc_type(ty):
+        if self.analysis.is_arc_type(ty):
             self.emitter.emit_string_retain(c_expr)
             return
 
         if isinstance(ty, NullableType):
             if self.emitter.is_niche_nullable(ty):
                 return
-            if not self._has_owned_fields(ty.inner):
+            if not self.analysis.has_arc_data(ty.inner):
                 return
 
             self.emitter.emit_if_header(f"({c_expr}).has_value")
@@ -1328,7 +1289,7 @@ class Backend:
         """
         Materialize copied values in a temp and emit retain logic when needed.
         """
-        if not self._has_owned_fields(ty):
+        if not self.analysis.has_arc_data(ty):
             return c_expr
 
         temp = self.emitter.fresh_tmp("copy")
@@ -1353,7 +1314,7 @@ class Backend:
 
         # Track _scrutinee for cleanup only for rvalue expressions with owned types
         if not self._is_place_expr(stmt.expr):
-            if self.is_arc_type(scrutinee_expr_type) or self._has_owned_fields(scrutinee_expr_type):
+            if self.analysis.has_arc_data(scrutinee_expr_type):
                 outer_scope.add_owned("_scrutinee", scrutinee_expr_type)
 
         self._switch_depth += 1
@@ -1430,7 +1391,7 @@ class Backend:
 
         # Track _scrutinee for cleanup only for rvalue expressions with owned types
         if not self._is_place_expr(stmt.expr):
-            if self.is_arc_type(scrutinee_expr_type) or self._has_owned_fields(scrutinee_expr_type):
+            if self.analysis.has_arc_data(scrutinee_expr_type):
                 outer_scope.add_owned("_scrutinee", scrutinee_expr_type)
 
         if isinstance(scrutinee_expr_type, BuiltinType) and scrutinee_expr_type.name == "string":
@@ -1539,8 +1500,8 @@ class Backend:
         else:
             # Without else, some value may not match any arm, so code after is always reachable
             self._next_stmt_unreachable = (
-                stmt.else_arm is not None
-                and arms_unreachable == total_arms
+                    stmt.else_arm is not None
+                    and arms_unreachable == total_arms
             )
 
         if not self._next_stmt_unreachable:
@@ -1693,8 +1654,8 @@ class Backend:
             self._emit_struct_cleanup(c_name, inner_type)
         elif isinstance(inner_type, EnumType):
             self._emit_enum_cleanup(c_name, inner_type)
-        elif self.is_arc_type(inner_type):
-            # Release the string value before freeing the container
+        elif self.analysis.is_arc_type(inner_type):
+            # Release the ARC value before freeing the container
             c_cond = self.emitter.emit_pointer_null_check(c_name, "!=")
             self.emitter.emit_if_header(c_cond)
             self.emitter.emit_block_start()
@@ -1797,8 +1758,9 @@ class Backend:
         if info is None:
             self.ice(f"[ICE-1280] missing StructInfo for {struct_type.module}.{struct_type.name}", node=expr)
         if len(info.fields) != len(expr.args):
-            self.ice(f"[ICE-1281] argument count mismatch in struct constructor for {struct_type.module}.{struct_type.name}: "
-                      f"expected {len(info.fields)}, got {len(expr.args)}", node=expr)
+            self.ice(
+                f"[ICE-1281] argument count mismatch in struct constructor for {struct_type.module}.{struct_type.name}: "
+                f"expected {len(info.fields)}, got {len(expr.args)}", node=expr)
 
         # Prepare field initializers as (name, value) tuples
         field_inits = []
@@ -1835,7 +1797,8 @@ class Backend:
         # Get field names from AST
         variant_decl = self.find_variant_decl(enum_type.module, enum_type.name, variant_name)
         if variant_decl is None:
-            self.ice(f"[ICE-1302] missing variant decl for {enum_type.module}.{enum_type.name}.{variant_name}", node=expr)
+            self.ice(f"[ICE-1302] missing variant decl for {enum_type.module}.{enum_type.name}.{variant_name}",
+                     node=expr)
         if len(variant_decl.fields) != len(expr.args):
             self.ice(f"[ICE-1303] arity mismatch in variant constructor {variant_name}", node=expr)
 
@@ -1890,7 +1853,8 @@ class Backend:
             variant_name = expr.type_ref.name
             sym = self._lookup_symbol(variant_name, self.current_module, module_path=expr.type_ref.module_path)
             if sym is None or sym.kind != SymbolKind.ENUM_VARIANT:
-                self.ice("[ICE-1220] new enum allocation missing variant symbol (type checker invariant violated)", node=expr)
+                self.ice("[ICE-1220] new enum allocation missing variant symbol (type checker invariant violated)",
+                         node=expr)
 
             enum_info = self.analysis.enum_infos.get((base_ty.module, base_ty.name))
             if enum_info is None:
@@ -1898,7 +1862,8 @@ class Backend:
 
             vinfo = enum_info.variants.get(variant_name)
             if vinfo is None:
-                self.ice(f"[ICE-1222] unknown enum variant '{variant_name}' for {base_ty.module}.{base_ty.name}", node=expr)
+                self.ice(f"[ICE-1222] unknown enum variant '{variant_name}' for {base_ty.module}.{base_ty.name}",
+                         node=expr)
 
             # Empty payload variant
             if len(vinfo.field_types) == 0:
@@ -1907,7 +1872,8 @@ class Backend:
                 # Get field names from AST
                 variant_decl = self.find_variant_decl(base_ty.module, base_ty.name, variant_name)
                 if variant_decl is None:
-                    self.ice(f"[ICE-1223] missing variant decl for {base_ty.module}.{base_ty.name}.{variant_name}", node=expr)
+                    self.ice(f"[ICE-1223] missing variant decl for {base_ty.module}.{base_ty.name}.{variant_name}",
+                             node=expr)
                 if len(variant_decl.fields) != len(expr.args):
                     self.ice(
                         f"[ICE-1224] arity mismatch in new {variant_name}: expected {len(variant_decl.fields)}, got {len(expr.args)}",
@@ -1923,8 +1889,9 @@ class Backend:
                 c_arg = self._emit_expr(expr.args[0])
                 self.emitter.emit_pointer_assignment(tmp, c_arg)
             else:
-                self.ice(f"[ICE-1230] new expression with multiple args not supported for builtin type '{format_type(base_ty)}'",
-                         node=expr)
+                self.ice(
+                    f"[ICE-1230] new expression with multiple args not supported for builtin type '{format_type(base_ty)}'",
+                    node=expr)
 
         else:
             if len(expr.args) == 1:
@@ -1932,8 +1899,9 @@ class Backend:
                 self.emitter.emit_pointer_assignment(tmp, c_arg)
             else:
                 # multiple args not supported for other types
-                self.ice(f"[ICE-1231] new expression with multiple args not supported for type '{format_type(base_ty)}'",
-                         node=expr)
+                self.ice(
+                    f"[ICE-1231] new expression with multiple args not supported for type '{format_type(base_ty)}'",
+                    node=expr)
 
         return tmp
 
@@ -2096,7 +2064,8 @@ class Backend:
                 # Regular function call - look up and mangle the name
                 # CRITICAL: extern functions are NOT mangled (FFI boundary)
                 if self.current_module:
-                    sym = self._lookup_symbol(expr.callee.name, self.current_module, module_path=expr.callee.module_path)
+                    sym = self._lookup_symbol(expr.callee.name, self.current_module,
+                                              module_path=expr.callee.module_path)
                     if sym and sym.kind == SymbolKind.FUNC:
                         if self._is_extern_function(sym):
                             # Don't mangle extern functions
@@ -2162,7 +2131,7 @@ class Backend:
                 # value-optional: construct wrapper
                 if isinstance(expr.expr, NullLiteral):
                     return self.emitter.emit_null_literal(dst_ty)
-                if self._is_place_expr(expr.expr) and self._has_owned_fields(dst_ty.inner):
+                if self._is_place_expr(expr.expr) and self.analysis.has_arc_data(dst_ty.inner):
                     retained = self._emit_copy_expr_with_retains(c_inner, dst_ty.inner)
                     return self.emitter.emit_some_value_for_nullable(dst_ty, retained)
                 return self.emitter.emit_some_value_for_nullable(dst_ty, c_inner)
@@ -2190,7 +2159,8 @@ class Backend:
 
             # Build the "return none" for the *enclosing* function.
             if not isinstance(self._current_func_result, NullableType):
-                self.ice("[ICE-1131] TryExpr used in non-nullable function (type checker invariant violated)", node=expr)
+                self.ice("[ICE-1131] TryExpr used in non-nullable function (type checker invariant violated)",
+                         node=expr)
 
             ret_none = self.emitter.emit_null_literal(self._current_func_result)
 
@@ -2242,7 +2212,7 @@ class Backend:
                 # value-optional: (opt == null) <=> !opt.has_value
                 if expr_op == "==":
                     return self.emitter.emit_null_check_eq(c_other)
-                else: # expr_op == "!="
+                else:  # expr_op == "!="
                     return self.emitter.emit_null_check_ne(c_other)
 
             # sanity check: should be pointer or pointer-optional
@@ -2286,7 +2256,6 @@ class Backend:
 
         return self.emitter.emit_binary_op(expr_op, c_left, c_right)
 
-
     # -------------------------------------------------------------------------
     # Type resolution helpers
     # -------------------------------------------------------------------------
@@ -2301,7 +2270,8 @@ class Backend:
         result = resolve_type_ref(self.analysis.module_envs, module_name, tref)
         return result.type
 
-    def _lookup_symbol(self, name: str, current_module_name: str, module_path: Optional[List[str]] = None) -> Optional[Symbol]:
+    def _lookup_symbol(self, name: str, current_module_name: str, module_path: Optional[List[str]] = None) -> Optional[
+        Symbol]:
         """
         Look up a symbol in the current module's environment.
 

@@ -11,7 +11,7 @@ from l0_diagnostics import Diagnostic
 from l0_locals import FunctionEnv
 from l0_signatures import StructInfo, EnumInfo
 from l0_symbols import ModuleEnv
-from l0_types import Type, FuncType
+from l0_types import Type, FuncType, BuiltinType, StructType, EnumType, NullableType, PointerType
 
 
 class VarRefResolution(Enum):
@@ -58,3 +58,37 @@ class AnalysisResult:
 
     def has_errors(self) -> bool:
         return any(d.kind == "error" for d in self.diagnostics)
+
+    def has_warnings(self) -> bool:
+        return any(d.kind == "warning" for d in self.diagnostics)
+
+    def is_arc_type(self, ty: Type) -> bool:
+        """Check if type needs ARC (reference counting). Currently only string."""
+        return isinstance(ty, BuiltinType) and ty.name == "string"
+
+    def has_arc_data(self, typ: Type) -> bool:
+        """Check whether `typ` transitively contains ARC-managed data, requiring retain/release orchestration."""
+        if self.is_arc_type(typ):
+            return True
+
+        if isinstance(typ, StructType):
+            info = self.struct_infos.get((typ.module, typ.name))
+            if info is None:
+                return False
+            return any(self.has_arc_data(f.type) for f in info.fields)
+
+        if isinstance(typ, EnumType):
+            enum_info = self.enum_infos.get((typ.module, typ.name))
+            if enum_info is None:
+                return False
+            return any(
+                any(self.has_arc_data(ft) for ft in vi.field_types)
+                for vi in enum_info.variants.values()
+            )
+
+        if isinstance(typ, NullableType):
+            if isinstance(typ.inner, PointerType):
+                return False
+            return self.has_arc_data(typ.inner)
+
+        return False
