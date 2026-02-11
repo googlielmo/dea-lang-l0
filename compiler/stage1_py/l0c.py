@@ -3,10 +3,12 @@
 
 import argparse
 import os
+import shutil
 import subprocess
 import tempfile
 from pathlib import Path
-from typing import Dict, List
+from re import search
+from typing import Dict, List, Optional
 
 from l0_analysis import AnalysisResult
 from l0_ast_printer import format_module
@@ -16,7 +18,7 @@ from l0_diagnostics import Diagnostic
 from l0_driver import L0Driver
 from l0_internal_error import InternalCompilerError
 from l0_lexer import TokenKind, Lexer
-from l0_logger import log_info, log_error
+from l0_logger import log_info, log_error, log_warning
 from l0_paths import SourceSearchPaths
 from l0_symbols import SymbolKind
 from l0_types import (
@@ -41,14 +43,15 @@ def _load_file_lines(path: str, cache: Dict[str, List[str]]) -> List[str]:
     return cache[path]
 
 
-def print_diagnostics(result: AnalysisResult, context : CompilationContext) -> None:
+def print_diagnostics(result: AnalysisResult, context: CompilationContext) -> None:
     file_cache: Dict[str, List[str]] = {}
 
     for diag in result.diagnostics:
         print_diagnostic_with_snippet(diag, file_cache, context)
 
 
-def print_diagnostic_with_snippet(diag: Diagnostic, file_cache: Dict[str, List[str]], context: CompilationContext = None) -> None:
+def print_diagnostic_with_snippet(diag: Diagnostic, file_cache: Dict[str, List[str]],
+                                  context: CompilationContext = None) -> None:
     # First line: header
     log_error(context, diag.format())
 
@@ -168,6 +171,37 @@ def _get_module_names(args, cu) -> List[str]:
     return [args.entry]
 
 
+def _find_cc() -> Optional[str]:
+    """Find the best available C compiler."""
+    for candidate in ("tcc", "gcc", "clang", "cc"):
+        if shutil.which(candidate):
+            return candidate
+    from_env = os.environ.get("CC")
+    if from_env:
+        return from_env
+    return None
+
+
+def _compiler_flag_family(compiler):
+    """
+    Simple heuristic to determine compiler family for flag selection.
+    Uses pattern matching to handle cases like "gcc-10" or "clang-14" on Unix and "gcc.exe" or "clang.exe" on Windows.
+    :param compiler: the name of the compiler executable
+    :return: a string indicating the compiler family ("tcc", "gcc", "clang", "cc", "msvc", or "unknown")
+    """
+    if compiler.endswith("tcc") or search(r"tcc(\.exe)?$", compiler):
+        return "tcc"
+    elif compiler.endswith(("gcc", "clang")) or search(r"(gcc|clang)(\.exe)?(-\d+)?$", compiler):
+        # clang supports most gcc flags and is often aliased to gcc, so treat them as the same family.
+        return "gcc"
+    elif compiler.endswith("cc") or search(r"cc(\.exe)?$", compiler):
+        return "cc"
+    elif compiler.endswith("cl") or search(r"cl(\.exe)?$", compiler):
+        return "msvc"
+    else:
+        return "unknown"
+
+
 def cmd_build(args: argparse.Namespace) -> int:
     """Build an executable from an L0 module."""
     context = build_compilation_context(args)
@@ -205,13 +239,38 @@ def cmd_build(args: argparse.Namespace) -> int:
         log_info(context, f"Generated C code: {c_path}")
 
         # Determine C compiler
-        compiler = args.c_compiler or os.getenv("CC") or "gcc"
+        compiler = args.c_compiler or _find_cc()
+        if compiler is None:
+            log_error(context,
+                      "error: [L0C-0009] no C compiler found: use --c-compiler to specify one or set the CC environment variable")
+            return 1
+
+        log_info(context, f"Using C compiler: {compiler}")
+
+        flag_family = _compiler_flag_family(compiler)
+        log_info(context, f"Detected compiler flag family: {flag_family}")
+
+        # Extra C compiler flags/options
+        if args.c_options:
+            extra_opts = args.c_options.split()
+            log_info(context, f"Extra C compiler options: {extra_opts}")
+        else:
+            extra_opts = []
 
         # Build compiler command
         cmd = [compiler, str(c_path), "-o", str(exe_path)]
+        cmd.extend(extra_opts)
 
         # Add standard flags
-        cmd.extend(["-std=c99", "-pedantic"])
+        if flag_family == "tcc":
+            cmd.extend(["-std=c99", "-Wall", "-pedantic"])
+        elif flag_family == "gcc":
+            cmd.extend(["-std=c99", "-Wall", "-Wextra", "-Wno-unused", "-Wno-parentheses", "-pedantic-errors"])
+        elif flag_family == "msvc":
+            cmd.extend(["/std:c11", "/W4"])
+        else:
+            log_warning(context,
+                        f"Unsupported compiler '{compiler}' (flag family '{flag_family}'): not adding standard flags")
 
         # Add runtime include path
         if args.runtime_include:
@@ -225,7 +284,8 @@ def cmd_build(args: argparse.Namespace) -> int:
         elif os.getenv("L0_RUNTIME_LIB"):
             cmd.extend(["-L", os.getenv("L0_RUNTIME_LIB"), "-ll0runtime"])
 
-        log_info(context, f"Compiling: {' '.join(cmd)}")
+        log_info(context, f"Compiling:")
+        log_info(context, f"{' '.join(cmd)}")
 
         # Run C compiler
         compile_result = subprocess.run(cmd, capture_output=True, text=True)
@@ -240,7 +300,6 @@ def cmd_build(args: argparse.Namespace) -> int:
 
         if compile_result.stderr:
             log_error(context, compile_result.stderr)
-
 
         log_info(context, f"Built executable: {exe_path}")
 
@@ -354,7 +413,7 @@ def cmd_ast(args: argparse.Namespace) -> int:
     return 0
 
 
-def _dump_tokens_for_file(path: Path, include_eof: bool, context = None) -> int:
+def _dump_tokens_for_file(path: Path, include_eof: bool, context=None) -> int:
     try:
         text = path.read_text(encoding="utf-8")
     except OSError as e:
@@ -589,8 +648,12 @@ def _add_all_modules_arg(parser: argparse.ArgumentParser) -> None:
 def _add_runtime_args(parser: argparse.ArgumentParser) -> None:
     """Add runtime-related arguments (compiler, include, lib paths)."""
     parser.add_argument(
-        "--c-compiler",
-        help="C compiler to use (default: $CC or gcc)",
+        "--c-compiler", "-c",
+        help="C compiler to use (default: tcc, gcc, clang, cc from PATH, or $CC environment variable, in that order)",
+    )
+    parser.add_argument(
+        "--c-options", "-C",
+        help='Extra options to pass to the C compiler (e.g. -C="-O2 -DDEBUG")',
     )
     parser.add_argument(
         "--runtime-include", "-I",
@@ -605,7 +668,7 @@ def _add_runtime_args(parser: argparse.ArgumentParser) -> None:
 def _add_codegen_arg(parser: argparse.ArgumentParser) -> None:
     """Add codegen-related arguments."""
     parser.add_argument(
-        "--no-line-directives",
+        "--no-line-directives", "-NLD",
         action="store_true",
         help="Disable #line directives in generated C code",
     )
@@ -632,7 +695,7 @@ def main(argv=None) -> None:
         help="Add a project source root (can be passed multiple times)",
     )
     parser.add_argument(
-         "-S", "--sys-root",
+        "-S", "--sys-root",
         action="append",
         default=[],
         help="Add a system/stdlib source root (can be passed multiple times; default: $L0_SYSTEM as colon-separated paths)",
