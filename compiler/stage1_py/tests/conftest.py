@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -15,6 +16,19 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 from l0_driver import L0Driver
 from l0_paths import SourceSearchPaths
+
+import shutil
+
+
+def _find_cc() -> str:
+    """Find the best available C compiler for testing: CC env var, then tcc, cc, gcc, clang."""
+    from_env = os.environ.get("CC")
+    if from_env:
+        return from_env
+    for candidate in ("tcc", "cc", "gcc", "clang"):
+        if shutil.which(candidate):
+            return candidate
+    return "gcc"
 
 
 @pytest.fixture
@@ -92,6 +106,8 @@ def codegen_search_paths(codegen_dir: Path, repo_root: Path) -> SourceSearchPath
 @pytest.fixture
 def compile_and_run(runtime_dir: Path):
     def _compile_and_run(c_code: str, work_dir: Path) -> tuple[bool, str, str]:
+        cc = _find_cc()
+
         c_file = work_dir / "output.c"
         exe_file = work_dir / "output"
 
@@ -99,10 +115,9 @@ def compile_and_run(runtime_dir: Path):
 
         result = subprocess.run(
             [
-                "gcc",
-                "-Wall",
-                "-Wextra",
+                cc,
                 "-std=c99",
+                "-pedantic",
                 "-I",
                 str(runtime_dir),
                 str(c_file),

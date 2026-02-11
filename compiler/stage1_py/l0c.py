@@ -211,7 +211,7 @@ def cmd_build(args: argparse.Namespace) -> int:
         cmd = [compiler, str(c_path), "-o", str(exe_path)]
 
         # Add standard flags
-        cmd.extend(["-std=c99", "-Wall", "-Wextra", "-Wno-unused", "-Wno-parentheses", "-pedantic-errors"])
+        cmd.extend(["-std=c99", "-pedantic"])
 
         # Add runtime include path
         if args.runtime_include:

@@ -11,6 +11,7 @@ from textwrap import dedent
 
 import pytest
 
+from conftest import _find_cc, compile_and_run
 from l0_ast import ByteLiteral, FuncDecl, LetStmt, ReturnStmt
 from l0_backend import Backend
 from l0_driver import L0Driver
@@ -608,44 +609,24 @@ def test_codegen_byte_arithmetic(tmp_path):
 # Build tests
 # ============================================================================
 
-def run_c_compiler(c_file: Path, out_file: Path) -> CompletedProcess[str]:
-    runtime_dir = Path(__file__).parent.parent / "runtime"
-    return subprocess.run(
-        ["gcc", "-std=c99", "-Wall", "-Wextra", "-Wno-unused", "-pedantic-errors", "-Wno-parentheses", f"-I{runtime_dir}", "-o", str(out_file), str(c_file)],
-        capture_output=True,
-        text=True,
-    )
-
-
-def test_build_byte_program_simple(tmp_path):
+def test_build_byte_program_simple(codegen_single, compile_and_run, tmp_path):
     """Test full build of a program using byte type."""
     src = """
     module main;
     func main() -> int {
         let b: byte = 'A';
         let i: int = b;
-        return i;
+        return i - 65; // Should return 0 (ASCII of 'A' is 65)
     }
     """
-    path = write_tmp(tmp_path, "main.l0", src)
+    c_code, diags = codegen_single("main", src)
+    assert c_code is not None, f"Codegen failed: {[d.message for d in diags]}"
 
-    driver = L0Driver()
-    driver.search_paths.add_project_root(tmp_path)
-    result = driver.analyze("main")
-    assert not result.has_errors(), [d.message for d in result.diagnostics]
+    success, stdout, stderr = compile_and_run(c_code, tmp_path)
+    assert success, f"Runtime failed.\nstdout: {stdout}\nstderr: {stderr}"
 
-    backend = Backend(result)
-    c_code = backend.generate()
-    c_file = tmp_path / "main.c"
-    c_file.write_text(c_code)
-    out_file = tmp_path / "main.out"
-    compile_result = run_c_compiler(c_file, out_file)
-    assert compile_result.returncode == 0, compile_result.stderr
-    # Run the compiled program and check exit code
-    run_result = subprocess.run([str(out_file)])
-    assert run_result.returncode == ord('A')  # Should return ASCII value of 'A'
 
-def test_build_byte_program_special(tmp_path):
+def test_build_byte_program_special(codegen_single, compile_and_run, tmp_path):
     """Test full build of a program using byte type."""
     src = """
     module main;
@@ -660,23 +641,11 @@ def test_build_byte_program_special(tmp_path):
         let b: byte = d;
         let i: int = b;
         
-        return i;
+        return i - 68; // Should return 0 (ASCII of 'D' is 68)
     }
     """
-    path = write_tmp(tmp_path, "main.l0", src)
+    c_code, diags = codegen_single("main", src)
+    assert c_code is not None, f"Codegen failed: {[d.message for d in diags]}"
 
-    driver = L0Driver()
-    driver.search_paths.add_project_root(tmp_path)
-    result = driver.analyze("main")
-    assert not result.has_errors(), [d.message for d in result.diagnostics]
-
-    backend = Backend(result)
-    c_code = backend.generate()
-    c_file = tmp_path / "main.c"
-    c_file.write_text(c_code)
-    out_file = tmp_path / "main.out"
-    compile_result = run_c_compiler(c_file, out_file)
-    assert compile_result.returncode == 0, compile_result.stderr
-    # Run the compiled program and check exit code
-    run_result = subprocess.run([str(out_file)])
-    assert run_result.returncode == ord('D')  # Should return ASCII value of 'D'
+    success, stdout, stderr = compile_and_run(c_code, tmp_path)
+    assert success, f"Runtime failed.\nstdout: {stdout}\nstderr: {stderr}"

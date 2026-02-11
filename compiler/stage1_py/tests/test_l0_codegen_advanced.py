@@ -12,30 +12,10 @@ This test suite focuses on:
 #  SPDX-License-Identifier: MIT OR Apache-2.0
 #  Copyright (c) 2026 gwz
 
-import subprocess
-from pathlib import Path
-from subprocess import CompletedProcess
-
 import pytest
 
 from l0_backend import Backend
 from l0_driver import L0Driver
-
-
-def _check_c_compiler_available():
-    """Check if a C compiler (gcc or clang) is available."""
-    for compiler in ["gcc", "clang", "cc"]:
-        try:
-            subprocess.run(
-                [compiler, "--version"],
-                capture_output=True,
-                check=False,
-                timeout=2,
-            )
-            return True
-        except (FileNotFoundError, subprocess.TimeoutExpired):
-            continue
-    return False
 
 
 # ============================================================================
@@ -668,24 +648,10 @@ def test_codegen_extern_with_pointer_return(codegen_single):
 
 
 # ============================================================================
-# Compilation tests (optional, requires C compiler)
+# Compilation tests
 # ============================================================================
 
-
-def run_c_compiler(c_file: Path, out_file: Path) -> CompletedProcess[str]:
-    runtime_dir = Path(__file__).parent.parent / "runtime"
-    return subprocess.run(
-        ["gcc", "-Wall", "-Wextra", "-std=c99", f"-I{runtime_dir}", "-o", str(out_file), str(c_file)],
-        capture_output=True,
-        text=True,
-    )
-
-
-@pytest.mark.skipif(
-    not _check_c_compiler_available(),
-    reason="C compiler not available",
-)
-def test_generated_code_compiles_minimal(codegen_single, tmp_path):
+def test_generated_code_compiles_minimal(codegen_single, tmp_path, compile_and_run):
     """Test that generated C code actually compiles."""
     c_code, _ = codegen_single(
         "main",
@@ -699,26 +665,11 @@ def test_generated_code_compiles_minimal(codegen_single, tmp_path):
     )
     assert c_code is not None
 
-    # Write C code to file
-    c_file = tmp_path / "output.c"
-    c_file.write_text(c_code)
-
     # Try to compile
-    out_file = tmp_path / "output"
-    result = run_c_compiler(c_file, out_file)
+    success, stdout, stderr = compile_and_run(c_code, tmp_path)
+    assert success, f"Compilation failed.\nstdout: {stdout}\nstderr: {stderr}"
 
-    if result.returncode != 0:
-        print("Compilation failed:")
-        print(result.stderr)
-
-    assert result.returncode == 0, f"Compilation failed: {result.stderr}"
-
-
-@pytest.mark.skipif(
-    not _check_c_compiler_available(),
-    reason="C compiler not available",
-)
-def test_generated_code_compiles_with_struct(codegen_single, tmp_path):
+def test_generated_code_compiles_with_struct(codegen_single, tmp_path, compile_and_run):
     """Test that generated code with structs compiles."""
     c_code, _ = codegen_single(
         "main",
@@ -732,22 +683,17 @@ def test_generated_code_compiles_with_struct(codegen_single, tmp_path):
 
         func main() -> int {
             let p: Point = Point(3, 4);
-            return p.x + p.y;
+            return p.x + p.y - 7;
         }
         """,
     )
     assert c_code is not None
 
-    c_file = tmp_path / "output.c"
-    c_file.write_text(c_code)
-
-    out_file = tmp_path / "output"
-    result = run_c_compiler(c_file, out_file)
-
-    assert result.returncode == 0, f"Compilation failed: {result.stderr}"
+    success, stdout, stderr = compile_and_run(c_code, tmp_path)
+    assert success, f"Compilation failed.\nstdout: {stdout}\nstderr: {stderr}"
 
 
-def test_generated_code_compiles_with_enum(codegen_single, tmp_path):
+def test_generated_code_compiles_with_enum(codegen_single, tmp_path, compile_and_run):
     """Test that generated code with enums compiles."""
     c_code, err = codegen_single(
         "main",
@@ -772,30 +718,16 @@ def test_generated_code_compiles_with_enum(codegen_single, tmp_path):
 
         func main() -> int {
             let opt: Option = Some(42);
-            return unwrap_or(opt, 0);
+            return unwrap_or(opt, 0) - 42;
         }
         """,
     )
 
-    if c_code is None:
-        for diag in err:
-            print(f"  {diag.format()}")
-        pytest.fail(f"codegen failed: {err}")
-
-    c_file = tmp_path / "output.c"
-    c_file.write_text(c_code)
-
-    out_file = tmp_path / "output"
-    result = run_c_compiler(c_file, out_file)
-
-    assert result.returncode == 0, f"Compilation failed: {result.stderr}"
+    success, stdout, stderr = compile_and_run(c_code, tmp_path)
+    assert success, f"Compilation failed.\nstdout: {stdout}\nstderr: {stderr}"
 
 
-@pytest.mark.skipif(
-    not _check_c_compiler_available(),
-    reason="C compiler not available",
-)
-def test_generated_code_runs_correctly(codegen_single, tmp_path):
+def test_generated_code_runs_correctly(codegen_single, tmp_path, compile_and_run):
     """Test that generated code runs and produces correct output."""
     c_code, _ = codegen_single(
         "main",
@@ -807,32 +739,14 @@ def test_generated_code_runs_correctly(codegen_single, tmp_path):
         }
 
         func main() -> int {
-            return add(40, 2);
+            return add(40, 2) - 42;
         }
         """,
     )
     assert c_code is not None
 
-    c_file = tmp_path / "output.c"
-    c_file.write_text(c_code)
-
-    out_file = tmp_path / "output"
-
-    # Compile
-    compile_result = run_c_compiler(c_file, out_file)
-
-    if compile_result.returncode != 0:
-        pytest.skip(f"Compilation failed: {compile_result.stderr}")
-
-    # Run
-    run_result = subprocess.run(
-        [str(out_file)],
-        capture_output=True,
-        text=True,
-    )
-
-    # Should return 42
-    assert run_result.returncode == 42
+    success, stdout, stderr = compile_and_run(c_code, tmp_path)
+    assert success, f"Compilation failed.\nstdout: {stdout}\nstderr: {stderr}"
 
 
 # ============================================================================
