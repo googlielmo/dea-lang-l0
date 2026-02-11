@@ -1091,13 +1091,9 @@ class CEmitter:
         else:
             self.out.emit("return;")
 
-    def emit_break_stmt(self) -> None:
-        """Emit a break statement."""
+    def emit_exit_switch(self) -> None:
+        """Emit a switch-exit break statement."""
         self.out.emit("break;")
-
-    def emit_continue_stmt(self) -> None:
-        """Emit a continue statement."""
-        self.out.emit("continue;")
 
     def emit_label(self, label: str) -> None:
         """Emit a C label (for goto targets)."""

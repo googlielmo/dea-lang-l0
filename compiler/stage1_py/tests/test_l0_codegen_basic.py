@@ -581,7 +581,7 @@ def test_codegen_match_simple(codegen_single):
     assert "case l0_main_Option_Some:" in c_code
     assert "case l0_main_Option_None:" in c_code
 
-    # Should have break statements
+    # Should exit switch cases
     assert "break;" in c_code
 
 
@@ -993,4 +993,3 @@ def test_codegen_parenthesized_expression(codegen_single):
 
     if c_code is None:
         return
-

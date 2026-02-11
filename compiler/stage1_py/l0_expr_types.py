@@ -385,21 +385,27 @@ class ExpressionTypeChecker:
             if cond_ty is not None and not self._is_bool(cond_ty):
                 self._error(stmt, "[TYP-0070] if condition must have type 'bool'")
 
+            pre_unreachable = self._next_stmt_unreachable
             pre_alive = [dict(scope) for scope in self._alive_scopes]
 
             # then branch
+            self._next_stmt_unreachable = False
             self._check_stmt(stmt.then_stmt, check_return_paths=check_return_paths)
             then_alive = [dict(scope) for scope in self._alive_scopes]
             then_returns = self._return_paths
+            then_unreachable = self._next_stmt_unreachable
 
             # else branch
             else_returns = False
+            else_unreachable = False
             if stmt.else_stmt is not None:
                 # Restore pre-if liveness
                 self._alive_scopes = [dict(scope) for scope in pre_alive]
+                self._next_stmt_unreachable = False
                 self._check_stmt(stmt.else_stmt, check_return_paths=check_return_paths)
                 else_alive = [dict(scope) for scope in self._alive_scopes]
                 else_returns = self._return_paths
+                else_unreachable = self._next_stmt_unreachable
 
                 # Merge then/else liveness
                 for scope_index in range(len(self._alive_scopes)):
@@ -412,6 +418,13 @@ class ExpressionTypeChecker:
                 # An if-else guarantees a return only if BOTH branches do.
                 # An if without an else never guarantees a return.
                 self._return_paths = then_returns and else_returns
+
+            if pre_unreachable:
+                self._next_stmt_unreachable = True
+            elif stmt.else_stmt is not None:
+                self._next_stmt_unreachable = then_unreachable and else_unreachable
+            else:
+                self._next_stmt_unreachable = False
 
             return None
 

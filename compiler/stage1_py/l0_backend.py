@@ -941,22 +941,16 @@ class Backend:
         elif isinstance(stmt, BreakStmt):
             # break;
             self._emit_cleanup_for_loop_exit()
-            if self._switch_depth > 0:
-                break_label, _ = self._loop_label_stack[-1]
-                self.emitter.emit_goto(break_label)
-            else:
-                self.emitter.emit_break_stmt()
+            break_label, _ = self._loop_label_stack[-1]
+            self.emitter.emit_goto(break_label)
             self._next_stmt_unreachable = True
             return None
 
         elif isinstance(stmt, ContinueStmt):
             # continue;
             self._emit_cleanup_for_loop_exit()
-            if self._switch_depth > 0:
-                _, continue_label = self._loop_label_stack[-1]
-                self.emitter.emit_goto(continue_label)
-            else:
-                self.emitter.emit_continue_stmt()
+            _, continue_label = self._loop_label_stack[-1]
+            self.emitter.emit_goto(continue_label)
             self._next_stmt_unreachable = True
             return None
 
@@ -1281,7 +1275,7 @@ class Backend:
                     field_expr = f"({c_expr}).data.{variant_name}.{field.name}"
                     self._emit_retain_for_copied_value(field_expr, field_ty)
 
-                self.emitter.emit_break_stmt()
+                self.emitter.emit_exit_switch()
                 self.emitter.emit_block_end()
             self.emitter.emit_switch_end()
 
@@ -1357,7 +1351,7 @@ class Backend:
 
             self._pop_scope()
 
-            self.emitter.emit_break_stmt()
+            self.emitter.emit_exit_switch()
             self.emitter.emit_block_end()
 
         self.emitter.emit_switch_end()
@@ -1470,7 +1464,7 @@ class Backend:
 
                 self._pop_scope()
 
-                self.emitter.emit_break_stmt()
+                self.emitter.emit_exit_switch()
                 self.emitter.emit_block_end()
 
             if stmt.else_arm is not None:
@@ -1489,7 +1483,7 @@ class Backend:
 
                 self._pop_scope()
 
-                self.emitter.emit_break_stmt()
+                self.emitter.emit_exit_switch()
                 self.emitter.emit_block_end()
 
             self.emitter.emit_switch_end()

@@ -764,7 +764,7 @@ class TestCodeGenFromFiles:
         # Verify wildcard becomes default
         assert "default:" in c_code
 
-        # Verify break statements
+        # Verify switch exits
         assert "break;" in c_code
 
 
@@ -871,4 +871,3 @@ class TestCodeGenFileDiscovery:
                 f"Parse errors:\n" +
                 "\n".join(f"  {name}: {err}" for name, err in parse_errors)
         )
-

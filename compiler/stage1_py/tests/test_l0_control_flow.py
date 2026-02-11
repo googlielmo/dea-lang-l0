@@ -121,6 +121,27 @@ def test_continue_inside_for_loop_ok(analyze_single):
     assert not result.has_errors()
 
 
+def test_no_unreachable_warning_after_conditional_continue(analyze_single):
+    """Conditional continue should not mark following statements unreachable."""
+    result = analyze_single(
+        "main",
+        """
+        module main;
+        func f() -> int {
+            let x: int = 0;
+            for (x = 0; x < 5; x = x + 1) {
+                if (x != 0) continue;
+                if (x != 0) break;
+                x = x + 1;
+            }
+            return x;
+        }
+        """,
+    )
+
+    assert not has_error_code(result.diagnostics, "TYP-0030")
+
+
 # ============================================================================
 # Nested loop break/continue
 # ============================================================================
@@ -150,8 +171,8 @@ def test_codegen_nested_loop_break(codegen_single):
     if c_code is None:
         assert False, f"Analysis failed: {[d.message for d in diags]}"
 
-    # Should have multiple break statements
-    assert c_code.count("break;") >= 2
+    # Should have multiple break goto statements
+    assert c_code.count("goto __lbrk_") >= 2
 
 
 def test_break_in_nested_if_inside_loop(analyze_single):
@@ -218,6 +239,60 @@ def test_for_loop_only_condition(analyze_single):
     )
 
     assert not result.has_errors()
+
+
+def test_codegen_for_loop_continue_runs_update(codegen_single, compile_and_run, tmp_path):
+    """Continue in for loop should jump to update and terminate."""
+    c_code, diags = codegen_single(
+        "main",
+        """
+        module main;
+        import std.io;
+        func main() {
+            let x = 0;
+            for (x = 0; x < 5; x = x + 1) {
+                if (x != 0) continue;
+                if (x != 0) break;
+                printl_i(x);
+            }
+            printl_s("done");
+            printl_i(x);
+        }
+        """,
+    )
+
+    if c_code is None:
+        assert False, f"Analysis failed: {[d.message for d in diags]}"
+
+    success, stdout, stderr = compile_and_run(c_code, tmp_path)
+    assert success, f"Program should exit 0: stderr={stderr}"
+    assert stdout == "0\ndone\n5\n"
+
+
+def test_codegen_break_continue_lower_to_goto(codegen_single):
+    """Break/continue should be lowered to goto labels (no C break/continue)."""
+    c_code, diags = codegen_single(
+        "main",
+        """
+        module main;
+        func f() -> int {
+            let x: int = 0;
+            for (x = 0; x < 10; x = x + 1) {
+                if (x == 1) { continue; }
+                if (x == 2) { break; }
+            }
+            return x;
+        }
+        """,
+    )
+
+    if c_code is None:
+        assert False, f"Analysis failed: {[d.message for d in diags]}"
+
+    assert "goto __lbrk_" in c_code
+    assert "goto __lcont_" in c_code
+    assert "break;" not in c_code
+    assert "continue;" not in c_code
 
 
 def test_for_loop_only_init(analyze_single):
