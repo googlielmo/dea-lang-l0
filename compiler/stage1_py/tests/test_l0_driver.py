@@ -69,3 +69,39 @@ def test_driver_caches_by_module_name(write_l0_file, temp_project):
     # module1 and module2 are fresh parses, but the cached module must match
     cached = driver.module_cache["cache_test"]
     assert cached.name == module1.name == module2.name
+
+
+def test_driver_accepts_utf8_bom(write_l0_file, temp_project):
+    path = write_l0_file(
+        "bom.main",
+        """
+        module bom.main;
+        func main() -> int { return 0; }
+        """,
+    )
+    path.write_text("\ufeff" + path.read_text(encoding="utf-8"), encoding="utf-8")
+
+    driver = L0Driver()
+    module = driver._load_single_file(path)
+
+    assert module.name == "bom.main"
+
+
+def test_driver_reports_non_utf8_source(write_l0_file, temp_project, repo_root):
+    path = write_l0_file(
+        "badenc.main",
+        """
+        module badenc.main;
+        func main() -> int { return 0; }
+        """,
+    )
+    path.write_bytes(b"module badenc.main;\nfunc main() -> int { return 0; }\n\xff")
+
+    driver = L0Driver()
+    driver.search_paths.add_system_root(repo_root / "l0" / "stdlib")
+    driver.search_paths.add_project_root(temp_project)
+
+    result = driver.analyze("badenc.main")
+
+    assert result.has_errors()
+    assert any("[DRV-0040]" in d.message for d in result.diagnostics)

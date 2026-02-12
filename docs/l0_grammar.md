@@ -84,7 +84,8 @@ ImportDecl          ::=     "import" ModulePath ";"
 ModulePath          ::=     Ident ("." Ident)*
 ```
 
-`Ident` here is the module name (no hierarchical packages in L<sub>0</sub>).
+`Ident` here is the module name component (no hierarchical packages in L<sub>0</sub> beyond dot-separated modules).
+This implies each module path component must be a valid identifier; hyphens and leading digits are not valid.
 
 ## 3. Top-level declarations
 

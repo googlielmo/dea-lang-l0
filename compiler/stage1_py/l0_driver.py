@@ -24,6 +24,35 @@ class ImportCycleError(Exception):
     pass
 
 
+class SourceEncodingError(Exception):
+    """Raised when a source file cannot be decoded as UTF-8."""
+
+    def __init__(self, path: str | Path, message: str):
+        self.path = str(path)
+        self.message = message
+        super().__init__(f"{self.path}: {self.message}")
+
+
+def load_source_utf8(path: str | Path) -> str:
+    """
+    Read source bytes and decode as UTF-8.
+
+    UTF-8 BOM is accepted and silently stripped.
+    """
+    p = Path(path)
+    data = p.read_bytes()
+    try:
+        text = data.decode("utf-8")
+    except UnicodeDecodeError as e:
+        raise SourceEncodingError(
+            p,
+            f"invalid UTF-8 encoding at byte offset {e.start}",
+        ) from e
+    if text.startswith("\ufeff"):
+        text = text[1:]
+    return text
+
+
 class L0Driver:
     """
     Stage-1 driver:
@@ -109,6 +138,11 @@ class L0Driver:
                     module_name=None, # TODO: fill in module name (may need to pass it through ParseError)
                     filename=e.filename
                 )
+            )
+            return result
+        except SourceEncodingError as e:
+            result.diagnostics.append(
+                Diagnostic(kind="error", message=f"input: [DRV-0040] {e}")
             )
             return result
 
@@ -232,7 +266,7 @@ class L0Driver:
         if not path.exists():
             raise FileNotFoundError(f"L0 source file not found: {path}")
 
-        text = path.read_text(encoding="utf-8")
+        text = load_source_utf8(path)
         return self._parse_source(text, file_path=str(path))
 
     def _parse_source(self, text: str, file_path: str) -> Module:

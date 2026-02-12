@@ -101,6 +101,15 @@ func process_config(path: string) -> int {
 - A C99-compatible compiler (gcc or clang)
 - Git (for cloning the repository)
 
+### Assumptions and Constraints
+
+- Module name components must be valid identifiers (`[A-Za-z_][A-Za-z0-9_]*`), so names like `app.main` are valid while `app.my-module` and `9main` are not.
+- Filesystem module resolution follows host behavior (case-sensitive hosts require exact case matches).
+- Source files are decoded as UTF-8; a UTF-8 BOM is accepted and ignored.
+- `run` and `build` require the entry module to define `main`.
+- Preferred `main` return types are `int`, `void`, or `bool` (`bool` maps to C exit code `0`/`1`).
+- If `--runtime-lib` or `L0_RUNTIME_LIB` is set, an `l0runtime` library artifact must exist in that directory.
+
 ### Setup
 
 #### 1. Clone the repository:

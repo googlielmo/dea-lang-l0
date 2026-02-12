@@ -9,13 +9,32 @@ explicit, transparent, and easy to bootstrap.
 The compiler is organized as a sequence of pure, explicit passes operating on structured data rather than side-effectful
 globals.
 
-``` 
-  Source (.l0)
-      |
-      v
-  Lexer.tokenize() --> tokens -->  Parser.parse_module()  --> AST -->  NameResolver.resolve()  -->
-      --> scoped envs -->  ExpressionTypeChecker.check()  --> typed envs -->  Backend.generate()  -->
-      --> C99 -->  system C compiler --> executable
+```
+Source (.l0)
+  │
+  ▼
+Lexer.tokenize() ──► Token stream
+  │
+  ▼
+Parser.parse_module() ──► AST (immutable dataclasses)
+  │
+  ▼
+NameResolver.resolve() ──► Module-level symbol tables (ModuleEnv per module)
+  │
+  ▼
+SignatureResolver.resolve() ──► Resolved type info (FuncType, StructInfo, EnumInfo)
+  │
+  ▼
+LocalScopeResolver.resolve() ──► Function-local scope trees (FunctionEnv per function)
+  │
+  ▼
+ExpressionTypeChecker.check() ────► Expression types, control-flow validation
+  │
+  ▼
+Backend.generate() ──► C99 source
+  │
+  ▼
+Host C compiler ──► Executable
 ```
 
 * **Lexer (`l0_lexer.py`)**: Converts UTF-8 source text into a token stream via `Lexer.tokenize()`, handling keywords,
@@ -73,6 +92,18 @@ Key invariants enforced throughout:
 4. **Total parsing**: the parser consumes all tokens or emits diagnostics; partial parses are treated as failures.
 5. **Explicit nullability**: pointer types carry an explicit nullable bit (`?`), and the type checker enforces safe
    usage.
+
+## Host and Toolchain Assumptions
+
+- Module path components are lexical identifiers (`[A-Za-z_][A-Za-z0-9_]*`).
+- Module file lookup and casing behavior follows the host filesystem semantics.
+- Stage 1 source decoding is UTF-8; a leading UTF-8 BOM is accepted and stripped.
+- `run`/`build` expect an entry `main` function in the selected entry module.
+- `main` return type is expected to be `int`, `void`, or `bool`; other return types are accepted but warned and ignored
+  by the C entry wrapper.
+- Generated C targets C99 for gcc/clang/tcc flows.
+- Runtime library linking remains optional by default; when explicitly configured (`--runtime-lib`/`L0_RUNTIME_LIB`),
+  the configured directory must contain an `l0runtime` library artifact.
 
 ## Frontend architecture
 
@@ -175,7 +206,7 @@ module = driver.load_module(module.name)          # gets from cache or loads/par
 if analysis.diagnostics contain errors:
     report and abort
 else:
-    c_source = codegen(analysis)  # future stage
+    c_source = codegen(analysis)
     write_output(c_source)
 ```
 
@@ -184,5 +215,4 @@ reporting.
 
 ## Future Directions
 
-* **Richer diagnostics** with fix-it hints and multi-span notes.
 * **Incremental builds**: cache lexer/parser results per module to speed up large projects.

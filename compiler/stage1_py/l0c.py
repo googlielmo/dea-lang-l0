@@ -7,7 +7,7 @@ import shutil
 import subprocess
 import tempfile
 from pathlib import Path
-from re import search
+from re import fullmatch, search
 from typing import Dict, List, Optional
 
 from l0_analysis import AnalysisResult
@@ -15,7 +15,7 @@ from l0_ast_printer import format_module
 from l0_backend import Backend
 from l0_context import CompilationContext
 from l0_diagnostics import Diagnostic
-from l0_driver import L0Driver
+from l0_driver import L0Driver, SourceEncodingError, load_source_utf8
 from l0_internal_error import InternalCompilerError
 from l0_lexer import TokenKind, Lexer
 from l0_logger import log_info, log_error, log_warning
@@ -38,7 +38,7 @@ def _init_env_defaults() -> None:
 
 def _load_file_lines(path: str, cache: Dict[str, List[str]]) -> List[str]:
     if path not in cache:
-        text = Path(path).read_text(encoding="utf-8")
+        text = load_source_utf8(path)
         cache[path] = text.splitlines()
     return cache[path]
 
@@ -60,7 +60,7 @@ def print_diagnostic_with_snippet(diag: Diagnostic, file_cache: Dict[str, List[s
 
     try:
         lines = _load_file_lines(diag.filename, file_cache)
-    except OSError:
+    except (OSError, SourceEncodingError):
         # Can't read file; fall back to header only
         return
 
@@ -96,7 +96,16 @@ def print_diagnostic_with_snippet(diag: Diagnostic, file_cache: Dict[str, List[s
     log_error(context, caret_prefix + carets)
 
 
-def build_search_paths(context: CompilationContext, args: argparse.Namespace) -> SourceSearchPaths:
+def _is_valid_module_name(module_name: str) -> bool:
+    if not module_name:
+        return False
+    parts = module_name.split(".")
+    if any(not part for part in parts):
+        return False
+    return all(fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", part) for part in parts)
+
+
+def build_search_paths(context: CompilationContext, args: argparse.Namespace) -> Optional[SourceSearchPaths]:
     # if args.entry is a path, split into dir and module name
     entry_path = Path(args.entry)
     if entry_path.suffix == ".l0" or entry_path.is_absolute() or entry_path.parent != Path('.'):
@@ -107,6 +116,12 @@ def build_search_paths(context: CompilationContext, args: argparse.Namespace) ->
         if entry_path.parent != Path('.'):
             args.project_root.append(str(entry_path.parent))
         args.entry = module_name
+    if not _is_valid_module_name(args.entry):
+        log_error(
+            context,
+            f"error: [L0C-0011] invalid entry module name '{args.entry}': module components must be valid identifiers",
+        )
+        return None
     if not args.project_root:
         args.project_root = ["."]
     if not args.sys_root:
@@ -157,6 +172,8 @@ def _run_analysis(args):
     """Run the analysis pipeline, returning (result, context, exit_code)."""
     context = build_compilation_context(args)
     search_paths = build_search_paths(context, args)
+    if search_paths is None:
+        return AnalysisResult(cu=None, context=context), context, 1
     driver = L0Driver(search_paths=search_paths, context=context)
     result = driver.analyze(args.entry)
     print_diagnostics(result, context=context)
@@ -202,16 +219,74 @@ def _compiler_flag_family(compiler):
         return "unknown"
 
 
+def _check_entry_main_for_build(result: AnalysisResult, entry_name: str, context: CompilationContext) -> bool:
+    entry_env = result.module_envs.get(entry_name)
+    if entry_env is None:
+        log_error(context, f"error: [L0C-0012] entry module '{entry_name}' not found in analysis result")
+        return False
+
+    main_symbol = entry_env.locals.get("main")
+    if main_symbol is None or main_symbol.kind != SymbolKind.FUNC:
+        log_error(
+            context,
+            f"error: [L0C-0012] entry module '{entry_name}' must define a 'main' function for build/run",
+        )
+        return False
+
+    main_type = result.func_types.get((entry_name, "main"))
+    if main_type is None:
+        log_error(
+            context,
+            f"error: [L0C-0016] missing type information for entry function '{entry_name}::main'",
+        )
+        return False
+
+    ret_type = format_type(main_type.result)
+    if ret_type not in {"void", "int", "bool"}:
+        log_error(
+            context,
+            "warning: [L0C-0013] entry 'main' returns "
+            f"'{ret_type}' (preferred: void/int/bool); generated C entry wrapper will ignore the return value",
+        )
+    return True
+
+
+def _validate_runtime_library_path(runtime_lib_path: str, context: CompilationContext) -> bool:
+    runtime_dir = Path(runtime_lib_path)
+    if not runtime_dir.is_dir():
+        log_error(
+            context,
+            f"error: [L0C-0014] runtime library path '{runtime_lib_path}' does not exist or is not a directory",
+        )
+        return False
+
+    expected = {"libl0runtime.a", "libl0runtime.so", "libl0runtime.dylib", "l0runtime.lib"}
+    if not any((runtime_dir / name).exists() for name in expected):
+        names = ", ".join(sorted(expected))
+        log_error(
+            context,
+            f"error: [L0C-0015] no l0runtime library found in '{runtime_lib_path}' (expected one of: {names})",
+        )
+        return False
+
+    return True
+
+
 def cmd_build(args: argparse.Namespace) -> int:
     """Build an executable from an L0 module."""
     context = build_compilation_context(args)
     search_paths = build_search_paths(context, args)
+    if search_paths is None:
+        return 1
     driver = L0Driver(search_paths=search_paths, context=context)
 
     result = driver.analyze(args.entry)
     print_diagnostics(result, context=context)
 
     if result.cu is None or result.has_errors():
+        return 1
+
+    if not _check_entry_main_for_build(result, args.entry, context):
         return 1
 
     # Generate C code
@@ -279,6 +354,11 @@ def cmd_build(args: argparse.Namespace) -> int:
             cmd.extend(["-I", os.getenv("L0_RUNTIME_INCLUDE")])
 
         # Add runtime library
+        runtime_lib_path = args.runtime_lib or os.getenv("L0_RUNTIME_LIB")
+        if runtime_lib_path:
+            if not _validate_runtime_library_path(runtime_lib_path, context):
+                return 1
+
         if args.runtime_lib:
             cmd.extend(["-L", args.runtime_lib, "-ll0runtime"])
         elif os.getenv("L0_RUNTIME_LIB"):
@@ -389,6 +469,8 @@ def cmd_ast(args: argparse.Namespace) -> int:
     """
     context = build_compilation_context(args)
     search_paths = build_search_paths(context, args)
+    if search_paths is None:
+        return 1
     driver = L0Driver(search_paths=search_paths, context=context)
 
     try:
@@ -415,9 +497,12 @@ def cmd_ast(args: argparse.Namespace) -> int:
 
 def _dump_tokens_for_file(path: Path, include_eof: bool, context=None) -> int:
     try:
-        text = path.read_text(encoding="utf-8")
+        text = load_source_utf8(path)
     except OSError as e:
         log_error(context, f"error: [L0C-0040] cannot read {path}: {e}")
+        return 1
+    except SourceEncodingError as e:
+        log_error(context, f"error: [L0C-0041] {e}")
         return 1
 
     lexer = Lexer(text, filename=str(path))
@@ -443,6 +528,8 @@ def cmd_tok(args: argparse.Namespace) -> int:
     """
     context = build_compilation_context(args)
     search_paths = build_search_paths(context, args)
+    if search_paths is None:
+        return 1
     driver = L0Driver(search_paths=search_paths, context=context)
 
     if args.all_modules:
@@ -463,7 +550,7 @@ def cmd_tok(args: argparse.Namespace) -> int:
                 continue
 
             print(f"=== Tokens for module {name} ({path}) ===")
-            rc = _dump_tokens_for_file(path, include_eof=args.include_eof)
+            rc = _dump_tokens_for_file(path, include_eof=args.include_eof, context=context)
             if rc != 0:
                 exit_code = rc
             print()
