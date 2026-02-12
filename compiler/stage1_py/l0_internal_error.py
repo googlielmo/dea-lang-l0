@@ -2,8 +2,6 @@
 #  Copyright (c) 2025-2026 gwz
 
 # l0_internal_error.py
-from __future__ import annotations
-
 from dataclasses import dataclass
 from typing import Optional
 

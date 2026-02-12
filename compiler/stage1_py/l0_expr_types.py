@@ -1,15 +1,13 @@
 #  SPDX-License-Identifier: MIT OR Apache-2.0
 #  Copyright (c) 2025-2026 gwz
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 from typing import Dict, Optional, List
 
 from l0_analysis import AnalysisResult, VarRefResolution
 from l0_ast import (
     Node, Stmt, Block, LetStmt, AssignStmt, ExprStmt, IfStmt, WhileStmt,
-    ReturnStmt, MatchArm, MatchStmt, CaseArm, CaseElse, CaseStmt, Expr, IntLiteral, StringLiteral, BoolLiteral,
+    ReturnStmt, MatchArm, MatchStmt, CaseStmt, Expr, IntLiteral, StringLiteral, BoolLiteral,
     NullLiteral, VarRef, UnaryOp, BinaryOp, CallExpr, IndexExpr, FieldAccessExpr, ParenExpr, CastExpr, VariantPattern,
     TryExpr, TypeExpr, DropStmt, NewExpr, WildcardPattern, BreakStmt, ContinueStmt, ForStmt, ByteLiteral,
     TypeAliasDecl, WithStmt)

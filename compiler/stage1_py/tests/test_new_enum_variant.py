@@ -9,8 +9,6 @@ with the correct tag value. A previous bug caused `new Variant()` with no
 payload to zero-initialize the struct, making all variants have tag 0.
 """
 
-from __future__ import annotations
-
 
 # ============================================================================
 # Regression tests for new Variant() initialization

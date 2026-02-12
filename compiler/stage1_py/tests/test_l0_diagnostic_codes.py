@@ -1,8 +1,6 @@
 #  SPDX-License-Identifier: MIT OR Apache-2.0
 #  Copyright (c) 2026 gwz
 
-from __future__ import annotations
-
 from pathlib import Path
 from textwrap import dedent
 
@@ -11,7 +9,6 @@ import pytest
 from conftest import has_error_code
 from l0_diagnostics import DIAGNOSTIC_CODE_FAMILIES
 from l0_driver import L0Driver
-
 
 # Codes that produce warnings, not errors.  Skip has_errors() assertion.
 WARNING_CODES = {

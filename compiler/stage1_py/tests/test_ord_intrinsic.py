@@ -1,8 +1,6 @@
 #  SPDX-License-Identifier: MIT OR Apache-2.0
 #  Copyright (c) 2026 gwz
 
-from __future__ import annotations
-
 from conftest import has_error_code
 
 
@@ -369,4 +367,3 @@ def test_ord_runtime_dereferenced_pointer(codegen_single, compile_and_run, tmp_p
 
     success, stdout, stderr = compile_and_run(c_code, tmp_path)
     assert success, f"Runtime failed.\nstdout: {stdout}\nstderr: {stderr}"
-

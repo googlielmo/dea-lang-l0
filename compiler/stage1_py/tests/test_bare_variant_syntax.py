@@ -7,8 +7,6 @@ Tests for bare variant constructor syntax.
 Zero-arg enum variants can be written as `Variant` instead of `Variant()`.
 """
 
-from __future__ import annotations
-
 from conftest import has_error_code
 
 

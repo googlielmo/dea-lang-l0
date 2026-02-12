@@ -1,8 +1,6 @@
 #  SPDX-License-Identifier: MIT OR Apache-2.0
 #  Copyright (c) 2025-2026 gwz
 
-from __future__ import annotations
-
 from dataclasses import dataclass, field
 from enum import Enum, auto
 from typing import Dict, Optional, Tuple
