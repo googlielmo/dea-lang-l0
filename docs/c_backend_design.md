@@ -2,454 +2,160 @@
 
 ## Overview
 
-The C backend (`l0_backend.py` + `l0_c_emitter.py`) takes a fully-analyzed `AnalysisResult` and emits portable C (C99) code.
+Stage 1 code generation is split into:
 
-## Design Principles
+- `compiler/stage1_py/l0_backend.py`: orchestration and lowering policy (`WHAT`/`WHEN`)
+- `compiler/stage1_py/l0_c_emitter.py`: C99 syntax emission (`HOW`)
+- `compiler/stage1_py/l0_string_escape.py`: shared literal escape decode/encode utilities
 
-1. **Portable C**: No compiler-specific extensions; targets standard C99
-2. **Type safety layer**: All L0 types map to explicit C typedefs
-3. **Readable output**: Generated code should be debuggable and understandable
-4. **No undefined behavior**: Follow the same UB-free principles as the language
+Input is a fully-typed `AnalysisResult`. Output is one C99 translation unit.
 
-## Type Mapping
+## Responsibilities Split
+
+### Backend (`l0_backend.py`)
+
+- Validates generation preconditions (`CompilationUnit` exists, no semantic errors).
+- Orders type emission using a dependency graph + topological sort.
+- Lowers statements/expressions to emitter calls.
+- Manages scope/lifetime state and ARC cleanup scheduling.
+- Handles retain-on-copy for ownership-sensitive assignments/initialization sites.
+- Emits function bodies and decides where cleanup runs on normal/early exits.
+
+### C emitter (`l0_c_emitter.py`)
+
+- Emits C includes, declarations, definitions, and formatting.
+- Implements name mangling and identifier hygiene for C keywords.
+- Converts semantic types to C types.
+- Emits C for operators, constructors, casts, loops, switch/case, labels/gotos.
+- Emits runtime helper calls (checked arithmetic, unwrap helpers, retain/release, allocation/drop).
+- Lowers string literals (const and non-const) through one canonical decode/encode path, emitted via
+  `L0_STRING_CONST(...)`.
+
+## Generated Unit Layout
+
+The generated C file is organized in this order:
+
+1. File header and includes (`stdint.h`, `stdbool.h`, `stddef.h`, `l0_siphash.h`, `l0_runtime.h`)
+2. Forward declarations for all structs/enums
+3. Optional wrapper typedefs (early phase: builtins)
+4. Struct/enum definitions in dependency order
+5. Optional wrapper typedefs (late phase: user-defined value types)
+6. Top-level `let` declarations (`static` globals)
+7. Function declarations (including extern declarations)
+8. Non-extern function definitions
+9. C `main(int argc, char **argv)` wrapper when entry module defines `main`
+
+Current backend target is a **single C translation unit**.
+
+## Type Lowering
 
 ### Builtins
 
-L0 types map to C typedefs, defined in the runtime header (`l0_runtime.h`):
+- `int` -> `l0_int`
+- `byte` -> `l0_byte`
+- `bool` -> `l0_bool`
+- `string` -> `l0_string`
+- `void` -> `void`
 
-```c
-typedef int32_t l0_int;
+(typedefs/runtime definitions live in `compiler/stage1_py/runtime/l0_runtime.h`.)
 
-typedef uint8_t l0_bool;
+### Structs and enums
 
-typedef struct {
-    const char* data;  /* Pointer to character data (may be NULL for empty string) */
-    l0_int len;        /* Length in bytes (must be >= 0) */
-} l0_string;
-```
+- Structs lower to `struct l0_{module}_{Name}`.
+- Enums lower to tagged unions:
+    - `enum l0_{module}_{Enum}_tag`
+    - `struct l0_{module}_{Enum} { tag; union data { ... } }`
+- Zero-field structs/variants emit dummy fields to stay C99-valid.
 
-### Structs
+### Pointers and nullable
 
-L0 structs map directly to C structs:
+- `T*` lowers to pointer type in C.
+- `T*?` uses niche representation: also a pointer type, `NULL` represents `none`.
+- Value nullable (`T?`, where `T` is not pointer-shaped) lowers to wrapper typedef:
+    - `typedef struct { l0_bool has_value; T value; } l0_opt_*;`
 
-```l0
-module main;
+Wrapper typedefs are emitted in two phases so dependencies are valid.
 
-struct Point {
-    x: int;
-    y: int;
-}
-```
+## Name Mangling and Symbol Rules
 
-↓
+- User-defined type/function names: `l0_{module_path_with_underscores}_{name}`
+- Top-level lets: `l0_{module}_{let_name}`
+- Local identifiers conflicting with C/runtime-reserved names are suffixed (`__v`).
+- `extern func` names are intentionally **not mangled** (FFI boundary).
 
-```c
-struct l0_main_Point {
-    l0_int x;
-    l0_int y;
-};
-```
-
-### Enums (Tagged Unions)
-
-L0 enums become tagged unions in C:
-
-```l0
-module main;
-
-enum Expr {
-    Int(value: int);
-    Add(left: Expr*, right: Expr*);
-}
-```
-
-↓
-
-```c
-enum l0_main_Expr_tag {
-    l0_main_Expr_Int,
-    l0_main_Expr_Add,
-};
-
-struct l0_main_Expr {
-    enum l0_main_Expr_tag tag;
-    union {
-        struct { l0_int value; } Int;
-        struct { struct l0_main_Expr left; struct l0_main_Expr right; } Add;
-    } data;
-};
-```
-
-### Pointers and Nullability
-
-- `T*` → `T*` in C (NULL not allowed)
-- `T*?` → `T*` in C with `NULL` allowed (UB-free semantics enforced via frontend checks and/or runtime panics as needed)
-- `T?` (non-pointer nullable) → struct wrapper `{ bool has_value; T value; }`.
-
-## Name Mangling
-
-To avoid C namespace collisions, we mangle names:
-
-- Structs: `l0_{module}_{name}` (e.g., `l0_app_main_Point`)
-- Enums: `l0_{module}_{name}` (e.g., `l0_expr_Expr`)
-- Functions: `l0_{module}_{name}` (e.g., `l0_app_main_add`)
-    - Exception: The entry module's `main` function stays as `main`
-
-Module dots are replaced with underscores: `app.main` → `app_main`
-
-## Statement Lowering
-
-### Let statements
-
-```l0
-let x: int = 5;
-```
-
-↓
-
-```c
-l0_int x = 5;
-```
-
-### Match statements
-
-Match becomes a switch on the tag field:
-
-```l0
-    match (e) {
-        Int(value) => {
-            return value;
-        }
-        Add(left, right) => {
-            return eval(left) + eval(right);
-        }
-    }
-```
-
-↓
-
-```c
-{
-    struct l0_main_Expr _scrutinee = e;
-    switch (_scrutinee.tag) {
-    case l0_main_Expr_Int: {
-        l0_int value = _scrutinee.data.Int.value;
-        return value;
-        break;
-    }
-    case l0_main_Expr_Add: {
-        struct l0_main_Expr left = _scrutinee.data.Add.left;
-        struct l0_main_Expr right = _scrutinee.data.Add.right;
-        return (l0_main_eval(left) + l0_main_eval(right));
-        break;
-    }
-    }
-}
-```
-
-### Control flow
-
-- `if` / `else` → direct C equivalents
-- `while` → direct C equivalent
-- `return` → direct C equivalent
-
-## Expression Lowering
-
-Most expressions map directly:
-
-- Literals: `42` → `42`, `true` → `1`, `"hello"` → `"hello"`
-- Binary ops: `a + b` → `(a + b)`
-- Unary ops: `-x` → `(-x)`
-- Calls: `f(x, y)` → `l0_main_f(x, y)` (with mangled names)
-- Field access: `p.x` → `p.x` or `p->x` depending on pointer type
-- Cast: `x as T` → `((T)(x))` for primitive types, or appropriate struct wrapping/unwrapping for nullable types.
-
-Ownership-sensitive lowering is handled with explicit APIs:
-
-- `_emit_expr_with_expected_type` performs emission + pure type conversion.
-- `_emit_owned_expr_with_expected_type` is used at ownership-creating sites (`let`, assignment, constructors) and applies retain-on-copy for place expressions via `_emit_copy_expr_with_retains`.
-
-### Struct/enum constructors
-
-Constructor syntax like `Point(1, 2)` or `Int(42)` are lowered to explicit initialization:
-
-```c
-struct l0_module_Point p = { .x = 1, .y = 2 };
-
-struct l0_module_Expr e = {
-    .tag = l0_module_Expr_Int,
-    .data = { .Int = { .value = 42 } }
-};
-```
-
-Zero-argument enum variants may be written without parentheses. `Red` and `Red()` produce
-identical C output:
-
-```c
-struct l0_module_Color c = { .tag = l0_module_Color_Red };
-```
-
-## Code Organization
-
-### Generated file structure
-
-```c
-/* Generated by L0 compiler */
-
-#include <stdint.h>
-#include <stdbool.h>
-#include <stddef.h>
-
-/* L0 runtime header */
-#include "l0_runtime.h"
-
-/* Forward declarations */
-struct l0_main_Point;
-...
-
-/* Struct definitions */
-struct l0_main_Point {
-    l0_int x;
-    l0_int y;
-};
-...
-
-/* Enum definitions (tagged unions) */
-...
-
-/* Function declarations */
-l0_int l0_main_main(void);
-...
-
-/* Function definitions */
-struct l0_main_Point l0_main_add(struct l0_main_Point p1, struct l0_main_Point p2) {
-    struct l0_main_Point p = (struct l0_main_Point){ .x = ((p1).x + (p2).x), .y = ((p1).y + (p2).y) };
-    return p;
-}
-
-l0_int l0_main_main(void) {
-    /* ... function body ... */
-    return 0;
-}
-
-...
-
-/* C entry point wrapper */
-int main(void) {
-    return (int) l0_main_main();
-}
-...
-```
-
-## Current Limitations
-
-The initial implementation has several limitations to be addressed:
-
-### 1. String escaping
-
-String literals need proper C escaping for quotes, newlines, etc.
-
-At the moment, strings are output as-is, which means they rely on the C compiler to handle invalid characters.
-
-### 3. Module imports
-
-Currently, emits everything in one file. Need to handle:
-
-- Multi-module projects with proper includes
-- Header/implementation file split
-
-### 4. Extern function handling
-
-Extern functions names are not mangled so they can link with the C kernel.
-Need to:
-
-- Consider extern "C" declarations for functions not in the C kernel.
-- Handle calling conventions when needed (e.g, l0_string → const char*)
-
-### 5. Nullable semantics
-
-Currently `T?` just maps to `T*` and `T*?` to `T*` as well. This is probably insufficient.
-
-- Use raw pointers with null checks?
-- Use wrapper structs with validity flags?
-- Document the NULL = none convention clearly
-
-### 7. Function name resolution in calls
-
-Currently, assumes direct function names. Need to:
-
-- Potentially support function pointers
-
-## Testing Strategy
-
-### Unit tests
-
-- Test type emission for all type forms
-- Test statement lowering for each statement kind
-- Test expression lowering for all operators
-- Test name mangling edge cases
-
-### Integration tests
-
-- Generate C code for simple programs
-- Compile with gcc/clang
-- Run and verify output
-- Test with TinyCC for portability
-
-### Example programs to test
-
-- Simple arithmetic (no dependencies)
-- Struct creation and field access
-- Enum creation and pattern matching
-- Recursive functions (tree traversal)
-- Multi-module program with imports
-
-## Design Decisions
-
-### Single-file vs multi-file output
-
-**Decision**: Start with single-file output for simplicity.
-
-- Easier to implement and test
-- Sufficient for small programs
-- Can split later when needed
-
-### Name mangling strategy
-
-**Decision**: Use `l0_{module}_{name}` with underscores.
-
-- Simple and predictable
-- Avoids most collisions
-- Easy to reverse-engineer from C
-- Consider shorter scheme if names get too long
-- Avoid C keywords by appending `__v` if needed
-
-### Tagged union representation
-
-**Decision**: Standard C tagged union approach.
-
-- Portable and well-understood
-- Efficient (no extra indirection)
-- Easy to debug
-- Matches common C practice
-
-### Match statement lowering
-
-**Decision**: Switch on tag with explicit bindings.
-
-- Straightforward translation
-- Compiler can optimize switch
-- Clear correspondence to source
-- Exhaustiveness checked by L0 frontend
-
-# L0 C Backend Implementation
-
-**C backend** (`l0_backend.py` + `l0_c_emitter.py`) - Emits C99 code from analyzed programs
-
-## Backend Usage
-
-The `Backend` class takes an `AnalysisResult` and produces C source code:
-
-```python
-from l0_driver import L0Driver
-from l0_backend import Backend
-
-# Analyze L0 program
-driver = L0Driver()
-result = driver.analyze("my_module")
-
-# Generate C code
-if not result.has_errors():
-    backend = Backend(result)
-    c_code = backend.generate()
-    print(c_code)
-```
-
-## Key Features Implemented
-
-### Type System
-
-- Builtin types (`int`, `bool`, `string`, `void`)
-- Structs with fields
-- Enums with payloads (as tagged unions)
-- Pointers (single and multiple levels)
-- Nullable types
-- Function types
-
-### Statements
-
-- Let bindings with type inference
-- Assignments
-- If/else conditionals
-- While loops
-- Return statements
-- Match statements (lowered to switch)
+## Statement and Expression Lowering
 
 ### Expressions
 
-- Literals (int, bool, string)
-- Variables
-- Binary operators (+, -, *, /, <, >, ==, !=, &&, ||, etc.)
-- Unary operators (-, !, *)
-- Function calls
-- Field access (. and -> in C)
-- Casts
-- Parenthesized expressions
-- Struct/Enum Constructors - Syntax for `Point(1, 2)` or `Int(42)` lowered to explicit initialization
-- String Escaping - String literals use C escaping
-- Function Name Resolution - Calls use mangled names
-- Nullable Semantics - `T?` handled as `T*` with null checks (T*? mapped to T* for now)
+Implemented lowering includes:
 
-### Name Mangling
+- Literals, var refs, unary/binary ops, calls, field/index access, casts, constructors
+- String literals are decoded from token escapes to bytes, then emitted as `L0_STRING_CONST("...", len)` values
+  (cast to `l0_string` where required by expression context), with bytes C-escaped from decoded content.
+- `new` heap allocation (`_rt_alloc_obj`) + initialization
+- `try` (`expr?`) lowering to checked unwrap with early return on empty
+- Checked int arithmetic uses runtime helpers (`_rt_iadd`, `_rt_isub`, `_rt_imul`, `_rt_idiv`, `_rt_imod`)
+- Checked narrowing casts use runtime helpers (`_rt_narrow_*`)
 
-- Struct names: `l0_{module}_{name}`
-- Enum names: `l0_{module}_{name}`
-- Function names: `l0_{module}_{name}`
-- Entry point `main` is also mangled and wrapped by C `main`, taking care of the L0 return type (void or int).
+### Statements
 
-## What's Missing (Known Limitations)
+Implemented lowering includes:
 
-### Important for Real Programs
+- `let`, assignment, expression statements
+- `if/else`, `while`, `for`
+- `match` over enum tags (switch-based)
+- `case` (scalar switch or string equality chain)
+- `with` (inline or block cleanup forms)
+- `break`, `continue`, `return`
+- `drop` (runtime deallocation + owned-field cleanup)
 
-- **Multi-module Support** - Currently single-file output only
-- **Extern "C" Functions** - Need to link with external C libraries
-- **Proper Nullable Handling** - More robust representation of nullable types
+## Ownership and Cleanup Model
 
-### Nice to Have
+The backend schedules cleanup, while emitter produces concrete cleanup code.
 
-- **Debug Line Directives** - For source-level debugging
-- **Better Error Recovery** - Handle partially-typed programs gracefully
-- **Code Formatting** - More readable output with comments
+Key points:
 
-## Future Considerations
+- ARC types (notably `string`) use runtime `rt_string_retain`/`rt_string_release`.
+- Copying from place expressions at ownership-creating sites performs retain-on-copy.
+- Scope exit cleanup runs in reverse declaration order.
+- Early exits (`return`, `break`, `continue`, `try` early return) run pending `with` cleanup first, then owned var
+  cleanup.
+- Enum/struct-by-value cleanup recursively cleans owned fields of active values.
 
-### Optimization opportunities
+## Entry Point Behavior
 
-- Inline small functions
-- Eliminate dead code
-- Constant folding (if not done earlier)
-- Tail call optimization for recursion
+If entry module defines `main`, backend emits C wrapper:
 
-### Debug information
+- Signature: `int main(int argc, char **argv)`
+- Initializes runtime argv state via `_rt_init_args(argc, argv)`
+- Calls mangled L0 main
+- Returns L0 `int` or `bool` result as C `int`, other result types are discarded and return `0` after call
 
-- Emit `#line` directives for error tracing
-- Keep correspondence between L0 and C code
-- Source maps for debuggers
+## Debuggability
 
-### Alternative targets in the future
+- Generated code is sectioned and comment-labeled.
+- `#line` directives are emitted when enabled in compile context (default on, can be disabled with
+  `--no-line-directives`) for accurate source mapping in debuggers and error messages.
+- Escape decoding used by `case` literal semantic checks is shared with codegen to avoid divergence.
 
-- Consider LLVM IR for better optimization
-- WebAssembly for browser deployment
-- Keep C backend as stable, portable option
+## Current Constraints and Known Gaps
 
-## Conclusion
+1. Backend emits one `.c` file (no header/source split, no separate object emission strategy).
+2. Function type emission as first-class C function pointers is not implemented.
+3. Runtime/ABI surface is C-only and assumes C99-compatible toolchains.
+4. Advanced optimizations are delegated to the underlying C compiler (focus is correctness and explicit lowering).
 
-The L0 compiler now has:
+## Testing Coverage
 
-1. Complete frontend (lexer → parser → semantic analysis)
-2. C backend (code generation)
-3. Clear path forward for remaining features
+Primary backend/codegen tests live under `compiler/stage1_py/tests/`, including:
 
-The backend is **functional**.
+- `test_l0_codegen_basic.py`
+- `test_l0_codegen_advanced.py`
+- `test_l0_codegen_semantics.py`
+- `test_l0_codegen_overflow_and_control_flow.py`
+- `test_l0_codegen_lvalue_caching.py`
+- `test_l0_codegen_constructors.py`
+- `test_l0_codegen_type_ordering.py`
+- `test_l0_driver_cross_module_runtime.py`
 
-The next steps focus on filling in missing features, improving robustness, and integrating with the CLI for ease of use.
+Golden expected C outputs are in `compiler/stage1_py/tests/codegen/*.expected`.

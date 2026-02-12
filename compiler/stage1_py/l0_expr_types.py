@@ -16,6 +16,7 @@ from l0_diagnostics import diag_from_node
 from l0_locals import FunctionEnv
 from l0_logger import log_debug
 from l0_resolve import resolve_symbol, resolve_type_ref, TypeResolveErrorKind, ResolveErrorKind
+from l0_string_escape import decode_l0_string_token, EscapeDecodeError
 from l0_symbols import ModuleEnv, SymbolKind, Symbol
 from l0_types import (
     Type,
@@ -1620,109 +1621,32 @@ class ExpressionTypeChecker:
         if isinstance(expr, IntLiteral):
             return self.int_type, expr.value
         if isinstance(expr, ByteLiteral):
-            decoded = self._decode_escaped_text(expr.value, expr)
-            if decoded is None:
+            decoded = self._decode_escaped_bytes(expr.value, expr)
+            if decoded is None or len(decoded) != 1:
                 return None
-            encoded = decoded.encode("utf-8")
-            value = encoded[0] if encoded else 0
+            value = decoded[0]
             return self.byte_type, value
         if isinstance(expr, BoolLiteral):
             return self.bool_type, expr.value
         if isinstance(expr, StringLiteral):
-            decoded = self._decode_escaped_text(expr.value, expr)
+            decoded = self._decode_escaped_bytes(expr.value, expr)
             if decoded is None:
                 return None
             return self.string_type, decoded
         return None
 
-    def _decode_escaped_text(self, text: str, node: Node) -> Optional[str]:
-        out_chars: List[str] = []
-        i = 0
-        hex_chars = "0123456789abcdefABCDEF"
-        oct_chars = "01234567"
-        escape_map = {
-            "\\": "\\",
-            "'": "'",
-            '"': '"',
-            "?": "?",
-            "a": "\a",
-            "b": "\b",
-            "f": "\f",
-            "n": "\n",
-            "r": "\r",
-            "t": "\t",
-            "v": "\v",
-        }
-
-        while i < len(text):
-            ch = text[i]
-            if ch != "\\":
-                out_chars.append(ch)
-                i += 1
-                continue
-
-            i += 1
-            if i >= len(text):
-                out_chars.append("\\")
-                break
-
-            esc = text[i]
-            if esc in escape_map:
-                out_chars.append(escape_map[esc])
-                i += 1
-                continue
-
-            if esc == "x":
-                i += 1
-                start = i
-                while i < len(text) and text[i] in hex_chars:
-                    i += 1
-                hex_digits = text[start:i]
-                if hex_digits:
-                    out_chars.append(chr(int(hex_digits, 16)))
-                else:
-                    out_chars.append("x")
-                continue
-
-            if esc == "u":
-                digits = text[i + 1:i + 5]
-                if len(digits) != 4 or any(ch not in hex_chars for ch in digits):
-                    self._error(node, "[TYP-0109] invalid unicode escape in 'case' literal")
-                    return None
-                value = int(digits, 16)
-                if value > 0x10FFFF:
-                    self._error(node, "[TYP-0109] unicode escape out of range in 'case' literal")
-                    return None
-                out_chars.append(chr(value))
-                i += 5
-                continue
-
-            if esc == "U":
-                digits = text[i + 1:i + 9]
-                if len(digits) != 8 or any(ch not in hex_chars for ch in digits):
-                    self._error(node, "[TYP-0109] invalid unicode escape in 'case' literal")
-                    return None
-                value = int(digits, 16)
-                if value > 0x10FFFF:
-                    self._error(node, "[TYP-0109] unicode escape out of range in 'case' literal")
-                    return None
-                out_chars.append(chr(value))
-                i += 9
-                continue
-
-            if esc in oct_chars:
-                start = i
-                i += 1
-                while i < len(text) and text[i] in oct_chars and i - start < 3:
-                    i += 1
-                oct_digits = text[start:i]
-                out_chars.append(chr(int(oct_digits, 8)))
-                continue
-
-            out_chars.append(esc)
-            i += 1
-
-        return "".join(out_chars)
+    def _decode_escaped_bytes(self, text: str, node: Node) -> Optional[bytes]:
+        try:
+            return decode_l0_string_token(text)
+        except EscapeDecodeError as err:
+            if err.code == "invalid_unicode_escape":
+                self._error(node, "[TYP-0109] invalid unicode escape in 'case' literal")
+                return None
+            if err.code == "unicode_out_of_range":
+                self._error(node, "[TYP-0109] unicode escape out of range in 'case' literal")
+                return None
+            self._error(node, "[TYP-0109] invalid escape in 'case' literal")
+            return None
 
     def _is_void(self, typ: Type) -> bool:
         return isinstance(typ, BuiltinType) and typ.name == "void"

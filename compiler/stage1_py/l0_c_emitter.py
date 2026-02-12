@@ -17,6 +17,7 @@ from l0_ast import (
 )
 from l0_internal_error import InternalCompilerError, ICELocation
 from l0_signatures import EnumInfo, StructInfo
+from l0_string_escape import decode_l0_string_token, encode_c_string_bytes
 from l0_types import Type, BuiltinType, StructType, EnumType, PointerType, NullableType, FuncType, format_type
 
 
@@ -889,17 +890,18 @@ class CEmitter:
 
     def emit_string_literal(self, value: str) -> str:
         """Emit C code for a string literal."""
-        return f'_rt_l0_string_from_const_literal("{value}")'
+        c_bytes, c_len = self._string_token_to_c_bytes_and_len(value)
+        return f"((l0_string)L0_STRING_CONST(\"{c_bytes}\", {c_len}))"
 
     def emit_const_string_literal(self, value: str) -> str:
         """Emit C code for a static string literal initializer."""
-        escaped = value.replace("\\", "\\\\").replace('"', '\\"').replace('\n', '\\n').replace('\t', '\\t')
-        str_len = len(value)
-        return (
-            "{ .kind = L0_STRING_K_STATIC, .data = { .s_str = { "
-            f".len = {str_len}, .bytes = \"{escaped}\" "
-            "} } }"
-        )
+        c_bytes, c_len = self._string_token_to_c_bytes_and_len(value)
+        return f"L0_STRING_CONST(\"{c_bytes}\", {c_len})"
+
+    def _string_token_to_c_bytes_and_len(self, value: str) -> tuple[str, int]:
+        """Decode an L0 string token payload and encode as C string-literal bytes."""
+        decoded = decode_l0_string_token(value)
+        return encode_c_string_bytes(decoded), len(decoded)
 
     def emit_bool_literal(self, value: bool) -> str:
         """Emit C code for a boolean literal."""

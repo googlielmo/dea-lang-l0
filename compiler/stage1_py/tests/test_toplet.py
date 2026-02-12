@@ -268,7 +268,7 @@ def test_codegen_toplet_primitives(tmp_path):
     assert "static l0_int l0_test_x = 42;" in c_code
     assert "static l0_bool l0_test_b = true;" in c_code
     assert "static l0_string l0_test_s" in c_code
-    assert "L0_STRING_K_STATIC" in c_code
+    assert 'L0_STRING_CONST("hello", 5)' in c_code
 
 
 def test_codegen_toplet_struct(tmp_path):

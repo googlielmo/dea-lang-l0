@@ -586,8 +586,8 @@ class TestCodeGenStringHandling:
         backend = Backend(result)
         c_code = backend.generate()
 
-        # String literals should use _rt_l0_string_from_const_literal
-        assert "_rt_l0_string_from_const_literal" in c_code
+        # String literals should lower to static string macro values.
+        assert 'L0_STRING_CONST("Hello", 5)' in c_code
         assert '"Hello"' in c_code
 
     def test_string_with_escapes(self):
@@ -612,10 +612,33 @@ class TestCodeGenStringHandling:
         backend = Backend(result)
         c_code = backend.generate()
 
-        # Should properly escape the string
-        assert "_rt_l0_string_from_const_literal" in c_code
-        # The escaped string should be in C code
-        assert "\\n" in c_code or "\\\\n" in c_code
+        # Escape sequence is decoded to bytes, then re-encoded for C output.
+        assert 'L0_STRING_CONST("Line1\\nLine2", 11)' in c_code
+
+    def test_string_literal_semantics_match_const_and_non_const_paths(self):
+        """Top-level and expression literal paths should produce identical string bytes/len."""
+        self.write_l0_file("string_paths", """
+            module string_paths;
+
+            let G: string = "A\\nB";
+
+            func f() -> string {
+                return "A\\nB";
+            }
+        """)
+
+        search_paths = self.getSourceSearchPaths()
+        driver = L0Driver(search_paths=search_paths)
+        result = driver.analyze("string_paths")
+        assert not result.has_errors()
+
+        backend = Backend(result)
+        c_code = backend.generate()
+
+        # Top-level static initializer uses decoded length 3 for A LF B.
+        assert '= L0_STRING_CONST("A\\nB", 3);' in c_code
+        # Expression-literal path uses the same decoded-byte semantics.
+        assert 'return ((l0_string)L0_STRING_CONST("A\\nB", 3));' in c_code
 
 
 class TestCodeGenFromFiles:

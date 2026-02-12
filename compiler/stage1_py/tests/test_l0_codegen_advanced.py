@@ -618,8 +618,8 @@ def test_codegen_extern_function_calls(codegen_single):
     assert "void rt_print(l0_string msg);" in c_code
     assert "l0_int* rt_alloc(l0_int size);" in c_code
 
-    # Call to extern should be present
-    assert 'rt_print(_rt_l0_string_from_const_literal("test"))' in c_code
+    # Call to extern should pass an inline static l0_string value.
+    assert 'rt_print(((l0_string)L0_STRING_CONST("test", 4)))' in c_code
 
 
 def test_codegen_extern_with_pointer_return(codegen_single):

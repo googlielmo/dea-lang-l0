@@ -78,8 +78,8 @@ grep -r 'XXX-NNNN' --include='*.py' compiler/stage1_py/
 
 ## Git Conventions
 
-- Multiline commits: sentence-case summary with period, then factual body.
+- Multiline commits: sentence-case summary with period, then factual body as bullets with "- " prefix, no wrapping.
 - No tag-phrases ("for clarity", "for consistency"). State what changed.
-- Use backticks for L0 code/type names in messages.
+- Use backticks for L0/Python/C code snippets and function/type names in messages.
 - No Co-Authored-By lines.
 - Before committing, verify this file's accuracy (file references current, new modules listed, deleted ones removed).

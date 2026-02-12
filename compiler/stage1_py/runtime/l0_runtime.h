@@ -100,6 +100,11 @@ typedef struct {
  */
 static l0_string L0_STRING_EMPTY = { 0, { .s_str = { 0, NULL } } };
 
+/**
+ * String literal construction macro
+ */
+#define L0_STRING_CONST(str_data, str_len) { .kind = L0_STRING_K_STATIC, .data.s_str = { .len = (str_len), .bytes = (str_data) } }
+
 /* ============================================================================
  * Optional wrappers (T? as {has_value, value})
  * ============================================================================ */
