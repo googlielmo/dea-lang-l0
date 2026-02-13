@@ -464,6 +464,10 @@ class Lexer:
                     chars.append(self._advance())
                 else:
                     raise LexerError(f"[LEX-0052] invalid unicode escape sequence (\\U)", self.filename, self.line, self.column)
+            value = int("".join(chars[2:]), 16)
+            if value > 0x10FFFF:
+                raise LexerError("[LEX-0054] Unicode code point out of range (must be <= 0x10FFFF)",
+                                 self.filename, self.line, self.column)
 
         elif esc in OCT_CHARS:  # octal escape
             chars.append(self._advance())  # append the first octal digit
