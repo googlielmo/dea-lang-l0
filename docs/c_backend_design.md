@@ -1,5 +1,13 @@
 # L0 C Backend Design
 
+This is the canonical backend implementation document for Stage 1.
+
+Related docs:
+
+- Stage 1 architecture and pass flow: [architecture](architecture.md)
+- Language/runtime rationale and future evolution: [design_decisions](design_decisions.md)
+- Stage 1 contract/index: [stage1_compiler_contract](stage1_compiler_contract.md)
+
 ## Overview
 
 Stage 1 code generation is split into:

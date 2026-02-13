@@ -1,218 +1,152 @@
 # L0 Compiler Architecture (Stage 1)
 
-This document summarizes the current compiler frontend architecture for the L0 language. Stage 1 is implemented in
-Python and focuses on a safe, C-like language surface that lowers to C in later stages. The goal is to keep the pipeline
-explicit, transparent, and easy to bootstrap.
+This is the canonical architecture document for the Stage 1 compiler.
 
-## High-level Pipeline
+Related canonical docs:
 
-The compiler is organized as a sequence of pure, explicit passes operating on structured data rather than side-effectful
-globals.
+- Backend lowering and generated C details: [c_backend_design](c_backend_design.md)
+- Language/runtime rationale and future evolution: [design_decisions](design_decisions.md)
+- Compact contract/index: [stage1_compiler_contract](stage1_compiler_contract.md)
+
+## 1. High-Level Pipeline
 
 ```
 Source (.l0)
-  │
-  ▼
-Lexer.tokenize() ──► Token stream
-  │
-  ▼
-Parser.parse_module() ──► AST (immutable dataclasses)
-  │
-  ▼
-NameResolver.resolve() ──► Module-level symbol tables (ModuleEnv per module)
-  │
-  ▼
-SignatureResolver.resolve() ──► Resolved type info (FuncType, StructInfo, EnumInfo)
-  │
-  ▼
-LocalScopeResolver.resolve() ──► Function-local scope trees (FunctionEnv per function)
-  │
-  ▼
-ExpressionTypeChecker.check() ────► Expression types, control-flow validation
-  │
-  ▼
-Backend.generate() ──► C99 source
-  │
-  ▼
-Host C compiler ──► Executable
+  |
+  v
+Lexer.tokenize() -> Token stream
+  |
+  v
+Parser.parse_module() -> AST
+  |
+  v
+NameResolver.resolve() -> ModuleEnv per module
+  |
+  v
+SignatureResolver.resolve() -> func/struct/enum/let type tables
+  |
+  v
+LocalScopeResolver.resolve() -> FunctionEnv per function
+  |
+  v
+ExpressionTypeChecker.check() -> expression types + semantic diagnostics
+  |
+  v
+Backend.generate() -> single C99 translation unit
+  |
+  v
+Host C compiler -> executable (run/build commands)
 ```
 
-* **Lexer (`l0_lexer.py`)**: Converts UTF-8 source text into a token stream via `Lexer.tokenize()`, handling keywords,
-  operators, literals, and comments with precise line/column tracking.
-* **Parser (`l0_parser.py`)**: Hand-written recursive-descent parser that builds the AST in `l0_ast.py` through
-  `Parser.parse_module()`, honoring precedence and statement/decl forms (modules, structs, enums, functions, match
-  statements, etc.).
-* **AST (`l0_ast.py`)**: Dataclasses that model modules, declarations, statements, expressions, and types. The AST
-  remains syntax-oriented; it does not perform name or type resolution itself.
-* **Name Resolver (`l0_name_resolver.py`)**: Walks the AST with `NameResolver.resolve()` to bind identifiers to
-  declarations, enforcing scoping rules and detecting undefined or shadowed names. It produces module environments that
-  annotate symbol bindings.
-* **Type Checker (`l0_expr_types.py`, `l0_types.py`)**: Uses `ExpressionTypeChecker.check()` to compute expression
-  types, enforce pointer nullability, match exhaustiveness, and return types, attaching type info to symbol
-  environments. Any violations are routed to the diagnostics layer.
-* **Diagnostics (`l0_diagnostics.py`)**: Centralized, structured error reporting with source spans, used by lexer/parser
-  and semantic passes.
-* **Driver (`l0_driver.py`, `l0_compilation.py`)**: Orchestrates the pipeline for a module: reading files, invoking
-  passes, and coordinating code generation.
-* **C backend (`l0_backend.py` + `l0_c_emitter.py`)**: Emits a single portable C99 translation unit from the analyzed
-  program (current Stage 1 backend).
+Pass coordination entry point: `L0Driver.analyze()` in `compiler/stage1_py/l0_driver.py`.
 
-## Module and File Layout
+## 2. Pass Responsibilities
 
-The project keeps modules flat and explicit:
+### 2.1 Lexer (`l0_lexer.py`)
 
-* `l0_lexer.py` — tokenization logic and token definitions.
-* `l0_parser.py` — recursive-descent parser entry `parse_module()`.
-* `l0_ast.py` — AST node dataclasses used across passes.
-* `l0_ast_printer.py` — human-readable dumps for debugging.
-* `l0_name_resolver.py` — scope and symbol resolution.
-* `l0_types.py` — primitive type representations and helpers.
-* `l0_expr_types.py` — expression/type checking and inference helpers.
-* `l0_diagnostics.py` — diagnostic objects and formatting utilities.
-* `l0_paths.py` — module path handling and filesystem conventions.
-* `l0_driver.py` / `l0_compilation.py` — top-level coordination of the compilation flow.
-* `tests/` — pytest suites covering lexer, parser, and semantic passes.
+- Converts UTF-8 source text to `Token` list.
+- Tracks `line`/`column`.
+- Handles keywords, literals, operators, punctuation, and comment skipping.
+- Emits `LexerError` for lexical failures.
 
-## Data Flow and Invariants
+### 2.2 Parser (`l0_parser.py`)
 
-```
-Tokens:      immutable list of Token {kind, text, line, column}
-AST:         dataclasses; no side effects; children own lists of nested nodes
-Scopes:      resolver assigns symbol bindings; no implicit globals
-Types:       explicit `TypeRef` and pointer/nullability fields; no ad-hoc strings
-Diagnostics: collected with spans; passes must not raise uncaught exceptions for user errors
-```
+- Recursive-descent parser producing `l0_ast.py` dataclass nodes.
+- Parses module header, imports, declarations, statements, expressions, and type refs.
+- Assignment is statement-only syntax (`AssignStmt`).
+- Emits `ParseError` for parse failures.
 
-Key invariants enforced throughout:
+### 2.3 Name Resolver (`l0_name_resolver.py`)
 
-1. **No implicit mutation across passes**: each stage receives and returns explicit structures; global state is avoided
-   to keep the pipeline deterministic.
-2. **No undefined behavior**: questionable constructs are rejected or represented as typed errors; panics are explicit.
-3. **Source stability**: line/column tracking persists from lexer through diagnostics for precise error reporting.
-4. **Total parsing**: the parser consumes all tokens or emits diagnostics; partial parses are treated as failures.
-5. **Explicit nullability**: pointer types carry an explicit nullable bit (`?`), and the type checker enforces safe
-   usage.
+- Builds `ModuleEnv` maps for all modules in a `CompilationUnit`.
+- Collects locals and opens imported symbols (open import semantics).
+- Tracks ambiguous imports and emits resolver diagnostics.
 
-## Host and Toolchain Assumptions
+### 2.4 Signature Resolver (`l0_signatures.py`)
 
-- Module path components are lexical identifiers (`[A-Za-z_][A-Za-z0-9_]*`).
-- Module file lookup and casing behavior follows the host filesystem semantics.
-- Stage 1 source decoding is UTF-8; a leading UTF-8 BOM is accepted and stripped.
-- `run`/`build` expect an entry `main` function in the selected entry module.
-- `main` return type is expected to be `int`, `void`, or `bool`; other return types are accepted but warned and ignored
-  by the C entry wrapper.
-- Generated C targets C99 for gcc/clang/tcc flows.
-- Runtime library linking remains optional by default; when explicitly configured (`--runtime-lib`/`L0_RUNTIME_LIB`),
-  the configured directory must contain an `l0runtime` library artifact.
+- Resolves top-level type references.
+- Populates:
+    - `func_types`
+    - `struct_infos`
+    - `enum_infos`
+    - `let_types`
+- Detects alias cycles and value-type dependency cycles.
 
-## Frontend architecture
+### 2.5 Local Scope Resolver (`l0_locals.py`)
 
-The compiler frontend consists of:
+- Builds lexical scope trees for non-extern functions.
+- Produces `FunctionEnv` keyed by `(module_name, func_name)`.
 
-### Lexer
+### 2.6 Expression Type Checker (`l0_expr_types.py`)
 
-* Tokenizes keywords, identifiers, literals, operators.
-* Implemented per spec in project documents.
+- Infers/checks expression and statement types.
+- Validates control-flow requirements (for example non-void return paths).
+- Tracks expression types in `AnalysisResult.expr_types`.
+- Records variable-resolution origin in `AnalysisResult.var_ref_resolution`.
+- Appends semantic diagnostics.
 
-### Parser
+### 2.7 Backend (`l0_backend.py`, `l0_c_emitter.py`)
 
-* Handwritten recursive descent matching the grammar.
-* Builds Python `dataclasses` AST:
-* Modules, imports, functions, structs, enums.
-* Statements and expressions with precedence.
-* Type references (`TypeRef`).
+- Consumes a typed `AnalysisResult` and emits C99.
+- Canonical backend details are maintained only in [c_backend_design](c_backend_design.md).
 
-### AST
+## 3. Core Data Flow
 
-* Program represented as clean immutable dataclasses.
-* No semantic information stored in the AST.
+Primary aggregate: `AnalysisResult` (`l0_analysis.py`).
 
-## Semantic model
+Important tables:
 
-The semantic passes follow the order specified in [design_decisions.md](design_decisions.md).
+- `module_envs`
+- `func_types`
+- `struct_infos`
+- `enum_infos`
+- `func_envs`
+- `let_types`
+- `expr_types`
+- `var_ref_resolution`
+- `intrinsic_targets`
+- `diagnostics`
 
-### Name resolution
+Compilation closure container: `CompilationUnit` (`l0_compilation.py`), containing:
 
-* Each module builds a `ModuleEnv`:
-    * local symbols
-    * imported symbols
-    * ambiguity checks
+- `entry_module`
+- `modules` (transitive import closure)
 
-* Diagnostics for:
-    * duplicate names
-    * conflicting imports
-    * unknown identifiers
+## 4. Invariants
 
-### Type resolution (SignatureResolver)
+1. Stages are explicit and ordered as in the pipeline above.
+2. Import closure is explicit and cycle-checked in the driver.
+3. Source locations are propagated for diagnostics.
+4. Semantic errors accumulate as diagnostics; they do not crash the compiler.
+5. Generated output target for Stage 1 is one C99 translation unit.
 
-* Resolves all top-level `TypeRef`s to semantic types:
-    * Builtins
-    * Structs
-    * Enums
-    * Pointer and nullable types
-    * Aliases (cycle-checked)
+## 5. File/Module Layout
 
-* Determines:
-    * `FuncType`
-    * struct field types
-    * enum payload types
+Main Stage 1 modules under `compiler/stage1_py/`:
 
-### Local scope resolution
+- `l0_lexer.py`
+- `l0_parser.py`
+- `l0_ast.py`
+- `l0_name_resolver.py`
+- `l0_signatures.py`
+- `l0_locals.py`
+- `l0_expr_types.py`
+- `l0_types.py`
+- `l0_resolve.py`
+- `l0_symbols.py`
+- `l0_analysis.py`
+- `l0_driver.py`
+- `l0_backend.py`
+- `l0_c_emitter.py`
+- `l0_string_escape.py`
+- `l0_diagnostics.py`
+- `l0_context.py`
+- `l0_paths.py`
+- `l0_compilation.py`
 
-* Builds lexical scopes per function:
-    * parameters
-    * block scopes
-    * match-arm scopes
+## 6. Host/Toolchain Assumptions
 
-* Pattern variables are introduced into scopes.
-
-### Expression type checker
-
-* Computes type for every expression.
-* Enforces:
-    * return type matching
-    * condition must be bool
-    * incompatible assignments
-    * illegal dereference (nullable or non-pointer)
-    * unresolved names
-    * etc.
-
-Diagnostics are accumulated in a unified structure.
-
-## C backend model
-
-The C backend is described in detail in [c_backend_design.md](c_backend_design.md).
-
-## Control Flow Example
-
-The L0Driver object is the main entry point that coordinates passes for modules and their imports.
-
-```
-driver = L0Driver(search_paths)                   # setup with module search paths: project dirs, stdlib, etc.
-
-analysis = driver.analyze(module.name)            # runs full frontend analysis pipeline for module and imports:
-                                                  # runs driver.build_compilation_unit to get full import closure
-                                                  # then runs NameResolver.resolve,
-                                                  # SignatureResolver.resolve,
-                                                  # LocalScopeResolver.resolve,
-                                                  # and ExpressionTypeChecker.check
-
-cu = driver.build_compilation_unit(module.name)   # recursive import closure, uses driver.load_module
-
-module = driver.load_module(module.name)          # gets from cache or loads/parses the file
-                                                  # runs Lexer.tokenize and Parser.parse_module
-
-
-if analysis.diagnostics contain errors:
-    report and abort
-else:
-    c_source = codegen(analysis)
-    write_output(c_source)
-```
-
-Each step returns structured results (modules, environments) plus diagnostics; the driver aggregates them for consistent
-reporting.
-
-## Future Directions
-
-* **Incremental builds**: cache lexer/parser results per module to speed up large projects.
+- Source decoding is UTF-8 with optional BOM stripping.
+- Module names use identifier segments separated by dots.
+- `run` and `build` require an entry `main` function in the entry module.
+- C target is C99 and host compiler is selected from CLI/env or PATH.

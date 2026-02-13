@@ -253,7 +253,7 @@ Key properties:
 
 ## Grammar
 
-The authoritative Stage-1 grammar is in [l0_grammar.md](docs/l0_grammar.md).
+The authoritative Stage-1 grammar is in [l0_grammar](docs/l0_grammar.md).
 
 Pointer and nullable types look like this:
 
@@ -270,10 +270,12 @@ calls, field access, `as` casts, and the **try operator** `?`.
 
 ## Compiler implementation architecture
 
-See [architecture.md](docs/architecture.md) for an overview of the Python L0 stage-1 compiler implementation
+See [architecture](docs/architecture.md) for an overview of the Python L0 stage-1 compiler implementation
 architecture and data flow.
 
-See also [design_decisions.md](docs/design_decisions.md) for additional context.
+See also [design_decisions](docs/design_decisions.md) for additional context.
+
+See [stage1_compiler_contract](docs/stage1_compiler_contract.md) for the compact Stage 1 contract/index.
 
 ## CLI
 
@@ -347,7 +349,7 @@ Enjoy the game! Type your inputs as prompted and see how well you can govern anc
 
 ## Project status
 
-The authoritative status file is [project_status.md](docs/project_status.md).
+The authoritative status file is [project_status](docs/project_status.md).
 
 ## License
 

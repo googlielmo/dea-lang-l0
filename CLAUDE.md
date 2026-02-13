@@ -16,12 +16,13 @@ implementation status, read the relevant doc file(s).**
 
 | Doc file                   | Covers                                                |
 |----------------------------|-------------------------------------------------------|
-| `docs/architecture.md`     | Compiler pipeline, passes, data flow, file layout     |
-| `docs/c_backend_design.md` | C backend architecture, emission strategy             |
-| `docs/design_decisions.md` | Runtime, pointer model, integer model, I/O, rationale |
-| `docs/l0_grammar.md`       | Formal EBNF grammar                                   |
-| `docs/project_status.md`   | Implementation status, known limitations, roadmap     |
-| `docs/standard_library.md` | stdlib module reference (`std.*`, `sys.*`)            |
+| `docs/architecture.md`            | Compiler pipeline, passes, data flow, file layout                |
+| `docs/stage1_compiler_contract.md` | Stage 1 compact contract, interfaces, guarantees, doc routing   |
+| `docs/c_backend_design.md`          | C backend architecture, emission strategy                        |
+| `docs/design_decisions.md`          | Runtime, pointer model, integer model, I/O, rationale           |
+| `docs/l0_grammar.md`                | Formal EBNF grammar                                              |
+| `docs/project_status.md`            | Implementation status, known limitations, roadmap                |
+| `docs/standard_library.md`          | stdlib module reference (`std.*`, `sys.*`)                       |
 
 Also see: `CONTRIBUTING.md`, `SECURITY.md`.
 
