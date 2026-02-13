@@ -177,6 +177,11 @@ func token_to_string(token: Token) -> string {
     }
 }
 
+func is_reserved_ident_word(word: string) -> bool {
+    return eq_s(word, "void") || eq_s(word, "bool") || eq_s(word, "string") ||
+           eq_s(word, "int") || eq_s(word, "byte");
+}
+
 func is_reserved_keyword(token: Token) -> bool {
     match (token.token_type) {
         TT_MODULE => { return true; }
@@ -204,9 +209,7 @@ func is_reserved_keyword(token: Token) -> bool {
         TT_DROP => { return true; }
         TT_WITH => { return true; }
         TT_CLEANUP => { return true; }
-        TT_STRING(t, v) => { return true; }
-        TT_INT(t, v) => { return true; }
-        TT_BYTE(t, v) => { return true; }
+        TT_IDENT(t) => { return is_reserved_ident_word(t); }
         TT_FUTURE_EXTENSION => { return true; }
         _ => { return false; }
     }

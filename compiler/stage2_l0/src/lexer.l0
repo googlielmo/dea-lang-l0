@@ -145,7 +145,7 @@ struct EscapedChar {
  */
 func tokenize(self: LexerState*) -> TokenVector? {
     let tokens = tv_create();
-    while (!ls_at_end(self)) {
+    while (true) {
         let token = ls_next_token(self)?;
         tv_push(tokens, token);
         self.prev_kind = token.token_type;
