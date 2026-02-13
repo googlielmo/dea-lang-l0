@@ -404,6 +404,7 @@ def cmd_run(args: argparse.Namespace) -> int:
             entry=args.entry,
             output=temp_exe,
             c_compiler=args.c_compiler,
+            c_options=args.c_options,
             runtime_include=args.runtime_include,
             runtime_lib=args.runtime_lib,
             keep_c=False,

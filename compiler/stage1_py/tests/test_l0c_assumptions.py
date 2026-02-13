@@ -4,7 +4,7 @@
 import argparse
 import textwrap
 
-from l0c import cmd_build, cmd_check
+from l0c import cmd_build, cmd_check, cmd_run
 
 
 def _write_module(root, module_name: str, source: str):
@@ -107,3 +107,32 @@ def test_build_fails_when_configured_runtime_lib_is_missing(tmp_path, monkeypatc
 
     assert rc == 1
     assert "[L0C-0015]" in capsys.readouterr().err
+
+
+def test_run_forwards_c_options_to_build(tmp_path, monkeypatch):
+    captured = {}
+
+    def _fake_cmd_build(args):
+        captured["c_options"] = args.c_options
+        return 1
+
+    monkeypatch.setattr("l0c.cmd_build", _fake_cmd_build)
+
+    args = argparse.Namespace(
+        entry="app.main",
+        args=[],
+        c_compiler="cc",
+        c_options="-O2 -DDEBUG",
+        runtime_include=None,
+        runtime_lib=None,
+        verbosity=0,
+        project_root=[str(tmp_path)],
+        sys_root=[],
+        no_line_directives=False,
+        log=False,
+    )
+
+    rc = cmd_run(args)
+
+    assert rc == 1
+    assert captured["c_options"] == "-O2 -DDEBUG"
