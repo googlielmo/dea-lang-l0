@@ -512,3 +512,262 @@ def test_codegen_runtime_integer_overflow_panics(codegen_single, compile_and_run
     ok, stdout, stderr = compile_and_run(c_code, tmp_path)
     assert not ok
     assert "integer addition overflow" in stderr
+
+
+# ---------------------------------------------------------------------------
+# ARC leak-fix tests
+# ---------------------------------------------------------------------------
+
+
+def test_codegen_discarded_arc_call_released(codegen_single):
+    c_code, _ = codegen_single(
+        "main",
+        """
+        module main;
+
+        import std.string;
+
+        func main() -> int {
+            concat_s("a", "b");
+            return 0;
+        }
+        """,
+    )
+
+    if c_code is None:
+        return
+
+    main_start = c_code.find("l0_int l0_main_main(")
+    assert main_start != -1
+    main_body = c_code[main_start:]
+    # The discarded concat_s result should be materialized and released
+    assert "_arc_" in main_body
+    assert "rt_string_release(" in main_body
+
+
+def test_codegen_nested_arc_call_temps_released(codegen_single, compile_and_run, tmp_path):
+    c_code, _ = codegen_single(
+        "main",
+        """
+        module main;
+
+        import std.io;
+        import std.string;
+
+        func main() -> int {
+            let x: string = concat_s("hello", concat_s(", ", "world"));
+            printl_s(x);
+            return 0;
+        }
+        """,
+    )
+
+    if c_code is None:
+        return
+
+    main_start = c_code.find("l0_int l0_main_main(")
+    assert main_start != -1
+    main_body = c_code[main_start:]
+    # Inner concat_s temp should be materialized
+    assert "_arc_" in main_body
+
+    ok, stdout, stderr = compile_and_run(c_code, tmp_path)
+    assert ok, stderr
+    assert stdout.strip() == "hello, world"
+
+
+def test_codegen_return_borrowed_param_retains(codegen_single, compile_and_run, tmp_path):
+    c_code, _ = codegen_single(
+        "main",
+        """
+        module main;
+
+        import std.io;
+
+        func id_s(s: string) -> string {
+            return s;
+        }
+
+        func main() -> int {
+            let x: string = id_s("hello");
+            printl_s(x);
+            return 0;
+        }
+        """,
+    )
+
+    if c_code is None:
+        return
+
+    id_s_start = c_code.rfind("l0_string l0_main_id_s(")
+    main_start = c_code.find("l0_int l0_main_main(", id_s_start)
+    assert id_s_start != -1 and main_start != -1
+    id_s_body = c_code[id_s_start:main_start]
+    assert "rt_string_retain(" in id_s_body
+
+    ok, stdout, stderr = compile_and_run(c_code, tmp_path)
+    assert ok, stderr
+    assert stdout.strip() == "hello"
+
+
+def test_codegen_return_borrowed_param_with_cleanup(codegen_single, compile_and_run, tmp_path):
+    c_code, _ = codegen_single(
+        "main",
+        """
+        module main;
+
+        import std.io;
+        import std.string;
+
+        func id_with_local(s: string) -> string {
+            let tmp: string = concat_s("x", "y");
+            return s;
+        }
+
+        func main() -> int {
+            let x: string = id_with_local("hello");
+            printl_s(x);
+            return 0;
+        }
+        """,
+    )
+
+    if c_code is None:
+        return
+
+    fn_start = c_code.rfind("l0_string l0_main_id_with_local(")
+    main_start = c_code.find("l0_int l0_main_main(", fn_start)
+    assert fn_start != -1 and main_start != -1
+    fn_body = c_code[fn_start:main_start]
+    # Should have retain (borrowed param return) and release (local tmp cleanup)
+    assert "rt_string_retain(" in fn_body
+    assert "rt_string_release(" in fn_body
+
+    ok, stdout, stderr = compile_and_run(c_code, tmp_path)
+    assert ok, stderr
+    assert stdout.strip() == "hello"
+
+
+def test_codegen_return_borrowed_param_no_move(codegen_single):
+    c_code, _ = codegen_single(
+        "main",
+        """
+        module main;
+
+        func id_s(s: string) -> string {
+            return s;
+        }
+
+        func main() -> int {
+            return 0;
+        }
+        """,
+    )
+
+    if c_code is None:
+        return
+
+    fn_start = c_code.rfind("l0_string l0_main_id_s(")
+    main_start = c_code.find("l0_int l0_main_main(", fn_start)
+    assert fn_start != -1 and main_start != -1
+    fn_body = c_code[fn_start:main_start]
+    # Should retain (not move) because param is borrowed, not owned
+    assert "rt_string_retain(" in fn_body
+
+
+def test_codegen_param_reassign_no_double_free(codegen_single, compile_and_run, tmp_path):
+    c_code, _ = codegen_single(
+        "main",
+        """
+        module main;
+
+        import std.io;
+        import std.string;
+
+        func f(s: string) -> void {
+            s = concat_s("new", "val");
+            printl_s(s);
+        }
+
+        func main() -> int {
+            f("old");
+            return 0;
+        }
+        """,
+    )
+
+    if c_code is None:
+        return
+
+    fn_start = c_code.rfind("void l0_main_f(")
+    main_start = c_code.find("l0_int l0_main_main(", fn_start)
+    assert fn_start != -1 and main_start != -1
+    fn_body = c_code[fn_start:main_start]
+    # First reassignment of borrowed param should NOT release old value
+    # but the new value should be released at scope exit
+    assert "rt_string_release(" in fn_body
+
+    ok, stdout, stderr = compile_and_run(c_code, tmp_path)
+    assert ok, stderr
+    assert stdout.strip() == "newval"
+
+
+def test_codegen_param_reassign_in_nested_scope(codegen_single, compile_and_run, tmp_path):
+    c_code, _ = codegen_single(
+        "main",
+        """
+        module main;
+
+        import std.io;
+        import std.string;
+
+        func f(s: string) -> void {
+            if (true) {
+                s = concat_s("inner", "val");
+            }
+            printl_s(s);
+        }
+
+        func main() -> int {
+            f("old");
+            return 0;
+        }
+        """,
+    )
+
+    if c_code is None:
+        return
+
+    ok, stdout, stderr = compile_and_run(c_code, tmp_path)
+    assert ok, stderr
+    assert stdout.strip() == "innerval"
+
+
+def test_codegen_param_reassign_twice(codegen_single, compile_and_run, tmp_path):
+    c_code, _ = codegen_single(
+        "main",
+        """
+        module main;
+
+        import std.io;
+        import std.string;
+
+        func f(s: string) -> void {
+            s = concat_s("first", "");
+            s = concat_s("second", "");
+            printl_s(s);
+        }
+
+        func main() -> int {
+            f("old");
+            return 0;
+        }
+        """,
+    )
+
+    if c_code is None:
+        return
+
+    ok, stdout, stderr = compile_and_run(c_code, tmp_path)
+    assert ok, stderr
+    assert stdout.strip() == "second"

@@ -154,6 +154,22 @@ class Backend:
         # CallExpr, literals, cast, etc. produce fresh values
         return False
 
+    def _needs_arc_temp(self, expr: Expr) -> bool:
+        """Check if a non-place rvalue with ARC data needs temp materialization.
+
+        String literals are static constants and don't need cleanup.
+        """
+        if isinstance(expr, StringLiteral):
+            return False
+        return True
+
+    def _materialize_arc_temp(self, c_expr: str, expr_type: Type) -> str:
+        """Materialize an ARC rvalue into a scope-owned temporary for automatic cleanup."""
+        temp = self.emitter.fresh_tmp("arc")
+        self.emitter.emit_temp_decl(self.emitter.emit_type(expr_type), temp, c_expr)
+        self._current_scope.add_owned(temp, expr_type)
+        return temp
+
     def _has_side_effects(self, expr: Expr) -> bool:
         """
         Returns True if the expression has side effects or contains function calls.
@@ -918,7 +934,13 @@ class Backend:
             # expr;
             c_expr = self._emit_expr(stmt.expr, is_statement=True)
             if c_expr:  # Only emit if not empty (empty for no-op comments)
-                self.emitter.emit_expr_stmt(c_expr)
+                expr_ty = self.analysis.expr_types.get(id(stmt.expr))
+                if (expr_ty and self.analysis.has_arc_data(expr_ty)
+                        and not self._is_place_expr(stmt.expr)
+                        and self._needs_arc_temp(stmt.expr)):
+                    self._materialize_arc_temp(c_expr, expr_ty)
+                else:
+                    self.emitter.emit_expr_stmt(c_expr)
             return None
 
         elif isinstance(stmt, IfStmt):
@@ -1140,6 +1162,36 @@ class Backend:
 
         return self._next_stmt_unreachable
 
+    def _find_declaring_scope(self, mangled_name: str) -> 'Optional[ScopeContext]':
+        """Walk the scope chain; return the scope whose declared_vars contains the name."""
+        scope = self._current_scope
+        while scope is not None:
+            for name, _ in scope.declared_vars:
+                if name == mangled_name:
+                    return scope
+            scope = scope.parent
+        return None
+
+    def _is_borrowed_arc_param(self, target_expr: Expr, dst_ty: Type) -> tuple:
+        """Check if target is a borrowed ARC param (declared but not owned anywhere)."""
+        if not isinstance(target_expr, VarRef):
+            return False, None
+        if not self.analysis.has_arc_data(dst_ty):
+            return False, None
+        mangled = self.emitter.mangle_identifier(target_expr.name)
+        # Check it's not owned anywhere in the scope chain
+        scope = self._current_scope
+        while scope is not None:
+            for owned_name, _ in scope.owned_vars:
+                if owned_name == mangled:
+                    return False, None
+            scope = scope.parent
+        # Check it IS declared somewhere
+        declaring = self._find_declaring_scope(mangled)
+        if declaring is None:
+            return False, None
+        return True, declaring
+
     def _emit_reassignment(self, stmt: AssignStmt) -> None:
         # Resolve source and destination types
         src_ty = self.analysis.expr_types.get(id(stmt.value))
@@ -1159,10 +1211,17 @@ class Backend:
             self.ice("[ICE-1241] failed to emit assignment", node=stmt)
 
         if self.analysis.has_arc_data(dst_ty):
-            temp = self.emitter.fresh_tmp("tmp")
-            self.emitter.emit_temp_decl(self.emitter.emit_type(dst_ty), temp, c_value)
-            self._emit_value_cleanup(c_target, dst_ty)
-            self.emitter.emit_assignment(c_target, temp)
+            is_borrowed, declaring_scope = self._is_borrowed_arc_param(stmt.target, dst_ty)
+            if is_borrowed:
+                # Borrowed param: skip release of old value, promote to owned
+                self.emitter.emit_assignment(c_target, c_value)
+                mangled = self.emitter.mangle_identifier(stmt.target.name)
+                declaring_scope.add_owned(mangled, dst_ty)
+            else:
+                temp = self.emitter.fresh_tmp("tmp")
+                self.emitter.emit_temp_decl(self.emitter.emit_type(dst_ty), temp, c_value)
+                self._emit_value_cleanup(c_target, dst_ty)
+                self.emitter.emit_assignment(c_target, temp)
         else:
             self.emitter.emit_assignment(c_target, c_value)
 
@@ -2098,18 +2157,43 @@ class Backend:
 
                         func_ty = sym.type if isinstance(sym.type, FuncType) else None
                         if func_ty and len(func_ty.params) == len(expr.args):
-                            c_args = ", ".join(
-                                self._emit_expr_with_expected_type(a, p) for a, p in zip(expr.args, func_ty.params)
-                            )
+                            c_arg_parts = []
+                            for a, p in zip(expr.args, func_ty.params):
+                                c_a = self._emit_expr_with_expected_type(a, p)
+                                a_ty = self.analysis.expr_types.get(id(a))
+                                if (a_ty and self.analysis.has_arc_data(a_ty)
+                                        and not self._is_place_expr(a)
+                                        and self._needs_arc_temp(a)):
+                                    c_a = self._materialize_arc_temp(c_a, a_ty)
+                                c_arg_parts.append(c_a)
+                            c_args = ", ".join(c_arg_parts)
                         else:
-                            c_args = ", ".join(self._emit_expr(a) for a in expr.args)
+                            c_arg_parts = []
+                            for a in expr.args:
+                                c_a = self._emit_expr(a)
+                                a_ty = self.analysis.expr_types.get(id(a))
+                                if (a_ty and self.analysis.has_arc_data(a_ty)
+                                        and not self._is_place_expr(a)
+                                        and self._needs_arc_temp(a)):
+                                    c_a = self._materialize_arc_temp(c_a, a_ty)
+                                c_arg_parts.append(c_a)
+                            c_args = ", ".join(c_arg_parts)
                         return self.emitter.emit_function_call(c_func_name, c_args)
 
                 self.ice("[ICE-1100] unresolved function call target after type checking", node=expr)
             else:
                 # Complex callee expression
                 c_callee = self._emit_expr(expr.callee)
-                c_args = ", ".join(self._emit_expr(arg) for arg in expr.args)
+                c_arg_parts = []
+                for a in expr.args:
+                    c_a = self._emit_expr(a)
+                    a_ty = self.analysis.expr_types.get(id(a))
+                    if (a_ty and self.analysis.has_arc_data(a_ty)
+                            and not self._is_place_expr(a)
+                            and self._needs_arc_temp(a)):
+                        c_a = self._materialize_arc_temp(c_a, a_ty)
+                    c_arg_parts.append(c_a)
+                c_args = ", ".join(c_arg_parts)
                 return self.emitter.emit_function_call(f"({c_callee})", c_args)
 
         elif isinstance(expr, IndexExpr):
