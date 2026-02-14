@@ -1,0 +1,122 @@
+/*
+ * SPDX-License-Identifier: MIT OR Apache-2.0
+ * Copyright (c) 2026 gwz
+ */
+
+module parser_test;
+
+import std.io;
+import std.string;
+import std.assert;
+
+import parser;
+
+func expect_error_code(source: string, expected: string) {
+    let result = parse_module_source(source, "<test>");
+
+    match (result.error) {
+        ParseNoError => {
+            assert(false, concat_s(concat_s("Expected parse error ", expected), " but parse succeeded"));
+        }
+        ParseHasError(err) => {
+            if (!eq_s(err.code, expected)) {
+                printl_ss("actual error code:", err.code);
+                assert(false, concat_s("Expected parse error code ", expected));
+            }
+        }
+    }
+
+    parse_result_free(result);
+}
+
+func expect_ok(source: string) {
+    let result = parse_module_source(source, "<test>");
+
+    match (result.error) {
+        ParseNoError => {
+            assert(result.root_module != null, "Expected module for successful parse");
+        }
+        ParseHasError(err) => {
+            printl_ss("unexpected parse error code:", err.code);
+            printl_ss("unexpected parse error message:", err.message);
+            assert(false, "Expected parse to succeed");
+        }
+    }
+
+    parse_result_free(result);
+}
+
+func test_valid_module() {
+    let src = "module main; import std.io; func add(a: int, b: int) -> int { return 0; }";
+    expect_ok(src);
+}
+
+func test_module_decl_error() {
+    expect_error_code("module ;", "PAR-0311");
+}
+
+func test_reserved_variable_name_error() {
+    let src = "module main; func main() -> int { let uint: int = 0; return uint; }";
+    expect_error_code(src, "PAR-0010");
+}
+
+func test_reserved_operator_error() {
+    let src = "module main; func main() -> int { let x: int = ~1; return x; }";
+    expect_error_code(src, "PAR-0226");
+}
+
+func test_with_mixed_forms_error() {
+    let src = "module main; func main() -> int { with (let x: int = 1 => drop x, let y: int = 2) { return 0; } }";
+    expect_error_code(src, "PAR-0503");
+}
+
+func test_case_empty_error() {
+    let src = "module main; func main() -> int { case (1) { } return 0; }";
+    expect_error_code(src, "PAR-0240");
+}
+
+func test_expr_precedence_postfix_and_qualified_type_ok() {
+    let src = "module main; extern func sink(x: int) -> int; func helper(v: int*) -> int { return v[0]; } func main() -> int { let p: int* = new int(1); let n: int = sink((1 + 2 * 3) as int); let x: int = helper(p); let y: int = new color::Color::Red*(p).field?; return n + x + y; }";
+    expect_ok(src);
+}
+
+func test_postfix_chain_ok() {
+    let src = "module main; func main() -> int { let v: int = a.b(1, 2)[0]?; return v; }";
+    expect_ok(src);
+}
+
+func test_type_expr_call_arg_ok() {
+    let src = "module main; extern func sizeof(x: int) -> int; func main() -> int { return sizeof(int*); }";
+    expect_ok(src);
+}
+
+func test_reserved_binary_and_error() {
+    let src = "module main; func main() -> int { let x: int = 1 & 2; return x; }";
+    expect_error_code(src, "PAR-0226");
+}
+
+func test_reserved_binary_shift_error() {
+    let src = "module main; func main() -> int { let x: int = 1 << 2; return x; }";
+    expect_error_code(src, "PAR-0226");
+}
+
+func test_qualified_type_name_ok() {
+    let src = "module main; func f(x: color::Color::Red*) -> color::Color::Red? { return null; }";
+    expect_ok(src);
+}
+
+func main() {
+    test_valid_module();
+    test_module_decl_error();
+    test_reserved_variable_name_error();
+    test_reserved_operator_error();
+    test_with_mixed_forms_error();
+    test_case_empty_error();
+    test_expr_precedence_postfix_and_qualified_type_ok();
+    test_postfix_chain_ok();
+    test_type_expr_call_arg_ok();
+    test_reserved_binary_and_error();
+    test_reserved_binary_shift_error();
+    test_qualified_type_name_ok();
+    printl_s("parser_test: all tests passed");
+}

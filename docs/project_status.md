@@ -1,6 +1,6 @@
 # L0 Project Status
 
-Version: 2026-02-13
+Version: 2026-02-14
 
 This document summarizes what is implemented in this repository today and what remains open.
 
@@ -126,13 +126,15 @@ Current std/sys modules in tree:
 
 ## Stage 2 Compiler (L0-in-L0) - Current State
 
-Stage 2 lives in `compiler/stage2_l0` and is in early active development.
+Stage 2 lives in `compiler/stage2_l0` and is in active development.
 
 Current implemented assets:
 
 - Core sources:
     - `src/tokens.l0`
     - `src/lexer.l0`
+    - `src/ast.l0`
+    - `src/parser.l0`
     - `src/main.l0`
 - Utility modules:
     - `src/util/array.l0`
@@ -140,8 +142,28 @@ Current implemented assets:
     - `src/util/linear_map.l0`
     - `src/util/text.l0`
 - Test suite under `compiler/stage2_l0/tests` and test runner `run_tests.sh`.
+- Current Stage 2 test runner status: `8/8` tests passing.
 
-Current focus is token model + lexer implementation + foundational utility data structures.
+Stage 2 parser status:
+
+- Module/import parsing is implemented (`module`, dotted `import` names).
+- Top-level declarations are implemented: `extern func`, `func`, `struct`, `enum`, `type`, top-level `let`.
+- Statement parsing is implemented: block, `let`, assignment, expression statements, `if/else`, `while`, `for`,
+  `match`, `case`, `with`, `drop`, `break`, `continue`, `return`.
+- Pattern parsing is implemented: `_` wildcard and variant patterns (including qualified names).
+- Expression parsing is implemented with precedence and postfix forms:
+  literals, `new`, calls, indexing, field access, cast (`as`), postfix try (`expr?`), unary ops, binary ops.
+- Type-expression call arguments are implemented for unambiguous intrinsic-style contexts (e.g. `sizeof(int*)`).
+- Qualified names are implemented in types, expressions, and patterns.
+- Parser diagnostics mirror Stage 1 error-code style (`PAR-xxxx`) for covered paths.
+
+Stage 2 AST storage status:
+
+- Hybrid representation is implemented:
+  pointer-owned metadata nodes plus arena-backed expression/statement/pattern nodes.
+- Arena IDs (`ExprId`, `StmtId`, `PatternId`) are used for graph edges in parsed trees.
+- Parser API returns `ParseResult` with arenas and module root.
+- `parse_result_free` deep cleanup is implemented for parser-owned allocations.
 
 ## Known Limitations and Constraints
 
@@ -153,10 +175,19 @@ These remain true in Stage 1:
 4. No generics, traits, or macros.
 5. Reserved/future keywords and operators are lexed for diagnostics and staged evolution.
 
+Current Stage 2 limitations:
+
+1. Semantic passes are not implemented yet (name resolution, signature resolution, local scopes, expression type
+   checking).
+2. Stage 2 backend/codegen pipeline is not implemented yet.
+3. Some language constraints intentionally remain staged in parser diagnostics (for example, array types and
+   bitwise/shift operators).
+
 ## Short Roadmap
 
 Near-term project direction, consistent with current docs/code:
 
-1. Continue Stage 2 from lexer/util foundations toward parser + semantic passes.
-2. Keep Stage 1 behavior deterministic and contract-documented while Stage 2 grows.
-3. Expand language features only once semantics and diagnostics are decision-complete.
+1. Continue Stage 2 from parser baseline into semantic passes (name/signature/local-scope/type checking).
+2. Connect Stage 2 semantic outputs to backend/codegen milestones.
+3. Keep Stage 1 behavior deterministic and contract-documented while Stage 2 grows.
+4. Expand language features only once semantics and diagnostics are decision-complete.

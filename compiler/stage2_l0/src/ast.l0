@@ -1,0 +1,599 @@
+/*
+ * SPDX-License-Identifier: MIT OR Apache-2.0
+ * Copyright (c) 2026 gwz
+ */
+
+module ast;
+
+import std.assert;
+import std.string;
+
+import util.vector;
+
+/* ------------------------------------
+   IDs and shared utilities
+   ------------------------------------ */
+
+type ExprId = int;
+type StmtId = int;
+type PatternId = int;
+
+func invalid_expr_id() -> ExprId {
+    return -1;
+}
+
+func invalid_stmt_id() -> StmtId {
+    return -1;
+}
+
+func invalid_pattern_id() -> PatternId {
+    return -1;
+}
+
+func ptr_vec_create(initial_capacity: int) -> VectorBase* {
+    return vec_create(sizeof(void*), initial_capacity);
+}
+
+func ptr_vec_push(self: VectorBase*, ptr: void*) {
+    let dest = vec_push(self) as void**;
+    *dest = ptr;
+}
+
+func ptr_vec_get(self: VectorBase*, index: int) -> void* {
+    let src = vec_get(self, index) as void**;
+    return *src;
+}
+
+func id_vec_create(initial_capacity: int) -> VectorBase* {
+    return vec_create(sizeof(int), initial_capacity);
+}
+
+func id_vec_push(self: VectorBase*, id: int) {
+    vec_push_int(self, id);
+}
+
+func id_vec_get(self: VectorBase*, index: int) -> int {
+    let src = vec_get(self, index) as int*;
+    return *src;
+}
+
+struct Span {
+    start_line: int;
+    start_column: int;
+    end_line: int;
+    end_column: int;
+}
+
+func span_here(line: int, column: int) -> Span {
+    return Span(line, column, line, column);
+}
+
+/* ------------------------------------
+   Pointer-owned metadata nodes
+   ------------------------------------ */
+
+struct TypeRef {
+    name: string;
+    pointer_depth: int;
+    is_nullable: bool;
+    module_path: VectorString*?;      // string entries
+    name_qualifier: VectorString*?;   // string entries
+    span: Span;
+}
+
+struct Import {
+    name: string;
+}
+
+struct Param {
+    name: string;
+    type_ref: TypeRef*;
+}
+
+struct FieldDecl {
+    name: string;
+    type_ref: TypeRef*;
+}
+
+struct EnumVariant {
+    name: string;
+    fields: VectorBase*; // FieldDecl*
+}
+
+struct FuncDecl {
+    name: string;
+    params: VectorBase*;     // Param*
+    return_type: TypeRef*;
+    body: StmtId;            // points into stmt arena
+    is_extern: bool;
+    span: Span;
+}
+
+struct StructDecl {
+    name: string;
+    fields: VectorBase*;     // FieldDecl*
+    span: Span;
+}
+
+struct EnumDecl {
+    name: string;
+    variants: VectorBase*;   // EnumVariant*
+    span: Span;
+}
+
+struct TypeAliasDecl {
+    name: string;
+    target: TypeRef*;
+    span: Span;
+}
+
+struct LetDecl {
+    name: string;
+    type_ref: TypeRef*?;
+    value: ExprId;
+    span: Span;
+}
+
+enum TopLevelDeclKind {
+    TD_FUNC;
+    TD_STRUCT;
+    TD_ENUM;
+    TD_TYPE_ALIAS;
+    TD_LET;
+}
+
+struct TopLevelDecl {
+    kind: TopLevelDeclKind;
+    data: void*;
+}
+
+struct Module {
+    name: string;
+    imports: VectorBase*; // Import*
+    decls: VectorBase*;   // TopLevelDecl*
+    span: Span;
+    filename: string;
+}
+
+/* ------------------------------------
+   Pattern arena
+   ------------------------------------ */
+
+enum PatternKind {
+    PT_WILDCARD;
+    PT_VARIANT;
+}
+
+struct PatternNode {
+    kind: PatternKind;
+    span: Span;
+    name: string;
+    vars: VectorString*?;
+    module_path: VectorString*?;
+    name_qualifier: VectorString*?;
+}
+
+struct PatternArena {
+    nodes: VectorBase*; // PatternNode*
+}
+
+func pattern_node_create(kind: PatternKind, span: Span) -> PatternNode* {
+    return new PatternNode(kind, span, "", null, null, null);
+}
+
+func pattern_arena_create(initial_capacity: int) -> PatternArena* {
+    return new PatternArena(ptr_vec_create(initial_capacity));
+}
+
+func pattern_arena_add(self: PatternArena*, node: PatternNode*) -> PatternId {
+    let id = vec_size(self.nodes);
+    ptr_vec_push(self.nodes, node as void*);
+    return id;
+}
+
+func pattern_arena_get(self: PatternArena*, id: PatternId) -> PatternNode* {
+    assert(id >= 0 && id < vec_size(self.nodes), "invalid PatternId");
+    return ptr_vec_get(self.nodes, id) as PatternNode*;
+}
+
+func _free_vs_opt(v: VectorString*?) {
+    if (v != null) {
+        vs_free(v as VectorString*);
+    }
+}
+
+func pattern_node_free(node: PatternNode*) {
+    _free_vs_opt(node.vars);
+    _free_vs_opt(node.module_path);
+    _free_vs_opt(node.name_qualifier);
+    drop node;
+}
+
+func pattern_arena_free(self: PatternArena*) {
+    for (let i = 0; i < vec_size(self.nodes); i = i + 1) {
+        let node = ptr_vec_get(self.nodes, i) as PatternNode*;
+        pattern_node_free(node);
+    }
+    vec_free(self.nodes);
+    drop self;
+}
+
+/* ------------------------------------
+   Expression arena
+   ------------------------------------ */
+
+enum ExprKind {
+    EX_INT;
+    EX_BYTE;
+    EX_STRING;
+    EX_BOOL;
+    EX_NULL;
+    EX_VAR_REF;
+    EX_NEW;
+    EX_UNARY;
+    EX_BINARY;
+    EX_CALL;
+    EX_INDEX;
+    EX_FIELD;
+    EX_PAREN;
+    EX_CAST;
+    EX_TRY;
+    EX_TYPE;
+}
+
+struct ExprNode {
+    kind: ExprKind;
+    span: Span;
+
+    int_value: int;
+    bool_value: bool;
+    text_value: string;
+
+    expr_a: ExprId;
+    expr_b: ExprId;
+    expr_c: ExprId;
+
+    ids: VectorBase*?;        // int entries, typically call/new args
+    type_ref: TypeRef*?;
+    module_path: VectorString*?;
+    name_qualifier: VectorString*?;
+}
+
+struct ExprArena {
+    nodes: VectorBase*; // ExprNode*
+}
+
+func expr_node_create(kind: ExprKind, span: Span) -> ExprNode* {
+    return new ExprNode(
+        kind,
+        span,
+        0,
+        false,
+        "",
+        invalid_expr_id(),
+        invalid_expr_id(),
+        invalid_expr_id(),
+        null,
+        null,
+        null,
+        null
+    );
+}
+
+func expr_arena_create(initial_capacity: int) -> ExprArena* {
+    return new ExprArena(ptr_vec_create(initial_capacity));
+}
+
+func expr_arena_add(self: ExprArena*, node: ExprNode*) -> ExprId {
+    let id = vec_size(self.nodes);
+    ptr_vec_push(self.nodes, node as void*);
+    return id;
+}
+
+func expr_arena_get(self: ExprArena*, id: ExprId) -> ExprNode* {
+    assert(id >= 0 && id < vec_size(self.nodes), "invalid ExprId");
+    return ptr_vec_get(self.nodes, id) as ExprNode*;
+}
+
+/* ------------------------------------
+   Statement arena
+   ------------------------------------ */
+
+struct MatchArm {
+    pattern: PatternId;
+    body: StmtId;
+    span: Span;
+}
+
+struct CaseArm {
+    literal: ExprId;
+    body: StmtId;
+    span: Span;
+}
+
+struct CaseElse {
+    body: StmtId;
+    span: Span;
+}
+
+struct WithItem {
+    init: StmtId;
+    cleanup_stmt: StmtId;
+    has_cleanup: bool;
+    span: Span;
+}
+
+enum StmtKind {
+    ST_BLOCK;
+    ST_LET;
+    ST_ASSIGN;
+    ST_EXPR;
+    ST_IF;
+    ST_WHILE;
+    ST_FOR;
+    ST_RETURN;
+    ST_DROP;
+    ST_MATCH;
+    ST_CASE;
+    ST_BREAK;
+    ST_CONTINUE;
+    ST_WITH;
+}
+
+struct StmtNode {
+    kind: StmtKind;
+    span: Span;
+
+    name: string;
+    type_ref: TypeRef*?;
+
+    expr_a: ExprId;
+    expr_b: ExprId;
+
+    stmt_a: StmtId;
+    stmt_b: StmtId;
+    stmt_c: StmtId;
+
+    ids: VectorBase*?;         // int entries, used for block stmt lists
+    match_arms: VectorBase*?;  // MatchArm*
+    case_arms: VectorBase*?;   // CaseArm*
+    case_else: CaseElse*?;
+    with_items: VectorBase*?;  // WithItem*
+}
+
+struct StmtArena {
+    nodes: VectorBase*; // StmtNode*
+}
+
+func stmt_node_create(kind: StmtKind, span: Span) -> StmtNode* {
+    return new StmtNode(
+        kind,
+        span,
+        "",
+        null,
+        invalid_expr_id(),
+        invalid_expr_id(),
+        invalid_stmt_id(),
+        invalid_stmt_id(),
+        invalid_stmt_id(),
+        null,
+        null,
+        null,
+        null,
+        null
+    );
+}
+
+func stmt_arena_create(initial_capacity: int) -> StmtArena* {
+    return new StmtArena(ptr_vec_create(initial_capacity));
+}
+
+func stmt_arena_add(self: StmtArena*, node: StmtNode*) -> StmtId {
+    let id = vec_size(self.nodes);
+    ptr_vec_push(self.nodes, node as void*);
+    return id;
+}
+
+func stmt_arena_get(self: StmtArena*, id: StmtId) -> StmtNode* {
+    assert(id >= 0 && id < vec_size(self.nodes), "invalid StmtId");
+    return ptr_vec_get(self.nodes, id) as StmtNode*;
+}
+
+/* ------------------------------------
+   Free helpers
+   ------------------------------------ */
+
+func type_ref_free(self: TypeRef*) {
+    _free_vs_opt(self.module_path);
+    _free_vs_opt(self.name_qualifier);
+    drop self;
+}
+
+func import_free(self: Import*) {
+    drop self;
+}
+
+func param_free(self: Param*) {
+    type_ref_free(self.type_ref);
+    drop self;
+}
+
+func field_decl_free(self: FieldDecl*) {
+    type_ref_free(self.type_ref);
+    drop self;
+}
+
+func enum_variant_free(self: EnumVariant*) {
+    for (let i = 0; i < vec_size(self.fields); i = i + 1) {
+        let fd = ptr_vec_get(self.fields, i) as FieldDecl*;
+        field_decl_free(fd);
+    }
+    vec_free(self.fields);
+    drop self;
+}
+
+func func_decl_free(self: FuncDecl*) {
+    for (let i = 0; i < vec_size(self.params); i = i + 1) {
+        let p = ptr_vec_get(self.params, i) as Param*;
+        param_free(p);
+    }
+    vec_free(self.params);
+    type_ref_free(self.return_type);
+    drop self;
+}
+
+func struct_decl_free(self: StructDecl*) {
+    for (let i = 0; i < vec_size(self.fields); i = i + 1) {
+        let fd = ptr_vec_get(self.fields, i) as FieldDecl*;
+        field_decl_free(fd);
+    }
+    vec_free(self.fields);
+    drop self;
+}
+
+func enum_decl_free(self: EnumDecl*) {
+    for (let i = 0; i < vec_size(self.variants); i = i + 1) {
+        let v = ptr_vec_get(self.variants, i) as EnumVariant*;
+        enum_variant_free(v);
+    }
+    vec_free(self.variants);
+    drop self;
+}
+
+func type_alias_decl_free(self: TypeAliasDecl*) {
+    type_ref_free(self.target);
+    drop self;
+}
+
+func let_decl_free(self: LetDecl*) {
+    if (self.type_ref != null) {
+        type_ref_free(self.type_ref as TypeRef*);
+    }
+    drop self;
+}
+
+func top_level_decl_free(self: TopLevelDecl*) {
+    match (self.kind) {
+        TD_FUNC => {
+            func_decl_free(self.data as FuncDecl*);
+        }
+        TD_STRUCT => {
+            struct_decl_free(self.data as StructDecl*);
+        }
+        TD_ENUM => {
+            enum_decl_free(self.data as EnumDecl*);
+        }
+        TD_TYPE_ALIAS => {
+            type_alias_decl_free(self.data as TypeAliasDecl*);
+        }
+        TD_LET => {
+            let_decl_free(self.data as LetDecl*);
+        }
+    }
+    drop self;
+}
+
+func module_free(self: Module*) {
+    for (let i = 0; i < vec_size(self.imports); i = i + 1) {
+        let imp = ptr_vec_get(self.imports, i) as Import*;
+        import_free(imp);
+    }
+    vec_free(self.imports);
+
+    for (let i = 0; i < vec_size(self.decls); i = i + 1) {
+        let decl = ptr_vec_get(self.decls, i) as TopLevelDecl*;
+        top_level_decl_free(decl);
+    }
+    vec_free(self.decls);
+
+    drop self;
+}
+
+func match_arm_free(self: MatchArm*) {
+    drop self;
+}
+
+func case_arm_free(self: CaseArm*) {
+    drop self;
+}
+
+func case_else_free(self: CaseElse*) {
+    drop self;
+}
+
+func with_item_free(self: WithItem*) {
+    drop self;
+}
+
+func expr_node_free(self: ExprNode*) {
+    if (self.ids != null) {
+        vec_free(self.ids as VectorBase*);
+    }
+    if (self.type_ref != null) {
+        type_ref_free(self.type_ref as TypeRef*);
+    }
+    _free_vs_opt(self.module_path);
+    _free_vs_opt(self.name_qualifier);
+    drop self;
+}
+
+func stmt_node_free(self: StmtNode*) {
+    if (self.type_ref != null) {
+        type_ref_free(self.type_ref as TypeRef*);
+    }
+
+    if (self.ids != null) {
+        vec_free(self.ids as VectorBase*);
+    }
+
+    if (self.match_arms != null) {
+        let arms = self.match_arms as VectorBase*;
+        for (let i = 0; i < vec_size(arms); i = i + 1) {
+            let arm = ptr_vec_get(arms, i) as MatchArm*;
+            match_arm_free(arm);
+        }
+        vec_free(arms);
+    }
+
+    if (self.case_arms != null) {
+        let arms = self.case_arms as VectorBase*;
+        for (let i = 0; i < vec_size(arms); i = i + 1) {
+            let arm = ptr_vec_get(arms, i) as CaseArm*;
+            case_arm_free(arm);
+        }
+        vec_free(arms);
+    }
+
+    if (self.case_else != null) {
+        case_else_free(self.case_else as CaseElse*);
+    }
+
+    if (self.with_items != null) {
+        let items = self.with_items as VectorBase*;
+        for (let i = 0; i < vec_size(items); i = i + 1) {
+            let it = ptr_vec_get(items, i) as WithItem*;
+            with_item_free(it);
+        }
+        vec_free(items);
+    }
+
+    drop self;
+}
+
+func expr_arena_free(self: ExprArena*) {
+    for (let i = 0; i < vec_size(self.nodes); i = i + 1) {
+        let node = ptr_vec_get(self.nodes, i) as ExprNode*;
+        expr_node_free(node);
+    }
+    vec_free(self.nodes);
+    drop self;
+}
+
+func stmt_arena_free(self: StmtArena*) {
+    for (let i = 0; i < vec_size(self.nodes); i = i + 1) {
+        let node = ptr_vec_get(self.nodes, i) as StmtNode*;
+        stmt_node_free(node);
+    }
+    vec_free(self.nodes);
+    drop self;
+}
