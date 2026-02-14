@@ -125,6 +125,8 @@ Key points:
 
 - ARC types (notably `string`) use runtime `rt_string_retain`/`rt_string_release`.
 - Copying from place expressions at ownership-creating sites performs retain-on-copy.
+- `return expr;` is an ownership-creating site. Returning a place expression retains before scope cleanup runs.
+- Direct `return local_var;` for owned locals is lowered as a move: cleanup skips that binding instead of retaining.
 - Scope exit cleanup runs in reverse declaration order.
 - Early exits (`return`, `break`, `continue`, `try` early return) run pending `with` cleanup first, then owned var
   cleanup.

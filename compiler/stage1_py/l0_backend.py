@@ -214,6 +214,26 @@ class Backend:
             scope = scope.parent
         return None
 
+    def _lookup_owned_local_name(self, expr: VarRef) -> Optional[str]:
+        """
+        Return the mangled local name when a VarRef resolves to an owned local binding.
+
+        Parameters are local VarRefs but are not owned by the callee, so they do not
+        appear in owned_vars and return None.
+        """
+        resolution = self.analysis.var_ref_resolution.get(id(expr))
+        if resolution is not VarRefResolution.LOCAL:
+            return None
+
+        mangled_name = self.emitter.mangle_identifier(expr.name)
+        scope = self._current_scope
+        while scope is not None:
+            for owned_name, _ in scope.owned_vars:
+                if owned_name == mangled_name:
+                    return mangled_name
+            scope = scope.parent
+        return None
+
     def _extract_value_type_dependencies(self, typ: Type) -> Set[Tuple[str, str]]:
         """
         Extract type dependencies for VALUE fields only.
@@ -978,14 +998,22 @@ class Backend:
             self.emitter.emit_return_stmt(None)
         else:
             returned_var = None
+            use_move_return = False
             if isinstance(stmt.value, VarRef):
-                returned_var = self.emitter.mangle_identifier(stmt.value.name)
+                returned_var = self._lookup_owned_local_name(stmt.value)
+                use_move_return = returned_var is not None
+
+            emit_return_value = (
+                self._emit_expr_with_expected_type
+                if use_move_return
+                else self._emit_owned_expr_with_expected_type
+            )
 
             needs_cleanup = (self._current_scope is not None
                              and self._scope_chain_has_cleanup())
             if needs_cleanup:
                 # Evaluate return expression BEFORE cleanup to avoid UAF
-                c_value = self._emit_expr_with_expected_type(
+                c_value = emit_return_value(
                     stmt.value, self._current_func_result)
                 ret_tmp = self.emitter.fresh_tmp("ret")
                 c_ret_type = self.emitter.emit_type(self._current_func_result)
@@ -995,7 +1023,7 @@ class Backend:
             else:
                 if self._current_scope is not None:
                     self._emit_cleanup_for_return(returned_var)
-                c_value = self._emit_expr_with_expected_type(
+                c_value = emit_return_value(
                     stmt.value, self._current_func_result)
                 self.emitter.emit_return_stmt(c_value)
 

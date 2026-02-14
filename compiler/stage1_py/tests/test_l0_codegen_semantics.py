@@ -359,6 +359,46 @@ def test_codegen_enum_copy_from_place_with_owned_payload_compiles(codegen_single
     assert ok, stderr
 
 
+def test_codegen_return_from_field_place_expr_retains(codegen_single, compile_and_run, tmp_path):
+    c_code, _ = codegen_single(
+        "main",
+        """
+        module main;
+
+        import std.io;
+        import std.string;
+
+        struct Box { s: string; }
+
+        func get_s(b: Box*) -> string {
+            return b.s;
+        }
+
+        func main() -> int {
+            let b: Box* = new Box(concat_s("ab", "cd"));
+            {
+                let x: string = get_s(b);
+            }
+            printl_s(b.s);
+            drop b;
+            return 0;
+        }
+        """,
+    )
+
+    if c_code is None:
+        return
+
+    get_s_start = c_code.rfind("l0_string l0_main_get_s(")
+    main_start = c_code.find("l0_int l0_main_main(", get_s_start)
+    assert get_s_start != -1 and main_start != -1
+    assert "rt_string_retain(" in c_code[get_s_start:main_start]
+
+    ok, stdout, stderr = compile_and_run(c_code, tmp_path)
+    assert ok, stderr
+    assert stdout.strip() == "abcd"
+
+
 def test_codegen_line_directives_and_mangling(codegen_single):
     c_code, _ = codegen_single(
         "main",
