@@ -2292,9 +2292,14 @@ class Backend:
                 self.emitter.emit_block_end()
             else:
                 self.emitter.emit_try_check_value(tmp, ret_none)
+            extracted = self.emitter.emit_try_extract_value(tmp)
             if is_statement:
-                return f"(void)({self.emitter.emit_try_extract_value(tmp)})"  # no-op in statement context
-            return self.emitter.emit_try_extract_value(tmp)
+                # In statement context, ARC payloads must remain a real value expression
+                # so ExprStmt can materialize/release them correctly.
+                if self.analysis.has_arc_data(src_ty.inner):
+                    return extracted
+                return f"(void)({extracted})"
+            return extracted
 
         self.ice(f"[ICE-9149] unknown expression type: {type(expr).__name__}", node=expr)
 

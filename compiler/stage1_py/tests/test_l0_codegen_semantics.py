@@ -545,6 +545,44 @@ def test_codegen_discarded_arc_call_released(codegen_single):
     assert "rt_string_release(" in main_body
 
 
+def test_codegen_try_stmt_with_arc_payload_compiles(codegen_single, compile_and_run, tmp_path):
+    c_code, _ = codegen_single(
+        "main",
+        """
+        module main;
+
+        func may_s(ok: bool) -> string? {
+            if (ok) {
+                return "ok" as string?;
+            }
+            return null;
+        }
+
+        func helper(ok: bool) -> int? {
+            may_s(ok)?;
+            return 7 as int?;
+        }
+
+        func main() -> int {
+            let a: int? = helper(true);
+            let b: int? = helper(false);
+            return 0;
+        }
+        """,
+    )
+
+    if c_code is None:
+        return
+
+    helper_start = c_code.find("l0_opt_int l0_main_helper(")
+    assert helper_start != -1
+    helper_body = c_code[helper_start:]
+    assert "= (void)((l0_try_" not in helper_body
+
+    ok, _stdout, stderr = compile_and_run(c_code, tmp_path)
+    assert ok, stderr
+
+
 def test_codegen_nested_arc_call_temps_released(codegen_single, compile_and_run, tmp_path):
     c_code, _ = codegen_single(
         "main",
