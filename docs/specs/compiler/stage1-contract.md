@@ -6,9 +6,9 @@ This document is the compact Stage 1 contract and navigation index.
 
 Canonical ownership:
 
-- Architecture and pass flow: [architecture](architecture.md)
-- C backend behavior and lowering details: [c_backend_design](c_backend_design.md)
-- Language/runtime rationale and future evolution: [design_decisions](design_decisions.md)
+- Architecture and pass flow: [reference/architecture.md](../../reference/architecture.md)
+- C backend behavior and lowering details: [reference/c-backend-design.md](../../reference/c-backend-design.md)
+- Language/runtime rationale and future evolution: [reference/design-decisions.md](../../reference/design-decisions.md)
 
 ## 1. Scope
 
@@ -86,8 +86,8 @@ Exit behavior:
 - Stage 1 emits a single C99 translation unit.
 - When trace flags are enabled, generated C emits `L0_TRACE_ARC` and/or `L0_TRACE_MEMORY` defines before
   including `l0_runtime.h`.
-- Backend details are canonical in [c_backend_design](c_backend_design.md).
-- Trace details are canonical in [trace_spec](trace_spec.md).
+- Backend details are canonical in [reference/c-backend-design.md](../../reference/c-backend-design.md).
+- Trace details are canonical in [specs/runtime/trace.md](../runtime/trace.md).
 
 ## 3. Current Core Data Shapes (Exact Names)
 
@@ -151,10 +151,10 @@ Important exact field names:
 Use the narrowest canonical document for each question:
 
 - Pass sequencing, module ownership, and frontend architecture:
-  [architecture](architecture.md)
+  [reference/architecture.md](../../reference/architecture.md)
 - Lowering policy, generated C layout, ARC/cleanup behavior, runtime calls:
-  [c_backend_design](c_backend_design.md)
+  [reference/c-backend-design.md](../../reference/c-backend-design.md)
 - Trace flags and runtime trace behavior:
-  [trace_spec](trace_spec.md)
+  [specs/runtime/trace.md](../runtime/trace.md)
 - Pointer/nullability model rationale, integer model rationale, stage-2 design direction:
-  [design_decisions](design_decisions.md)
+  [reference/design-decisions.md](../../reference/design-decisions.md)

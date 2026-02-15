@@ -4,9 +4,9 @@ This is the canonical architecture document for the Stage 1 compiler.
 
 Related canonical docs:
 
-- Backend lowering and generated C details: [c_backend_design](c_backend_design.md)
-- Language/runtime rationale and future evolution: [design_decisions](design_decisions.md)
-- Compact contract/index: [stage1_compiler_contract](stage1_compiler_contract.md)
+- Backend lowering and generated C details: [reference/c-backend-design.md](c-backend-design.md)
+- Language/runtime rationale and future evolution: [reference/design-decisions.md](design-decisions.md)
+- Compact contract/index: [specs/compiler/stage1-contract.md](../specs/compiler/stage1-contract.md)
 
 ## 1. High-Level Pipeline
 
@@ -88,7 +88,7 @@ Pass coordination entry point: `L0Driver.analyze()` in `compiler/stage1_py/l0_dr
 ### 2.7 Backend (`l0_backend.py`, `l0_c_emitter.py`)
 
 - Consumes a typed `AnalysisResult` and emits C99.
-- Canonical backend details are maintained only in [c_backend_design](c_backend_design.md).
+- Canonical backend details are maintained only in [reference/c-backend-design.md](c-backend-design.md).
 
 ## 3. Core Data Flow
 

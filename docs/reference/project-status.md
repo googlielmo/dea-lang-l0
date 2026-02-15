@@ -8,12 +8,12 @@ This document summarizes what is implemented in this repository today and what r
 
 Use this file as a status snapshot. For implementation details, use:
 
-- [architecture](architecture.md) for pass structure and data flow.
-- [stage1_compiler_contract](stage1_compiler_contract.md) for external interfaces and guarantees.
-- [c_backend_design](c_backend_design.md) for backend lowering and generated C behavior.
-- [trace_spec](trace_spec.md) for tracing flags and runtime trace semantics.
-- [l0_grammar](l0_grammar.md) for accepted concrete syntax.
-- [standard_library](standard_library.md) for current std/sys module APIs.
+- [reference/architecture.md](architecture.md) for pass structure and data flow.
+- [specs/compiler/stage1-contract.md](../specs/compiler/stage1-contract.md) for external interfaces and guarantees.
+- [reference/c-backend-design.md](c-backend-design.md) for backend lowering and generated C behavior.
+- [specs/runtime/trace.md](../specs/runtime/trace.md) for tracing flags and runtime trace semantics.
+- [reference/grammar/l0.md](grammar/l0.md) for accepted concrete syntax.
+- [reference/standard-library.md](standard-library.md) for current std/sys module APIs.
 
 ## Stage 1 Compiler (Python) - Current Implementation
 
@@ -106,7 +106,8 @@ Commands and aliases:
 Common supported options:
 
 - Roots and logging: `-P/--project-root`, `-S/--sys-root`, `-v/--verbose`, `-l/--log`
-- Build/codegen: `-NLD/--no-line-directives`, `--trace-arc`, `--trace-memory`, `-c/--c-compiler`, `-C/--c-options`, `-I/--runtime-include`,
+- Build/codegen: `-NLD/--no-line-directives`, `--trace-arc`, `--trace-memory`, `-c/--c-compiler`, `-C/--c-options`,
+  `-I/--runtime-include`,
   `-L/--runtime-lib`, `-o/--output`, `--keep-c`
 - Dumps: `-a/--all-modules` for `tok|ast|sym|type`, `-I/--include-eof` for `tok`
 

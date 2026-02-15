@@ -14,16 +14,20 @@ Core principle: **no undefined behavior** in the language itself.
 Detailed information lives in `docs/`. **Before answering questions about grammar, architecture, backend design, or
 implementation status, read the relevant doc file(s).**
 
-| Doc file                   | Covers                                                |
-|----------------------------|-------------------------------------------------------|
-| `docs/architecture.md`            | Compiler pipeline, passes, data flow, file layout                |
-| `docs/stage1_compiler_contract.md` | Stage 1 compact contract, interfaces, guarantees, doc routing   |
-| `docs/c_backend_design.md`          | C backend architecture, emission strategy                        |
-| `docs/design_decisions.md`          | Runtime, pointer model, integer model, I/O, rationale           |
-| `docs/l0_grammar.md`                | Formal EBNF grammar                                              |
-| `docs/project_status.md`            | Implementation status, known limitations, roadmap                |
-| `docs/standard_library.md`          | stdlib module reference (`std.*`, `sys.*`)                       |
-| `docs/trace_spec.md`                | Trace flags, generated defines, runtime trace contract           |
+| Doc file                                 | Covers                                                        |
+|------------------------------------------|---------------------------------------------------------------|
+| `docs/reference/architecture.md`         | Compiler pipeline, passes, data flow, file layout             |
+| `docs/specs/compiler/stage1-contract.md` | Stage 1 compact contract, interfaces, guarantees, doc routing |
+| `docs/reference/c-backend-design.md`     | C backend architecture, emission strategy                     |
+| `docs/reference/design-decisions.md`     | Runtime, pointer model, integer model, I/O, rationale         |
+| `docs/reference/grammar/l0.md`           | Formal EBNF grammar                                           |
+| `docs/reference/project-status.md`       | Implementation status, known limitations, roadmap             |
+| `docs/reference/standard-library.md`     | stdlib module reference (`std.*`, `sys.*`)                    |
+| `docs/specs/runtime/trace.md`            | Trace flags, generated defines, runtime trace contract        |
+
+Documentation policy:
+- `docs/README.md` for docs placement, naming, and attic rules.
+- `docs/attic/README.md` for archived/obsolete document policy details.
 
 Also see: `CONTRIBUTING.md`, `SECURITY.md`.
 

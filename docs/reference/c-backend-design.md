@@ -4,9 +4,9 @@ This is the canonical backend implementation document for Stage 1.
 
 Related docs:
 
-- Stage 1 architecture and pass flow: [architecture](architecture.md)
-- Language/runtime rationale and future evolution: [design_decisions](design_decisions.md)
-- Stage 1 contract/index: [stage1_compiler_contract](stage1_compiler_contract.md)
+- Stage 1 architecture and pass flow: [reference/architecture.md](architecture.md)
+- Language/runtime rationale and future evolution: [reference/design-decisions.md](design-decisions.md)
+- Stage 1 contract/index: [specs/compiler/stage1-contract.md](../specs/compiler/stage1-contract.md)
 
 ## Overview
 
@@ -151,7 +151,7 @@ If entry module defines `main`, backend emits C wrapper:
   preprocessor toggles consumed by `l0_runtime.h`.
 - Escape decoding used by `case` literal semantic checks is shared with codegen to avoid divergence.
 
-Tracing details and runtime log contract are specified in [trace_spec](trace_spec.md).
+Tracing details and runtime log contract are specified in [specs/runtime/trace.md](../specs/runtime/trace.md).
 
 ## Current Constraints and Known Gaps
 

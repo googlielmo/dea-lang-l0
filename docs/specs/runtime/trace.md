@@ -43,8 +43,8 @@ Manual C defines passed via `-C` (for example `-C "-DL0_TRACE_ARC"`) remain comp
 
 - Trace output stream: `stderr`.
 - Prefixes:
-  - ARC: `[l0][arc]`
-  - Memory: `[l0][mem]`
+    - ARC: `[l0][arc]`
+    - Memory: `[l0][mem]`
 - Trace format is line-oriented text, one event per line.
 
 No stdout behavior is changed by tracing.

@@ -4,9 +4,9 @@ This document records rationale and policy decisions.
 
 Canonical ownership boundaries:
 
-- Compiler architecture and pass flow: [architecture](architecture.md)
-- C backend implementation/lowering details: [c_backend_design](c_backend_design.md)
-- Stage 1 contract/index: [stage1_compiler_contract](stage1_compiler_contract.md)
+- Compiler architecture and pass flow: [reference/architecture.md](architecture.md)
+- C backend implementation/lowering details: [reference/c-backend-design.md](c-backend-design.md)
+- Stage 1 contract/index: [specs/compiler/stage1-contract.md](../specs/compiler/stage1-contract.md)
 
 ## 1. Scope and Goals
 
@@ -119,7 +119,8 @@ Policy:
 - `byte` is 8-bit semantics,
 - runtime helpers enforce defined behavior for overflow/division/mod edge cases.
 
-Implementation details of generated helpers and typedef mapping are canonical in [c_backend_design](c_backend_design.md) and
+Implementation details of generated helpers and typedef mapping are canonical
+in [reference/c-backend-design.md](c-backend-design.md) and
 `runtime/l0_runtime.h`.
 
 ## 8. Toolchain and Portability Policy
@@ -130,7 +131,7 @@ Policy-level decision:
 - backend behavior should be deterministic and easy to reason about,
 - platform/compiler specifics should be isolated to runtime boundary code.
 
-Operational backend rules belong in [c_backend_design](c_backend_design.md).
+Operational backend rules belong in [reference/c-backend-design.md](c-backend-design.md).
 
 ## 9. Future Evolution
 

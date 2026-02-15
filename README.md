@@ -103,7 +103,8 @@ func process_config(path: string) -> int {
 
 ### Assumptions and Constraints
 
-- Module name components must be valid identifiers (`[A-Za-z_][A-Za-z0-9_]*`), so names like `app.main` are valid while `app.my-module` and `9main` are not.
+- Module name components must be valid identifiers (`[A-Za-z_][A-Za-z0-9_]*`), so names like `app.main` are valid while
+  `app.my-module` and `9main` are not.
 - Filesystem module resolution follows host behavior (case-sensitive hosts require exact case matches).
 - Source files are decoded as UTF-8; a UTF-8 BOM is accepted and ignored.
 - `run` and `build` require the entry module to define `main`.
@@ -132,6 +133,7 @@ The `l0c` wrapper script sets sensible defaults, but you can override them with 
    ```
 
 If not set, defaults are relative to the repository root:
+
 - `L0_HOME` → `compiler/stage1_py`
 - `L0_SYSTEM` → `$L0_HOME/l0/stdlib`
 - `L0_RUNTIME_INCLUDE` → `$L0_HOME/runtime`
@@ -253,7 +255,7 @@ Key properties:
 
 ## Grammar
 
-The authoritative Stage-1 grammar is in [l0_grammar](docs/l0_grammar.md).
+The authoritative Stage-1 grammar is in [reference/grammar/l0.md](docs/reference/grammar/l0.md).
 
 Pointer and nullable types look like this:
 
@@ -270,12 +272,12 @@ calls, field access, `as` casts, and the **try operator** `?`.
 
 ## Compiler implementation architecture
 
-See [architecture](docs/architecture.md) for an overview of the Python L0 stage-1 compiler implementation
-architecture and data flow.
+See [reference/architecture.md](docs/reference/architecture.md) for an overview of the Python L0 stage-1 compiler
+implementation architecture and data flow.
 
-See also [design_decisions](docs/design_decisions.md) for additional context.
+See also [reference/design-decisions.md](docs/reference/design-decisions.md) for additional context.
 
-See [stage1_compiler_contract](docs/stage1_compiler_contract.md) for the compact Stage 1 contract/index.
+See [specs/compiler/stage1-contract.md](docs/specs/compiler/stage1-contract.md) for the compact Stage 1 contract/index.
 
 ## CLI
 
@@ -321,7 +323,7 @@ Trace options for generated C/runtime debugging:
 ./l0c run --trace-arc --trace-memory app.main
 ```
 
-Trace logs are written to `stderr`. See [trace_spec](docs/trace_spec.md) for the full contract.
+Trace logs are written to `stderr`. See [specs/runtime/trace.md](docs/specs/runtime/trace.md) for the full contract.
 
 Example usage:
 
@@ -359,7 +361,7 @@ Enjoy the game! Type your inputs as prompted and see how well you can govern anc
 
 ## Project status
 
-The authoritative status file is [project_status](docs/project_status.md).
+The authoritative status file is [reference/project-status.md](docs/reference/project-status.md).
 
 ## License
 
