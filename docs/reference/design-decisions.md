@@ -12,8 +12,9 @@ Canonical ownership boundaries:
 
 The language aims to be:
 
-- small,
+- small but expressive,
 - practical for a self-hosting compiler,
+- suitable for systems programming and runtime implementation,
 - explicit about safety constraints,
 - portable via conservative C99 lowering.
 
@@ -65,9 +66,9 @@ therefore currently rejected for unsupported targets.
 
 ### 4.1 Nullability policy
 
-- `T?` encodes nullable/optional values.
-- Non-pointer nullable values are represented by wrapper forms in generated C.
-- Nullable pointers use pointer-null representation.
+- `T?` encodes nullable/optional values, `null` is the only empty value of a nullable type.
+- Non-pointer nullable values are represented by wrapper forms in generated C (e.g., `l0_opt_*` structs).
+- Nullable pointers use pointer-null representation (niche optimization).
 
 ### 4.2 Cast policy (`as`)
 
@@ -75,17 +76,19 @@ Casts are explicit and checked by type rules and runtime helpers where needed.
 
 Important intent:
 
-- narrowing/wrapping/unwrap semantics are explicit,
+- narrowing and wrap/unwrap semantics are explicit,
 - invalid casts are compile-time errors,
 - runtime checks are used for defined-failure cases (panic), not UB.
 
-### 4.3 Try operator (`expr?`)
+### 4.3 Null propagation operator
 
-Try-propagation provides nullable short-circuiting behavior with explicit type semantics.
+The try expression syntax (`expr?`) propagates null out of the current function (returns early) and provides nullable
+short-circuiting behavior with explicit type semantics.
 
-### 4.4 `sizeof`
+### 4.4 Language intrinsics and type introspection
 
-`sizeof` exists as a language intrinsic and returns `int` in Stage 1.
+- `sizeof` exists as a language intrinsic and returns `int` in Stage 1.
+- `ord` is a language intrinsic for enum tag introspection and returns `int` in Stage 1.
 
 ## 5. Early I/O Model
 
@@ -96,8 +99,10 @@ Rationale:
 - enough for compiler bootstrapping and diagnostics,
 - avoids premature API surface complexity.
 
-Concrete runtime API names are documented in `compiler/stage1_py/l0/stdlib/sys/rt.l0` and implemented in
+Concrete runtime API names are available in the `sys.rt` module and implemented in
 `compiler/stage1_py/runtime/l0_runtime.h`.
+
+See also: [reference/standard-library.md](standard-library.md) for the current `std`/`sys` module API surface.
 
 ## 6. Name Disambiguation via Qualified References
 

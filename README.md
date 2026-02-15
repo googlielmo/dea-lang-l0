@@ -241,31 +241,25 @@ Key properties:
 * **Modules**: one file = one module (dotted names supported).
 * **Qualified names**: disambiguate imported symbols with `module.path::Symbol` in types, expressions, and patterns.
 * **Types**: builtins, structs, enums with payloads, type aliases.
-* **Automatically reference counted string values**: `string` is a first-class type.
+* **Automatically reference counted (ARC) string values**: `string` is a first-class type.
 * **Pointers**: `T*`, nullable `T*?`; no address-of operator `&` in early stages.
 * **Auto-dereference**: Field access `ptr.field` automatically dereferences pointers.
-* **Pattern matching**: statement-only, simple variant patterns.
+* **Pattern matching**: statement-only, simple variant patterns with `match`.
 * **Expressions**: C-like precedence, no assignment-as-expression.
-* **Statements**: `let`, assignment, if/else, while, return, match.
-* **Extern functions** interface with the C kernel.
-* **Introspection**: `sizeof(T)` available at compile time.
+* **Statements**: `let` bindings, assignment, `if`/`else`, `while`, C-like `for`, `case` for literal value matching,
+  `with`/`cleanup` blocks for deterministic cleanup.
+* **Flow control**: `return`, `break`, `continue`, `expr?` early return on null.
+* **Extern functions**: interface with the C kernel.
+* **Introspection**: `sizeof()` and `ord()` available at compile time.
 * **Null Safety**:
     * Postfix **try operator** `?` for short-circuiting null propagation (optional chaining).
-    * Checked casts: `T? as T` (unwrap with panic if null) and `T as T?` (safe wrap).
+    * Checked casts: `T? as T` (unwrap with panic if null) and `T as T?` widening (safe wrap).
 
 ## Grammar
 
 The authoritative Stage-1 grammar is in [reference/grammar/l0.md](docs/reference/grammar/l0.md).
 
-Pointer and nullable types look like this:
-
-```
-T
-T*
-T**
-T?
-T*?
-```
+Pointer and nullable types look like `T*`, `T**`, `T?`, `T*?`, etc.
 
 Expressions include unary (`-`, `!`, `*`, `~`), binary arithmetic, logical, comparisons, bitwise, indexing,
 calls, field access, `as` casts, and the **try operator** `?`.
