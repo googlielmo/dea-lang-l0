@@ -1,0 +1,113 @@
+# L0 Trace Specification
+
+Version: 2026-02-15
+
+This document specifies Stage 1 trace instrumentation for generated C code and runtime behavior.
+
+## 1. Purpose
+
+Trace instrumentation exists to verify ownership and memory code paths at runtime, especially subtle ARC behavior
+(`retain`/`release`) and allocation/deallocation flows.
+
+Tracing is opt-in and intended for debugging, validation, and regression analysis.
+
+## 2. User Interface (Stage 1 CLI)
+
+`l0c` exposes trace flags on codegen-producing commands (`gen`, `build`, `run`):
+
+- `--trace-arc`: enable ARC operation tracing.
+- `--trace-memory`: enable memory operation tracing.
+
+Flags are independent and composable.
+
+Examples:
+
+```bash
+./l0c gen --trace-arc app.main
+./l0c build --trace-memory app.main
+./l0c run --trace-arc --trace-memory app.main
+```
+
+## 3. Generated C Contract
+
+When enabled, generated C emits preprocessor defines immediately before including `l0_runtime.h`:
+
+- `#define L0_TRACE_ARC 1`
+- `#define L0_TRACE_MEMORY 1`
+
+These defines gate runtime trace code with `#ifdef` so trace logic is fully excluded when flags are off.
+
+Manual C defines passed via `-C` (for example `-C "-DL0_TRACE_ARC"`) remain compatible.
+
+## 4. Runtime Output Contract
+
+- Trace output stream: `stderr`.
+- Prefixes:
+  - ARC: `[l0][arc]`
+  - Memory: `[l0][mem]`
+- Trace format is line-oriented text, one event per line.
+
+No stdout behavior is changed by tracing.
+
+## 5. Trace Families
+
+### 5.1 ARC (`L0_TRACE_ARC`)
+
+ARC traces include retain/release operations and branch outcomes.
+
+Current ARC instrumentation points:
+
+- `rt_string_retain`
+- `rt_string_release` path (`_rt_free_string`)
+
+Typical fields include:
+
+- operation (`op=retain` or `op=release`)
+- string kind (`static`/`heap`)
+- pointer identity
+- reference count transition (`rc_before`/`rc_after`) where applicable
+- action (`retain`, `keep`, `free`, `noop-*`, or `panic-*`)
+
+### 5.2 Memory (`L0_TRACE_MEMORY`)
+
+Memory traces include allocation/free/reallocation/new/drop paths.
+
+Current memory instrumentation points:
+
+- `rt_alloc`
+- `rt_realloc`
+- `rt_free`
+- `rt_calloc`
+- `_rt_alloc_string`
+- `_rt_realloc_string`
+- `_rt_free_string`
+- `_rt_alloc_obj`
+- `_rt_drop`
+
+Typical fields include:
+
+- operation name
+- size/count arguments
+- pointer identities (old/new for realloc)
+- action (`ok`, `fail`, `free`, `noop-*`, `panic-*`)
+
+## 6. Compatibility and Defaults
+
+- Tracing is disabled by default.
+- Enabling tracing does not change language semantics; it only emits additional `stderr` logs.
+- Existing programs compile and run unchanged without trace flags.
+
+## 7. Non-goals (Current Stage)
+
+- Structured trace output formats (JSON/binary).
+- Source-location tagging on each trace line.
+- Configurable runtime filtering levels/categories.
+
+## 8. Candidate Future Flags
+
+Potential future `trace-*` families:
+
+- `trace-panic`
+- `trace-io`
+- `trace-hash`
+- `trace-newdrop` (if split from general memory tracing)

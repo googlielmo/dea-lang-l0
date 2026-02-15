@@ -313,6 +313,16 @@ options:
                         Add a system/stdlib source root (can be passed multiple times; default: $L0_SYSTEM as colon-separated paths)
 ```
 
+Trace options for generated C/runtime debugging:
+
+```shell
+./l0c gen --trace-arc app.main
+./l0c run --trace-memory app.main
+./l0c run --trace-arc --trace-memory app.main
+```
+
+Trace logs are written to `stderr`. See [trace_spec](docs/trace_spec.md) for the full contract.
+
 Example usage:
 
 ```shell

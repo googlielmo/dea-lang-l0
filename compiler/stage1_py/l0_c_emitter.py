@@ -369,6 +369,10 @@ class CEmitter:
         self.out.emit('#include "l0_siphash.h"')
         self.out.emit()
         self.out.emit("/* L0 runtime header */")
+        if self.analysis.context.trace_arc:
+            self.out.emit("#define L0_TRACE_ARC 1")
+        if self.analysis.context.trace_memory:
+            self.out.emit("#define L0_TRACE_MEMORY 1")
         self.out.emit('#include "l0_runtime.h"')
         self.out.emit()
 

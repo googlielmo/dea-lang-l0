@@ -11,6 +11,7 @@ Use this file as a status snapshot. For implementation details, use:
 - [architecture](architecture.md) for pass structure and data flow.
 - [stage1_compiler_contract](stage1_compiler_contract.md) for external interfaces and guarantees.
 - [c_backend_design](c_backend_design.md) for backend lowering and generated C behavior.
+- [trace_spec](trace_spec.md) for tracing flags and runtime trace semantics.
 - [l0_grammar](l0_grammar.md) for accepted concrete syntax.
 - [standard_library](standard_library.md) for current std/sys module APIs.
 
@@ -85,6 +86,7 @@ Current backend behavior includes:
 - ARC-aware ownership cleanup for string-containing values.
 - Main-wrapper emission for entry module `main`.
 - `#line` directives enabled by default (disable with `--no-line-directives`).
+- Optional runtime tracing toggles emitted during codegen (`--trace-arc`, `--trace-memory`).
 
 ## Stage 1 CLI and Workflow Status
 
@@ -104,7 +106,7 @@ Commands and aliases:
 Common supported options:
 
 - Roots and logging: `-P/--project-root`, `-S/--sys-root`, `-v/--verbose`, `-l/--log`
-- Build/codegen: `-NLD/--no-line-directives`, `-c/--c-compiler`, `-C/--c-options`, `-I/--runtime-include`,
+- Build/codegen: `-NLD/--no-line-directives`, `--trace-arc`, `--trace-memory`, `-c/--c-compiler`, `-C/--c-options`, `-I/--runtime-include`,
   `-L/--runtime-lib`, `-o/--output`, `--keep-c`
 - Dumps: `-a/--all-modules` for `tok|ast|sym|type`, `-I/--include-eof` for `tok`
 

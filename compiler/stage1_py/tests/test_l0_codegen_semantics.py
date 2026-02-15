@@ -1,6 +1,37 @@
 #  SPDX-License-Identifier: MIT OR Apache-2.0
 #  Copyright (c) 2026 gwz
 
+
+def test_codegen_trace_defines_emitted(analyze_single):
+    result = analyze_single(
+        "main",
+        """
+        module main;
+
+        func main() -> int {
+            return 0;
+        }
+        """,
+    )
+
+    assert not result.has_errors(), result.diagnostics
+    result.context.trace_arc = True
+    result.context.trace_memory = True
+
+    from l0_backend import Backend
+
+    c_code = Backend(result).generate()
+
+    arc_pos = c_code.find("#define L0_TRACE_ARC 1")
+    mem_pos = c_code.find("#define L0_TRACE_MEMORY 1")
+    runtime_pos = c_code.find('#include "l0_runtime.h"')
+    assert arc_pos != -1
+    assert mem_pos != -1
+    assert runtime_pos != -1
+    assert arc_pos < runtime_pos
+    assert mem_pos < runtime_pos
+
+
 def test_codegen_enum_tagging_and_match_switch(codegen_single):
     c_code, _ = codegen_single(
         "main",
@@ -512,6 +543,67 @@ def test_codegen_runtime_integer_overflow_panics(codegen_single, compile_and_run
     ok, stdout, stderr = compile_and_run(c_code, tmp_path)
     assert not ok
     assert "integer addition overflow" in stderr
+
+
+def test_codegen_runtime_trace_arc_to_stderr(analyze_single, compile_and_run, tmp_path):
+    result = analyze_single(
+        "main",
+        """
+        module main;
+
+        import std.io;
+
+        func main() -> int {
+            let a: string = "a";
+            let b: string = a;
+            printl_s(b);
+            return 0;
+        }
+        """,
+    )
+    assert not result.has_errors(), result.diagnostics
+    result.context.trace_arc = True
+
+    from l0_backend import Backend
+
+    c_code = Backend(result).generate()
+    ok, stdout, stderr = compile_and_run(c_code, tmp_path)
+    assert ok, stderr
+    assert stdout.strip() == "a"
+    assert "[l0][arc]" in stderr
+    assert "op=retain" in stderr
+    assert "op=release" in stderr
+
+
+def test_codegen_runtime_trace_memory_to_stderr(analyze_single, compile_and_run, tmp_path):
+    result = analyze_single(
+        "main",
+        """
+        module main;
+
+        struct Pair {
+            a: int;
+            b: int;
+        }
+
+        func main() -> int {
+            let p: Pair* = new Pair(1, 2);
+            drop p;
+            return 0;
+        }
+        """,
+    )
+    assert not result.has_errors(), result.diagnostics
+    result.context.trace_memory = True
+
+    from l0_backend import Backend
+
+    c_code = Backend(result).generate()
+    ok, _stdout, stderr = compile_and_run(c_code, tmp_path)
+    assert ok, stderr
+    assert "[l0][mem]" in stderr
+    assert "op=new_alloc" in stderr
+    assert "op=drop" in stderr
 
 
 # ---------------------------------------------------------------------------

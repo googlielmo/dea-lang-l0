@@ -30,10 +30,14 @@ class CompilationContext:
     Attributes:
         emit_line_directives:   If True, emit #line directives in generated C code
                                 for better debugging and error messages.
+        trace_arc:              If True, generated C enables ARC tracing in runtime (`L0_TRACE_ARC`).
+        trace_memory:           If True, generated C enables memory tracing in runtime (`L0_TRACE_MEMORY`).
         log_rich_format:        If True, emit logs in rich format: may include log level, timestamps, etc.
         log_level:              Current logging level (0=SILENT, 1=INFO, 3=DEBUG).
     """
     emit_line_directives: bool = True
+    trace_arc: bool = False
+    trace_memory: bool = False
     log_rich_format: bool = False
     log_level: LogLevel = LogLevel.WARNING
 

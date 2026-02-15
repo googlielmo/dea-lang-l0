@@ -41,6 +41,32 @@
 #include "l0_siphash.h"
 
 /* ============================================================================
+ * Optional tracing support (compile-time toggles)
+ * ============================================================================ */
+
+#ifdef L0_TRACE_ARC
+#define _RT_TRACE_ARC(...) \
+    do { \
+        fprintf(stderr, "[l0][arc] "); \
+        fprintf(stderr, __VA_ARGS__); \
+        fprintf(stderr, "\n"); \
+    } while (0)
+#else
+#define _RT_TRACE_ARC(...) ((void)0)
+#endif
+
+#ifdef L0_TRACE_MEMORY
+#define _RT_TRACE_MEM(...) \
+    do { \
+        fprintf(stderr, "[l0][mem] "); \
+        fprintf(stderr, __VA_ARGS__); \
+        fprintf(stderr, "\n"); \
+    } while (0)
+#else
+#define _RT_TRACE_MEM(...) ((void)0)
+#endif
+
+/* ============================================================================
  * Core type definitions
  * ============================================================================ */
 
@@ -348,7 +374,9 @@ static l0_string _rt_alloc_string(l0_int len) {
     if (mem == NULL) {
         _rt_panic("_rt_alloc_string: out of memory");
     }
-    return _rt_init_heap_string(mem, len);
+    l0_string s = _rt_init_heap_string(mem, len);
+    _RT_TRACE_MEM("op=alloc_string len=%d ptr=%p", (int)len, (void*)s.data.h_str);
+    return s;
 }
 
 /**
@@ -358,28 +386,58 @@ static l0_string _rt_alloc_string(l0_int len) {
 static void _rt_free_string(l0_string str) {
     if (str.kind == L0_STRING_K_STATIC) {
         /* Static string: do nothing */
+        _RT_TRACE_ARC("op=release kind=static ptr=%p rc_before=-1 rc_after=-1 action=noop", (void*)str.data.s_str.bytes);
         return;
     }
     _l0_h_string *hs = str.data.h_str;
     if (hs == NULL) {
+        _RT_TRACE_ARC("op=release kind=heap ptr=%p rc_before=-1 rc_after=-1 action=panic-null-ptr", (void*)hs);
+        _RT_TRACE_MEM("op=free_string ptr=%p action=panic-null-ptr", (void*)hs);
         _rt_panic("_rt_free_string: null heap string pointer");
     }
-    if (hs->refcount > 0 && hs->refcount < INT32_MAX) {
+    l0_int rc_before = hs->refcount;
+    if (rc_before > 0 && rc_before < INT32_MAX) {
         /* Reference counted string */
         hs->refcount--;
         if (hs->refcount == 0) {
+            _RT_TRACE_ARC(
+                "op=release kind=heap ptr=%p rc_before=%d rc_after=0 action=free",
+                (void*)hs, (int)rc_before
+            );
+            _RT_TRACE_MEM("op=free_string ptr=%p action=free", (void*)hs);
             hs->refcount = _RT_MEM_SENTINEL; /* prevent double free */
             free((void*)hs);
+        } else {
+            _RT_TRACE_ARC(
+                "op=release kind=heap ptr=%p rc_before=%d rc_after=%d action=keep",
+                (void*)hs, (int)rc_before, (int)hs->refcount
+            );
+            _RT_TRACE_MEM("op=free_string ptr=%p action=decrement-only", (void*)hs);
         }
         return;
     }
-    if (hs->refcount == INT32_MAX) {
+    if (rc_before == INT32_MAX) {
         /* Non-reference counted string: do nothing */
+        _RT_TRACE_ARC(
+            "op=release kind=heap ptr=%p rc_before=%d rc_after=%d action=noop-nonref",
+            (void*)hs, (int)rc_before, (int)rc_before
+        );
+        _RT_TRACE_MEM("op=free_string ptr=%p action=noop-nonref", (void*)hs);
         return;
     }
-    if (hs->refcount == _RT_MEM_SENTINEL) {
+    if (rc_before == _RT_MEM_SENTINEL) {
+        _RT_TRACE_ARC(
+            "op=release kind=heap ptr=%p rc_before=%d rc_after=%d action=panic-double-free",
+            (void*)hs, (int)rc_before, (int)rc_before
+        );
+        _RT_TRACE_MEM("op=free_string ptr=%p action=panic-double-free", (void*)hs);
         _rt_panic("_rt_free_string: double free detected");
     }
+    _RT_TRACE_ARC(
+        "op=release kind=heap ptr=%p rc_before=%d rc_after=%d action=panic-invalid-state",
+        (void*)hs, (int)rc_before, (int)rc_before
+    );
+    _RT_TRACE_MEM("op=free_string ptr=%p action=panic-invalid-state", (void*)hs);
     _rt_panic_fmt("_rt_free_string: invalid string refcount state: %d", (int)hs->refcount);
 }
 
@@ -396,18 +454,24 @@ static l0_string _rt_realloc_string(l0_string s, l0_int new_len) {
         return _rt_alloc_string(new_len);
     }
     if (s.kind != L0_STRING_K_HEAP || s.data.h_str == NULL) {
+        _RT_TRACE_MEM("op=realloc_string old_ptr=%p new_len=%d action=panic-invalid-string", (void*)s.data.h_str, (int)new_len);
         _rt_panic("_rt_realloc_string: string is not heap-allocated");
     }
     _l0_h_string *old_hs = s.data.h_str;
     size_t new_size = sizeof(_l0_h_string) + new_len + 1;
     void *new_mem = realloc((void*)old_hs, new_size);
     if (new_mem == NULL) {
+        _RT_TRACE_MEM("op=realloc_string old_ptr=%p new_len=%d action=panic-oom", (void*)old_hs, (int)new_len);
         _rt_panic("_rt_realloc_string: out of memory");
     }
     _l0_h_string *new_hs = (_l0_h_string *)new_mem;
     new_hs->len = new_len;
     new_hs->bytes[new_len] = '\0'; /* null-terminate */
     s.data.h_str = new_hs;
+    _RT_TRACE_MEM(
+        "op=realloc_string old_ptr=%p new_ptr=%p new_len=%d action=ok",
+        (void*)old_hs, (void*)new_hs, (int)new_len
+    );
     return s;
 }
 
@@ -630,20 +694,45 @@ static l0_string rt_string_from_byte_array(l0_byte* bytes, l0_int len) {
  */
 static l0_string rt_string_retain(l0_string s) {
     if (s.kind == L0_STRING_K_STATIC) {
+        _RT_TRACE_ARC("op=retain kind=static ptr=%p rc_before=-1 rc_after=-1 action=noop", (void*)s.data.s_str.bytes);
         return s;
     }
     _l0_h_string *hs = s.data.h_str;
     if (hs == NULL) {
+        _RT_TRACE_ARC("op=retain kind=heap ptr=%p rc_before=-1 rc_after=-1 action=panic-null-ptr", (void*)hs);
         _rt_panic("rt_string_retain: null heap string pointer");
     }
-    if (hs->refcount == _RT_MEM_SENTINEL) {
+    l0_int rc_before = hs->refcount;
+    if (rc_before == _RT_MEM_SENTINEL) {
+        _RT_TRACE_ARC(
+            "op=retain kind=heap ptr=%p rc_before=%d rc_after=%d action=panic-use-after-free",
+            (void*)hs, (int)rc_before, (int)rc_before
+        );
         _rt_panic("rt_string_retain: use after free");
     }
-    if (hs->refcount > 0 && hs->refcount < INT32_MAX - 1) {
+    if (rc_before > 0 && rc_before < INT32_MAX - 1) {
         hs->refcount++;
+        _RT_TRACE_ARC(
+            "op=retain kind=heap ptr=%p rc_before=%d rc_after=%d action=retain",
+            (void*)hs, (int)rc_before, (int)hs->refcount
+        );
+    } else if (rc_before == INT32_MAX - 1) {
+        _RT_TRACE_ARC(
+            "op=retain kind=heap ptr=%p rc_before=%d rc_after=%d action=panic-overflow",
+            (void*)hs, (int)rc_before, (int)rc_before
+        );
+        _rt_panic_fmt("rt_string_retain: invalid refcount state: %d", (int)hs->refcount);
     } else if (hs->refcount == INT32_MAX) {
         /* Non-refcounted heap string: no-op */
+        _RT_TRACE_ARC(
+            "op=retain kind=heap ptr=%p rc_before=%d rc_after=%d action=noop-nonref",
+            (void*)hs, (int)rc_before, (int)rc_before
+        );
     } else {
+        _RT_TRACE_ARC(
+            "op=retain kind=heap ptr=%p rc_before=%d rc_after=%d action=panic-invalid-state",
+            (void*)hs, (int)rc_before, (int)rc_before
+        );
         _rt_panic_fmt("rt_string_retain: invalid refcount state: %d", (int)hs->refcount);
     }
     return s;
@@ -1092,9 +1181,11 @@ static void *rt_alloc(l0_int bytes) {
 
     if (ptr == NULL) {
         /* Allocation failed - return NULL and let caller handle it */
+        _RT_TRACE_MEM("op=alloc bytes=%d ptr=%p action=fail", (int)bytes, (void*)ptr);
         return NULL;
     }
 
+    _RT_TRACE_MEM("op=alloc bytes=%d ptr=%p action=ok", (int)bytes, ptr);
     return ptr;
 }
 
@@ -1121,9 +1212,11 @@ static void *rt_realloc(void *ptr, l0_int new_bytes) {
 
     if (new_ptr == NULL) {
         /* Real failure! original pointer is still valid */
+        _RT_TRACE_MEM("op=realloc old_ptr=%p bytes=%d new_ptr=%p action=fail", ptr, (int)new_bytes, (void*)new_ptr);
         return NULL;
     }
 
+    _RT_TRACE_MEM("op=realloc old_ptr=%p bytes=%d new_ptr=%p action=ok", ptr, (int)new_bytes, new_ptr);
     return new_ptr;
 }
 
@@ -1134,6 +1227,7 @@ static void *rt_realloc(void *ptr, l0_int new_bytes) {
  */
 static void rt_free(void *ptr) {
     /* free(NULL) is a no-op in C */
+    _RT_TRACE_MEM("op=free ptr=%p action=call", ptr);
     free(ptr);
 }
 
@@ -1158,6 +1252,10 @@ static void *rt_calloc(l0_int count, l0_int elem_size) {
     size_t size = (size_t)elem_size;
 
     void *ptr = calloc(n, size);
+    _RT_TRACE_MEM(
+        "op=calloc count=%d elem_size=%d ptr=%p action=%s",
+        (int)count, (int)elem_size, ptr, ptr == NULL ? "fail" : "ok"
+    );
     return ptr;
 }
 
@@ -1287,6 +1385,7 @@ static void *_rt_alloc_obj(l0_int bytes) {
     void *ptr = rt_calloc(1, bytes);
     if (ptr == NULL) {
         rt_free(ptr);
+        _RT_TRACE_MEM("op=new_alloc bytes=%d ptr=%p action=panic-oom", (int)bytes, ptr);
         _rt_panic("new: out of memory");
     }
 
@@ -1298,6 +1397,7 @@ static void *_rt_alloc_obj(l0_int bytes) {
     node->next = _rt_alloc_list;
     _rt_alloc_list = node;
 
+    _RT_TRACE_MEM("op=new_alloc bytes=%d ptr=%p action=ok", (int)bytes, ptr);
     return ptr;
 }
 
@@ -1309,6 +1409,7 @@ static void *_rt_alloc_obj(l0_int bytes) {
  */
 static void _rt_drop(void *ptr) {
     if (ptr == NULL) {
+        _RT_TRACE_MEM("op=drop ptr=%p action=noop-null", ptr);
         return; /* covers drop of null optional pointers (T*?) */
     }
 
@@ -1318,6 +1419,7 @@ static void _rt_drop(void *ptr) {
     }
 
     if (*cur == NULL) {
+        _RT_TRACE_MEM("op=drop ptr=%p action=panic-not-found", ptr);
         _rt_panic("drop: pointer not allocated by 'new'");
     }
 
@@ -1325,6 +1427,7 @@ static void _rt_drop(void *ptr) {
     *cur = dead->next;
     free(dead);
 
+    _RT_TRACE_MEM("op=drop ptr=%p action=free", ptr);
     free(ptr);
 }
 

@@ -27,6 +27,8 @@ def _build_args(tmp_path, entry: str, **overrides):
         project_root=[str(tmp_path)],
         sys_root=[],
         no_line_directives=False,
+        trace_arc=False,
+        trace_memory=False,
         log=False,
     )
     base.update(overrides)
@@ -129,6 +131,8 @@ def test_run_forwards_c_options_to_build(tmp_path, monkeypatch):
         project_root=[str(tmp_path)],
         sys_root=[],
         no_line_directives=False,
+        trace_arc=False,
+        trace_memory=False,
         log=False,
     )
 
@@ -136,3 +140,36 @@ def test_run_forwards_c_options_to_build(tmp_path, monkeypatch):
 
     assert rc == 1
     assert captured["c_options"] == "-O2 -DDEBUG"
+
+
+def test_run_forwards_trace_flags_to_build(tmp_path, monkeypatch):
+    captured = {}
+
+    def _fake_cmd_build(args):
+        captured["trace_arc"] = args.trace_arc
+        captured["trace_memory"] = args.trace_memory
+        return 1
+
+    monkeypatch.setattr("l0c.cmd_build", _fake_cmd_build)
+
+    args = argparse.Namespace(
+        entry="app.main",
+        args=[],
+        c_compiler="cc",
+        c_options=None,
+        runtime_include=None,
+        runtime_lib=None,
+        verbosity=0,
+        project_root=[str(tmp_path)],
+        sys_root=[],
+        no_line_directives=False,
+        trace_arc=True,
+        trace_memory=True,
+        log=False,
+    )
+
+    rc = cmd_run(args)
+
+    assert rc == 1
+    assert captured["trace_arc"] is True
+    assert captured["trace_memory"] is True

@@ -23,6 +23,7 @@ implementation status, read the relevant doc file(s).**
 | `docs/l0_grammar.md`                | Formal EBNF grammar                                              |
 | `docs/project_status.md`            | Implementation status, known limitations, roadmap                |
 | `docs/standard_library.md`          | stdlib module reference (`std.*`, `sys.*`)                       |
+| `docs/trace_spec.md`                | Trace flags, generated defines, runtime trace contract           |
 
 Also see: `CONTRIBUTING.md`, `SECURITY.md`.
 
@@ -44,6 +45,8 @@ All commands run from the repository root:
 Verbosity: `-v` (info), `-vvv` (debug).
 
 C compiler selection: `-c <compiler>`. Auto-detection order: tcc, gcc, clang, cc from PATH, then `$CC`.
+
+Trace toggles (codegen/build/run): `--trace-arc`, `--trace-memory`.
 
 ### Testing
 

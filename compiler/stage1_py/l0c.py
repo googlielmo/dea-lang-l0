@@ -163,6 +163,8 @@ def build_compilation_context(args: argparse.Namespace) -> CompilationContext:
 
     return CompilationContext(
         emit_line_directives=not getattr(args, 'no_line_directives', False),
+        trace_arc=getattr(args, 'trace_arc', False),
+        trace_memory=getattr(args, 'trace_memory', False),
         log_rich_format=log_rich_format,
         log_level=log_level,
     )
@@ -412,6 +414,8 @@ def cmd_run(args: argparse.Namespace) -> int:
             project_root=args.project_root,
             sys_root=args.sys_root,
             no_line_directives=args.no_line_directives,
+            trace_arc=getattr(args, 'trace_arc', False),
+            trace_memory=getattr(args, 'trace_memory', False),
             log=args.log,
         )
 
@@ -759,6 +763,16 @@ def _add_codegen_arg(parser: argparse.ArgumentParser) -> None:
         "--no-line-directives", "-NLD",
         action="store_true",
         help="Disable #line directives in generated C code",
+    )
+    parser.add_argument(
+        "--trace-arc",
+        action="store_true",
+        help="Enable ARC runtime tracing in generated C code (emits L0_TRACE_ARC)",
+    )
+    parser.add_argument(
+        "--trace-memory",
+        action="store_true",
+        help="Enable memory runtime tracing in generated C code (emits L0_TRACE_MEMORY)",
     )
 
 

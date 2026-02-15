@@ -55,6 +55,8 @@ Global options:
 Codegen/build options (where applicable):
 
 - `-NLD` / `--no-line-directives`
+- `--trace-arc`
+- `--trace-memory`
 - `-c` / `--c-compiler`
 - `-C` / `--c-options`
 - `-I` / `--runtime-include`
@@ -82,7 +84,10 @@ Exit behavior:
 ### 2.3 Backend output contract
 
 - Stage 1 emits a single C99 translation unit.
+- When trace flags are enabled, generated C emits `L0_TRACE_ARC` and/or `L0_TRACE_MEMORY` defines before
+  including `l0_runtime.h`.
 - Backend details are canonical in [c_backend_design](c_backend_design.md).
+- Trace details are canonical in [trace_spec](trace_spec.md).
 
 ## 3. Current Core Data Shapes (Exact Names)
 
@@ -149,5 +154,7 @@ Use the narrowest canonical document for each question:
   [architecture](architecture.md)
 - Lowering policy, generated C layout, ARC/cleanup behavior, runtime calls:
   [c_backend_design](c_backend_design.md)
+- Trace flags and runtime trace behavior:
+  [trace_spec](trace_spec.md)
 - Pointer/nullability model rationale, integer model rationale, stage-2 design direction:
   [design_decisions](design_decisions.md)

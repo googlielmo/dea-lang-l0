@@ -43,7 +43,8 @@ Input is a fully-typed `AnalysisResult`. Output is one C99 translation unit.
 
 The generated C file is organized in this order:
 
-1. File header and includes (`stdint.h`, `stdbool.h`, `stddef.h`, `l0_siphash.h`, `l0_runtime.h`)
+1. File header and includes (`stdint.h`, `stdbool.h`, `stddef.h`, `l0_siphash.h`, `l0_runtime.h`), with optional
+   trace defines (`L0_TRACE_ARC`, `L0_TRACE_MEMORY`) emitted before `l0_runtime.h` when enabled via CLI
 2. Forward declarations for all structs/enums
 3. Optional wrapper typedefs (early phase: builtins)
 4. Struct/enum definitions in dependency order
@@ -146,7 +147,11 @@ If entry module defines `main`, backend emits C wrapper:
 - Generated code is sectioned and comment-labeled.
 - `#line` directives are emitted when enabled in compile context (default on, can be disabled with
   `--no-line-directives`) for accurate source mapping in debuggers and error messages.
+- Runtime tracing can be enabled from codegen with `--trace-arc` and `--trace-memory`; generated C emits
+  preprocessor toggles consumed by `l0_runtime.h`.
 - Escape decoding used by `case` literal semantic checks is shared with codegen to avoid divergence.
+
+Tracing details and runtime log contract are specified in [trace_spec](trace_spec.md).
 
 ## Current Constraints and Known Gaps
 
