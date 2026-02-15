@@ -540,11 +540,6 @@ class Parser:
 
     def _parse_case_literal(self) -> Expr:
         start = self._span_start()
-        if self._match(TokenKind.MINUS):
-            tok = self._peek()
-            if self._match(TokenKind.INT):
-                return IntLiteral(-int(tok.text), span=self._extend_span(start))
-            raise ParseError("[PAR-0241] expected integer literal after '-'", tok, self.filename)
         tok = self._peek()
         if self._match(TokenKind.INT):
             return IntLiteral(int(tok.text), span=self._extend_span(start))

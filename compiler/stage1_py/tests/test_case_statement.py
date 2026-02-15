@@ -15,12 +15,11 @@ Covers:
 
 import pytest
 
+from l0_ast import (
+    Module, FuncDecl, CaseStmt, CaseElse,
+    IntLiteral, ByteLiteral, StringLiteral, BoolLiteral, Block, )
 from l0_lexer import Lexer, TokenKind
 from l0_parser import Parser, ParseError
-from l0_ast import (
-    Module, FuncDecl, CaseStmt, CaseArm, CaseElse,
-    IntLiteral, ByteLiteral, StringLiteral, BoolLiteral, Block,
-)
 
 
 # ============================================================================
@@ -191,9 +190,12 @@ def test_parse_case_negative_int():
     """
     stmt = get_func_body_stmt(src)
     assert isinstance(stmt, CaseStmt)
-    assert stmt.arms[0].literal.value == -1
-    assert stmt.arms[1].literal.value == 0
-    assert stmt.arms[2].literal.value == 1
+    literal1 = stmt.arms[0].literal
+    literal2 = stmt.arms[1].literal
+    literal3 = stmt.arms[2].literal
+    assert isinstance(literal1, IntLiteral) and literal1.value == -1
+    assert isinstance(literal2, IntLiteral) and literal2.value == 0
+    assert isinstance(literal3, IntLiteral) and literal3.value == 1
 
 
 def test_parse_case_arm_body_is_single_stmt():

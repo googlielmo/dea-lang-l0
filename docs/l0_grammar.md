@@ -19,7 +19,7 @@ HexDigit        ::=     "0".."9" | "A".."F" | "a".."f"
 ### 1.2 Literals
 
 ```ebnf
-IntLiteral          ::=     Digit+
+IntLiteral          ::=     ( "-" )? Digit+ (* ambiguity with unary minus operator resolved in context by the lexer *)
 
 BoolLiteral         ::=     "true" | "false"
 
@@ -250,7 +250,7 @@ CaseArm         ::=     CaseLiteral "=>" Stmt
 
 ElseArm         ::=     "else" Stmt
 
-CaseLiteral     ::=     ( "-" )? IntLiteral | ByteLiteral | StringLiteral | BoolLiteral
+CaseLiteral     ::=     IntLiteral | ByteLiteral | StringLiteral | BoolLiteral
 ```
 
 Patterns (L<sub>0</sub> subset):

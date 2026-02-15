@@ -1302,18 +1302,6 @@ func ps_parse_with_stmt(self: ParserState*) -> StmtId? {
 func ps_parse_case_literal(self: ParserState*) -> ExprId? {
     let start = ps_span_start(self);
 
-    if (ps_match(self, ord(TT_MINUS))) {
-        let tok = ps_peek(self);
-        if (ps_match_int(self)) {
-            let node = expr_node_create(EX_INT, ps_extend_span(self, start));
-            node.int_value = -1 * (token_int_value(tok) as int);
-            node.text_value = concat_s("-", token_int_text(tok) as string);
-            return expr_arena_add(self.expr_arena, node);
-        }
-        ps_set_error(self, "PAR-0241", "[PAR-0241] expected integer literal after '-'", tok);
-        return null;
-    }
-
     let tok = ps_peek(self);
     if (ps_match_int(self)) {
         let node = expr_node_create(EX_INT, ps_extend_span(self, start));
