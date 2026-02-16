@@ -20,6 +20,9 @@ from l0_driver import L0Driver
 from l0_lexer import Lexer
 from l0_parser import Parser
 
+STAGE1_ROOT = Path(__file__).resolve().parents[2]
+RUNTIME_PATH = STAGE1_ROOT / "runtime"
+
 
 def write_tmp(tmp_path, name: str, src: str):
     """Helper to write a temporary L0 source file."""
@@ -371,11 +374,10 @@ def test_execute_toplet_primitives(tmp_path):
     c_file = tmp_path / "test.c"
     c_file.write_text(c_code)
 
-    runtime_path = Path(__file__).parent.parent / "runtime"
     exe_path = tmp_path / "test_exe"
 
     compile_result = subprocess.run(
-        ["gcc", "-std=c99", "-I", str(runtime_path), str(c_file), "-o", str(exe_path)],
+        ["gcc", "-std=c99", "-I", str(RUNTIME_PATH), str(c_file), "-o", str(exe_path)],
         capture_output=True,
         text=True
     )
@@ -419,11 +421,10 @@ def test_execute_toplet_mutation(tmp_path):
     c_file = tmp_path / "test.c"
     c_file.write_text(c_code)
 
-    runtime_path = Path(__file__).parent.parent / "runtime"
     exe_path = tmp_path / "test_exe"
 
     compile_result = subprocess.run(
-        ["gcc", "-std=c99", "-I", str(runtime_path), str(c_file), "-o", str(exe_path)],
+        ["gcc", "-std=c99", "-I", str(RUNTIME_PATH), str(c_file), "-o", str(exe_path)],
         capture_output=True,
         text=True
     )
@@ -465,11 +466,10 @@ def test_execute_toplet_struct(tmp_path):
     c_file = tmp_path / "test.c"
     c_file.write_text(c_code)
 
-    runtime_path = Path(__file__).parent.parent / "runtime"
     exe_path = tmp_path / "test_exe"
 
     compile_result = subprocess.run(
-        ["gcc", "-std=c99", "-I", str(runtime_path), str(c_file), "-o", str(exe_path)],
+        ["gcc", "-std=c99", "-I", str(RUNTIME_PATH), str(c_file), "-o", str(exe_path)],
         capture_output=True,
         text=True
     )
@@ -516,11 +516,10 @@ def test_execute_toplet_nested_struct(tmp_path):
     c_file = tmp_path / "test.c"
     c_file.write_text(c_code)
 
-    runtime_path = Path(__file__).parent.parent / "runtime"
     exe_path = tmp_path / "test_exe"
 
     compile_result = subprocess.run(
-        ["gcc", "-std=c99", "-I", str(runtime_path), str(c_file), "-o", str(exe_path)],
+        ["gcc", "-std=c99", "-I", str(RUNTIME_PATH), str(c_file), "-o", str(exe_path)],
         capture_output=True,
         text=True
     )

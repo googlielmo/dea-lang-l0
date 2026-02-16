@@ -90,7 +90,7 @@ def search_paths(temp_project: Path, repo_root: Path) -> SourceSearchPaths:
 
 @pytest.fixture
 def codegen_dir() -> Path:
-    return Path(__file__).parent / "codegen"
+    return Path(__file__).parent / "backend" / "codegen"
 
 
 @pytest.fixture

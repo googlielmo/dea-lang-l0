@@ -57,9 +57,11 @@ Trace toggles (codegen/build/run): `--trace-arc`, `--trace-memory`.
 ```bash
 cd compiler/stage1_py
 pytest -n 3                       # all tests (parallel, optimal)
-pytest tests/test_l0_lexer.py     # specific file
+pytest tests/lexer/test_lexer.py  # specific file
 pytest -k "test_name"             # pattern match
 ```
+
+When adding or moving tests, follow `compiler/stage1_py/tests/README.md` for placement and naming rules.
 
 Requires pytest >= 9.0.2, pytest-xdist >= 3.5, and a C compiler.
 TCC is used by default if present (fastest); Clang and GCC are also searched in the current $PATH if `tcc` is not

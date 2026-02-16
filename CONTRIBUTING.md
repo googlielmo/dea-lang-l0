@@ -21,7 +21,7 @@ From the repository root:
 ```bash
 cd compiler/stage1_py
 pytest                           # run all tests
-pytest tests/test_l0_lexer.py   # run a specific test file
+pytest tests/lexer/test_lexer.py # run a specific test file
 pytest -k "test_name"           # run tests matching a pattern
 ```
 

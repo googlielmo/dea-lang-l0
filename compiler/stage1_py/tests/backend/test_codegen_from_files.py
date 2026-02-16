@@ -4,7 +4,7 @@ Test L0 code generation backend.
 This test module calls the L0 driver and codegen classes.
 
 Includes both programmatic tests and tests that load .l0 files from
-tests/codegen/ directory.
+tests/backend/codegen/ directory.
 """
 
 #  SPDX-License-Identifier: MIT OR Apache-2.0
@@ -23,7 +23,7 @@ CODEGEN_TEST_DIR = Path(__file__).parent / "codegen"
 
 
 def find_codegen_test_files():
-    """Find all .l0 test files in tests/codegen/ directory."""
+    """Find all .l0 test files in tests/backend/codegen/ directory."""
     if not CODEGEN_TEST_DIR.exists():
         return []
     return sorted(CODEGEN_TEST_DIR.glob("test_*.l0"))
@@ -643,7 +643,7 @@ class TestCodeGenStringHandling:
 
 class TestCodeGenFromFiles:
     """
-    Test code generation using actual .l0 files from tests/codegen/.
+    Test code generation using actual .l0 files from tests/backend/codegen/.
 
     This combines the benefits of:
     - Direct API calls (fast, debuggable)
@@ -660,7 +660,7 @@ class TestCodeGenFromFiles:
     @pytest.mark.parametrize("test_file", find_codegen_test_files(), ids=lambda p: p.stem)
     def test_codegen_from_file(self, test_file: Path, tmp_path: Path, compile_and_run):
         """
-        Test code generation for .l0 files in tests/codegen/.
+        Test code generation for .l0 files in tests/backend/codegen/.
 
         This test:
         1. Loads the .l0 file using L0Driver
@@ -834,7 +834,7 @@ class TestCodeGenFileDiscovery:
         test_files = find_codegen_test_files()
 
         if not test_files:
-            pytest.skip("No test files found in tests/codegen/")
+            pytest.skip("No test files found in tests/backend/codegen/")
 
         # Verify we found expected test files
         file_names = {f.name for f in test_files}

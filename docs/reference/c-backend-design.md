@@ -162,15 +162,15 @@ Tracing details and runtime log contract are specified in [specs/runtime/trace.m
 
 ## Testing Coverage
 
-Primary backend/codegen tests live under `compiler/stage1_py/tests/`, including:
+Primary backend/codegen tests live under `compiler/stage1_py/tests/backend/`, including:
 
-- `test_l0_codegen_basic.py`
-- `test_l0_codegen_advanced.py`
-- `test_l0_codegen_semantics.py`
-- `test_l0_codegen_overflow_and_control_flow.py`
-- `test_l0_codegen_lvalue_caching.py`
-- `test_l0_codegen_constructors.py`
-- `test_l0_codegen_type_ordering.py`
-- `test_l0_driver_cross_module_runtime.py`
+- `test_codegen_basic.py`
+- `test_codegen_advanced.py`
+- `test_codegen_semantics.py`
+- `test_codegen_overflow_and_control_flow.py`
+- `test_codegen_lvalue_caching.py`
+- `test_codegen_constructors.py`
+- `test_codegen_type_ordering.py`
+- `test_driver_cross_module_runtime.py`
 
-Golden expected C outputs are in `compiler/stage1_py/tests/codegen/*.expected`.
+Golden expected C outputs are in `compiler/stage1_py/tests/backend/codegen/*.expected`.
