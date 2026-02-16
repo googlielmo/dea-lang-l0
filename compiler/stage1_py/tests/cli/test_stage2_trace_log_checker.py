@@ -1,0 +1,160 @@
+#  SPDX-License-Identifier: MIT OR Apache-2.0
+#  Copyright (c) 2026 gwz
+
+from __future__ import annotations
+
+import subprocess
+import sys
+from pathlib import Path
+from textwrap import dedent
+
+
+def _checker_path() -> Path:
+    repo_root = Path(__file__).resolve().parents[4]
+    return repo_root / "compiler" / "stage2_l0" / "check_trace_log.py"
+
+
+def _run_checker(tmp_path, log_text: str, extra_args: list[str] | None = None):
+    log_path = tmp_path / "trace.stderr.log"
+    log_path.write_text(dedent(log_text), encoding="utf-8")
+
+    args = [sys.executable, str(_checker_path()), str(log_path)]
+    if extra_args:
+        args.extend(extra_args)
+
+    proc = subprocess.run(
+        args,
+        capture_output=True,
+        text=True,
+    )
+    return proc
+
+
+def test_trace_checker_balanced_log_returns_zero(tmp_path):
+    proc = _run_checker(
+        tmp_path,
+        """
+        [l0][mem] op=new_alloc bytes=16 ptr=0x1 action=ok
+        [l0][mem] op=drop ptr=0x1 action=free
+        [l0][mem] op=alloc_string len=2 ptr=0x2
+        [l0][mem] op=free_string ptr=0x2 action=decrement-only
+        [l0][mem] op=free_string ptr=0x2 action=free
+        [l0][arc] op=release kind=heap ptr=0x2 rc_before=1 rc_after=0 action=free
+        """,
+    )
+
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert "errors=0" in proc.stdout
+
+
+def test_trace_checker_detects_object_leak(tmp_path):
+    proc = _run_checker(
+        tmp_path,
+        """
+        [l0][mem] op=new_alloc bytes=32 ptr=0xAA action=ok
+        """,
+    )
+
+    assert proc.returncode == 1
+    assert "ERROR: object leak balance for ptr=0xAA" in proc.stdout
+
+
+def test_trace_checker_detects_string_leak(tmp_path):
+    proc = _run_checker(
+        tmp_path,
+        """
+        [l0][mem] op=alloc_string len=4 ptr=0xBB
+        [l0][mem] op=free_string ptr=0xBB action=decrement-only
+        """,
+    )
+
+    assert proc.returncode == 1
+    assert "ERROR: string leak balance for ptr=0xBB" in proc.stdout
+
+
+def test_trace_checker_detects_negative_balance(tmp_path):
+    proc = _run_checker(
+        tmp_path,
+        """
+        [l0][mem] op=drop ptr=0x10 action=free
+        [l0][mem] op=free_string ptr=0x20 action=free
+        """,
+    )
+
+    assert proc.returncode == 1
+    assert "without matching new_alloc" in proc.stdout
+    assert "without matching alloc_string" in proc.stdout
+
+
+def test_trace_checker_detects_arc_panic_and_bad_terminal_rc(tmp_path):
+    proc = _run_checker(
+        tmp_path,
+        """
+        [l0][arc] op=retain kind=heap ptr=0x1 rc_before=0 rc_after=1 action=panic-overflow
+        [l0][arc] op=release kind=heap ptr=0x1 rc_before=2 rc_after=1 action=free
+        """,
+    )
+
+    assert proc.returncode == 1
+    assert "ERROR: line 2: arc panic action detected" in proc.stdout
+    assert "ERROR: line 3: arc heap free release must end at rc_after=0" in proc.stdout
+
+
+def test_trace_checker_detects_missing_ptr_for_critical_events(tmp_path):
+    proc = _run_checker(
+        tmp_path,
+        """
+        [l0][mem] op=new_alloc bytes=64 action=ok
+        [l0][mem] op=alloc_string len=3
+        [l0][arc] op=release kind=heap rc_before=1 rc_after=0 action=free
+        """,
+    )
+
+    assert proc.returncode == 1
+    assert "ERROR: line 2: mem op=new_alloc is missing ptr" in proc.stdout
+    assert "ERROR: line 3: mem op=alloc_string is missing ptr" in proc.stdout
+    assert "ERROR: line 4: arc heap free release is missing ptr" in proc.stdout
+
+
+def test_trace_checker_warns_when_new_alloc_is_finalized_by_free_call(tmp_path):
+    proc = _run_checker(
+        tmp_path,
+        """
+        [l0][mem] op=new_alloc bytes=16 ptr=0x99 action=ok
+        [l0][mem] op=free ptr=0x99 action=call
+        """,
+    )
+
+    assert proc.returncode == 0
+    assert "errors=0" in proc.stdout
+    assert "WARN: line 3: new_alloc ptr=0x99 released via mem op=free action=call" in proc.stdout
+
+
+def test_trace_checker_honors_max_details(tmp_path):
+    lines = "\n".join(
+        f"[l0][mem] op=new_alloc bytes=16 ptr=0x{i:x} action=ok" for i in range(1, 8)
+    )
+    proc = _run_checker(tmp_path, lines, extra_args=["--max-details", "3"])
+
+    assert proc.returncode == 1
+    assert proc.stdout.count("ERROR: object leak balance") == 3
+    assert "ERROR: ... 4 more" in proc.stdout
+
+
+def test_trace_checker_triage_output(tmp_path):
+    proc = _run_checker(
+        tmp_path,
+        """
+        [l0][mem] op=new_alloc bytes=16 ptr=0xA action=ok
+        [l0][mem] op=new_alloc bytes=64 ptr=0xB action=ok
+        [l0][mem] op=alloc_string len=5 ptr=0xC
+        """,
+        extra_args=["--triage"],
+    )
+
+    assert proc.returncode == 1
+    assert "triage:" in proc.stdout
+    assert "leaked_object_ptrs=2" in proc.stdout
+    assert "leaked_string_ptrs=1" in proc.stdout
+    assert "bytes=16 count=1" in proc.stdout
+    assert "bytes=64 count=1" in proc.stdout

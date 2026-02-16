@@ -3,6 +3,7 @@
 ## ARC leaks for temporaries and discarded results
 
 - Date: 2026-02-14
+- Status: Closed (fixed)
 - Title: Fix ARC leaks for temporaries and discarded results in Stage 1 backend
 - Kind: Bug Fix
 - Severity: High (leaks + double-free)
