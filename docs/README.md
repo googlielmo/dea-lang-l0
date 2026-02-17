@@ -30,17 +30,17 @@ This directory is organized by document intent first, then subsystem.
 
 Use:
 
-`YYYY-MM-DD-<area>-<slug>-ref-<tracker>.md`
+`YYYY-MM-DD-<area>-<slug>-<tracker>.md`
 
 Examples:
 
-- `2026-02-15-arc-retain-cycle-leak-ref-none.md`
+- `2026-02-15-arc-retain-cycle-leak-noref.md`
 - `2026-03-02-arc-double-release-on-error-path-ref-gh-128.md`
 
 Tracker values:
 
-- `none` when no tracking system item exists yet.
-- `gh-<number>`, `jira-<key>`, or equivalent when available.
+- `noref` when no tracking system item exists yet.
+- `ref-gh-<number>`, `ref-jira-<key>`, or equivalent when available.
 
 ## Attic Policy
 

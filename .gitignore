@@ -407,3 +407,11 @@ vcpkg_installed/
 # test output & cache
 Testing/
 .cache/
+
+
+#######################################
+# AI Agents
+#######################################
+
+# Anthropic's Claude AI agent
+.claude/

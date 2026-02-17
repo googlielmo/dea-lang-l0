@@ -290,7 +290,7 @@ class CEmitter:
         return f"l0_opt_{self._opt_key_for_type(inner)}"
 
     def emit_none_value_for_nullable(self, t: NullableType) -> str:
-        """Emit C code for the 'none' value of a nullable type."""
+        """Emit C code for the L0 'null' value of a nullable type."""
         if isinstance(t.inner, PointerType):
             return "NULL"
         wrapper_name = self._opt_wrapper_name_for_inner(t.inner)
