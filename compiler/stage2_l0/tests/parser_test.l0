@@ -105,6 +105,31 @@ func test_qualified_type_name_ok() {
     expect_ok(src);
 }
 
+func test_top_level_let_expr_error() {
+    let src = "module main; let x: int = ~1;";
+    expect_error_code(src, "PAR-0226");
+}
+
+func test_type_alias_missing_semi_error() {
+    let src = "module main; type Foo = int func main() -> int { return 0; }";
+    expect_error_code(src, "PAR-0073");
+}
+
+func test_struct_field_error() {
+    let src = "module main; struct Foo { x: 123; }";
+    expect_error_code(src, "PAR-0400");
+}
+
+func test_enum_variant_field_error() {
+    let src = "module main; enum Foo { Bar(x: 123); }";
+    expect_error_code(src, "PAR-0400");
+}
+
+func test_new_expr_bad_arg_error() {
+    let src = "module main; func main() -> int { let x: Foo* = new Foo(~1); return 0; }";
+    expect_error_code(src, "PAR-0226");
+}
+
 func main() {
     test_valid_module();
     test_module_decl_error();
@@ -118,5 +143,10 @@ func main() {
     test_reserved_binary_and_error();
     test_reserved_binary_shift_error();
     test_qualified_type_name_ok();
+    test_top_level_let_expr_error();
+    test_type_alias_missing_semi_error();
+    test_struct_field_error();
+    test_enum_variant_field_error();
+    test_new_expr_bad_arg_error();
     printl_s("parser_test: all tests passed");
 }

@@ -734,23 +734,25 @@ func ps_parse_postfix_expr(self: ParserState*) -> ExprId? {
 
     while (true) {
         if (ps_match(self, ord(TT_LPAREN))) {
-            let args = id_vec_create(4);
-            if (!ps_check(self, ord(TT_RPAREN))) {
-                while (true) {
-                    let arg = ps_parse_call_argument(self)?;
-                    id_vec_push(args, arg);
-                    if (!ps_match(self, ord(TT_COMMA))) {
-                        break;
+            with (let args: VectorBase*? = id_vec_create(4) => _free_id_vec_opt(args)) {
+                if (!ps_check(self, ord(TT_RPAREN))) {
+                    while (true) {
+                        let arg = ps_parse_call_argument(self)?;
+                        id_vec_push(args as VectorBase*, arg);
+                        if (!ps_match(self, ord(TT_COMMA))) {
+                            break;
+                        }
                     }
                 }
-            }
-            ps_expect(self, ord(TT_RPAREN), "PAR-0210", "[PAR-0210] expected ')' after arguments")?;
+                ps_expect(self, ord(TT_RPAREN), "PAR-0210", "[PAR-0210] expected ')' after arguments")?;
 
-            let node = expr_node_create(EX_CALL, ps_extend_span(self, start));
-            node.expr_a = current;
-            node.ids = args;
-            current = expr_arena_add(self.expr_arena, node);
-            continue;
+                let node = expr_node_create(EX_CALL, ps_extend_span(self, start));
+                node.expr_a = current;
+                node.ids = args as VectorBase*;
+                args = null;
+                current = expr_arena_add(self.expr_arena, node);
+                continue;
+            }
         }
 
         if (ps_match(self, ord(TT_LBRACKET))) {
@@ -792,31 +794,34 @@ func ps_parse_primary_expr(self: ParserState*) -> ExprId? {
     let tok = ps_peek(self);
 
     if (ps_match(self, ord(TT_NEW))) {
-        let type_ref = ps_parse_type(self)?;
-        let args: VectorBase*? = null;
-
-        if (ps_match(self, ord(TT_LPAREN))) {
-            args = id_vec_create(4);
-            if (!ps_check(self, ord(TT_RPAREN))) {
-                while (true) {
-                    let arg = ps_parse_call_argument(self)?;
-                    id_vec_push(args as VectorBase*, arg);
-                    if (!ps_match(self, ord(TT_COMMA))) {
-                        break;
+        let parsed_type = ps_parse_type(self)?;
+        with (let type_ref: TypeRef*? = parsed_type => _free_type_ref_opt(type_ref),
+              let args: VectorBase*? = null => _free_id_vec_opt(args)) {
+            if (ps_match(self, ord(TT_LPAREN))) {
+                args = id_vec_create(4);
+                if (!ps_check(self, ord(TT_RPAREN))) {
+                    while (true) {
+                        let arg = ps_parse_call_argument(self)?;
+                        id_vec_push(args as VectorBase*, arg);
+                        if (!ps_match(self, ord(TT_COMMA))) {
+                            break;
+                        }
                     }
                 }
+                ps_expect(self, ord(TT_RPAREN), "PAR-0223", "[PAR-0223] expected ')' after arguments to 'new'")?;
             }
-            ps_expect(self, ord(TT_RPAREN), "PAR-0223", "[PAR-0223] expected ')' after arguments to 'new'")?;
-        }
 
-        let node = expr_node_create(EX_NEW, ps_extend_span(self, start));
-        node.type_ref = type_ref;
-        if (args == null) {
-            node.ids = id_vec_create(0);
-        } else {
-            node.ids = args as VectorBase*;
+            let node = expr_node_create(EX_NEW, ps_extend_span(self, start));
+            node.type_ref = type_ref as TypeRef*;
+            if (args == null) {
+                node.ids = id_vec_create(0);
+            } else {
+                node.ids = args as VectorBase*;
+            }
+            type_ref = null;
+            args = null;
+            return expr_arena_add(self.expr_arena, node);
         }
-        return expr_arena_add(self.expr_arena, node);
     }
 
     if (ps_match_int(self)) {
@@ -1007,22 +1012,21 @@ func ps_parse_let_stmt(self: ParserState*) -> StmtId? {
     ps_expect(self, ord(TT_LET), "PAR-0110", "[PAR-0110] expected 'let'")?;
     let name_tok = ps_expect_variable_name(self, "PAR-0111", "[PAR-0111] expected variable name")?;
 
-    let type_ref: TypeRef*? = null;
-    if (ps_match(self, ord(TT_COLON))) {
-        type_ref = ps_parse_type(self);
-        if (type_ref == null) {
-            return null;
+    with (let type_ref: TypeRef*? = null => _free_type_ref_opt(type_ref)) {
+        if (ps_match(self, ord(TT_COLON))) {
+            type_ref = ps_parse_type(self)?;
         }
+
+        ps_expect(self, ord(TT_EQ), "PAR-0112", "[PAR-0112] expected '=' in let binding")?;
+        let value = ps_parse_expr(self)?;
+
+        let node = stmt_node_create(ST_LET, ps_extend_span(self, start));
+        node.name = token_ident_text(name_tok) as string;
+        node.type_ref = type_ref;
+        type_ref = null;
+        node.expr_a = value;
+        return stmt_arena_add(self.stmt_arena, node);
     }
-
-    ps_expect(self, ord(TT_EQ), "PAR-0112", "[PAR-0112] expected '=' in let binding")?;
-    let value = ps_parse_expr(self)?;
-
-    let node = stmt_node_create(ST_LET, ps_extend_span(self, start));
-    node.name = token_ident_text(name_tok) as string;
-    node.type_ref = type_ref;
-    node.expr_a = value;
-    return stmt_arena_add(self.stmt_arena, node);
 }
 
 func ps_parse_if_stmt(self: ParserState*) -> StmtId? {
@@ -1586,9 +1590,13 @@ func ps_parse_type_alias(self: ParserState*) -> TypeAliasDecl*? {
     ps_expect(self, ord(TT_TYPE), "PAR-0070", "[PAR-0070] expected type name")?;
     let name_tok = ps_expect_ident(self, "PAR-0071", "[PAR-0071] expected type alias name")?;
     ps_expect(self, ord(TT_EQ), "PAR-0072", "[PAR-0072] expected '=' in type alias")?;
-    let target = ps_parse_type(self)?;
-    ps_expect(self, ord(TT_SEMI), "PAR-0073", "[PAR-0073] expected ';' after type alias")?;
-    return new TypeAliasDecl(token_ident_text(name_tok) as string, target, ps_extend_span(self, start));
+    let parsed = ps_parse_type(self)?;
+    with (let target: TypeRef*? = parsed => _free_type_ref_opt(target)) {
+        ps_expect(self, ord(TT_SEMI), "PAR-0073", "[PAR-0073] expected ';' after type alias")?;
+        let result = new TypeAliasDecl(token_ident_text(name_tok) as string, target as TypeRef*, ps_extend_span(self, start));
+        target = null;
+        return result;
+    }
 }
 
 func ps_parse_top_level_let(self: ParserState*) -> LetDecl*? {
@@ -1596,19 +1604,19 @@ func ps_parse_top_level_let(self: ParserState*) -> LetDecl*? {
     ps_expect(self, ord(TT_LET), "PAR-0080", "[PAR-0080] expected 'let'")?;
     let name_tok = ps_expect_variable_name(self, "PAR-0081", "[PAR-0081] expected variable name")?;
 
-    let type_ref: TypeRef*? = null;
-    if (ps_match(self, ord(TT_COLON))) {
-        type_ref = ps_parse_type(self);
-        if (type_ref == null) {
-            return null;
+    with (let type_ref: TypeRef*? = null => _free_type_ref_opt(type_ref)) {
+        if (ps_match(self, ord(TT_COLON))) {
+            type_ref = ps_parse_type(self)?;
         }
+
+        ps_expect(self, ord(TT_EQ), "PAR-0082", "[PAR-0082] expected '=' in let binding")?;
+        let value = ps_parse_expr(self)?;
+        ps_expect(self, ord(TT_SEMI), "PAR-0083", "[PAR-0083] expected ';' after let declaration")?;
+
+        let result = new LetDecl(token_ident_text(name_tok) as string, type_ref, value, ps_extend_span(self, start));
+        type_ref = null;
+        return result;
     }
-
-    ps_expect(self, ord(TT_EQ), "PAR-0082", "[PAR-0082] expected '=' in let binding")?;
-    let value = ps_parse_expr(self)?;
-    ps_expect(self, ord(TT_SEMI), "PAR-0083", "[PAR-0083] expected ';' after let declaration")?;
-
-    return new LetDecl(token_ident_text(name_tok) as string, type_ref, value, ps_extend_span(self, start));
 }
 
 func ps_parse_top_level_decl(self: ParserState*) -> TopLevelDecl*? {
