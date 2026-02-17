@@ -1031,22 +1031,20 @@ class Backend:
                 else self._emit_owned_expr_with_expected_type
             )
 
+            # Evaluate return expression first so ARC temps materialized during
+            # expression emission are visible to cleanup scheduling.
+            c_value = emit_return_value(stmt.value, self._current_func_result)
+
             needs_cleanup = (self._current_scope is not None
                              and self._scope_chain_has_cleanup())
             if needs_cleanup:
-                # Evaluate return expression BEFORE cleanup to avoid UAF
-                c_value = emit_return_value(
-                    stmt.value, self._current_func_result)
+                # Keep return value alive across cleanup to avoid use-after-free.
                 ret_tmp = self.emitter.fresh_tmp("ret")
                 c_ret_type = self.emitter.emit_type(self._current_func_result)
                 self.emitter.emit_temp_decl(c_ret_type, ret_tmp, c_value)
                 self._emit_cleanup_for_return(returned_var)
                 self.emitter.emit_return_stmt(ret_tmp)
             else:
-                if self._current_scope is not None:
-                    self._emit_cleanup_for_return(returned_var)
-                c_value = emit_return_value(
-                    stmt.value, self._current_func_result)
                 self.emitter.emit_return_stmt(c_value)
 
         # Mark subsequent code as unreachable

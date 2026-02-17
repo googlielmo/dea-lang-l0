@@ -448,6 +448,49 @@ def test_trace_arc_nested_concat_intermediary_freed(
         )
 
 
+def test_trace_arc_concat3_nested_argument_freed(
+    analyze_single, compile_and_run, tmp_path
+):
+    """concat3_s-style nested argument temps must be freed on each call."""
+    ok, stdout, _stderr, arc = _compile_with_trace_arc(
+        analyze_single,
+        compile_and_run,
+        tmp_path,
+        """
+        module main;
+        import std.io;
+        import std.string;
+
+        func concat3_s(a: string, b: string, c: string) -> string {
+            return concat_s(concat_s(a, b), c);
+        }
+
+        func main() -> int {
+            let x: string = concat3_s("a", "b", "c");
+            let y: string = concat3_s("", "middle", "");
+            printl_s(x);
+            printl_s(y);
+            return 0;
+        }
+        """,
+    )
+    assert ok, _stderr
+    assert stdout.strip().splitlines() == ["abc", "middle"]
+
+    heap_frees = [
+        e for e in arc
+        if e["kind"] == "heap" and e["op"] == "release" and e["action"] == "free"
+    ]
+    # Two concat3_s calls => each has one intermediary + one final heap string.
+    assert len(heap_frees) >= 4, (
+        f"expected >=4 heap frees (2 calls x intermediary+final), got {len(heap_frees)}: {heap_frees}"
+    )
+    for f in heap_frees:
+        assert f["rc_before"] == "1" and f["rc_after"] == "0", (
+            f"expected rc 1→0 free: {f}"
+        )
+
+
 # ---------------------------------------------------------------------------
 # J – Return borrowed param retains
 # ---------------------------------------------------------------------------

@@ -706,6 +706,42 @@ def test_codegen_nested_arc_call_temps_released(codegen_single, compile_and_run,
     assert stdout.strip() == "hello, world"
 
 
+def test_codegen_concat3_nested_arg_temp_materialized(codegen_single, compile_and_run, tmp_path):
+    c_code, _ = codegen_single(
+        "main",
+        """
+        module main;
+
+        import std.io;
+        import std.string;
+
+        func concat3_s(a: string, b: string, c: string) -> string {
+            return concat_s(concat_s(a, b), c);
+        }
+
+        func main() -> int {
+            let out: string = concat3_s("one", "-", "two");
+            printl_s(out);
+            return 0;
+        }
+        """,
+    )
+
+    if c_code is None:
+        return
+
+    concat3_start = c_code.rfind("l0_string l0_main_concat3_s(")
+    main_start = c_code.find("l0_int l0_main_main(", concat3_start)
+    assert concat3_start != -1 and main_start != -1
+    concat3_body = c_code[concat3_start:main_start]
+    assert "_arc_" in concat3_body
+    assert "rt_string_release(" in concat3_body
+
+    ok, stdout, stderr = compile_and_run(c_code, tmp_path)
+    assert ok, stderr
+    assert stdout.strip() == "one-two"
+
+
 def test_codegen_return_borrowed_param_retains(codegen_single, compile_and_run, tmp_path):
     c_code, _ = codegen_single(
         "main",
