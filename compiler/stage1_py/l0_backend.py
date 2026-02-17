@@ -1312,6 +1312,46 @@ class Backend:
             self._current_scope.add_owned(c_var_name, var_ty)
         return None
 
+    def _resolve_let_type(self, stmt: LetStmt, module_name: str) -> Type:
+        """Resolve concrete type for a let declaration."""
+        var_ty = None
+        if stmt.type is not None:
+            var_ty = self._resolve_type_ref(stmt.type, module_name)
+        if var_ty is None:
+            var_ty = self.analysis.expr_types.get(id(stmt.value))
+        if var_ty is None:
+            self.ice(f"[ICE-1170] missing inferred type for let initializer '{stmt.name}'", node=stmt.value)
+        return var_ty
+
+    def _emit_with_cleanup_header_let_predecl(self, stmt: LetStmt, module_name: str) -> Optional[Type]:
+        """
+        Predeclare a nullable `with`-header let for cleanup-block form.
+
+        Nullable lets are predeclared as `null` so cleanup code can
+        reference them on header `?` failure paths.
+
+        Non-nullable lets use the normal declaration+initializer path and return None here.
+        """
+        var_ty = self._resolve_let_type(stmt, module_name)
+        if not isinstance(var_ty, NullableType):
+            return None
+
+        c_var_name = self.emitter.mangle_identifier(stmt.name)
+        c_type = self.emitter.emit_type(var_ty)
+        c_zero = self.emitter.emit_null_literal(var_ty, for_initializer=True)
+        self.emitter.emit_let_decl(c_type, c_var_name, c_zero)
+
+        if self._current_scope is not None:
+            self._current_scope.add_owned(c_var_name, var_ty)
+
+        return var_ty
+
+    def _emit_with_cleanup_header_let_assign(self, stmt: LetStmt, var_ty: Type) -> None:
+        """Emit initializer assignment for a predeclared cleanup-block let."""
+        c_var_name = self.emitter.mangle_identifier(stmt.name)
+        c_value = self._emit_owned_expr_with_expected_type(stmt.value, var_ty)
+        self.emitter.emit_assignment(c_var_name, c_value)
+
     def _emit_retain_for_copied_value(self, c_expr: str, ty: Type) -> None:
         """
         Emit retain operations for a copied owned value.
@@ -1668,17 +1708,38 @@ class Backend:
         self.emitter.emit_block_start()
         with_scope = self._push_scope()
 
-        # Emit all init statements in the header scope
-        for item in stmt.items:
-            self._emit_stmt(item.init, module_name)
-
         if stmt.cleanup_body is not None:
             with_scope.with_cleanup_block = stmt.cleanup_body
         else:
-            with_scope.with_cleanup_inline = [
-                item.cleanup for item in reversed(stmt.items)
-                if item.cleanup is not None
-            ]
+            # Register inline cleanup incrementally so a TryExpr (`?`) failure
+            # in header item N can still clean up items 0..N-1.
+            with_scope.with_cleanup_inline = []
+
+        predeclared_nullable_lets: Dict[int, Type] = {}
+        if stmt.cleanup_body is not None:
+            # First pass: predeclare nullable lets so cleanup on early header
+            # failure can reference all nullable header names.
+            for item in stmt.items:
+                if isinstance(item.init, LetStmt):
+                    predecl_ty = self._emit_with_cleanup_header_let_predecl(item.init, module_name)
+                    if predecl_ty is not None:
+                        predeclared_nullable_lets[id(item.init)] = predecl_ty
+
+        # Emit all init statements in the header scope.
+        for item in stmt.items:
+            if stmt.cleanup_body is not None and isinstance(item.init, LetStmt):
+                predecl_ty = predeclared_nullable_lets.get(id(item.init))
+                if predecl_ty is not None:
+                    self._emit_with_cleanup_header_let_assign(item.init, predecl_ty)
+                else:
+                    self._emit_let(item.init, module_name)
+            else:
+                self._emit_stmt(item.init, module_name)
+
+            if stmt.cleanup_body is None and item.cleanup is not None:
+                assert with_scope.with_cleanup_inline is not None
+                # LIFO order: latest successful item cleans first.
+                with_scope.with_cleanup_inline.insert(0, item.cleanup)
 
         # Emit body as a nested block so its declarations get their own
         # C scope (mirrors L0 scoping rules).

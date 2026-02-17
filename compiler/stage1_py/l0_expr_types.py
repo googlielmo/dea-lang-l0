@@ -2,7 +2,7 @@
 #  Copyright (c) 2025-2026 gwz
 
 from dataclasses import dataclass
-from typing import Dict, Optional, List
+from typing import Dict, Optional, List, Set, Tuple
 
 from l0_analysis import AnalysisResult, VarRefResolution
 from l0_ast import (
@@ -89,6 +89,9 @@ class ExpressionTypeChecker:
         self._return_paths: bool = False  # does current path guarantee a return?
         self._breakable_loop_depth: int = 0  # depth of loops allowing 'break'/'continue'
         self._next_stmt_unreachable: bool = False  # is next statement unreachable (after break/continue)?
+        # Stack of guards for cleanup-block references to header vars that may
+        # be uninitialized on header `?` failure paths.
+        self._cleanup_header_ref_guard_stack: List[Tuple[int, Set[str]]] = []
 
     # ------------------------------------------------------------------
     # Public entry point
@@ -239,6 +242,52 @@ class ExpressionTypeChecker:
             if name in scope:
                 return scope[name]
         return None
+
+    def _lookup_local_scope_index(self, name: str) -> Optional[int]:
+        """Return scope index where local resolves (nearest scope wins)."""
+        for idx in range(len(self._local_scopes) - 1, -1, -1):
+            if name in self._local_scopes[idx]:
+                return idx
+        return None
+
+    def _is_guarded_cleanup_header_ref(self, name: str, scope_index: int) -> bool:
+        """True when a local resolves to a guarded maybe-uninitialized header let."""
+        for header_scope_index, guarded_names in reversed(self._cleanup_header_ref_guard_stack):
+            if scope_index == header_scope_index and name in guarded_names:
+                return True
+        return False
+
+    def _expr_contains_try(self, expr: Expr) -> bool:
+        if isinstance(expr, TryExpr):
+            return True
+        if isinstance(expr, UnaryOp):
+            return self._expr_contains_try(expr.operand)
+        if isinstance(expr, BinaryOp):
+            return self._expr_contains_try(expr.left) or self._expr_contains_try(expr.right)
+        if isinstance(expr, CallExpr):
+            if self._expr_contains_try(expr.callee):
+                return True
+            return any(self._expr_contains_try(arg) for arg in expr.args)
+        if isinstance(expr, IndexExpr):
+            return self._expr_contains_try(expr.array) or self._expr_contains_try(expr.index)
+        if isinstance(expr, FieldAccessExpr):
+            return self._expr_contains_try(expr.obj)
+        if isinstance(expr, ParenExpr):
+            return self._expr_contains_try(expr.inner)
+        if isinstance(expr, CastExpr):
+            return self._expr_contains_try(expr.expr)
+        if isinstance(expr, NewExpr):
+            return any(self._expr_contains_try(arg) for arg in expr.args)
+        return False
+
+    def _stmt_contains_try(self, stmt: Stmt) -> bool:
+        if isinstance(stmt, LetStmt):
+            return self._expr_contains_try(stmt.value)
+        if isinstance(stmt, AssignStmt):
+            return self._expr_contains_try(stmt.target) or self._expr_contains_try(stmt.value)
+        if isinstance(stmt, ExprStmt):
+            return self._expr_contains_try(stmt.expr)
+        return False
 
     def _lookup_alive(self, name: str) -> Optional[bool]:
         for scope in reversed(self._alive_scopes):
@@ -669,17 +718,37 @@ class ExpressionTypeChecker:
             # Type-check items sequentially in a new scope
             self._push_scope()
             try:
+                seen_header_try = False
+                maybe_uninit_nonnullable: Set[str] = set()
+
                 for item in stmt.items:
+                    init_has_try = self._stmt_contains_try(item.init)
                     self._check_stmt(item.init)
                     if item.cleanup is not None:
                         self._check_stmt(item.cleanup)
+
+                    if init_has_try:
+                        seen_header_try = True
+
+                    if isinstance(item.init, LetStmt):
+                        # If any prior (or current) header init can short-circuit via `?`,
+                        # this let may be uninitialized along that failure path.
+                        if seen_header_try:
+                            let_ty = self._local_scopes[-1].get(item.init.name)
+                            if let_ty is not None and not isinstance(let_ty, NullableType):
+                                maybe_uninit_nonnullable.add(item.init.name)
 
                 # Body in a nested scope
                 self._check_block(stmt.body, check_return_paths=check_return_paths)
 
                 # Cleanup body in the item scope (not body scope)
                 if stmt.cleanup_body is not None:
-                    self._check_block(stmt.cleanup_body)
+                    header_scope_index = len(self._local_scopes) - 1
+                    self._cleanup_header_ref_guard_stack.append((header_scope_index, maybe_uninit_nonnullable))
+                    try:
+                        self._check_block(stmt.cleanup_body)
+                    finally:
+                        self._cleanup_header_ref_guard_stack.pop()
             finally:
                 self._pop_scope()
             return None
@@ -805,9 +874,17 @@ class ExpressionTypeChecker:
 
         # 1. Locals / parameters
         if expr.module_path is None:
-            local_ty = self._lookup_local(expr.name)
-            if local_ty is not None:
+            local_scope_idx = self._lookup_local_scope_index(expr.name)
+            if local_scope_idx is not None:
+                local_ty = self._local_scopes[local_scope_idx][expr.name]
                 self.analysis.var_ref_resolution[id(expr)] = VarRefResolution.LOCAL
+                if self._is_guarded_cleanup_header_ref(expr.name, local_scope_idx):
+                    self._error(
+                        expr,
+                        f"[TYP-0156] 'cleanup' block references 'with' header variable '{expr.name}' "
+                        f"that may be uninitialized on '?' header-failure path; "
+                        f"use nullable type or inline '=>' cleanup"
+                    )
                 alive = self._lookup_alive(expr.name)
                 if alive is False:
                     self._error(expr, f"[TYP-0150] use of dropped variable '{expr.name}'")

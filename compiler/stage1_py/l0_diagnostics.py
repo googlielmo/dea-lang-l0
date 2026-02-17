@@ -8,7 +8,6 @@ from typing import Optional
 from l0_ast import Node
 from l0_lexer import Token
 
-
 DIAGNOSTIC_CODE_FAMILIES = {
     "LEX": [
         "LEX-0010",
@@ -179,9 +178,9 @@ DIAGNOSTIC_CODE_FAMILIES = {
         "TYP-0053", "TYP-0060", "TYP-0061", "TYP-0062", "TYP-0070",
         "TYP-0080", "TYP-0090", "TYP-0100", "TYP-0101", "TYP-0102",
         "TYP-0103", "TYP-0104", "TYP-0105", "TYP-0106", "TYP-0107",
-        "TYP-0108", "TYP-0109", "TYP-0110", "TYP-0120",
-        "TYP-0139", "TYP-0149", "TYP-0150", "TYP-0151", "TYP-0152",
-        "TYP-0153", "TYP-0154", "TYP-0155", "TYP-0158", "TYP-0159",
+        "TYP-0108", "TYP-0109", "TYP-0110", "TYP-0120", "TYP-0139",
+        "TYP-0149", "TYP-0150", "TYP-0151", "TYP-0152", "TYP-0153",
+        "TYP-0154", "TYP-0155", "TYP-0156", "TYP-0158", "TYP-0159",
         "TYP-0160", "TYP-0161", "TYP-0162", "TYP-0170", "TYP-0171",
         "TYP-0172", "TYP-0173", "TYP-0180", "TYP-0181", "TYP-0182",
         "TYP-0183", "TYP-0189", "TYP-0190", "TYP-0191", "TYP-0200",

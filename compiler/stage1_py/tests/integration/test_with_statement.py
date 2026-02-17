@@ -14,12 +14,11 @@ Covers:
 
 import pytest
 
+from l0_ast import (
+    Module, FuncDecl, WithStmt, LetStmt, ExprStmt, AssignStmt,
+)
 from l0_lexer import Lexer, TokenKind
 from l0_parser import Parser, ParseError
-from l0_ast import (
-    Module, FuncDecl, WithStmt, WithItem, LetStmt, ExprStmt, AssignStmt,
-    Block, CallExpr, VarRef,
-)
 
 
 # ============================================================================
@@ -871,3 +870,120 @@ def test_codegen_try_operator_emits_cleanup_on_early_return(codegen_single):
     assert pos_release > 0, "Expected rt_string_release in try null-check branch"
     assert pos_return > 0, "Expected return in try null-check branch"
     assert pos_release < pos_return, "rt_string_release must come before return in null branch"
+
+
+def test_with_header_try_failure_runs_prior_inline_cleanup(codegen_single, compile_and_run, tmp_path):
+    """A ? failure in a later with-header item must run prior successful inline cleanup."""
+    c_code, diags = codegen_single("main", """
+        module main;
+        import std.io;
+        func ok() -> int? {
+            return 1 as int?;
+        }
+        func fail() -> int? {
+            return null;
+        }
+        func helper() -> int? {
+            with (let q: int = ok()? => printl_s("cleanup_q"),
+                  let p: int = fail()? => printl_s("cleanup_p")) {
+                printl_s("inside");
+            }
+            return 0 as int?;
+        }
+        func main() -> int {
+            let r: int? = helper();
+            if (r == null) {
+                return 0;
+            }
+            return 1;
+        }
+    """)
+    assert c_code is not None, [d.message for d in diags]
+    success, stdout, stderr = compile_and_run(c_code, tmp_path)
+    assert success, f"Program should exit 0: stderr={stderr}"
+    assert "cleanup_q" in stdout, "Expected prior successful with-header item cleanup to run"
+    assert "cleanup_p" not in stdout, "Failed with-header item cleanup must not run"
+    assert "inside" not in stdout, "With body should not execute when header ? fails"
+
+
+def test_with_cleanup_block_header_try_failure_nullable_vars(codegen_single, compile_and_run, tmp_path):
+    """Cleanup block can run on header ? failure when referenced header vars are nullable."""
+    c_code, diags = codegen_single("main", """
+        module main;
+        import std.io;
+        func ok() -> int? {
+            return 1 as int?;
+        }
+        func fail() -> int? {
+            return null;
+        }
+        func helper() -> int? {
+            with (let q: int? = ok()?,
+                  let p: int? = fail()?) {
+                printl_s("inside");
+            } cleanup {
+                if (q != null) { printl_s("cleanup_q"); }
+                if (p != null) { printl_s("cleanup_p"); }
+            }
+            return 0 as int?;
+        }
+        func main() -> int {
+            let r: int? = helper();
+            if (r == null) {
+                return 0;
+            }
+            return 1;
+        }
+    """)
+    assert c_code is not None, [d.message for d in diags]
+    # Nullable lets in cleanup-block headers are predeclared to `null`.
+    assert "q = {0};" in c_code
+    assert "p = {0};" in c_code
+    success, stdout, stderr = compile_and_run(c_code, tmp_path)
+    assert success, f"Program should exit 0: stderr={stderr}"
+    assert "cleanup_q" in stdout
+    assert "cleanup_p" not in stdout
+    assert "inside" not in stdout
+
+
+def test_typecheck_with_cleanup_block_header_try_failure_nonnullable_ref_rejected(analyze_single):
+    """Cleanup references to maybe-uninitialized non-nullable header lets are rejected."""
+    result = analyze_single("main", """
+        module main;
+        import std.io;
+        func ok() -> int? { return 1 as int?; }
+        func fail() -> int? { return null; }
+        func helper() -> int? {
+            with (let q: int = ok()?,
+                  let p: int = fail()?) {
+            } cleanup {
+                printl_si("q", q);
+                printl_si("p", p);
+            }
+            return 0 as int?;
+        }
+        func main() -> int { return 0; }
+    """)
+    errors = [d for d in result.diagnostics if d.kind == "error"]
+    assert any("TYP-0156" in d.message for d in errors), [d.message for d in errors]
+
+
+def test_typecheck_with_cleanup_block_header_try_failure_nonnullable_not_referenced_passes(analyze_single):
+    """Non-nullable maybe-uninitialized header lets are allowed when cleanup does not reference them."""
+    result = analyze_single("main", """
+        module main;
+        import std.io;
+        func ok() -> int? { return 1 as int?; }
+        func fail() -> int? { return null; }
+        func helper() -> int? {
+            with (let q: int = ok()?,
+                  let p: int = fail()?) {
+            } cleanup {
+                printl_s("cleanup");
+            }
+            return 0 as int?;
+        }
+        func main() -> int { return 0; }
+    """)
+    errors = [d for d in result.diagnostics if d.kind == "error"]
+    assert len(errors) == 0, [d.message for d in errors]

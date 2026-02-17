@@ -277,6 +277,22 @@ TYP_TRIGGERS = {
         enum E { Some(v: int); }
         func foo() -> int { let x: int = Some; return 0; }
     """),
+    "TYP-0156": dedent("""\
+        module main;
+        import std.io;
+        func ok() -> int? { return 1 as int?; }
+        func fail() -> int? { return null; }
+        func foo() -> int? {
+            with (let q: int = ok()?,
+                  let p: int = fail()?) {
+            } cleanup {
+                printl_si("q", q);
+                printl_si("p", p);
+            }
+            return 0 as int?;
+        }
+        func main() -> int { return 0; }
+    """),
     "TYP-0158": dedent("""\
         module main;
         enum Color { Red(); }

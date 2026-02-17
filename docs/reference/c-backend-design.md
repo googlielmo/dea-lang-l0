@@ -79,7 +79,7 @@ Current backend target is a **single C translation unit**.
 ### Pointers and nullable
 
 - `T*` lowers to pointer type in C.
-- `T*?` uses niche representation: also a pointer type, `NULL` represents `none`.
+- `T*?` uses niche representation: also a pointer type, `NULL` represents L0 `null`.
 - Value nullable (`T?`, where `T` is not pointer-shaped) lowers to wrapper typedef:
     - `typedef struct { l0_bool has_value; T value; } l0_opt_*;`
 
@@ -130,7 +130,9 @@ Key points:
 - Direct `return local_var;` for owned locals is lowered as a move: cleanup skips that binding instead of retaining.
 - Scope exit cleanup runs in reverse declaration order.
 - Early exits (`return`, `break`, `continue`, `try` early return) run pending `with` cleanup first, then owned var
-  cleanup.
+  cleanup, including `try` short-circuits that happen while evaluating `with` headers.
+- For `with` cleanup-block form, nullable header lets are predeclared to `null` before initializer evaluation so
+  header-failure cleanup can safely reference them.
 - Enum/struct-by-value cleanup recursively cleans owned fields of active values.
 
 ## Entry Point Behavior
