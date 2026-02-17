@@ -409,29 +409,34 @@ func ps_try_parse_qualified_name(self: ParserState*) -> QualifiedNameResult*? {
 
     // Commit parse and build vectors.
     let first = ps_expect_ident(self, "PAR-0401", "[PAR-0401] expected identifier before '::'")?;
-    let parts = vs_create(4);
-    vs_push(parts, token_ident_text(first) as string);
 
-    while (ps_match(self, ord(TT_DOT))) {
-        let part = ps_expect_ident(self, "PAR-0300", "[PAR-0300] expected identifier after '.' in module name")?;
-        vs_push(parts, token_ident_text(part) as string);
-    }
+    with (let parts: VectorString*? = vs_create(4) => _free_vs_opt(parts),
+          let qualifier: VectorString*? = null => _free_vs_opt(qualifier)) {
+        vs_push(parts as VectorString*, token_ident_text(first) as string);
 
-    ps_expect(self, ord(TT_DOUBLE_COLON), "PAR-0401", "[PAR-0401] expected '::' in qualified name")?;
-    let name_tok = ps_expect_ident(self, "PAR-0401", "[PAR-0401] expected identifier after '::'")?;
-
-    let qualifier: VectorString*? = null;
-    let current_name_tok = name_tok;
-
-    while (ps_match(self, ord(TT_DOUBLE_COLON))) {
-        if (qualifier == null) {
-            qualifier = vs_create(2);
+        while (ps_match(self, ord(TT_DOT))) {
+            let part = ps_expect_ident(self, "PAR-0300", "[PAR-0300] expected identifier after '.' in module name")?;
+            vs_push(parts as VectorString*, token_ident_text(part) as string);
         }
-        vs_push(qualifier as VectorString*, token_ident_text(current_name_tok) as string);
-        current_name_tok = ps_expect_ident(self, "PAR-0401", "[PAR-0401] expected identifier after '::'")?;
-    }
 
-    return new QualifiedNameResult(parts, qualifier, current_name_tok);
+        ps_expect(self, ord(TT_DOUBLE_COLON), "PAR-0401", "[PAR-0401] expected '::' in qualified name")?;
+        let name_tok = ps_expect_ident(self, "PAR-0401", "[PAR-0401] expected identifier after '::'")?;
+
+        let current_name_tok = name_tok;
+
+        while (ps_match(self, ord(TT_DOUBLE_COLON))) {
+            if (qualifier == null) {
+                qualifier = vs_create(2);
+            }
+            vs_push(qualifier as VectorString*, token_ident_text(current_name_tok) as string);
+            current_name_tok = ps_expect_ident(self, "PAR-0401", "[PAR-0401] expected identifier after '::'")?;
+        }
+
+        let result = new QualifiedNameResult(parts as VectorString*, qualifier, current_name_tok);
+        parts = null;
+        qualifier = null;
+        return result;
+    }
 }
 
 /* ------------------------------------
@@ -913,18 +918,20 @@ func ps_parse_pattern(self: ParserState*) -> PatternId? {
         node.name_qualifier = name_qualifier;
 
         if (ps_match(self, ord(TT_LPAREN))) {
-            let vars = vs_create(2);
-            if (!ps_check(self, ord(TT_RPAREN))) {
-                while (true) {
-                    let var_tok = ps_expect_variable_name(self, "PAR-0180", "[PAR-0180] expected pattern variable name")?;
-                    vs_push(vars, token_ident_text(var_tok) as string);
-                    if (!ps_match(self, ord(TT_COMMA))) {
-                        break;
+            with (let vars: VectorString*? = vs_create(2) => _free_vs_opt(vars)) {
+                if (!ps_check(self, ord(TT_RPAREN))) {
+                    while (true) {
+                        let var_tok = ps_expect_variable_name(self, "PAR-0180", "[PAR-0180] expected pattern variable name")?;
+                        vs_push(vars as VectorString*, token_ident_text(var_tok) as string);
+                        if (!ps_match(self, ord(TT_COMMA))) {
+                            break;
+                        }
                     }
                 }
+                ps_expect(self, ord(TT_RPAREN), "PAR-0181", "[PAR-0181] expected ')' in pattern")?;
+                node.vars = vars;
+                vars = null;
             }
-            ps_expect(self, ord(TT_RPAREN), "PAR-0181", "[PAR-0181] expected ')' in pattern")?;
-            node.vars = vars;
         }
 
         // refresh span after optional payload
@@ -944,17 +951,19 @@ func ps_parse_block(self: ParserState*) -> StmtId? {
     let start = ps_span_start(self);
     ps_expect(self, ord(TT_LBRACE), "PAR-0090", "[PAR-0090] expected '{' to start block")?;
 
-    let stmts = id_vec_create(8);
-    while (!ps_check(self, ord(TT_RBRACE))) {
-        let stmt = ps_parse_stmt(self)?;
-        id_vec_push(stmts, stmt);
+    with (let stmts: VectorBase*? = id_vec_create(8) => _free_id_vec_opt(stmts)) {
+        while (!ps_check(self, ord(TT_RBRACE))) {
+            let stmt = ps_parse_stmt(self)?;
+            id_vec_push(stmts as VectorBase*, stmt);
+        }
+
+        ps_expect(self, ord(TT_RBRACE), "PAR-0091", "[PAR-0091] expected '}' after block")?;
+
+        let node = stmt_node_create(ST_BLOCK, ps_extend_span(self, start));
+        node.ids = stmts as VectorBase*;
+        stmts = null;
+        return stmt_arena_add(self.stmt_arena, node);
     }
-
-    ps_expect(self, ord(TT_RBRACE), "PAR-0091", "[PAR-0091] expected '}' after block")?;
-
-    let node = stmt_node_create(ST_BLOCK, ps_extend_span(self, start));
-    node.ids = stmts;
-    return stmt_arena_add(self.stmt_arena, node);
 }
 
 func ps_parse_break_stmt(self: ParserState*) -> StmtId? {
@@ -1153,60 +1162,50 @@ func ps_parse_match_stmt(self: ParserState*) -> StmtId? {
     ps_expect(self, ord(TT_RPAREN), "PAR-0172", "[PAR-0172] expected ')'")?;
     ps_expect(self, ord(TT_LBRACE), "PAR-0173", "[PAR-0173] expected '{' after match expression")?;
 
-    let arms = ptr_vec_create(4);
+    with (let arms: VectorBase*? = ptr_vec_create(4) => _free_match_arm_vec_opt(arms)) {
+        while (!ps_check(self, ord(TT_RBRACE))) {
+            let arm_start = ps_span_start(self);
+            let pattern = ps_parse_pattern(self)?;
+            ps_expect(self, ord(TT_ARROW_MATCH), "PAR-0174", "[PAR-0174] expected '=>' in match arm")?;
+            let body = ps_parse_block(self)?;
+            let arm = new MatchArm(pattern, body, ps_extend_span(self, arm_start));
+            ptr_vec_push(arms as VectorBase*, arm as void*);
+        }
 
-    while (!ps_check(self, ord(TT_RBRACE))) {
-        let arm_start = ps_span_start(self);
-        let pattern = ps_parse_pattern(self)?;
-        ps_expect(self, ord(TT_ARROW_MATCH), "PAR-0174", "[PAR-0174] expected '=>' in match arm")?;
-        let body = ps_parse_block(self)?;
-        let arm = new MatchArm(pattern, body, ps_extend_span(self, arm_start));
-        ptr_vec_push(arms, arm as void*);
-    }
+        ps_expect(self, ord(TT_RBRACE), "PAR-0175", "[PAR-0175] expected '}' after match")?;
 
-    ps_expect(self, ord(TT_RBRACE), "PAR-0175", "[PAR-0175] expected '}' after match")?;
+        if (vec_size(arms as VectorBase*) == 0) {
+            ps_set_error(self, "PAR-0177", "[PAR-0177] match statement must have at least one arm", ps_peek(self));
+            return null;
+        }
 
-    if (vec_size(arms) == 0) {
-        ps_set_error(self, "PAR-0177", "[PAR-0177] match statement must have at least one arm", ps_peek(self));
-        vec_free(arms);
-        return null;
-    }
+        // duplicate wildcard/variant pattern check
+        for (let i = 0; i < vec_size(arms as VectorBase*); i = i + 1) {
+            let ai = ptr_vec_get(arms as VectorBase*, i) as MatchArm*;
+            let pi = pattern_arena_get(self.pattern_arena, ai.pattern);
 
-    // duplicate wildcard/variant pattern check
-    for (let i = 0; i < vec_size(arms); i = i + 1) {
-        let ai = ptr_vec_get(arms, i) as MatchArm*;
-        let pi = pattern_arena_get(self.pattern_arena, ai.pattern);
+            for (let j = i + 1; j < vec_size(arms as VectorBase*); j = j + 1) {
+                let aj = ptr_vec_get(arms as VectorBase*, j) as MatchArm*;
+                let pj = pattern_arena_get(self.pattern_arena, aj.pattern);
 
-        for (let j = i + 1; j < vec_size(arms); j = j + 1) {
-            let aj = ptr_vec_get(arms, j) as MatchArm*;
-            let pj = pattern_arena_get(self.pattern_arena, aj.pattern);
-
-            if (ord(pi.kind) == ord(PT_WILDCARD) && ord(pj.kind) == ord(PT_WILDCARD)) {
-                ps_set_error(self, "PAR-0176", "[PAR-0176] duplicate variant patterns in match statement", ps_peek(self));
-                for (let k = 0; k < vec_size(arms); k = k + 1) {
-                    let ak = ptr_vec_get(arms, k) as MatchArm*;
-                    drop ak;
+                if (ord(pi.kind) == ord(PT_WILDCARD) && ord(pj.kind) == ord(PT_WILDCARD)) {
+                    ps_set_error(self, "PAR-0176", "[PAR-0176] duplicate variant patterns in match statement", ps_peek(self));
+                    return null;
                 }
-                vec_free(arms);
-                return null;
-            }
 
-            if (ord(pi.kind) == ord(PT_VARIANT) && ord(pj.kind) == ord(PT_VARIANT) && eq_s(pi.name, pj.name)) {
-                ps_set_error(self, "PAR-0176", "[PAR-0176] duplicate variant patterns in match statement", ps_peek(self));
-                for (let k = 0; k < vec_size(arms); k = k + 1) {
-                    let ak = ptr_vec_get(arms, k) as MatchArm*;
-                    drop ak;
+                if (ord(pi.kind) == ord(PT_VARIANT) && ord(pj.kind) == ord(PT_VARIANT) && eq_s(pi.name, pj.name)) {
+                    ps_set_error(self, "PAR-0176", "[PAR-0176] duplicate variant patterns in match statement", ps_peek(self));
+                    return null;
                 }
-                vec_free(arms);
-                return null;
             }
         }
-    }
 
-    let node = stmt_node_create(ST_MATCH, ps_extend_span(self, start));
-    node.expr_a = expr;
-    node.match_arms = arms;
-    return stmt_arena_add(self.stmt_arena, node);
+        let node = stmt_node_create(ST_MATCH, ps_extend_span(self, start));
+        node.expr_a = expr;
+        node.match_arms = arms as VectorBase*;
+        arms = null;
+        return stmt_arena_add(self.stmt_arena, node);
+    }
 }
 
 func ps_parse_with_item(self: ParserState*) -> WithItem*? {
@@ -1229,74 +1228,61 @@ func ps_parse_with_stmt(self: ParserState*) -> StmtId? {
     ps_expect(self, ord(TT_WITH), "PAR-0500", "[PAR-0500] expected 'with'")?;
     ps_expect(self, ord(TT_LPAREN), "PAR-0501", "[PAR-0501] expected '(' after 'with'")?;
 
-    let items = ptr_vec_create(4);
-    while (true) {
-        let item = ps_parse_with_item(self)?;
-        ptr_vec_push(items, item as void*);
-        if (!ps_match(self, ord(TT_COMMA))) {
-            break;
+    with (let items: VectorBase*? = ptr_vec_create(4) => _free_with_item_vec_opt(items)) {
+        while (true) {
+            let item = ps_parse_with_item(self)?;
+            ptr_vec_push(items as VectorBase*, item as void*);
+            if (!ps_match(self, ord(TT_COMMA))) {
+                break;
+            }
         }
-    }
 
-    ps_expect(self, ord(TT_RPAREN), "PAR-0502", "[PAR-0502] expected ')' after with items")?;
+        ps_expect(self, ord(TT_RPAREN), "PAR-0502", "[PAR-0502] expected ')' after with items")?;
 
-    let body = ps_parse_block(self)?;
+        let body = ps_parse_block(self)?;
 
-    let cleanup_body = invalid_stmt_id();
-    let has_cleanup_body = false;
-    if (ps_match(self, ord(TT_CLEANUP))) {
-        cleanup_body = ps_parse_block(self)?;
-        has_cleanup_body = true;
-    }
-
-    let has_arrows = false;
-    let has_bare = false;
-    for (let i = 0; i < vec_size(items); i = i + 1) {
-        let it = ptr_vec_get(items, i) as WithItem*;
-        if (it.has_cleanup) {
-            has_arrows = true;
-        } else {
-            has_bare = true;
+        let cleanup_body = invalid_stmt_id();
+        let has_cleanup_body = false;
+        if (ps_match(self, ord(TT_CLEANUP))) {
+            cleanup_body = ps_parse_block(self)?;
+            has_cleanup_body = true;
         }
-    }
 
-    if (has_arrows && has_bare) {
-        ps_set_error(self, "PAR-0503", "[PAR-0503] 'with': all items must use '=>' or none", ps_peek(self));
-        for (let i = 0; i < vec_size(items); i = i + 1) {
-            let it = ptr_vec_get(items, i) as WithItem*;
-            drop it;
+        let has_arrows = false;
+        let has_bare = false;
+        for (let i = 0; i < vec_size(items as VectorBase*); i = i + 1) {
+            let it = ptr_vec_get(items as VectorBase*, i) as WithItem*;
+            if (it.has_cleanup) {
+                has_arrows = true;
+            } else {
+                has_bare = true;
+            }
         }
-        vec_free(items);
-        return null;
-    }
 
-    if (has_arrows && has_cleanup_body) {
-        ps_set_error(self, "PAR-0504", "[PAR-0504] 'with': cannot have both '=>' and cleanup block", ps_peek(self));
-        for (let i = 0; i < vec_size(items); i = i + 1) {
-            let it = ptr_vec_get(items, i) as WithItem*;
-            drop it;
+        if (has_arrows && has_bare) {
+            ps_set_error(self, "PAR-0503", "[PAR-0503] 'with': all items must use '=>' or none", ps_peek(self));
+            return null;
         }
-        vec_free(items);
-        return null;
-    }
 
-    if (!has_arrows && !has_cleanup_body) {
-        ps_set_error(self, "PAR-0505", "[PAR-0505] 'with': cleanup block required when '=>' is not used", ps_peek(self));
-        for (let i = 0; i < vec_size(items); i = i + 1) {
-            let it = ptr_vec_get(items, i) as WithItem*;
-            drop it;
+        if (has_arrows && has_cleanup_body) {
+            ps_set_error(self, "PAR-0504", "[PAR-0504] 'with': cannot have both '=>' and cleanup block", ps_peek(self));
+            return null;
         }
-        vec_free(items);
-        return null;
-    }
 
-    let node = stmt_node_create(ST_WITH, ps_extend_span(self, start));
-    node.with_items = items;
-    node.stmt_a = body;
-    if (has_cleanup_body) {
-        node.stmt_b = cleanup_body;
+        if (!has_arrows && !has_cleanup_body) {
+            ps_set_error(self, "PAR-0505", "[PAR-0505] 'with': cleanup block required when '=>' is not used", ps_peek(self));
+            return null;
+        }
+
+        let node = stmt_node_create(ST_WITH, ps_extend_span(self, start));
+        node.with_items = items as VectorBase*;
+        node.stmt_a = body;
+        if (has_cleanup_body) {
+            node.stmt_b = cleanup_body;
+        }
+        items = null;
+        return stmt_arena_add(self.stmt_arena, node);
     }
-    return stmt_arena_add(self.stmt_arena, node);
 }
 
 func ps_parse_case_literal(self: ParserState*) -> ExprId? {
@@ -1346,74 +1332,57 @@ func ps_parse_case_stmt(self: ParserState*) -> StmtId? {
     ps_expect(self, ord(TT_RPAREN), "PAR-0232", "[PAR-0232] expected ')'")?;
     ps_expect(self, ord(TT_LBRACE), "PAR-0233", "[PAR-0233] expected '{' after 'case' expression")?;
 
-    let arms = ptr_vec_create(4);
-    let else_arm: CaseElse*? = null;
-    let seen_else = false;
+    with (let arms: VectorBase*? = ptr_vec_create(4) => _free_case_arm_vec_opt(arms),
+          let else_arm: CaseElse*? = null => _free_case_else_opt(else_arm)) {
+        let seen_else = false;
 
-    while (!ps_check(self, ord(TT_RBRACE))) {
-        if (ps_match(self, ord(TT_ELSE))) {
+        while (!ps_check(self, ord(TT_RBRACE))) {
+            if (ps_match(self, ord(TT_ELSE))) {
+                if (seen_else) {
+                    ps_set_error(self, "PAR-0236", "[PAR-0236] duplicate 'else' arm in 'case' statement", ps_peek(self));
+                    return null;
+                }
+
+                let else_start = ps_span_start(self);
+                if (ps_match(self, ord(TT_ARROW_MATCH))) {
+                    ps_set_error(self, "PAR-0237", "[PAR-0237] '=>' not allowed in 'else' arm", ps_peek(self));
+                    return null;
+                }
+
+                let body = ps_parse_stmt(self)?;
+                else_arm = new CaseElse(body, ps_extend_span(self, else_start));
+                seen_else = true;
+                continue;
+            }
+
             if (seen_else) {
-                ps_set_error(self, "PAR-0236", "[PAR-0236] duplicate 'else' arm in 'case' statement", ps_peek(self));
-                for (let i = 0; i < vec_size(arms); i = i + 1) {
-                    let a = ptr_vec_get(arms, i) as CaseArm*;
-                    drop a;
-                }
-                vec_free(arms);
+                ps_set_error(self, "PAR-0234", "[PAR-0234] value arm cannot appear after 'else' in 'case' statement", ps_peek(self));
                 return null;
             }
 
-            let else_start = ps_span_start(self);
-            if (ps_match(self, ord(TT_ARROW_MATCH))) {
-                ps_set_error(self, "PAR-0237", "[PAR-0237] '=>' not allowed in 'else' arm", ps_peek(self));
-                for (let i = 0; i < vec_size(arms); i = i + 1) {
-                    let a = ptr_vec_get(arms, i) as CaseArm*;
-                    drop a;
-                }
-                vec_free(arms);
-                return null;
-            }
-
+            let arm_start = ps_span_start(self);
+            let literal = ps_parse_case_literal(self)?;
+            ps_expect(self, ord(TT_ARROW_MATCH), "PAR-0235", "[PAR-0235] expected '=>' in 'case' arm")?;
             let body = ps_parse_stmt(self)?;
-            else_arm = new CaseElse(body, ps_extend_span(self, else_start));
-            seen_else = true;
-            continue;
+            let arm = new CaseArm(literal, body, ps_extend_span(self, arm_start));
+            ptr_vec_push(arms as VectorBase*, arm as void*);
         }
 
-        if (seen_else) {
-            ps_set_error(self, "PAR-0234", "[PAR-0234] value arm cannot appear after 'else' in 'case' statement", ps_peek(self));
-            for (let i = 0; i < vec_size(arms); i = i + 1) {
-                let a = ptr_vec_get(arms, i) as CaseArm*;
-                drop a;
-            }
-            vec_free(arms);
-            if (else_arm != null) {
-                let else_ptr = else_arm as CaseElse*;
-                drop else_ptr;
-            }
+        ps_expect(self, ord(TT_RBRACE), "PAR-0239", "[PAR-0239] expected '}' after 'case' statement")?;
+
+        if (vec_size(arms as VectorBase*) == 0 && else_arm == null) {
+            ps_set_error(self, "PAR-0240", "[PAR-0240] 'case' statement must have at least one arm", ps_peek(self));
             return null;
         }
 
-        let arm_start = ps_span_start(self);
-        let literal = ps_parse_case_literal(self)?;
-        ps_expect(self, ord(TT_ARROW_MATCH), "PAR-0235", "[PAR-0235] expected '=>' in 'case' arm")?;
-        let body = ps_parse_stmt(self)?;
-        let arm = new CaseArm(literal, body, ps_extend_span(self, arm_start));
-        ptr_vec_push(arms, arm as void*);
+        let node = stmt_node_create(ST_CASE, ps_extend_span(self, start));
+        node.expr_a = expr;
+        node.case_arms = arms as VectorBase*;
+        node.case_else = else_arm;
+        arms = null;
+        else_arm = null;
+        return stmt_arena_add(self.stmt_arena, node);
     }
-
-    ps_expect(self, ord(TT_RBRACE), "PAR-0239", "[PAR-0239] expected '}' after 'case' statement")?;
-
-    if (vec_size(arms) == 0 && else_arm == null) {
-        ps_set_error(self, "PAR-0240", "[PAR-0240] 'case' statement must have at least one arm", ps_peek(self));
-        vec_free(arms);
-        return null;
-    }
-
-    let node = stmt_node_create(ST_CASE, ps_extend_span(self, start));
-    node.expr_a = expr;
-    node.case_arms = arms;
-    node.case_else = else_arm;
-    return stmt_arena_add(self.stmt_arena, node);
 }
 
 func ps_parse_simple_stmt(self: ParserState*) -> StmtId? {
@@ -1511,29 +1480,36 @@ func ps_parse_function(self: ParserState*, is_extern: bool) -> FuncDecl*? {
     ps_expect(self, ord(TT_FUNC), "PAR-0040", "[PAR-0040] expected 'func'")?;
     let name_tok = ps_expect_ident(self, "PAR-0041", "[PAR-0041] expected function name")?;
     ps_expect(self, ord(TT_LPAREN), "PAR-0042", "[PAR-0042] expected '('")?;
-    let params = ptr_vec_create(4);
 
-    if (!ps_check(self, ord(TT_RPAREN))) {
-        while (true) {
-            let param_name = ps_expect_ident(self, "PAR-0043", "[PAR-0043] expected parameter name")?;
-            ps_expect(self, ord(TT_COLON), "PAR-0044", "[PAR-0044] expected ':' after parameter name")?;
-            let param_type = ps_parse_type(self)?;
-            let p = new Param(token_ident_text(param_name) as string, param_type);
-            ptr_vec_push(params, p as void*);
-            if (!ps_match(self, ord(TT_COMMA))) {
-                break;
+    with (let params: VectorBase*? = ptr_vec_create(4) => _free_param_vec_opt(params),
+          let ret_type: TypeRef*? = null => _free_type_ref_opt(ret_type)) {
+        if (!ps_check(self, ord(TT_RPAREN))) {
+            while (true) {
+                let param_name = ps_expect_ident(self, "PAR-0043", "[PAR-0043] expected parameter name")?;
+                ps_expect(self, ord(TT_COLON), "PAR-0044", "[PAR-0044] expected ':' after parameter name")?;
+                let param_type = ps_parse_type(self)?;
+                let p = new Param(token_ident_text(param_name) as string, param_type);
+                ptr_vec_push(params as VectorBase*, p as void*);
+                if (!ps_match(self, ord(TT_COMMA))) {
+                    break;
+                }
             }
         }
-    }
-    ps_expect(self, ord(TT_RPAREN), "PAR-0045", "[PAR-0045] expected ')' after parameters")?;
+        ps_expect(self, ord(TT_RPAREN), "PAR-0045", "[PAR-0045] expected ')' after parameters")?;
 
-    if (ps_match(self, ord(TT_ARROW_FUNC))) {
-        let parsed_ret = ps_parse_type(self)?;
-        return ps_finish_function(self, start, name_tok, params, is_extern, parsed_ret);
-    }
+        if (ps_match(self, ord(TT_ARROW_FUNC))) {
+            ret_type = ps_parse_type(self)?;
+        } else {
+            ret_type = new TypeRef("void", 0, false, null, null, ps_extend_span(self, start));
+        }
 
-    let ret_void = new TypeRef("void", 0, false, null, null, ps_extend_span(self, start));
-    return ps_finish_function(self, start, name_tok, params, is_extern, ret_void);
+        let result = ps_finish_function(self, start, name_tok, params as VectorBase*, is_extern, ret_type as TypeRef*);
+        if (result != null) {
+            params = null;
+            ret_type = null;
+        }
+        return result;
+    }
 }
 
 func ps_parse_extern_func(self: ParserState*) -> FuncDecl*? {
@@ -1547,18 +1523,21 @@ func ps_parse_struct(self: ParserState*) -> StructDecl*? {
     let name_tok = ps_expect_ident(self, "PAR-0051", "[PAR-0051] expected struct name")?;
     ps_expect(self, ord(TT_LBRACE), "PAR-0052", "[PAR-0052] expected '{' after struct name")?;
 
-    let fields = ptr_vec_create(4);
-    while (!ps_check(self, ord(TT_RBRACE))) {
-        let field_name = ps_expect_ident(self, "PAR-0053", "[PAR-0053] expected field name")?;
-        ps_expect(self, ord(TT_COLON), "PAR-0054", "[PAR-0054] expected ':' after field name")?;
-        let field_type = ps_parse_type(self)?;
-        ps_expect(self, ord(TT_SEMI), "PAR-0055", "[PAR-0055] expected ';' after field declaration")?;
-        let fd = new FieldDecl(token_ident_text(field_name) as string, field_type);
-        ptr_vec_push(fields, fd as void*);
-    }
+    with (let fields: VectorBase*? = ptr_vec_create(4) => _free_field_decl_vec_opt(fields)) {
+        while (!ps_check(self, ord(TT_RBRACE))) {
+            let field_name = ps_expect_ident(self, "PAR-0053", "[PAR-0053] expected field name")?;
+            ps_expect(self, ord(TT_COLON), "PAR-0054", "[PAR-0054] expected ':' after field name")?;
+            let field_type = ps_parse_type(self)?;
+            ps_expect(self, ord(TT_SEMI), "PAR-0055", "[PAR-0055] expected ';' after field declaration")?;
+            let fd = new FieldDecl(token_ident_text(field_name) as string, field_type);
+            ptr_vec_push(fields as VectorBase*, fd as void*);
+        }
 
-    ps_expect(self, ord(TT_RBRACE), "PAR-0056", "[PAR-0056] expected '}' after struct body")?;
-    return new StructDecl(token_ident_text(name_tok) as string, fields, ps_extend_span(self, start));
+        ps_expect(self, ord(TT_RBRACE), "PAR-0056", "[PAR-0056] expected '}' after struct body")?;
+        let result = new StructDecl(token_ident_text(name_tok) as string, fields as VectorBase*, ps_extend_span(self, start));
+        fields = null;
+        return result;
+    }
 }
 
 func ps_parse_enum(self: ParserState*) -> EnumDecl*? {
@@ -1567,34 +1546,39 @@ func ps_parse_enum(self: ParserState*) -> EnumDecl*? {
     let name_tok = ps_expect_ident(self, "PAR-0061", "[PAR-0061] expected enum name")?;
     ps_expect(self, ord(TT_LBRACE), "PAR-0062", "[PAR-0062] expected '{' after enum name")?;
 
-    let variants = ptr_vec_create(4);
-    while (!ps_check(self, ord(TT_RBRACE))) {
-        let var_name_tok = ps_expect_ident(self, "PAR-0063", "[PAR-0063] expected variant name")?;
-        let fields = ptr_vec_create(2);
+    with (let variants: VectorBase*? = ptr_vec_create(4) => _free_enum_variant_vec_opt(variants)) {
+        while (!ps_check(self, ord(TT_RBRACE))) {
+            let var_name_tok = ps_expect_ident(self, "PAR-0063", "[PAR-0063] expected variant name")?;
 
-        if (ps_match(self, ord(TT_LPAREN))) {
-            if (!ps_check(self, ord(TT_RPAREN))) {
-                while (true) {
-                    let fname = ps_expect_ident(self, "PAR-0064", "[PAR-0064] expected variant field name")?;
-                    ps_expect(self, ord(TT_COLON), "PAR-0065", "[PAR-0065] expected ':'")?;
-                    let ftype = ps_parse_type(self)?;
-                    let fd = new FieldDecl(token_ident_text(fname) as string, ftype);
-                    ptr_vec_push(fields, fd as void*);
-                    if (!ps_match(self, ord(TT_COMMA))) {
-                        break;
+            with (let fields: VectorBase*? = ptr_vec_create(2) => _free_field_decl_vec_opt(fields)) {
+                if (ps_match(self, ord(TT_LPAREN))) {
+                    if (!ps_check(self, ord(TT_RPAREN))) {
+                        while (true) {
+                            let fname = ps_expect_ident(self, "PAR-0064", "[PAR-0064] expected variant field name")?;
+                            ps_expect(self, ord(TT_COLON), "PAR-0065", "[PAR-0065] expected ':'")?;
+                            let ftype = ps_parse_type(self)?;
+                            let fd = new FieldDecl(token_ident_text(fname) as string, ftype);
+                            ptr_vec_push(fields as VectorBase*, fd as void*);
+                            if (!ps_match(self, ord(TT_COMMA))) {
+                                break;
+                            }
+                        }
                     }
+                    ps_expect(self, ord(TT_RPAREN), "PAR-0066", "[PAR-0066] expected ')' after variant payload")?;
                 }
+
+                ps_expect(self, ord(TT_SEMI), "PAR-0067", "[PAR-0067] expected ';' after variant")?;
+                let variant = new EnumVariant(token_ident_text(var_name_tok) as string, fields as VectorBase*);
+                ptr_vec_push(variants as VectorBase*, variant as void*);
+                fields = null;
             }
-            ps_expect(self, ord(TT_RPAREN), "PAR-0066", "[PAR-0066] expected ')' after variant payload")?;
         }
 
-        ps_expect(self, ord(TT_SEMI), "PAR-0067", "[PAR-0067] expected ';' after variant")?;
-        let variant = new EnumVariant(token_ident_text(var_name_tok) as string, fields);
-        ptr_vec_push(variants, variant as void*);
+        ps_expect(self, ord(TT_RBRACE), "PAR-0068", "[PAR-0068] expected '}' after enum body")?;
+        let result = new EnumDecl(token_ident_text(name_tok) as string, variants as VectorBase*, ps_extend_span(self, start));
+        variants = null;
+        return result;
     }
-
-    ps_expect(self, ord(TT_RBRACE), "PAR-0068", "[PAR-0068] expected '}' after enum body")?;
-    return new EnumDecl(token_ident_text(name_tok) as string, variants, ps_extend_span(self, start));
 }
 
 func ps_parse_type_alias(self: ParserState*) -> TypeAliasDecl*? {
@@ -1668,23 +1652,27 @@ func ps_parse_module(self: ParserState*) -> Module*? {
 
     ps_expect(self, ord(TT_SEMI), "PAR-0312", "[PAR-0312] expected ';' after module name")?;
 
-    let imports = ptr_vec_create(4);
-    while (ps_match(self, ord(TT_IMPORT))) {
-        let first = ps_expect_ident(self, "PAR-0320", "[PAR-0320] expected imported module name")?;
-        let first_imp = token_ident_text(first) as string;
-        let imp_name = parse_dotted_name_rest(self, first_imp)?;
-        ps_expect(self, ord(TT_SEMI), "PAR-0321", "[PAR-0321] expected ';' after import")?;
-        let imp = new Import(imp_name);
-        ptr_vec_push(imports, imp as void*);
-    }
+    with (let imports: VectorBase*? = ptr_vec_create(4) => _free_import_vec_opt(imports),
+          let decls: VectorBase*? = ptr_vec_create(8) => _free_top_level_decl_vec_opt(decls)) {
+        while (ps_match(self, ord(TT_IMPORT))) {
+            let first = ps_expect_ident(self, "PAR-0320", "[PAR-0320] expected imported module name")?;
+            let first_imp = token_ident_text(first) as string;
+            let imp_name = parse_dotted_name_rest(self, first_imp)?;
+            ps_expect(self, ord(TT_SEMI), "PAR-0321", "[PAR-0321] expected ';' after import")?;
+            let imp = new Import(imp_name);
+            ptr_vec_push(imports as VectorBase*, imp as void*);
+        }
 
-    let decls = ptr_vec_create(8);
-    while (!ps_at_end(self)) {
-        let decl = ps_parse_top_level_decl(self)?;
-        ptr_vec_push(decls, decl as void*);
-    }
+        while (!ps_at_end(self)) {
+            let decl = ps_parse_top_level_decl(self)?;
+            ptr_vec_push(decls as VectorBase*, decl as void*);
+        }
 
-    return new Module(module_name, imports, decls, ps_extend_span(self, start), self.filename);
+        let result = new Module(module_name, imports as VectorBase*, decls as VectorBase*, ps_extend_span(self, start), self.filename);
+        imports = null;
+        decls = null;
+        return result;
+    }
 }
 
 /* ------------------------------------

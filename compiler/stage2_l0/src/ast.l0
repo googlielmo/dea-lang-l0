@@ -525,6 +525,116 @@ func with_item_free(self: WithItem*) {
     drop self;
 }
 
+/* ------------------------------------
+   Nullable cleanup helpers (for `with` guards)
+   ------------------------------------ */
+
+func _free_id_vec_opt(v: VectorBase*?) {
+    if (v != null) {
+        vec_free(v as VectorBase*);
+    }
+}
+
+func _free_type_ref_opt(v: TypeRef*?) {
+    if (v != null) {
+        type_ref_free(v as TypeRef*);
+    }
+}
+
+func _free_import_vec_opt(v: VectorBase*?) {
+    if (v != null) {
+        let vec = v as VectorBase*;
+        for (let i = 0; i < vec_size(vec); i = i + 1) {
+            let imp = ptr_vec_get(vec, i) as Import*;
+            import_free(imp);
+        }
+        vec_free(vec);
+    }
+}
+
+func _free_top_level_decl_vec_opt(v: VectorBase*?) {
+    if (v != null) {
+        let vec = v as VectorBase*;
+        for (let i = 0; i < vec_size(vec); i = i + 1) {
+            let decl = ptr_vec_get(vec, i) as TopLevelDecl*;
+            top_level_decl_free(decl);
+        }
+        vec_free(vec);
+    }
+}
+
+func _free_param_vec_opt(v: VectorBase*?) {
+    if (v != null) {
+        let vec = v as VectorBase*;
+        for (let i = 0; i < vec_size(vec); i = i + 1) {
+            let p = ptr_vec_get(vec, i) as Param*;
+            param_free(p);
+        }
+        vec_free(vec);
+    }
+}
+
+func _free_field_decl_vec_opt(v: VectorBase*?) {
+    if (v != null) {
+        let vec = v as VectorBase*;
+        for (let i = 0; i < vec_size(vec); i = i + 1) {
+            let fd = ptr_vec_get(vec, i) as FieldDecl*;
+            field_decl_free(fd);
+        }
+        vec_free(vec);
+    }
+}
+
+func _free_enum_variant_vec_opt(v: VectorBase*?) {
+    if (v != null) {
+        let vec = v as VectorBase*;
+        for (let i = 0; i < vec_size(vec); i = i + 1) {
+            let ev = ptr_vec_get(vec, i) as EnumVariant*;
+            enum_variant_free(ev);
+        }
+        vec_free(vec);
+    }
+}
+
+func _free_match_arm_vec_opt(v: VectorBase*?) {
+    if (v != null) {
+        let vec = v as VectorBase*;
+        for (let i = 0; i < vec_size(vec); i = i + 1) {
+            let arm = ptr_vec_get(vec, i) as MatchArm*;
+            match_arm_free(arm);
+        }
+        vec_free(vec);
+    }
+}
+
+func _free_case_arm_vec_opt(v: VectorBase*?) {
+    if (v != null) {
+        let vec = v as VectorBase*;
+        for (let i = 0; i < vec_size(vec); i = i + 1) {
+            let arm = ptr_vec_get(vec, i) as CaseArm*;
+            case_arm_free(arm);
+        }
+        vec_free(vec);
+    }
+}
+
+func _free_case_else_opt(v: CaseElse*?) {
+    if (v != null) {
+        case_else_free(v as CaseElse*);
+    }
+}
+
+func _free_with_item_vec_opt(v: VectorBase*?) {
+    if (v != null) {
+        let vec = v as VectorBase*;
+        for (let i = 0; i < vec_size(vec); i = i + 1) {
+            let it = ptr_vec_get(vec, i) as WithItem*;
+            with_item_free(it);
+        }
+        vec_free(vec);
+    }
+}
+
 func expr_node_free(self: ExprNode*) {
     if (self.ids != null) {
         vec_free(self.ids as VectorBase*);
