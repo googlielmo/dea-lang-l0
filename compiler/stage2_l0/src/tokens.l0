@@ -8,6 +8,7 @@ module tokens;
 import std.io;
 import std.string;
 import std.unit;
+import sys.rt;
 
 import util.text;
 import util.vector;
@@ -298,5 +299,15 @@ func tv_len(self: TokenVector) -> int {
 }
 
 func tv_free(self: TokenVector) {
+    for (let i: int = 0; i < self.vec.length; i = i + 1) {
+        let tok_ptr = vec_get(self.vec, i) as Token*;
+        match (tok_ptr.token_type) {
+            TT_IDENT(t) => { rt_string_release(t); }
+            TT_INT(t, v) => { rt_string_release(t); }
+            TT_BYTE(t, v) => { rt_string_release(t); }
+            TT_STRING(t, v) => { rt_string_release(t); rt_string_release(v); }
+            _ => {}
+        }
+    }
     vec_free(self.vec);
 }
