@@ -89,6 +89,8 @@ grep -r 'XXX-NNNN' --include='*.py' compiler/stage1_py/
 ## Git Conventions
 
 - Multiline commits: sentence-case summary with period, then factual body as bullets with "- " prefix, no wrapping.
+- For multiline commit messages, write the message to a temporary file and use `git commit -F <file>` to avoid shell
+  escaping issues (especially with backticks).
 - No tag-phrases ("for clarity", "for consistency"). State what changed.
 - Use backticks for L0/Python/C code snippets and function/type names in messages.
 - No Co-Authored-By lines.

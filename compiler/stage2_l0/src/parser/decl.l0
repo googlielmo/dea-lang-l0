@@ -1,0 +1,305 @@
+/*
+ * SPDX-License-Identifier: MIT OR Apache-2.0
+ * Copyright (c) 2026 gwz
+ */
+
+module parser.decl;
+
+import util.text;
+import util.vector;
+
+import tokens;
+import lexer;
+import ast;
+import parser.shared;
+import parser.expr;
+import parser.stmt;
+
+/* ------------------------------------
+   Top-level declarations
+   ------------------------------------ */
+
+func ps_make_empty_block_stmt(self: ParserState*, span: Span) -> StmtId {
+    let node = stmt_node_create(ST_BLOCK, span);
+    node.ids = id_vec_create(0);
+    return stmt_arena_add(self.stmt_arena, node);
+}
+
+func ps_finish_function(self: ParserState*, start: Span, name_tok: Token, params: VectorBase*, is_extern: bool, ret_type: TypeRef*) -> FuncDecl*? {
+    let body = invalid_stmt_id();
+    if (is_extern) {
+        ps_expect(self, ord(TT_SEMI), "PAR-0046", "[PAR-0046] expected ';' after extern function decl")?;
+        body = ps_make_empty_block_stmt(self, ps_extend_span(self, start));
+    } else {
+        body = ps_parse_block(self)?;
+    }
+
+    return new FuncDecl(
+        token_ident_text(name_tok) as string,
+        params,
+        ret_type,
+        body,
+        is_extern,
+        ps_extend_span(self, start)
+    );
+}
+
+func ps_parse_function(self: ParserState*, is_extern: bool) -> FuncDecl*? {
+    let start = ps_span_start(self);
+    ps_expect(self, ord(TT_FUNC), "PAR-0040", "[PAR-0040] expected 'func'")?;
+    let name_tok = ps_expect_ident(self, "PAR-0041", "[PAR-0041] expected function name")?;
+    ps_expect(self, ord(TT_LPAREN), "PAR-0042", "[PAR-0042] expected '('")?;
+
+    with (let params: VectorBase*? = ptr_vec_create(4) => _free_param_vec_opt(params),
+          let ret_type: TypeRef*? = null => _free_type_ref_opt(ret_type)) {
+        if (!ps_check(self, ord(TT_RPAREN))) {
+            while (true) {
+                let param_name = ps_expect_ident(self, "PAR-0043", "[PAR-0043] expected parameter name")?;
+                ps_expect(self, ord(TT_COLON), "PAR-0044", "[PAR-0044] expected ':' after parameter name")?;
+                let param_type = ps_parse_type(self)?;
+                let p = new Param(token_ident_text(param_name) as string, param_type);
+                ptr_vec_push(params as VectorBase*, p as void*);
+                if (!ps_match(self, ord(TT_COMMA))) {
+                    break;
+                }
+            }
+        }
+        ps_expect(self, ord(TT_RPAREN), "PAR-0045", "[PAR-0045] expected ')' after parameters")?;
+
+        if (ps_match(self, ord(TT_ARROW_FUNC))) {
+            ret_type = ps_parse_type(self)?;
+        } else {
+            ret_type = new TypeRef("void", 0, false, null, null, ps_extend_span(self, start));
+        }
+
+        let result = ps_finish_function(self, start, name_tok, params as VectorBase*, is_extern, ret_type as TypeRef*);
+        if (result != null) {
+            params = null;
+            ret_type = null;
+        }
+        return result;
+    }
+}
+
+func ps_parse_extern_func(self: ParserState*) -> FuncDecl*? {
+    ps_expect(self, ord(TT_EXTERN), "PAR-0030", "[PAR-0030] expected 'extern'")?;
+    return ps_parse_function(self, true);
+}
+
+func ps_parse_struct(self: ParserState*) -> StructDecl*? {
+    let start = ps_span_start(self);
+    ps_expect(self, ord(TT_STRUCT), "PAR-0050", "[PAR-0050] expected 'struct'")?;
+    let name_tok = ps_expect_ident(self, "PAR-0051", "[PAR-0051] expected struct name")?;
+    ps_expect(self, ord(TT_LBRACE), "PAR-0052", "[PAR-0052] expected '{' after struct name")?;
+
+    with (let fields: VectorBase*? = ptr_vec_create(4) => _free_field_decl_vec_opt(fields)) {
+        while (!ps_check(self, ord(TT_RBRACE))) {
+            let field_name = ps_expect_ident(self, "PAR-0053", "[PAR-0053] expected field name")?;
+            ps_expect(self, ord(TT_COLON), "PAR-0054", "[PAR-0054] expected ':' after field name")?;
+            let field_type = ps_parse_type(self)?;
+            ps_expect(self, ord(TT_SEMI), "PAR-0055", "[PAR-0055] expected ';' after field declaration")?;
+            let fd = new FieldDecl(token_ident_text(field_name) as string, field_type);
+            ptr_vec_push(fields as VectorBase*, fd as void*);
+        }
+
+        ps_expect(self, ord(TT_RBRACE), "PAR-0056", "[PAR-0056] expected '}' after struct body")?;
+        let result = new StructDecl(token_ident_text(name_tok) as string, fields as VectorBase*, ps_extend_span(self, start));
+        fields = null;
+        return result;
+    }
+}
+
+func ps_parse_enum(self: ParserState*) -> EnumDecl*? {
+    let start = ps_span_start(self);
+    ps_expect(self, ord(TT_ENUM), "PAR-0060", "[PAR-0060] expected 'enum'")?;
+    let name_tok = ps_expect_ident(self, "PAR-0061", "[PAR-0061] expected enum name")?;
+    ps_expect(self, ord(TT_LBRACE), "PAR-0062", "[PAR-0062] expected '{' after enum name")?;
+
+    with (let variants: VectorBase*? = ptr_vec_create(4) => _free_enum_variant_vec_opt(variants)) {
+        while (!ps_check(self, ord(TT_RBRACE))) {
+            let var_name_tok = ps_expect_ident(self, "PAR-0063", "[PAR-0063] expected variant name")?;
+
+            with (let fields: VectorBase*? = ptr_vec_create(2) => _free_field_decl_vec_opt(fields)) {
+                if (ps_match(self, ord(TT_LPAREN))) {
+                    if (!ps_check(self, ord(TT_RPAREN))) {
+                        while (true) {
+                            let fname = ps_expect_ident(self, "PAR-0064", "[PAR-0064] expected variant field name")?;
+                            ps_expect(self, ord(TT_COLON), "PAR-0065", "[PAR-0065] expected ':'")?;
+                            let ftype = ps_parse_type(self)?;
+                            let fd = new FieldDecl(token_ident_text(fname) as string, ftype);
+                            ptr_vec_push(fields as VectorBase*, fd as void*);
+                            if (!ps_match(self, ord(TT_COMMA))) {
+                                break;
+                            }
+                        }
+                    }
+                    ps_expect(self, ord(TT_RPAREN), "PAR-0066", "[PAR-0066] expected ')' after variant payload")?;
+                }
+
+                ps_expect(self, ord(TT_SEMI), "PAR-0067", "[PAR-0067] expected ';' after variant")?;
+                let variant = new EnumVariant(token_ident_text(var_name_tok) as string, fields as VectorBase*);
+                ptr_vec_push(variants as VectorBase*, variant as void*);
+                fields = null;
+            }
+        }
+
+        ps_expect(self, ord(TT_RBRACE), "PAR-0068", "[PAR-0068] expected '}' after enum body")?;
+        let result = new EnumDecl(token_ident_text(name_tok) as string, variants as VectorBase*, ps_extend_span(self, start));
+        variants = null;
+        return result;
+    }
+}
+
+func ps_parse_type_alias(self: ParserState*) -> TypeAliasDecl*? {
+    let start = ps_span_start(self);
+    ps_expect(self, ord(TT_TYPE), "PAR-0070", "[PAR-0070] expected type name")?;
+    let name_tok = ps_expect_ident(self, "PAR-0071", "[PAR-0071] expected type alias name")?;
+    ps_expect(self, ord(TT_EQ), "PAR-0072", "[PAR-0072] expected '=' in type alias")?;
+    let parsed = ps_parse_type(self)?;
+    with (let target: TypeRef*? = parsed => _free_type_ref_opt(target)) {
+        ps_expect(self, ord(TT_SEMI), "PAR-0073", "[PAR-0073] expected ';' after type alias")?;
+        let result = new TypeAliasDecl(token_ident_text(name_tok) as string, target as TypeRef*, ps_extend_span(self, start));
+        target = null;
+        return result;
+    }
+}
+
+func ps_parse_top_level_let(self: ParserState*) -> LetDecl*? {
+    let start = ps_span_start(self);
+    ps_expect(self, ord(TT_LET), "PAR-0080", "[PAR-0080] expected 'let'")?;
+    let name_tok = ps_expect_variable_name(self, "PAR-0081", "[PAR-0081] expected variable name")?;
+
+    with (let type_ref: TypeRef*? = null => _free_type_ref_opt(type_ref)) {
+        if (ps_match(self, ord(TT_COLON))) {
+            type_ref = ps_parse_type(self)?;
+        }
+
+        ps_expect(self, ord(TT_EQ), "PAR-0082", "[PAR-0082] expected '=' in let binding")?;
+        let value = ps_parse_expr(self)?;
+        ps_expect(self, ord(TT_SEMI), "PAR-0083", "[PAR-0083] expected ';' after let declaration")?;
+
+        let result = new LetDecl(token_ident_text(name_tok) as string, type_ref, value, ps_extend_span(self, start));
+        type_ref = null;
+        return result;
+    }
+}
+
+func ps_parse_top_level_decl(self: ParserState*) -> TopLevelDecl*? {
+    if (ps_check(self, ord(TT_EXTERN))) {
+        let decl = ps_parse_extern_func(self)?;
+        return new TopLevelDecl(TD_FUNC, decl as void*);
+    }
+    if (ps_check(self, ord(TT_FUNC))) {
+        let decl = ps_parse_function(self, false)?;
+        return new TopLevelDecl(TD_FUNC, decl as void*);
+    }
+    if (ps_check(self, ord(TT_STRUCT))) {
+        let decl = ps_parse_struct(self)?;
+        return new TopLevelDecl(TD_STRUCT, decl as void*);
+    }
+    if (ps_check(self, ord(TT_ENUM))) {
+        let decl = ps_parse_enum(self)?;
+        return new TopLevelDecl(TD_ENUM, decl as void*);
+    }
+    if (ps_check(self, ord(TT_TYPE))) {
+        let decl = ps_parse_type_alias(self)?;
+        return new TopLevelDecl(TD_TYPE_ALIAS, decl as void*);
+    }
+    if (ps_check(self, ord(TT_LET))) {
+        let decl = ps_parse_top_level_let(self)?;
+        return new TopLevelDecl(TD_LET, decl as void*);
+    }
+
+    ps_set_error(self, "PAR-0020", concat3_s("[PAR-0020] unexpected token in top level: ", token_to_string(ps_peek(self)), ""), ps_peek(self));
+    return null;
+}
+
+func ps_parse_module(self: ParserState*) -> Module*? {
+    let start = ps_span_start(self);
+
+    ps_expect(self, ord(TT_MODULE), "PAR-0310", "[PAR-0310] expected 'module'")?;
+
+    let first_mod = ps_expect_ident(self, "PAR-0311", "[PAR-0311] expected module name")?;
+    let first_text = token_ident_text(first_mod) as string;
+    let module_name = parse_dotted_name_rest(self, first_text)?;
+
+    ps_expect(self, ord(TT_SEMI), "PAR-0312", "[PAR-0312] expected ';' after module name")?;
+
+    with (let imports: VectorBase*? = ptr_vec_create(4) => _free_import_vec_opt(imports),
+          let decls: VectorBase*? = ptr_vec_create(8) => _free_top_level_decl_vec_opt(decls)) {
+        while (ps_match(self, ord(TT_IMPORT))) {
+            let first = ps_expect_ident(self, "PAR-0320", "[PAR-0320] expected imported module name")?;
+            let first_imp = token_ident_text(first) as string;
+            let imp_name = parse_dotted_name_rest(self, first_imp)?;
+            ps_expect(self, ord(TT_SEMI), "PAR-0321", "[PAR-0321] expected ';' after import")?;
+            let imp = new Import(imp_name);
+            ptr_vec_push(imports as VectorBase*, imp as void*);
+        }
+
+        while (!ps_at_end(self)) {
+            let decl = ps_parse_top_level_decl(self)?;
+            ptr_vec_push(decls as VectorBase*, decl as void*);
+        }
+
+        let result = new Module(module_name, imports as VectorBase*, decls as VectorBase*, ps_extend_span(self, start), self.filename);
+        imports = null;
+        decls = null;
+        return result;
+    }
+}
+
+/* ------------------------------------
+   Public API
+   ------------------------------------ */
+
+func impl_parse_module_tokens(tokens: TokenVector, filename: string) -> ImplParseResult* {
+    let ps = ps_create(tokens, filename);
+    let mod = ps_parse_module(ps);
+
+    let result = new ImplParseResult(
+        mod,
+        ps.expr_arena,
+        ps.stmt_arena,
+        ps.pattern_arena,
+        ps.error
+    );
+
+    ps_destroy(ps);
+    return result;
+}
+
+func ps_lex_error_result(ls: LexerState*, filename: string) -> ImplParseResult* {
+    let expr_ar = expr_arena_create(1);
+    let stmt_ar = stmt_arena_create(1);
+    let pat_ar = pattern_arena_create(1);
+
+    let err_state = ImplParseNoError;
+    match (ls.error) {
+        NoError => {
+            err_state = ImplParseHasError(ImplParseError("PAR-0000", "unknown parse/lex error", ls.line, ls.column, filename));
+        }
+        Error(code, message) => {
+            err_state = ImplParseHasError(ImplParseError(code, message, ls.line, ls.column, filename));
+        }
+    }
+
+    let result = new ImplParseResult(null, expr_ar, stmt_ar, pat_ar, err_state);
+    drop ls;
+    return result;
+}
+
+func ps_tokens_result(ls: LexerState*, toks: TokenVector, filename: string) -> ImplParseResult* {
+    let result = impl_parse_module_tokens(toks, filename);
+    tv_free(toks);
+    drop ls;
+    return result;
+}
+
+func impl_parse_module_source(source: string, filename: string) -> ImplParseResult* {
+    let ls = ls_create(source, filename);
+    let toks = tokenize(ls);
+    if (toks == null) {
+        return ps_lex_error_result(ls, filename);
+    }
+    return ps_tokens_result(ls, toks as TokenVector, filename);
+}
