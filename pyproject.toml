@@ -14,7 +14,7 @@ dependencies = []
 dev = ["pytest>=9.0.2", "pytest-xdist>=3.5"]
 
 [tool.pytest.ini_options]
-addopts = "-n 3"
+addopts = "-n auto"
 testpaths = ["compiler/stage1_py/tests"]
 
 [tool.setuptools]
