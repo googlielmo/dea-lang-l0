@@ -1402,6 +1402,8 @@ class Backend:
 
                 self.emitter.emit_exit_switch()
                 self.emitter.emit_block_end()
+
+            self.emitter.emit_unreachable_marker("retain")
             self.emitter.emit_switch_end()
 
     def _emit_copy_expr_with_retains(self, c_expr: str, ty: Type) -> str:
@@ -1470,13 +1472,13 @@ class Backend:
             # Cleanup if arm didn't terminate
             if not self._next_stmt_unreachable:
                 self._emit_cleanup_at_scope_exit(arm_scope)
+                self.emitter.emit_exit_switch()
 
             if self._next_stmt_unreachable:
                 arms_unreachable += 1
 
             self._pop_scope()
 
-            self.emitter.emit_exit_switch()
             self.emitter.emit_block_end()
 
         self.emitter.emit_switch_end()
@@ -1485,8 +1487,11 @@ class Backend:
         # Code after match is unreachable only if ALL arms are unreachable
         self._next_stmt_unreachable = (arms_unreachable == len(stmt.arms))
 
-        if not self._next_stmt_unreachable:
+        if self._next_stmt_unreachable:
+            self.emitter.emit_unreachable_marker("'match'")
+        else:
             self._emit_cleanup_at_scope_exit(outer_scope)
+
         self._pop_scope()
         self.emitter.emit_block_end()
 
@@ -1583,13 +1588,13 @@ class Backend:
 
                 if not self._next_stmt_unreachable:
                     self._emit_cleanup_at_scope_exit(arm_scope)
+                    self.emitter.emit_exit_switch()
 
                 if self._next_stmt_unreachable:
                     arms_unreachable += 1
 
                 self._pop_scope()
 
-                self.emitter.emit_exit_switch()
                 self.emitter.emit_block_end()
 
             if stmt.else_arm is not None:
@@ -1602,13 +1607,13 @@ class Backend:
 
                 if not self._next_stmt_unreachable:
                     self._emit_cleanup_at_scope_exit(arm_scope)
+                    self.emitter.emit_exit_switch()
 
                 if self._next_stmt_unreachable:
                     arms_unreachable += 1
 
                 self._pop_scope()
 
-                self.emitter.emit_exit_switch()
                 self.emitter.emit_block_end()
 
             self.emitter.emit_switch_end()
@@ -1623,8 +1628,11 @@ class Backend:
                     and arms_unreachable == total_arms
             )
 
-        if not self._next_stmt_unreachable:
+        if self._next_stmt_unreachable:
+            self.emitter.emit_unreachable_marker("'case'")
+        else:
             self._emit_cleanup_at_scope_exit(outer_scope)
+
         self._pop_scope()
         self.emitter.emit_block_end()
 

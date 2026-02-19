@@ -41,6 +41,19 @@
 #include "l0_siphash.h"
 
 /* ============================================================================
+ * Compiler-specific builtins and attributes
+ * ============================================================================ */
+
+#if defined(__TINYC__) && __TINYC__ >= 928
+/* __builtin_unreachable added in mob branch post-0.9.27 */
+#   define L0_UNREACHABLE(_s) __builtin_unreachable()
+#elif defined(__GNUC__) || defined(__clang__)
+#   define L0_UNREACHABLE(_s) __builtin_unreachable()
+#else
+#   define L0_UNREACHABLE(_s) rt_panic(_s)
+#endif
+
+/* ============================================================================
  * Optional tracing support (compile-time toggles)
  * ============================================================================ */
 

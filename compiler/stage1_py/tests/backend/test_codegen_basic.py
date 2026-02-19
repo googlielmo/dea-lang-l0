@@ -581,8 +581,8 @@ def test_codegen_match_simple(codegen_single):
     assert "case l0_main_Option_Some:" in c_code
     assert "case l0_main_Option_None:" in c_code
 
-    # Should exit switch cases
-    assert "break;" in c_code
+    # Should NOT contain break statements (since we return from each arm)
+    assert not "break;" in c_code
 
 
 def test_codegen_match_with_wildcard(codegen_single):

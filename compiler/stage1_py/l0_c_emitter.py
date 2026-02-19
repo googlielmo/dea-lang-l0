@@ -169,9 +169,9 @@ class CEmitter:
 
         Appends '__v' suffix to avoid C keyword conflicts.
         Also mangles names ending with '__v' itself,
-        or starting with '_' or 'l0_' (to avoid clashes with L0 runtime names).
+        or starting with '_' or 'l0_'/'L0_' (to avoid clashes with L0 runtime names).
         """
-        if name in self.C_KEYWORDS or name.endswith("__v") or name.startswith("l0_") or name.startswith("_"):
+        if name in self.C_KEYWORDS or name.endswith("__v") or name.startswith("l0_") or name.startswith("L0_") or name.startswith("_"):
             return f"{name}__v"
         return name
 
@@ -351,6 +351,12 @@ class CEmitter:
     def emit_unreachable_comment(self) -> None:
         """Emit an unreachable code comment for debugging."""
         self.out.emit("/* unreachable code here */")
+
+    def emit_unreachable_marker(self, reason: str = "unreachable") -> None:
+        """Emit an intrinsic or panic for unreachable code paths."""
+        # escape reason string for C
+        c_reason = encode_c_string_bytes(reason.encode("utf-8"))
+        self.out.emit(f'L0_UNREACHABLE("{c_reason}");')
 
     # ============================================================================
     # Top-Level Structure Emission

@@ -34,6 +34,16 @@ func process_with_wildcard(r: Result) -> int {
     }
 }
 
+func process_return_after_match(r: Result) -> int {
+    match (r) {
+        Ok(v) => {
+            return v;
+        }
+        _ => {}
+    }
+    return -1;
+}
+
 func main() -> int {
     let r1: Result = Ok(42);
     let r2: Result = Err(5);
@@ -42,6 +52,8 @@ func main() -> int {
     printl_i(process(r2));
     printl_i(process_with_wildcard(r1));
     printl_i(process_with_wildcard(r2));
-    
+    printl_i(process_return_after_match(r1));
+    printl_i(process_return_after_match(r2));
+
     return 0;
 }
