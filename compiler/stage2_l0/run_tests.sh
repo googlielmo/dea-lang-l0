@@ -34,7 +34,7 @@ for test_file in "$TESTS_DIR"/*.l0; do
     # if VERBOSE is set, show output immediately
     if [ $VERBOSE -eq 1 ]; then
         echo
-        if ./l0c -P compiler/stage2_l0/src run "$test_file"; then
+        if ./l0c -P compiler/stage2_l0/src --run "$test_file"; then
             echo "PASS"
             passed=$((passed + 1))
         else
@@ -45,7 +45,7 @@ for test_file in "$TESTS_DIR"/*.l0; do
         continue
     else
         # otherwise, capture output to a per-test temp file
-        if ./l0c -P compiler/stage2_l0/src run "$test_file" > "/tmp/test_output_$$_${test_name}.txt" 2>&1; then
+        if ./l0c -P compiler/stage2_l0/src --run "$test_file" > "/tmp/test_output_$$_${test_name}.txt" 2>&1; then
             echo "PASS"
             passed=$((passed + 1))
             rm -f "/tmp/test_output_$$_${test_name}.txt"

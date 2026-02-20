@@ -5,10 +5,11 @@ import argparse
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 from re import fullmatch, search
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Sequence, Tuple
 
 from l0_analysis import AnalysisResult
 from l0_ast_printer import format_module
@@ -307,7 +308,11 @@ def cmd_build(args: argparse.Namespace) -> int:
 
     # Write C code to temporary or specified file
     if args.keep_c:
-        c_path = exe_path.with_suffix(".c")
+        c_output_override = getattr(args, "c_output_path", None)
+        if c_output_override:
+            c_path = Path(c_output_override)
+        else:
+            c_path = exe_path.with_suffix(".c")
     else:
         c_path = Path(tempfile.mktemp(suffix=".c"))
 
@@ -402,6 +407,21 @@ def cmd_run(args: argparse.Namespace) -> int:
 
     try:
         # Build to temporary executable
+        keep_c = getattr(args, 'keep_c', False)
+        output_arg = getattr(args, 'output', None)
+        if output_arg and not keep_c:
+            log_error(
+                context,
+                "warning: [L0C-0017] '--output/-o' is ignored in --run mode unless '--keep-c' is set; "
+                "the executable path remains temporary",
+            )
+        c_output_path = None
+        if keep_c:
+            if output_arg:
+                c_output_path = str(Path(output_arg).with_suffix(".c"))
+            else:
+                c_output_path = str(Path("a.out").with_suffix(".c"))
+
         build_args = argparse.Namespace(
             entry=args.entry,
             output=temp_exe,
@@ -409,7 +429,8 @@ def cmd_run(args: argparse.Namespace) -> int:
             c_options=args.c_options,
             runtime_include=args.runtime_include,
             runtime_lib=args.runtime_lib,
-            keep_c=False,
+            keep_c=keep_c,
+            c_output_path=c_output_path,
             verbosity=getattr(args, 'verbosity', 0),
             project_root=args.project_root,
             sys_root=args.sys_root,
@@ -723,9 +744,13 @@ def cmd_type(args: argparse.Namespace) -> int:
     return 0
 
 
-def _add_entry_arg(parser: argparse.ArgumentParser) -> None:
-    """Add the entry module argument."""
-    parser.add_argument("entry", help="Entry module name (e.g. 'app.main')")
+def _add_target_args(parser: argparse.ArgumentParser) -> None:
+    """Add target module/file arguments."""
+    parser.add_argument(
+        "targets",
+        nargs="+",
+        help="Target module/file name(s); currently exactly one target is supported",
+    )
 
 
 def _add_all_modules_arg(parser: argparse.ArgumentParser) -> None:
@@ -733,7 +758,7 @@ def _add_all_modules_arg(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--all-modules", "-a",
         action="store_true",
-        help="Process all modules in the compilation unit",
+        help="Process all modules in the compilation unit (valid in: --tok, --ast, --sym, --type)",
     )
 
 
@@ -741,19 +766,22 @@ def _add_runtime_args(parser: argparse.ArgumentParser) -> None:
     """Add runtime-related arguments (compiler, include, lib paths)."""
     parser.add_argument(
         "--c-compiler", "-c",
-        help="C compiler to use (default: tcc, gcc, clang, cc from PATH, or $CC environment variable, in that order)",
+        help=(
+            "C compiler to use (default: tcc, gcc, clang, cc from PATH, or $CC environment variable, in that order;"
+            " valid in: --build, --run)"
+        ),
     )
     parser.add_argument(
         "--c-options", "-C",
-        help='Extra options to pass to the C compiler (e.g. -C="-O2 -DDEBUG")',
+        help='Extra options to pass to the C compiler (e.g. -C="-O2 -DDEBUG"; valid in: --build, --run)',
     )
     parser.add_argument(
         "--runtime-include", "-I",
-        help="Path to L0 runtime headers (default: $L0_RUNTIME_INCLUDE)",
+        help="Path to L0 runtime headers (default: $L0_RUNTIME_INCLUDE; valid in: --build, --run)",
     )
     parser.add_argument(
         "--runtime-lib", "-L",
-        help="Path to L0 runtime library (default: $L0_RUNTIME_LIB)",
+        help="Path to L0 runtime library (default: $L0_RUNTIME_LIB; valid in: --build, --run)",
     )
 
 
@@ -762,24 +790,219 @@ def _add_codegen_arg(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--no-line-directives", "-NLD",
         action="store_true",
-        help="Disable #line directives in generated C code",
+        help="Disable #line directives in generated C code (valid in: --build, --run, --gen)",
     )
     parser.add_argument(
         "--trace-arc",
         action="store_true",
-        help="Enable ARC runtime tracing in generated C code (emits L0_TRACE_ARC)",
+        help="Enable ARC runtime tracing in generated C code (emits L0_TRACE_ARC; valid in: --build, --run, --gen)",
     )
     parser.add_argument(
         "--trace-memory",
         action="store_true",
-        help="Enable memory runtime tracing in generated C code (emits L0_TRACE_MEMORY)",
+        help="Enable memory runtime tracing in generated C code (emits L0_TRACE_MEMORY; valid in: --build, --run, --gen)",
     )
+
+
+_LEGACY_COMMAND_TO_MODE = {
+    "run": "run",
+    "build": "build",
+    "gen": "gen",
+    "codegen": "gen",
+    "check": "check",
+    "analyze": "check",
+    "tok": "tok",
+    "tokens": "tok",
+    "ast": "ast",
+    "sym": "sym",
+    "symbols": "sym",
+    "type": "type",
+    "types": "type",
+}
+
+_MODE_FLAGS = {
+    "-r",
+    "-g",
+    "--run",
+    "--build",
+    "--gen",
+    "--codegen",
+    "--check",
+    "--analyze",
+    "--tok",
+    "--tokens",
+    "--ast",
+    "--sym",
+    "--symbols",
+    "--type",
+    "--types",
+}
+
+_OPTIONS_REQUIRING_VALUE = {
+    "-P", "--project-root",
+    "-S", "--sys-root",
+    "-c", "--c-compiler",
+    "-C", "--c-options",
+    "-I", "--runtime-include",
+    "-L", "--runtime-lib",
+    "-o", "--output",
+}
+
+
+def _split_cli_and_program_args(argv: Sequence[str]) -> Tuple[List[str], List[str]]:
+    argv_list = list(argv)
+    if "--" not in argv_list:
+        return argv_list, []
+    idx = argv_list.index("--")
+    return argv_list[:idx], argv_list[idx + 1:]
+
+
+def _contains_mode_flag(argv: Sequence[str]) -> bool:
+    for token in argv:
+        if token == "--":
+            break
+        if token in _MODE_FLAGS:
+            return True
+    return False
+
+
+def _find_legacy_command_index(argv: Sequence[str]) -> Optional[int]:
+    i = 0
+    while i < len(argv):
+        token = argv[i]
+        if token == "--":
+            return None
+
+        if token in _LEGACY_COMMAND_TO_MODE:
+            # Do not rewrite single trailing words like `./l0c run` to keep
+            # default-build behavior for a target named `run`.
+            if i + 1 < len(argv):
+                return i
+            return None
+
+        if token.startswith("--"):
+            if "=" in token:
+                i += 1
+                continue
+            if token in _OPTIONS_REQUIRING_VALUE:
+                i += 2
+                continue
+            i += 1
+            continue
+
+        if token.startswith("-") and token != "-":
+            if fullmatch(r"-v+", token):
+                i += 1
+                continue
+            if token in _OPTIONS_REQUIRING_VALUE:
+                i += 2
+                continue
+            i += 1
+            continue
+
+        i += 1
+
+    return None
+
+
+def _rewrite_legacy_command_argv(argv: Sequence[str]) -> Tuple[List[str], Optional[str]]:
+    rewritten = list(argv)
+    if _contains_mode_flag(rewritten):
+        return rewritten, None
+
+    cmd_idx = _find_legacy_command_index(rewritten)
+    if cmd_idx is None:
+        return rewritten, None
+
+    legacy_command = rewritten[cmd_idx]
+    rewritten[cmd_idx] = f"--{_LEGACY_COMMAND_TO_MODE[legacy_command]}"
+    if legacy_command == "run":
+        rewritten = _rewrite_legacy_run_argv(rewritten, cmd_idx)
+    return rewritten, legacy_command
+
+
+def _rewrite_legacy_run_argv(argv: Sequence[str], command_index: int) -> List[str]:
+    rewritten = list(argv)
+    tail = rewritten[command_index + 1:]
+    if not tail or "--" in tail:
+        return rewritten
+
+    i = 0
+    while i < len(tail):
+        token = tail[i]
+        if token.startswith("--"):
+            if "=" in token:
+                i += 1
+                continue
+            if token in _OPTIONS_REQUIRING_VALUE:
+                i += 2
+                continue
+            i += 1
+            continue
+
+        if token.startswith("-") and token != "-":
+            if fullmatch(r"-v+", token):
+                i += 1
+                continue
+            if token in _OPTIONS_REQUIRING_VALUE:
+                i += 2
+                continue
+            i += 1
+            continue
+
+        # First non-option token in legacy run syntax is the entry target.
+        target_index = i
+        if target_index + 1 >= len(tail):
+            return rewritten
+        return (
+            rewritten[:command_index + 1]
+            + tail[:target_index + 1]
+            + ["--"]
+            + tail[target_index + 1:]
+        )
+
+    return rewritten
+
+
+def _validate_mode_scoped_flags(parser: argparse.ArgumentParser, args: argparse.Namespace) -> None:
+    mode = args.mode
+
+    scoped_flags = [
+        ("output", "--output", {"build", "run", "gen"}),
+        ("keep_c", "--keep-c", {"build", "run"}),
+        ("c_compiler", "--c-compiler", {"build", "run"}),
+        ("c_options", "--c-options", {"build", "run"}),
+        ("runtime_include", "--runtime-include", {"build", "run"}),
+        ("runtime_lib", "--runtime-lib", {"build", "run"}),
+        ("no_line_directives", "--no-line-directives", {"build", "run", "gen"}),
+        ("trace_arc", "--trace-arc", {"build", "run", "gen"}),
+        ("trace_memory", "--trace-memory", {"build", "run", "gen"}),
+        ("all_modules", "--all-modules", {"tok", "ast", "sym", "type"}),
+        ("include_eof", "--include-eof", {"tok"}),
+    ]
+
+    for attr, flag_name, valid_modes in scoped_flags:
+        value = getattr(args, attr)
+        provided = bool(value)
+        if not provided:
+            continue
+        if mode in valid_modes:
+            continue
+        modes_msg = ", ".join(f"--{m}" for m in sorted(valid_modes))
+        parser.error(f"option '{flag_name}' is valid only with modes: {modes_msg}")
 
 
 def main(argv=None) -> None:
     _init_env_defaults()
-    parser = argparse.ArgumentParser(prog="l0c", description="L0 compiler (Stage 1)")
-    subparsers = parser.add_subparsers(dest="command", required=True, help="Command to run")
+    parser = argparse.ArgumentParser(
+        prog="l0c",
+        description="L0 compiler (Stage 1)",
+        epilog=(
+            "Modes are selected with flags (default: --build). "
+            "Use '--' to pass program arguments for --run. "
+            "Legacy command words like 'run' and 'gen' are accepted as a compatibility shim."
+        ),
+    )
 
     parser.add_argument("-v", "--verbose",
                         action='count',
@@ -803,81 +1026,77 @@ def main(argv=None) -> None:
         help="Add a system/stdlib source root (can be passed multiple times; default: $L0_SYSTEM as colon-separated paths)",
     )
 
-    ###########################
-    # run command
-    ###########################
-    p_run = subparsers.add_parser("run", help="Build and run a module")
-    _add_runtime_args(p_run)
-    _add_codegen_arg(p_run)
-    _add_entry_arg(p_run)
-    p_run.add_argument("args", nargs="*", help="Arguments to pass to the program")
-    p_run.set_defaults(func=cmd_run)
+    mode_group = parser.add_mutually_exclusive_group()
+    mode_group.add_argument("--run", "-r", action="store_const", const="run", dest="mode", help="Build and run a module")
+    mode_group.add_argument("--build", action="store_const", const="build", dest="mode",
+                            help="Build an executable (default mode)")
+    mode_group.add_argument("--gen", "-g", "--codegen", action="store_const", const="gen", dest="mode",
+                            help="Generate C code")
+    mode_group.add_argument("--check", "--analyze", action="store_const", const="check", dest="mode",
+                            help="Parse and analyze a module")
+    mode_group.add_argument("--tok", "--tokens", action="store_const", const="tok", dest="mode",
+                            help="Dump lexer tokens")
+    mode_group.add_argument("--ast", action="store_const", const="ast", dest="mode", help="Pretty-print the AST")
+    mode_group.add_argument("--sym", "--symbols", action="store_const", const="sym", dest="mode",
+                            help="Dump module-level symbols")
+    mode_group.add_argument("--type", "--types", action="store_const", const="type", dest="mode",
+                            help="Dump resolved types")
+    parser.set_defaults(mode="build")
 
-    ###########################
-    # build command
-    ###########################
-    p_build = subparsers.add_parser("build", help="Build an executable")
-    p_build.add_argument("--output", "-o", help="Output executable path (default: a.out)")
-    _add_runtime_args(p_build)
-    _add_codegen_arg(p_build)
-    p_build.add_argument("--keep-c", action="store_true",
-                         help="Keep generated C file (saves as <output>.c)")
-    _add_entry_arg(p_build)
-    p_build.set_defaults(func=cmd_build)
+    parser.add_argument(
+        "--output",
+        "-o",
+        help=(
+            "Output path (valid in: --build, --gen, --run; run uses it only for kept C filename with --keep-c "
+            "and warns otherwise)"
+        ),
+    )
+    _add_runtime_args(parser)
+    _add_codegen_arg(parser)
+    parser.add_argument(
+        "--keep-c",
+        action="store_true",
+        help="Keep generated C file (valid in: --build, --run; run writes ./a.c by default, or <output>.c with -o)",
+    )
+    _add_all_modules_arg(parser)
+    parser.add_argument("--include-eof", action="store_true", help="Include the EOF token in tok output (valid in: --tok)")
+    _add_target_args(parser)
 
-    ###########################
-    # gen command
-    ###########################
-    p_gen = subparsers.add_parser("gen", help="Generate C code", aliases=["codegen"])
-    p_gen.add_argument("--output", "-o", help="Output C file (default: stdout)")
-    _add_codegen_arg(p_gen)
-    _add_entry_arg(p_gen)
-    p_gen.set_defaults(func=cmd_codegen)
+    raw_argv = list(argv) if argv is not None else sys.argv[1:]
+    rewritten_argv, legacy_command = _rewrite_legacy_command_argv(raw_argv)
+    cli_argv, program_args = _split_cli_and_program_args(rewritten_argv)
+    args = parser.parse_args(cli_argv)
 
-    ###########################
-    # check command
-    ###########################
-    p_check = subparsers.add_parser("check", help="Parse and analyze a module", aliases=["analyze"])
-    _add_entry_arg(p_check)
-    p_check.set_defaults(func=cmd_check)
+    if args.mode == "run":
+        if legacy_command == "run":
+            args.entry = args.targets[0]
+            args.args = args.targets[1:] + program_args
+        else:
+            if len(args.targets) > 1:
+                parser.error("mode '--run' accepts exactly one target; use '--' before runtime program arguments")
+            args.entry = args.targets[0]
+            args.args = program_args
+    else:
+        if program_args:
+            parser.error("arguments after '--' are valid only with '--run'")
+        if len(args.targets) > 1:
+            parser.error("multiple targets are not supported yet; pass exactly one target")
+        args.entry = args.targets[0]
 
-    ###########################
-    # tok command
-    ###########################
-    p_tok = subparsers.add_parser("tok", help="Dump lexer tokens", aliases=["tokens"])
-    _add_all_modules_arg(p_tok)
-    p_tok.add_argument("--include-eof", "-I", action="store_true",
-                       help="Include the EOF token in the output")
-    _add_entry_arg(p_tok)
-    p_tok.set_defaults(func=cmd_tok)
+    _validate_mode_scoped_flags(parser, args)
 
-    ###########################
-    # ast command
-    ###########################
-    p_ast = subparsers.add_parser("ast", help="Pretty-print the parsed AST")
-    _add_all_modules_arg(p_ast)
-    _add_entry_arg(p_ast)
-    p_ast.set_defaults(func=cmd_ast)
+    dispatch = {
+        "run": cmd_run,
+        "build": cmd_build,
+        "gen": cmd_codegen,
+        "check": cmd_check,
+        "tok": cmd_tok,
+        "ast": cmd_ast,
+        "sym": cmd_sym,
+        "type": cmd_type,
+    }
 
-    ###########################
-    # sym command
-    ###########################
-    p_sym = subparsers.add_parser("sym", help="Dump module-level symbols", aliases=["symbols"])
-    _add_all_modules_arg(p_sym)
-    _add_entry_arg(p_sym)
-    p_sym.set_defaults(func=cmd_sym)
-
-    ###########################
-    # type command
-    ###########################
-    p_type = subparsers.add_parser("type", help="Dump resolved types", aliases=["types"])
-    _add_all_modules_arg(p_type)
-    _add_entry_arg(p_type)
-    p_type.set_defaults(func=cmd_type)
-
-    args = parser.parse_args(argv)
-
-    rc = args.func(args)
+    rc = dispatch[args.mode](args)
     raise SystemExit(rc)
 
 

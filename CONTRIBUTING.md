@@ -30,8 +30,8 @@ pytest -k "test_name"           # run tests matching a pattern
 Verify the compiler works end-to-end:
 
 ```bash
-./l0c -P examples run hello      # build and run hello.l0
-./l0c -P examples check hello    # parse and type-check only
+./l0c -P examples --run hello    # build and run hello.l0
+./l0c -P examples --check hello  # parse and type-check only
 ```
 
 ### Debugging
@@ -39,8 +39,8 @@ Verify the compiler works end-to-end:
 Use verbose flags to see compilation stages:
 
 ```bash
-./l0c -v -P examples check hello     # info-level logging
-./l0c -vvv -P examples check hello   # debug-level logging
+./l0c -v -P examples --check hello     # info-level logging
+./l0c -vvv -P examples --check hello   # debug-level logging
 ```
 
 ## Making changes

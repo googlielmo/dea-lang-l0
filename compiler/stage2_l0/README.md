@@ -33,7 +33,7 @@ Capture Stage 2 parser traces (both ARC and memory) to files:
 This runs:
 
 ```bash
-./l0c -P compiler/stage2_l0/src run --trace-arc --trace-memory compiler/stage2_l0/tests/parser_test.l0
+./l0c -P compiler/stage2_l0/src --run --trace-arc --trace-memory compiler/stage2_l0/tests/parser_test.l0
 ```
 
 By default, output files are written under `/tmp` and printed at the end:

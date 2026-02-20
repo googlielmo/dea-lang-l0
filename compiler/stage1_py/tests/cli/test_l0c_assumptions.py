@@ -173,3 +173,106 @@ def test_run_forwards_trace_flags_to_build(tmp_path, monkeypatch):
     assert rc == 1
     assert captured["trace_arc"] is True
     assert captured["trace_memory"] is True
+
+
+def test_run_with_keep_c_uses_default_build_c_path_and_temp_exe(tmp_path, monkeypatch):
+    captured = {}
+
+    def _fake_cmd_build(args):
+        captured["output"] = args.output
+        captured["keep_c"] = args.keep_c
+        captured["c_output_path"] = getattr(args, "c_output_path", None)
+        return 1
+
+    monkeypatch.setattr("l0c.cmd_build", _fake_cmd_build)
+
+    args = argparse.Namespace(
+        entry="app.main",
+        args=[],
+        c_compiler="cc",
+        c_options=None,
+        runtime_include=None,
+        runtime_lib=None,
+        keep_c=True,
+        verbosity=0,
+        project_root=[str(tmp_path)],
+        sys_root=[],
+        no_line_directives=False,
+        trace_arc=False,
+        trace_memory=False,
+        log=False,
+    )
+
+    rc = cmd_run(args)
+
+    assert rc == 1
+    assert captured["keep_c"] is True
+    assert captured["output"] != "a.out"
+    assert captured["c_output_path"] == "a.c"
+
+
+def test_run_with_keep_c_and_output_uses_output_stem_for_c_path(tmp_path, monkeypatch):
+    captured = {}
+
+    def _fake_cmd_build(args):
+        captured["output"] = args.output
+        captured["keep_c"] = args.keep_c
+        captured["c_output_path"] = getattr(args, "c_output_path", None)
+        return 1
+
+    monkeypatch.setattr("l0c.cmd_build", _fake_cmd_build)
+
+    args = argparse.Namespace(
+        entry="app.main",
+        args=[],
+        output="custom_name",
+        c_compiler="cc",
+        c_options=None,
+        runtime_include=None,
+        runtime_lib=None,
+        keep_c=True,
+        verbosity=0,
+        project_root=[str(tmp_path)],
+        sys_root=[],
+        no_line_directives=False,
+        trace_arc=False,
+        trace_memory=False,
+        log=False,
+    )
+
+    rc = cmd_run(args)
+
+    assert rc == 1
+    assert captured["keep_c"] is True
+    assert captured["output"] != "custom_name"
+    assert captured["c_output_path"] == "custom_name.c"
+
+
+def test_run_warns_when_output_is_set_without_keep_c(tmp_path, monkeypatch, capsys):
+    def _fake_cmd_build(args):
+        return 1
+
+    monkeypatch.setattr("l0c.cmd_build", _fake_cmd_build)
+
+    args = argparse.Namespace(
+        entry="app.main",
+        args=[],
+        output="custom_name",
+        c_compiler="cc",
+        c_options=None,
+        runtime_include=None,
+        runtime_lib=None,
+        keep_c=False,
+        verbosity=0,
+        project_root=[str(tmp_path)],
+        sys_root=[],
+        no_line_directives=False,
+        trace_arc=False,
+        trace_memory=False,
+        log=False,
+    )
+
+    rc = cmd_run(args)
+
+    assert rc == 1
+    assert "[L0C-0017]" in capsys.readouterr().err

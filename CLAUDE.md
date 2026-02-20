@@ -36,14 +36,14 @@ Also see: `CONTRIBUTING.md`, `SECURITY.md`.
 All commands run from the repository root:
 
 ```bash
-./l0c -P examples run hello       # build + run
-./l0c -P examples build hello     # build executable
-./l0c -P examples gen hello       # emit C only
-./l0c -P examples check hello     # parse + type-check
-./l0c -P examples tok hello       # dump tokens
-./l0c -P examples ast hello       # pretty-print AST
-./l0c -P examples sym hello       # dump symbols
-./l0c -P examples type hello      # dump resolved top-level types
+./l0c -P examples --run hello     # build + run
+./l0c -P examples --build hello   # build executable
+./l0c -P examples --gen hello     # emit C only
+./l0c -P examples --check hello   # parse + type-check
+./l0c -P examples --tok hello     # dump tokens
+./l0c -P examples --ast hello     # pretty-print AST
+./l0c -P examples --sym hello     # dump symbols
+./l0c -P examples --type hello    # dump resolved top-level types
 ```
 
 Verbosity: `-v` (info), `-vvv` (debug).
@@ -65,7 +65,7 @@ When adding or moving tests, follow `compiler/stage1_py/tests/README.md` for pla
 
 Requires pytest >= 9.0.2, pytest-xdist >= 3.5, and a C compiler.
 TCC is used by default if present (fastest); Clang and GCC are also searched in the current $PATH if `tcc` is not
-available. Override with `./l0c build -c <compiler>`.
+available. Override with `./l0c --build -c <compiler>`.
 
 ## Important Constraints
 

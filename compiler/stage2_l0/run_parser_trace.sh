@@ -59,7 +59,7 @@ mkdir -p "$(dirname "$STDOUT_PATH")"
 
 cd "$REPO_ROOT"
 
-if ./l0c -P compiler/stage2_l0/src run --trace-arc --trace-memory compiler/stage2_l0/tests/parser_test.l0 >"$STDOUT_PATH" 2>"$OUT_PATH"; then
+if ./l0c -P compiler/stage2_l0/src --run --trace-arc --trace-memory compiler/stage2_l0/tests/parser_test.l0 >"$STDOUT_PATH" 2>"$OUT_PATH"; then
     rc=0
 else
     rc=$?

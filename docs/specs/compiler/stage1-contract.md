@@ -1,6 +1,6 @@
 # L0 Stage 1 Compiler Contract
 
-Version: 2026-02-13
+Version: 2026-02-19
 
 This document is the compact Stage 1 contract and navigation index.
 
@@ -34,16 +34,21 @@ The end-to-end flow is:
 
 Entry point: `compiler/stage1_py/l0c.py`
 
-Primary commands:
+Primary mode flags:
 
-- `run`
-- `build`
-- `gen` (alias: `codegen`)
-- `check` (alias: `analyze`)
-- `tok` (alias: `tokens`)
-- `ast`
-- `sym` (alias: `symbols`)
-- `type` (alias: `types`)
+- `--run` (short: `-r`)
+- `--build` (default mode when omitted)
+- `--gen` (short: `-g`; alias flag: `--codegen`)
+- `--check` (alias flag: `--analyze`)
+- `--tok` (alias flag: `--tokens`)
+- `--ast`
+- `--sym` (alias flag: `--symbols`)
+- `--type` (alias flag: `--types`)
+
+Compatibility shim:
+
+- Legacy command words (`run`, `build`, `gen`, `check`, `tok`, `ast`, `sym`, `type` and aliases) are accepted.
+- New `--run` form expects runtime program arguments after `--`.
 
 Global options:
 
@@ -52,27 +57,27 @@ Global options:
 - `-P` / `--project-root`
 - `-S` / `--sys-root`
 
-Codegen/build options (where applicable):
+Mode-scoped options (enforced by CLI argument validation):
 
-- `-NLD` / `--no-line-directives`
-- `--trace-arc`
-- `--trace-memory`
-- `-c` / `--c-compiler`
-- `-C` / `--c-options`
-- `-I` / `--runtime-include`
-- `-L` / `--runtime-lib`
-- `-o` / `--output`
-- `--keep-c` (build)
+- `-o` / `--output` for `build|gen|run` (`run` uses it only for kept C filename with `--keep-c`; otherwise warns)
+- `--keep-c` for `build|run` (`run` writes `./a.c` by default, or `<output>.c` with `-o`)
+- `-c` / `--c-compiler` for `build|run`
+- `-C` / `--c-options` for `build|run`
+- `-I` / `--runtime-include` for `build|run`
+- `-L` / `--runtime-lib` for `build|run`
+- `-NLD` / `--no-line-directives` for `build|run|gen`
+- `--trace-arc` for `build|run|gen`
+- `--trace-memory` for `build|run|gen`
 
 Debug-dump options:
 
 - `--all-modules` / `-a` for `tok|ast|sym|type`
-- `--include-eof` / `-I` for `tok`
+- `--include-eof` for `tok`
 
 Exit behavior:
 
-- analysis or C-compilation failures return non-zero from CLI commands,
-- `run` returns the executed program's process exit code (`KeyboardInterrupt` -> `130`).
+- analysis or C-compilation failures return non-zero from CLI modes,
+- `--run` returns the executed program's process exit code (`KeyboardInterrupt` -> `130`).
 
 ### 2.2 Source/module contract
 

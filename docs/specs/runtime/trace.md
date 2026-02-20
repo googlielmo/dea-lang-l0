@@ -1,6 +1,6 @@
 # L0 Trace Specification
 
-Version: 2026-02-15
+Version: 2026-02-19
 
 This document specifies Stage 1 trace instrumentation for generated C code and runtime behavior.
 
@@ -13,7 +13,7 @@ Tracing is opt-in and intended for debugging, validation, and regression analysi
 
 ## 2. User Interface (Stage 1 CLI)
 
-`l0c` exposes trace flags on codegen-producing commands (`gen`, `build`, `run`):
+`l0c` exposes trace flags on codegen-producing modes (`--gen`, `--build`, `--run`):
 
 - `--trace-arc`: enable ARC operation tracing.
 - `--trace-memory`: enable memory operation tracing.
@@ -23,9 +23,9 @@ Flags are independent and composable.
 Examples:
 
 ```bash
-./l0c gen --trace-arc app.main
-./l0c build --trace-memory app.main
-./l0c run --trace-arc --trace-memory app.main
+./l0c --gen --trace-arc app.main
+./l0c --build --trace-memory app.main
+./l0c --run --trace-arc --trace-memory app.main
 ```
 
 ## 3. Generated C Contract

@@ -164,7 +164,7 @@ Create a file named `hello.l0` with the following content:
 #### 2. Run it:
 
    ```shell
-   ./l0c run hello.l0
+   ./l0c --run hello.l0
    ```
 
 This compiles and executes the program in one step.
@@ -172,20 +172,20 @@ This compiles and executes the program in one step.
 You can just use the module name (without `.l0`) and the compiler will use the corresponding file:
 
    ```shell
-   ./l0c run hello
+   ./l0c --run hello
    ```
 
 #### 3. Build an executable:
 
    ```shell
-   ./l0c build hello.l0 -o hello
+   ./l0c --build hello.l0 -o hello
    ./hello
    ```
 
 #### 4. Check for errors without building:
 
    ```shell
-   ./l0c check hello.l0
+   ./l0c --check hello.l0
    ```
 
 ### Project Structure
@@ -193,7 +193,7 @@ You can just use the module name (without `.l0`) and the compiler will use the c
 When working on L0 projects, use `--project-root` (or `-P`) to specify your source directories:
 
 ```shell
-./l0c run -P ./src -P ./lib main
+./l0c --run -P ./src -P ./lib main
 ```
 
 The compiler searches for modules in:
@@ -284,37 +284,86 @@ Provided by the `l0c` executable (Python):
 Output:
 
 ```
-usage: l0c [-h] [--verbose] [--project-root PROJECT_ROOT] [--sys-root SYS_ROOT] {run,build,gen,codegen,check,analyze,tok,tokens,ast,sym,symbols,type,types} ...
+usage: l0c [-h] [-v] [-l] [-P PROJECT_ROOT] [-S SYS_ROOT] [--run | --build |
+           --gen | --check | --tok | --ast | --sym | --type] [--output OUTPUT]
+           [--c-compiler C_COMPILER] [--c-options C_OPTIONS]
+           [--runtime-include RUNTIME_INCLUDE] [--runtime-lib RUNTIME_LIB]
+           [--no-line-directives] [--trace-arc] [--trace-memory] [--keep-c]
+           [--all-modules] [--include-eof]
+           targets [targets ...]
 
 L0 compiler (Stage 1)
 
 positional arguments:
-  {run,build,gen,codegen,check,analyze,tok,tokens,ast,sym,symbols,type,types}
-                        Command to run
-    run                 Build and run a module
-    build               Build an executable
-    gen (codegen)       Generate C code
-    check (analyze)     Parse and analyze a module
-    tok (tokens)        Dump lexer tokens
-    ast                 Pretty-print the parsed AST
-    sym (symbols)       Dump module-level symbols
-    type (types)        Dump resolved types
+  targets               Target module/file name(s); currently exactly one
+                        target is supported
 
 options:
   -h, --help            show this help message and exit
-  --verbose, -v
-  --project-root, -P PROJECT_ROOT
-                        Add a project source root (can be passed multiple times)
-  --sys-root, -S SYS_ROOT
-                        Add a system/stdlib source root (can be passed multiple times; default: $L0_SYSTEM as colon-separated paths)
+  -v, --verbose         Increase verbosity: -v=INFO, -vvv=DEBUG
+  -l, --log             Enable rich log formatting (timestamps, levels)
+  -P, --project-root PROJECT_ROOT
+                        Add a project source root (can be passed multiple
+                        times)
+  -S, --sys-root SYS_ROOT
+                        Add a system/stdlib source root (can be passed
+                        multiple times; default: $L0_SYSTEM as colon-separated
+                        paths)
+  --run, -r             Build and run a module
+  --build               Build an executable (default mode)
+  --gen, -g, --codegen  Generate C code
+  --check, --analyze    Parse and analyze a module
+  --tok, --tokens       Dump lexer tokens
+  --ast                 Pretty-print the AST
+  --sym, --symbols      Dump module-level symbols
+  --type, --types       Dump resolved types
+  --output, -o OUTPUT   Output path (valid in: --build, --gen, --run; run uses
+                        it only for kept C filename with --keep-c and warns
+                        otherwise)
+  --c-compiler, -c C_COMPILER
+                        C compiler to use (default: tcc, gcc, clang, cc from
+                        PATH, or $CC environment variable, in that order;
+                        valid in: --build, --run)
+  --c-options, -C C_OPTIONS
+                        Extra options to pass to the C compiler (e.g. -C="-O2
+                        -DDEBUG"; valid in: --build, --run)
+  --runtime-include, -I RUNTIME_INCLUDE
+                        Path to L0 runtime headers (default:
+                        $L0_RUNTIME_INCLUDE; valid in: --build, --run)
+  --runtime-lib, -L RUNTIME_LIB
+                        Path to L0 runtime library (default: $L0_RUNTIME_LIB;
+                        valid in: --build, --run)
+  --no-line-directives, -NLD
+                        Disable #line directives in generated C code (valid
+                        in: --build, --run, --gen)
+  --trace-arc           Enable ARC runtime tracing in generated C code (emits
+                        L0_TRACE_ARC; valid in: --build, --run, --gen)
+  --trace-memory        Enable memory runtime tracing in generated C code
+                        (emits L0_TRACE_MEMORY; valid in: --build, --run,
+                        --gen)
+  --keep-c              Keep generated C file (valid in: --build, --run; run
+                        writes ./a.c by default, or <output>.c with -o)
+  --all-modules, -a     Process all modules in the compilation unit (valid in:
+                        --tok, --ast, --sym, --type)
+  --include-eof         Include the EOF token in tok output (valid in: --tok)
+
+Modes are selected with flags (default: --build). Use '--' to pass program
+arguments for --run. Legacy command words like 'run' and 'gen' are accepted as
+a compatibility shim.
+```
+
+For `--run`, pass program arguments after `--`:
+
+```shell
+./l0c --run app.main -- arg1 arg2
 ```
 
 Trace options for generated C/runtime debugging:
 
 ```shell
-./l0c gen --trace-arc app.main
-./l0c run --trace-memory app.main
-./l0c run --trace-arc --trace-memory app.main
+./l0c --gen --trace-arc app.main
+./l0c --run --trace-memory app.main
+./l0c --run --trace-arc --trace-memory app.main
 ```
 
 Trace logs are written to `stderr`. See [specs/runtime/trace.md](docs/specs/runtime/trace.md) for the full contract.
@@ -322,7 +371,7 @@ Trace logs are written to `stderr`. See [specs/runtime/trace.md](docs/specs/runt
 Example usage:
 
 ```shell
-./l0c -P examples run hamurabi
+./l0c -P examples --run hamurabi
 ```
 
 Output:
