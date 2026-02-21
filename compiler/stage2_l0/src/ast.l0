@@ -196,16 +196,16 @@ func pattern_arena_get(self: PatternArena*, id: PatternId) -> PatternNode* {
     return ptr_vec_get(self.nodes, id) as PatternNode*;
 }
 
-func _free_vs_opt(v: VectorString*?) {
+func vs_free_opt(v: VectorString*?) {
     if (v != null) {
         vs_free(v as VectorString*);
     }
 }
 
 func pattern_node_free(node: PatternNode*) {
-    _free_vs_opt(node.vars);
-    _free_vs_opt(node.module_path);
-    _free_vs_opt(node.name_qualifier);
+    vs_free_opt(node.vars);
+    vs_free_opt(node.module_path);
+    vs_free_opt(node.name_qualifier);
     drop node;
 }
 
@@ -403,10 +403,13 @@ func stmt_arena_get(self: StmtArena*, id: StmtId) -> StmtNode* {
    Free helpers
    ------------------------------------ */
 
-func type_ref_free(self: TypeRef*) {
-    _free_vs_opt(self.module_path);
-    _free_vs_opt(self.name_qualifier);
-    drop self;
+func type_ref_free(self: TypeRef*?) {
+    if (self != null) {
+        let type_ref = self as TypeRef*;
+        vs_free_opt(type_ref.module_path);
+        vs_free_opt(type_ref.name_qualifier);
+        drop type_ref;
+    }
 }
 
 func import_free(self: Import*) {
@@ -466,9 +469,7 @@ func type_alias_decl_free(self: TypeAliasDecl*) {
 }
 
 func let_decl_free(self: LetDecl*) {
-    if (self.type_ref != null) {
-        type_ref_free(self.type_ref as TypeRef*);
-    }
+    type_ref_free(self.type_ref);
     drop self;
 }
 
@@ -517,31 +518,24 @@ func case_arm_free(self: CaseArm*) {
     drop self;
 }
 
-func case_else_free(self: CaseElse*) {
-    drop self;
+func case_else_free(self: CaseElse*?) {
+    if (self != null) {
+        let case_else = self as CaseElse*;
+        drop case_else;
+    }
 }
 
 func with_item_free(self: WithItem*) {
     drop self;
 }
 
-/* ------------------------------------
-   Nullable cleanup helpers (for `with` guards)
-   ------------------------------------ */
-
-func _free_id_vec_opt(v: VectorBase*?) {
+func id_vec_free(v: VectorBase*?) {
     if (v != null) {
         vec_free(v as VectorBase*);
     }
 }
 
-func _free_type_ref_opt(v: TypeRef*?) {
-    if (v != null) {
-        type_ref_free(v as TypeRef*);
-    }
-}
-
-func _free_import_vec_opt(v: VectorBase*?) {
+func import_vec_free(v: VectorBase*?) {
     if (v != null) {
         let vec = v as VectorBase*;
         for (let i = 0; i < vec_size(vec); i = i + 1) {
@@ -552,7 +546,7 @@ func _free_import_vec_opt(v: VectorBase*?) {
     }
 }
 
-func _free_top_level_decl_vec_opt(v: VectorBase*?) {
+func top_level_decl_vec_free(v: VectorBase*?) {
     if (v != null) {
         let vec = v as VectorBase*;
         for (let i = 0; i < vec_size(vec); i = i + 1) {
@@ -563,7 +557,7 @@ func _free_top_level_decl_vec_opt(v: VectorBase*?) {
     }
 }
 
-func _free_param_vec_opt(v: VectorBase*?) {
+func param_vec_free(v: VectorBase*?) {
     if (v != null) {
         let vec = v as VectorBase*;
         for (let i = 0; i < vec_size(vec); i = i + 1) {
@@ -574,7 +568,7 @@ func _free_param_vec_opt(v: VectorBase*?) {
     }
 }
 
-func _free_field_decl_vec_opt(v: VectorBase*?) {
+func field_decl_vec_free(v: VectorBase*?) {
     if (v != null) {
         let vec = v as VectorBase*;
         for (let i = 0; i < vec_size(vec); i = i + 1) {
@@ -585,7 +579,7 @@ func _free_field_decl_vec_opt(v: VectorBase*?) {
     }
 }
 
-func _free_enum_variant_vec_opt(v: VectorBase*?) {
+func enum_variant_vec_free(v: VectorBase*?) {
     if (v != null) {
         let vec = v as VectorBase*;
         for (let i = 0; i < vec_size(vec); i = i + 1) {
@@ -596,7 +590,7 @@ func _free_enum_variant_vec_opt(v: VectorBase*?) {
     }
 }
 
-func _free_match_arm_vec_opt(v: VectorBase*?) {
+func match_arm_vec_free(v: VectorBase*?) {
     if (v != null) {
         let vec = v as VectorBase*;
         for (let i = 0; i < vec_size(vec); i = i + 1) {
@@ -607,7 +601,7 @@ func _free_match_arm_vec_opt(v: VectorBase*?) {
     }
 }
 
-func _free_case_arm_vec_opt(v: VectorBase*?) {
+func case_arm_vec_free(v: VectorBase*?) {
     if (v != null) {
         let vec = v as VectorBase*;
         for (let i = 0; i < vec_size(vec); i = i + 1) {
@@ -618,13 +612,7 @@ func _free_case_arm_vec_opt(v: VectorBase*?) {
     }
 }
 
-func _free_case_else_opt(v: CaseElse*?) {
-    if (v != null) {
-        case_else_free(v as CaseElse*);
-    }
-}
-
-func _free_with_item_vec_opt(v: VectorBase*?) {
+func with_item_vec_free(v: VectorBase*?) {
     if (v != null) {
         let vec = v as VectorBase*;
         for (let i = 0; i < vec_size(vec); i = i + 1) {
@@ -636,56 +624,20 @@ func _free_with_item_vec_opt(v: VectorBase*?) {
 }
 
 func expr_node_free(self: ExprNode*) {
-    if (self.ids != null) {
-        vec_free(self.ids as VectorBase*);
-    }
-    if (self.type_ref != null) {
-        type_ref_free(self.type_ref as TypeRef*);
-    }
-    _free_vs_opt(self.module_path);
-    _free_vs_opt(self.name_qualifier);
+    id_vec_free(self.ids);
+    type_ref_free(self.type_ref);
+    vs_free_opt(self.module_path);
+    vs_free_opt(self.name_qualifier);
     drop self;
 }
 
 func stmt_node_free(self: StmtNode*) {
-    if (self.type_ref != null) {
-        type_ref_free(self.type_ref as TypeRef*);
-    }
-
-    if (self.ids != null) {
-        vec_free(self.ids as VectorBase*);
-    }
-
-    if (self.match_arms != null) {
-        let arms = self.match_arms as VectorBase*;
-        for (let i = 0; i < vec_size(arms); i = i + 1) {
-            let arm = ptr_vec_get(arms, i) as MatchArm*;
-            match_arm_free(arm);
-        }
-        vec_free(arms);
-    }
-
-    if (self.case_arms != null) {
-        let arms = self.case_arms as VectorBase*;
-        for (let i = 0; i < vec_size(arms); i = i + 1) {
-            let arm = ptr_vec_get(arms, i) as CaseArm*;
-            case_arm_free(arm);
-        }
-        vec_free(arms);
-    }
-
-    if (self.case_else != null) {
-        case_else_free(self.case_else as CaseElse*);
-    }
-
-    if (self.with_items != null) {
-        let items = self.with_items as VectorBase*;
-        for (let i = 0; i < vec_size(items); i = i + 1) {
-            let it = ptr_vec_get(items, i) as WithItem*;
-            with_item_free(it);
-        }
-        vec_free(items);
-    }
+    type_ref_free(self.type_ref);
+    id_vec_free(self.ids);
+    match_arm_vec_free(self.match_arms);
+    case_arm_vec_free(self.case_arms);
+    case_else_free(self.case_else);
+    with_item_vec_free(self.with_items);
 
     drop self;
 }

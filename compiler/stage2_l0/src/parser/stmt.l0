@@ -49,7 +49,7 @@ func ps_parse_pattern(self: ParserState*) -> PatternId? {
         node.name_qualifier = name_qualifier;
 
         if (ps_match(self, ord(TT_LPAREN))) {
-            with (let vars: VectorString*? = vs_create(2) => _free_vs_opt(vars)) {
+            with (let vars: VectorString*? = vs_create(2) => vs_free_opt(vars)) {
                 if (!ps_check(self, ord(TT_RPAREN))) {
                     while (true) {
                         let var_tok = ps_expect_variable_name(self, "PAR-0180", "[PAR-0180] expected pattern variable name")?;
@@ -82,7 +82,7 @@ func ps_parse_block(self: ParserState*) -> StmtId? {
     let start = ps_span_start(self);
     ps_expect(self, ord(TT_LBRACE), "PAR-0090", "[PAR-0090] expected '{' to start block")?;
 
-    with (let stmts: VectorBase*? = id_vec_create(8) => _free_id_vec_opt(stmts)) {
+    with (let stmts: VectorBase*? = id_vec_create(8) => id_vec_free(stmts)) {
         while (!ps_check(self, ord(TT_RBRACE))) {
             let stmt = ps_parse_stmt(self)?;
             id_vec_push(stmts as VectorBase*, stmt);
@@ -138,7 +138,7 @@ func ps_parse_let_stmt(self: ParserState*) -> StmtId? {
     ps_expect(self, ord(TT_LET), "PAR-0110", "[PAR-0110] expected 'let'")?;
     let name_tok = ps_expect_variable_name(self, "PAR-0111", "[PAR-0111] expected variable name")?;
 
-    with (let type_ref: TypeRef*? = null => _free_type_ref_opt(type_ref)) {
+    with (let type_ref: TypeRef*? = null => type_ref_free(type_ref)) {
         if (ps_match(self, ord(TT_COLON))) {
             type_ref = ps_parse_type(self)?;
         }
@@ -292,7 +292,7 @@ func ps_parse_match_stmt(self: ParserState*) -> StmtId? {
     ps_expect(self, ord(TT_RPAREN), "PAR-0172", "[PAR-0172] expected ')'")?;
     ps_expect(self, ord(TT_LBRACE), "PAR-0173", "[PAR-0173] expected '{' after match expression")?;
 
-    with (let arms: VectorBase*? = ptr_vec_create(4) => _free_match_arm_vec_opt(arms)) {
+    with (let arms: VectorBase*? = ptr_vec_create(4) => match_arm_vec_free(arms)) {
         while (!ps_check(self, ord(TT_RBRACE))) {
             let arm_start = ps_span_start(self);
             let pattern = ps_parse_pattern(self)?;
@@ -358,7 +358,7 @@ func ps_parse_with_stmt(self: ParserState*) -> StmtId? {
     ps_expect(self, ord(TT_WITH), "PAR-0500", "[PAR-0500] expected 'with'")?;
     ps_expect(self, ord(TT_LPAREN), "PAR-0501", "[PAR-0501] expected '(' after 'with'")?;
 
-    with (let items: VectorBase*? = ptr_vec_create(4) => _free_with_item_vec_opt(items)) {
+    with (let items: VectorBase*? = ptr_vec_create(4) => with_item_vec_free(items)) {
         while (true) {
             let item = ps_parse_with_item(self)?;
             ptr_vec_push(items as VectorBase*, item as void*);
@@ -462,8 +462,8 @@ func ps_parse_case_stmt(self: ParserState*) -> StmtId? {
     ps_expect(self, ord(TT_RPAREN), "PAR-0232", "[PAR-0232] expected ')'")?;
     ps_expect(self, ord(TT_LBRACE), "PAR-0233", "[PAR-0233] expected '{' after 'case' expression")?;
 
-    with (let arms: VectorBase*? = ptr_vec_create(4) => _free_case_arm_vec_opt(arms),
-          let else_arm: CaseElse*? = null => _free_case_else_opt(else_arm)) {
+    with (let arms: VectorBase*? = ptr_vec_create(4) => case_arm_vec_free(arms),
+          let else_arm: CaseElse*? = null => case_else_free(else_arm)) {
         let seen_else = false;
 
         while (!ps_check(self, ord(TT_RBRACE))) {

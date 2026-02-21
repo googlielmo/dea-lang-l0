@@ -237,7 +237,7 @@ func ps_parse_postfix_expr(self: ParserState*) -> ExprId? {
 
     while (true) {
         if (ps_match(self, ord(TT_LPAREN))) {
-            with (let args: VectorBase*? = id_vec_create(4) => _free_id_vec_opt(args)) {
+            with (let args: VectorBase*? = id_vec_create(4) => id_vec_free(args)) {
                 if (!ps_check(self, ord(TT_RPAREN))) {
                     while (true) {
                         let arg = ps_parse_call_argument(self)?;
@@ -298,8 +298,8 @@ func ps_parse_primary_expr(self: ParserState*) -> ExprId? {
 
     if (ps_match(self, ord(TT_NEW))) {
         let parsed_type = ps_parse_type(self)?;
-        with (let type_ref: TypeRef*? = parsed_type => _free_type_ref_opt(type_ref),
-              let args: VectorBase*? = null => _free_id_vec_opt(args)) {
+        with (let type_ref: TypeRef*? = parsed_type => type_ref_free(type_ref),
+              let args: VectorBase*? = null => id_vec_free(args)) {
             if (ps_match(self, ord(TT_LPAREN))) {
                 args = id_vec_create(4);
                 if (!ps_check(self, ord(TT_RPAREN))) {

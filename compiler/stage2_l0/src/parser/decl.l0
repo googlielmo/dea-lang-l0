@@ -50,8 +50,8 @@ func ps_parse_function(self: ParserState*, is_extern: bool) -> FuncDecl*? {
     let name_tok = ps_expect_ident(self, "PAR-0041", "[PAR-0041] expected function name")?;
     ps_expect(self, ord(TT_LPAREN), "PAR-0042", "[PAR-0042] expected '('")?;
 
-    with (let params: VectorBase*? = ptr_vec_create(4) => _free_param_vec_opt(params),
-          let ret_type: TypeRef*? = null => _free_type_ref_opt(ret_type)) {
+    with (let params: VectorBase*? = ptr_vec_create(4) => param_vec_free(params),
+          let ret_type: TypeRef*? = null => type_ref_free(ret_type)) {
         if (!ps_check(self, ord(TT_RPAREN))) {
             while (true) {
                 let param_name = ps_expect_ident(self, "PAR-0043", "[PAR-0043] expected parameter name")?;
@@ -92,7 +92,7 @@ func ps_parse_struct(self: ParserState*) -> StructDecl*? {
     let name_tok = ps_expect_ident(self, "PAR-0051", "[PAR-0051] expected struct name")?;
     ps_expect(self, ord(TT_LBRACE), "PAR-0052", "[PAR-0052] expected '{' after struct name")?;
 
-    with (let fields: VectorBase*? = ptr_vec_create(4) => _free_field_decl_vec_opt(fields)) {
+    with (let fields: VectorBase*? = ptr_vec_create(4) => field_decl_vec_free(fields)) {
         while (!ps_check(self, ord(TT_RBRACE))) {
             let field_name = ps_expect_ident(self, "PAR-0053", "[PAR-0053] expected field name")?;
             ps_expect(self, ord(TT_COLON), "PAR-0054", "[PAR-0054] expected ':' after field name")?;
@@ -115,11 +115,11 @@ func ps_parse_enum(self: ParserState*) -> EnumDecl*? {
     let name_tok = ps_expect_ident(self, "PAR-0061", "[PAR-0061] expected enum name")?;
     ps_expect(self, ord(TT_LBRACE), "PAR-0062", "[PAR-0062] expected '{' after enum name")?;
 
-    with (let variants: VectorBase*? = ptr_vec_create(4) => _free_enum_variant_vec_opt(variants)) {
+    with (let variants: VectorBase*? = ptr_vec_create(4) => enum_variant_vec_free(variants)) {
         while (!ps_check(self, ord(TT_RBRACE))) {
             let var_name_tok = ps_expect_ident(self, "PAR-0063", "[PAR-0063] expected variant name")?;
 
-            with (let fields: VectorBase*? = ptr_vec_create(2) => _free_field_decl_vec_opt(fields)) {
+            with (let fields: VectorBase*? = ptr_vec_create(2) => field_decl_vec_free(fields)) {
                 if (ps_match(self, ord(TT_LPAREN))) {
                     if (!ps_check(self, ord(TT_RPAREN))) {
                         while (true) {
@@ -156,7 +156,7 @@ func ps_parse_type_alias(self: ParserState*) -> TypeAliasDecl*? {
     let name_tok = ps_expect_ident(self, "PAR-0071", "[PAR-0071] expected type alias name")?;
     ps_expect(self, ord(TT_EQ), "PAR-0072", "[PAR-0072] expected '=' in type alias")?;
     let parsed = ps_parse_type(self)?;
-    with (let target: TypeRef*? = parsed => _free_type_ref_opt(target)) {
+    with (let target: TypeRef*? = parsed => type_ref_free(target)) {
         ps_expect(self, ord(TT_SEMI), "PAR-0073", "[PAR-0073] expected ';' after type alias")?;
         let result = new TypeAliasDecl(token_ident_text(name_tok) as string, target as TypeRef*, ps_extend_span(self, start));
         target = null;
@@ -169,7 +169,7 @@ func ps_parse_top_level_let(self: ParserState*) -> LetDecl*? {
     ps_expect(self, ord(TT_LET), "PAR-0080", "[PAR-0080] expected 'let'")?;
     let name_tok = ps_expect_variable_name(self, "PAR-0081", "[PAR-0081] expected variable name")?;
 
-    with (let type_ref: TypeRef*? = null => _free_type_ref_opt(type_ref)) {
+    with (let type_ref: TypeRef*? = null => type_ref_free(type_ref)) {
         if (ps_match(self, ord(TT_COLON))) {
             type_ref = ps_parse_type(self)?;
         }
@@ -225,8 +225,8 @@ func ps_parse_module(self: ParserState*) -> Module*? {
 
     ps_expect(self, ord(TT_SEMI), "PAR-0312", "[PAR-0312] expected ';' after module name")?;
 
-    with (let imports: VectorBase*? = ptr_vec_create(4) => _free_import_vec_opt(imports),
-          let decls: VectorBase*? = ptr_vec_create(8) => _free_top_level_decl_vec_opt(decls)) {
+    with (let imports: VectorBase*? = ptr_vec_create(4) => import_vec_free(imports),
+          let decls: VectorBase*? = ptr_vec_create(8) => top_level_decl_vec_free(decls)) {
         while (ps_match(self, ord(TT_IMPORT))) {
             let first = ps_expect_ident(self, "PAR-0320", "[PAR-0320] expected imported module name")?;
             let first_imp = token_ident_text(first) as string;
