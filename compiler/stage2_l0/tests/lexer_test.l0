@@ -50,6 +50,7 @@ func test_token_vector() {
         printl_si("    column:", tok.column);
     }
 
+    tv_free(tv);
     printl_s("\nDone!");
 }
 

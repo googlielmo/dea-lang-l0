@@ -68,13 +68,18 @@ func arr_resize(self: ArrayBase*, new_length: int) {
         let new_bytes = (new_capacity - old_capacity) * self.element_size;
         rt_memset(start_ptr, 0, new_bytes);
     }
-    self.capacity = new_length;
+    self.capacity = new_length; // Keep logical length; zero maps to 1-byte backing allocation only.
     self.data = new_data;
 }
 
 func arr_get(self: ArrayBase*, index: int) -> void* {
     arr_check(self, index);
     return rt_array_element(self.data, self.element_size, index);
+}
+
+func arr_zap(self: ArrayBase*, index: int) {
+    let dest_ptr = arr_get(self, index);
+    rt_memset(dest_ptr, 0, self.element_size);
 }
 
 func arr_free(self: ArrayBase*) {

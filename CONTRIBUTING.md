@@ -25,6 +25,16 @@ pytest tests/lexer/test_lexer.py # run a specific test file
 pytest -k "test_name"           # run tests matching a pattern
 ```
 
+For Stage 2 (`compiler/stage2_l0`) changes, run:
+
+```bash
+./compiler/stage2_l0/run_tests.sh
+./compiler/stage2_l0/run_trace_tests.sh
+```
+
+`run_trace_tests.sh` is an important finalization gate for Stage 2 changes because it checks runtime trace health
+(including leak triage) across the full Stage 2 test suite.
+
 ### Smoke test
 
 Verify the compiler works end-to-end:

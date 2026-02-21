@@ -22,6 +22,24 @@ Output:
 - Summary of test results (total, passed, failed) and details for any failures.
 - Exit code: `0` if all tests pass, `1` if any test fails.
 
+Run Stage 2 L0 trace checks (runtime + leak triage on every test):
+
+```bash
+./compiler/stage2_l0/run_trace_tests.sh
+```
+
+Options:
+
+- `-v`: print per-test analyzer details.
+- `--keep-artifacts`: keep stdout/stderr/report files under `/tmp`.
+- `--max-details <n>`: pass through to `check_trace_log.py` detail limit.
+
+Output:
+
+- Per-test `TRACE_OK`/`TRACE_FAIL`/`RUN_FAIL`.
+- Leak summary fields from analyzer (`leaked_object_ptrs`, `leaked_string_ptrs`).
+- Exit code: `0` if all trace checks pass, `1` if any test fails or has trace errors.
+
 ## Trace test runs
 
 Capture Stage 2 trace logs (both ARC and memory) for a Stage 2 test:

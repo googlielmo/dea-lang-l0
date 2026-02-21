@@ -59,34 +59,32 @@ func to_lower(c: byte) -> byte {
 
 struct StringBuffer {
     parts: VectorString*; // Vector of strings
+    size: int; // Total size of all parts (cached for efficiency)
 }
 
 func sb_create() -> StringBuffer* {
     let parts = vs_create(8);
-    let self = new StringBuffer(parts);
+    let self = new StringBuffer(parts, 0);
     return self;
 }
 
 func sb_append(self: StringBuffer*, s: string) {
     vs_push(self.parts, s);
+    self.size = self.size + len_s(s);
 }
 
 func sb_to_string(self: StringBuffer*) -> string {
-    let result: string = "";
-    for (let i: int = 0; i < vs_size(self.parts); i = i + 1) {
-        let part = vs_get(self.parts, i);
-        result = concat_s(result, part);
+    with (let cb = cb_create() => cb_free(cb)) {
+        cb_reserve(cb, self.size);
+        for (let i: int = 0; i < vs_size(self.parts); i = i + 1) {
+            cb_append_s(cb, vs_get(self.parts, i));
+        }
+        return cb_to_string(cb);
     }
-    return result;
 }
 
 func sb_size(self: StringBuffer*) -> int {
-    let size: int = 0;
-    for (let i: int = 0; i < vs_size(self.parts); i = i + 1) {
-        let part = vs_get(self.parts, i);
-        size = size + len_s(part);
-    }
-    return size;
+    return self.size;
 }
 
 func sb_free(self: StringBuffer*) {
@@ -108,6 +106,18 @@ func cb_create() -> CharBuffer* {
     return self;
 }
 
+func cb_capacity(self: CharBuffer*) -> int {
+    return vec_capacity(self.chars);
+}
+
+func cb_size(self: CharBuffer*) -> int {
+    return vec_size(self.chars);
+}
+
+func cb_reserve(self: CharBuffer*, total_capacity: int) {
+    vec_reserve(self.chars, total_capacity);
+}
+
 func cb_append(self: CharBuffer*, c: byte) {
     let dest = vec_push(self.chars) as byte*;
     *dest = c;
@@ -118,10 +128,6 @@ func cb_append_s(self: CharBuffer*, s: string) {
         let c = char_at_s(s, i);
         cb_append(self, c);
     }
-}
-
-func cb_size(self: CharBuffer*) -> int {
-    return vec_size(self.chars);
 }
 
 func cb_reverse(cb: CharBuffer*) {

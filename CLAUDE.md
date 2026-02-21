@@ -26,6 +26,7 @@ implementation status, read the relevant doc file(s).**
 | `docs/specs/runtime/trace.md`            | Trace flags, generated defines, runtime trace contract        |
 
 Documentation policy:
+
 - `docs/README.md` for docs placement, naming, and attic rules.
 - `docs/attic/README.md` for archived/obsolete document policy details.
 - When changing stdlib modules or exported `extern func` signatures, update `docs/reference/standard-library.md` in the
@@ -62,6 +63,16 @@ pytest -n 3                       # all tests (parallel, optimal)
 pytest tests/lexer/test_lexer.py  # specific file
 pytest -k "test_name"             # pattern match
 ```
+
+For Stage 2 (`compiler/stage2_l0`) changes, finalization checks should include:
+
+```bash
+./compiler/stage2_l0/run_tests.sh
+./compiler/stage2_l0/run_trace_tests.sh
+```
+
+`run_trace_tests.sh` is an important finalization gate because it validates ARC/memory traces and leak triage across
+all Stage 2 tests.
 
 When adding or moving tests, follow `compiler/stage1_py/tests/README.md` for placement and naming rules.
 
