@@ -122,7 +122,15 @@ func process_config(path: string) -> int {
 
 #### 2. Set environment variables (optional):
 
-The `l0c` wrapper script sets sensible defaults, but you can override them with these variables:
+For interactive shells, source the helper script:
+
+   ```shell
+   source ./l0-env.sh
+   ```
+
+This sets `L0_HOME` and adds the repository root to `PATH` for the current shell session (`bash` and `zsh`).
+
+If you prefer manual setup or want to override values, use:
 
    ```shell
    export L0_HOME=/path/to/l0/compiler/stage1_py
