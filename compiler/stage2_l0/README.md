@@ -22,13 +22,15 @@ Output:
 - Summary of test results (total, passed, failed) and details for any failures.
 - Exit code: `0` if all tests pass, `1` if any test fails.
 
-## Trace parser runs
+## Trace test runs
 
-Capture Stage 2 parser traces (both ARC and memory) to files:
+Capture Stage 2 trace logs (both ARC and memory) for a Stage 2 test:
 
 ```bash
-./compiler/stage2_l0/run_parser_trace.sh
+./compiler/stage2_l0/run_test_trace.sh parser_test
 ```
+
+The test argument accepts either `parser_test` or `parser_test.l0`.
 
 This runs:
 
@@ -45,7 +47,8 @@ By default, output files are written under `/tmp` and printed at the end:
 Custom output paths:
 
 ```bash
-./compiler/stage2_l0/run_parser_trace.sh \
+./compiler/stage2_l0/run_test_trace.sh \
+  parser_test \
   --out /tmp/parser.stderr.log \
   --stdout /tmp/parser.stdout.log
 ```
