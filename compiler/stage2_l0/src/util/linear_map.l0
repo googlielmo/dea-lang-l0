@@ -259,17 +259,13 @@ func lmss_set(self: LinearMapStringString*, key: string, value: string) {
     let index = _lmss_find_by_key(self, key);
 
     if (index >= 0) {
-        // Update existing entry: release old value, retain and set new
+        // Assignment already performs ARC retain/release for string fields.
         let entry_ptr = _lmss_entry_by_index(self, index);
-        rt_string_release(entry_ptr.value);
-        rt_string_retain(value);
         entry_ptr.value = value;
         return;
     }
 
-    // New entry: retain both key and value
-    rt_string_retain(key);
-    rt_string_retain(value);
+    // Assignment already performs ARC retain/release for string fields.
     _lm_grow(self.base);
     let new_index = self.base.entries.length - 1;
     let entry_ptr = _lmss_entry_by_index(self, new_index);
@@ -306,9 +302,8 @@ func lmss_remove(self: LinearMapStringString*, key: string) -> bool {
     let last_index = self.base.entries.length - 1;
     if (index != last_index) {
         let last_entry_ptr = _lmss_entry_by_index(self, last_index);
-        // Copy last entry to the removed slot
-        entry_ptr.key = last_entry_ptr.key;
-        entry_ptr.value = last_entry_ptr.value;
+        // Move bytes to avoid extra ARC retains from field-by-field assignment.
+        rt_memcpy(entry_ptr, last_entry_ptr, sizeof(LinearMapStringStringEntry));
     }
     vec_zap(self.base.entries, last_index);
     self.base.entries.length = self.base.entries.length - 1;
@@ -394,16 +389,13 @@ func lmis_set(self: LinearMapIntString*, key: int, value: string) {
     let index = _lmis_find_by_key(self, key);
 
     if (index >= 0) {
-        // Update existing entry: release old value, retain and set new
+        // Assignment already performs ARC retain/release for string fields.
         let entry_ptr = _lmis_entry_by_index(self, index);
-        rt_string_release(entry_ptr.value);
-        rt_string_retain(value);
         entry_ptr.value = value;
         return;
     }
 
-    // New entry: only retain value (int key doesn't need retain)
-    rt_string_retain(value);
+    // Assignment already performs ARC retain/release for string fields.
     _lm_grow(self.base);
     let new_index = self.base.entries.length - 1;
     let entry_ptr = _lmis_entry_by_index(self, new_index);
@@ -439,9 +431,8 @@ func lmis_remove(self: LinearMapIntString*, key: int) -> bool {
     let last_index = self.base.entries.length - 1;
     if (index != last_index) {
         let last_entry_ptr = _lmis_entry_by_index(self, last_index);
-        // Copy last entry to the removed slot
-        entry_ptr.key = last_entry_ptr.key;
-        entry_ptr.value = last_entry_ptr.value;
+        // Move bytes to avoid extra ARC retains from field-by-field assignment.
+        rt_memcpy(entry_ptr, last_entry_ptr, sizeof(LinearMapIntStringEntry));
     }
     vec_zap(self.base.entries, last_index);
     self.base.entries.length = self.base.entries.length - 1;

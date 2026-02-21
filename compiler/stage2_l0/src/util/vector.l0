@@ -38,8 +38,15 @@ func vec_create(element_size: int, initial_capacity: int) -> VectorBase* {
 }
 
 func vec_grow(self: VectorBase*) {
-    if (self.length >= self.arr.capacity) {
-        arr_resize(self.arr, self.arr.capacity * 2);
+    assert(self.length <= self.arr.capacity, "Vector invariant violated in vec_grow");
+    if (self.length == self.arr.capacity) {
+        let next_capacity = self.arr.capacity;
+        if (next_capacity == 0) {
+            next_capacity = 1;
+        } else {
+            next_capacity = next_capacity * 2;
+        }
+        arr_resize(self.arr, next_capacity);
     }
     self.length = self.length + 1;
 }
@@ -72,8 +79,7 @@ func vec_capacity(self: VectorBase*) -> int {
 }
 
 func vec_zap(self: VectorBase*, index: int) {
-    let dest_ptr = arr_get(self.arr, index);
-    rt_memset(dest_ptr, 0, self.arr.element_size);
+    arr_zap(self.arr, index);
 }
 
 func vec_clear(self: VectorBase*) {
@@ -128,7 +134,6 @@ func vs_create(initial_capacity: int) -> VectorString* {
 func vs_push(self: VectorString*, val: string) {
     let dest = vec_push(self) as string*;
     *dest = val;
-    rt_string_retain(val);
 }
 
 func vs_get(self: VectorString*, index: int) -> string {
