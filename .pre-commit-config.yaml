@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+# Copyright (c) 2026 gwz
+
+repos:
+  - repo: local
+    hooks:
+      - id: copyright-headers
+        name: Check copyright headers
+        entry: python3 .github/workflows/check_copyright_headers.py
+        language: system
+        pass_filenames: false

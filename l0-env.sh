@@ -1,4 +1,9 @@
 #!/usr/bin/env bash
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+# Copyright (c) 2026 gwz
+#
+
 script_src="${BASH_SOURCE[0]-}"
 if [[ -z "${script_src}" && -n "${ZSH_VERSION-}" ]]; then
     script_src="${(%):-%N}"
