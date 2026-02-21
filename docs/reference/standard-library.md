@@ -146,17 +146,22 @@ This module exposes runtime hash functions directly via `extern func` declaratio
 
 ### `std.string`
 
-**Imports:** `sys.rt`
+**Imports:** `sys.rt`, `std.assert`
 
-| Function     | Signature                                     | Description                       |
-|--------------|-----------------------------------------------|-----------------------------------|
-| `len_s`      | `(s: string) -> int`                          | Returns string byte length.       |
-| `char_at_s`  | `(s: string, index: int) -> byte`             | Returns byte at index.            |
-| `eq_s`       | `(a: string, b: string) -> bool`              | Compares strings.                 |
-| `concat_s`   | `(a: string, b: string) -> string`            | Concatenates strings.             |
-| `slice_s`    | `(s: string, start: int, end: int) -> string` | Returns substring `[start, end)`. |
-| `byte_to_s`  | `(b: byte) -> string`                         | Creates one-byte string.          |
-| `bytes_to_s` | `(bytes: byte*, len: int) -> string`          | Creates string from byte buffer.  |
+| Function      | Signature                                                | Description                                                                 |
+|---------------|----------------------------------------------------------|-----------------------------------------------------------------------------|
+| `len_s`       | `(s: string) -> int`                                     | Returns string byte length.                                                 |
+| `char_at_s`   | `(s: string, index: int) -> byte`                        | Returns byte at index.                                                      |
+| `eq_s`        | `(a: string, b: string) -> bool`                         | Compares strings.                                                           |
+| `concat_s`    | `(a: string, b: string) -> string`                       | Concatenates strings.                                                       |
+| `slice_s`     | `(s: string, start: int, end: int) -> string`            | Returns substring `[start, end)`.                                           |
+| `byte_to_s`   | `(b: byte) -> string`                                    | Creates one-byte string.                                                    |
+| `bytes_to_s`  | `(bytes: byte*, len: int) -> string`                     | Creates string from byte buffer.                                            |
+| `find_s`      | `(haystack: string, needle: string) -> int`              | Returns first match index or `-1`.                                          |
+| `find_from_s` | `(haystack: string, needle: string, pos: int) -> int`    | Returns first match index at/after `pos`, or `-1`. Requires `pos >= 0`.    |
+| `contains_s`  | `(haystack: string, needle: string) -> bool`             | Returns whether `needle` occurs in `haystack`.                              |
+| `starts_with_s` | `(s: string, prefix: string) -> bool`                  | Returns whether `s` starts with `prefix`.                                   |
+| `ends_with_s` | `(s: string, suffix: string) -> bool`                    | Returns whether `s` ends with `suffix`.                                     |
 
 ### `std.system`
 
