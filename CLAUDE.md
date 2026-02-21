@@ -59,7 +59,7 @@ Trace toggles (codegen/build/run): `--trace-arc`, `--trace-memory`.
 
 ```bash
 cd compiler/stage1_py
-pytest -n 3                       # all tests (parallel, optimal)
+pytest -n auto                    # all tests (parallel, optimal)
 pytest tests/lexer/test_lexer.py  # specific file
 pytest -k "test_name"             # pattern match
 ```

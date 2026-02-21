@@ -35,7 +35,7 @@ From repository root:
 
 ```bash
 cd compiler/stage1_py
-pytest -n 3
+pytest -n auto
 pytest tests/lexer/test_lexer.py
 pytest -k "pattern"
 ```
