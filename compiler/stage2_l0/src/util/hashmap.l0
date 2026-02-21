@@ -1,0 +1,688 @@
+/*
+ * SPDX-License-Identifier: MIT OR Apache-2.0
+ * Copyright (c) 2025-2026 gwz
+ */
+
+module util.hashmap;
+
+import sys.rt;
+import sys.unsafe;
+
+import std.assert;
+import std.string;
+import std.hash;
+
+import util.array;
+import util.vector;
+
+/* ========================================
+   Shared constants and helpers
+   ======================================== */
+
+let HM_EMPTY: byte = 0;
+let HM_OCCUPIED: byte = 1;
+let HM_TOMBSTONE: byte = 2;
+
+let HM_DEFAULT_CAP: int = 16;
+
+/*
+ * Compute a non-negative slot index from a hash and a power-of-2 capacity.
+ */
+func _hm_slot(h: int, cap: int) -> int {
+    let r = h % cap;
+    if (r < 0) {
+        return r + cap;
+    }
+    return r;
+}
+
+/* ========================================
+   StringPtrMap: string -> void*
+
+   Open-addressing hash table with linear probing.
+   Keys are ARC-managed strings (manual retain/release).
+   Values are caller-managed void pointers.
+
+   Struct-of-arrays layout:
+     states  — byte per slot (EMPTY / OCCUPIED / TOMBSTONE)
+     hashes  — int per slot (cached hash code)
+     keys    — string per slot (ARC-managed)
+     values  — void* per slot
+   ======================================== */
+
+struct StringPtrMap {
+    capacity: int;
+    count: int;
+    tomb_count: int;
+    states: ArrayBase*;
+    hashes: ArrayBase*;
+    keys: ArrayBase*;
+    values: ArrayBase*;
+}
+
+/* ----------------------------------------
+   Construction
+   ---------------------------------------- */
+
+func spm_create() -> StringPtrMap* {
+    return _spm_alloc(HM_DEFAULT_CAP);
+}
+
+func spm_create_with_capacity(min_cap: int) -> StringPtrMap* {
+    let cap = HM_DEFAULT_CAP;
+    while (cap < min_cap) {
+        cap = cap * 2;
+    }
+    return _spm_alloc(cap);
+}
+
+func _spm_alloc(cap: int) -> StringPtrMap* {
+    let states = arr_create(sizeof(byte), cap);
+    let hashes = arr_create(sizeof(int), cap);
+    let keys   = arr_create(sizeof(string), cap);
+    let values = arr_create(sizeof(void*), cap);
+    return new StringPtrMap(cap, 0, 0, states, hashes, keys, values);
+}
+
+/* ----------------------------------------
+   Slot accessors (internal)
+   ---------------------------------------- */
+
+func _spm_get_state(self: StringPtrMap*, i: int) -> byte {
+    let p = arr_get(self.states, i) as byte*;
+    return *p;
+}
+
+func _spm_set_state(self: StringPtrMap*, i: int, s: byte) {
+    let p = arr_get(self.states, i) as byte*;
+    *p = s;
+}
+
+func _spm_get_hash(self: StringPtrMap*, i: int) -> int {
+    let p = arr_get(self.hashes, i) as int*;
+    return *p;
+}
+
+func _spm_set_hash(self: StringPtrMap*, i: int, h: int) {
+    let p = arr_get(self.hashes, i) as int*;
+    *p = h;
+}
+
+func _spm_get_key(self: StringPtrMap*, i: int) -> string {
+    let p = arr_get(self.keys, i) as string*;
+    return *p;
+}
+
+func _spm_set_key_retain(self: StringPtrMap*, i: int, k: string) {
+    let p = arr_get(self.keys, i) as string*;
+    *p = k;
+}
+
+func _spm_release_key(self: StringPtrMap*, i: int) {
+    let p = arr_get(self.keys, i) as string*;
+    rt_string_release(*p);
+    arr_zap(self.keys, i);
+}
+
+func _spm_get_value(self: StringPtrMap*, i: int) -> void* {
+    let p = arr_get(self.values, i) as void**;
+    return *p;
+}
+
+func _spm_set_value(self: StringPtrMap*, i: int, v: void*) {
+    let p = arr_get(self.values, i) as void**;
+    *p = v;
+}
+
+/* ----------------------------------------
+   Probing (internal)
+   ---------------------------------------- */
+
+/*
+ * Find the slot index of an existing key.
+ * Returns the slot index if found, or -1 if not in the map.
+ */
+func _spm_find(self: StringPtrMap*, key: string, h: int) -> int {
+    let cap = self.capacity;
+    let idx = _hm_slot(h, cap);
+
+    for (let i: int = 0; i < cap; i = i + 1) {
+        let state = _spm_get_state(self, idx);
+        if (state == HM_EMPTY) {
+            return -1;
+        }
+        if (state == HM_OCCUPIED) {
+            if (_spm_get_hash(self, idx) == h) {
+                if (eq_s(_spm_get_key(self, idx), key)) {
+                    return idx;
+                }
+            }
+        }
+        /* TOMBSTONE: keep probing */
+        idx = (idx + 1) % cap;
+    }
+    return -1;
+}
+
+/*
+ * Find the first non-occupied slot for insertion.
+ */
+func _spm_find_insert(self: StringPtrMap*, h: int) -> int {
+    let cap = self.capacity;
+    let idx = _hm_slot(h, cap);
+
+    for (let i: int = 0; i < cap; i = i + 1) {
+        let state = _spm_get_state(self, idx);
+        if (state != HM_OCCUPIED) {
+            return idx;
+        }
+        idx = (idx + 1) % cap;
+    }
+    assert(false, "hashmap: no free slot found during insert probe");
+    return -1;
+}
+
+/* ----------------------------------------
+   Rehash (internal)
+   ---------------------------------------- */
+
+func _spm_needs_grow(self: StringPtrMap*) -> bool {
+    return (self.count + self.tomb_count) * 4 > self.capacity * 3;
+}
+
+func _spm_rehash(self: StringPtrMap*) {
+    let old_cap    = self.capacity;
+    let old_states = self.states;
+    let old_hashes = self.hashes;
+    let old_keys   = self.keys;
+    let old_values = self.values;
+
+    let new_cap = old_cap * 2;
+    self.capacity   = new_cap;
+    self.count      = 0;
+    self.tomb_count = 0;
+    self.states = arr_create(sizeof(byte), new_cap);
+    self.hashes = arr_create(sizeof(int), new_cap);
+    self.keys   = arr_create(sizeof(string), new_cap);
+    self.values = arr_create(sizeof(void*), new_cap);
+
+    for (let i: int = 0; i < old_cap; i = i + 1) {
+        let sp = arr_get(old_states, i) as byte*;
+        if (*sp == HM_OCCUPIED) {
+            let h  = *(arr_get(old_hashes, i) as int*);
+            let kp = arr_get(old_keys, i) as string*;
+            let vp = arr_get(old_values, i) as void**;
+
+            let idx = _hm_slot(h, new_cap);
+            while (_spm_get_state(self, idx) != HM_EMPTY) {
+                idx = (idx + 1) % new_cap;
+            }
+
+            _spm_set_state(self, idx, HM_OCCUPIED);
+            _spm_set_hash(self, idx, h);
+            _spm_set_value(self, idx, *vp);
+
+            /* Move key ownership: raw byte copy, no retain/release pair */
+            let dest_kp = arr_get(self.keys, idx) as string*;
+            rt_memcpy(dest_kp as void*, kp as void*, sizeof(string));
+
+            self.count = self.count + 1;
+        }
+    }
+
+    /* Free old arrays — keys already moved, no release needed */
+    arr_free(old_states);
+    arr_free(old_hashes);
+    arr_free(old_keys);
+    arr_free(old_values);
+}
+
+/* ========================================
+   StringPtrMap: public API
+   ======================================== */
+
+/*
+ * Insert or update a key-value pair.
+ * Key is retained on first insertion. On update, only the value changes.
+ */
+func spm_put(self: StringPtrMap*, key: string, value: void*) {
+    if (_spm_needs_grow(self)) {
+        _spm_rehash(self);
+    }
+
+    let h = rt_hash_string(key);
+    let found_idx = _spm_find(self, key, h);
+
+    if (found_idx >= 0) {
+        _spm_set_value(self, found_idx, value);
+    } else {
+        let idx = _spm_find_insert(self, h);
+        let state = _spm_get_state(self, idx);
+        if (state == HM_TOMBSTONE) {
+            self.tomb_count = self.tomb_count - 1;
+        }
+        _spm_set_state(self, idx, HM_OCCUPIED);
+        _spm_set_hash(self, idx, h);
+        _spm_set_key_retain(self, idx, key);
+        _spm_set_value(self, idx, value);
+        self.count = self.count + 1;
+    }
+}
+
+/*
+ * Look up a key. Returns the associated value, or null if not found.
+ *
+ * Note: if null is a valid stored value, use spm_has() to disambiguate.
+ */
+func spm_get(self: StringPtrMap*, key: string) -> void*? {
+    if (self.count == 0) {
+        return null;
+    }
+    let h = rt_hash_string(key);
+    let idx = _spm_find(self, key, h);
+    if (idx < 0) {
+        return null;
+    }
+    return _spm_get_value(self, idx);
+}
+
+/*
+ * Check whether a key exists in the map.
+ */
+func spm_has(self: StringPtrMap*, key: string) -> bool {
+    if (self.count == 0) {
+        return false;
+    }
+    let h = rt_hash_string(key);
+    return _spm_find(self, key, h) >= 0;
+}
+
+/*
+ * Remove a key. Returns true if the key was found and removed.
+ */
+func spm_remove(self: StringPtrMap*, key: string) -> bool {
+    if (self.count == 0) {
+        return false;
+    }
+    let h = rt_hash_string(key);
+    let idx = _spm_find(self, key, h);
+    if (idx < 0) {
+        return false;
+    }
+
+    _spm_release_key(self, idx);
+    _spm_set_state(self, idx, HM_TOMBSTONE);
+    self.count = self.count - 1;
+    self.tomb_count = self.tomb_count + 1;
+    return true;
+}
+
+func spm_size(self: StringPtrMap*) -> int {
+    return self.count;
+}
+
+func spm_capacity(self: StringPtrMap*) -> int {
+    return self.capacity;
+}
+
+/*
+ * Remove all entries. Releases all key strings.
+ */
+func spm_clear(self: StringPtrMap*) {
+    for (let i: int = 0; i < self.capacity; i = i + 1) {
+        if (_spm_get_state(self, i) == HM_OCCUPIED) {
+            _spm_release_key(self, i);
+        }
+    }
+    rt_memset(self.states.data, 0, self.capacity * sizeof(byte));
+    rt_memset(self.hashes.data, 0, self.capacity * sizeof(int));
+    rt_memset(self.keys.data,   0, self.capacity * sizeof(string));
+    rt_memset(self.values.data, 0, self.capacity * sizeof(void*));
+    self.count = 0;
+    self.tomb_count = 0;
+}
+
+/*
+ * Collect all keys into a new VectorString.
+ * Caller owns the result and must vs_free() it.
+ */
+func spm_keys(self: StringPtrMap*) -> VectorString* {
+    let result = vs_create(self.count);
+    for (let i: int = 0; i < self.capacity; i = i + 1) {
+        if (_spm_get_state(self, i) == HM_OCCUPIED) {
+            vs_push(result, _spm_get_key(self, i));
+        }
+    }
+    return result;
+}
+
+/*
+ * Free the map and all backing storage.
+ * Releases all key strings. Does NOT free values (caller-managed).
+ */
+func spm_free(self: StringPtrMap*) {
+    for (let i: int = 0; i < self.capacity; i = i + 1) {
+        if (_spm_get_state(self, i) == HM_OCCUPIED) {
+            _spm_release_key(self, i);
+        }
+    }
+    arr_free(self.states);
+    arr_free(self.hashes);
+    arr_free(self.keys);
+    arr_free(self.values);
+    drop self;
+}
+
+/* ----------------------------------------
+   Iteration support
+   ---------------------------------------- */
+
+func spm_slot_occupied(self: StringPtrMap*, i: int) -> bool {
+    return _spm_get_state(self, i) == HM_OCCUPIED;
+}
+
+func spm_slot_key(self: StringPtrMap*, i: int) -> string {
+    return _spm_get_key(self, i);
+}
+
+func spm_slot_value(self: StringPtrMap*, i: int) -> void* {
+    return _spm_get_value(self, i);
+}
+
+
+/* ========================================
+   StringIntMap: string -> int
+
+   Same layout and probing as StringPtrMap,
+   but values are int instead of void*.
+   ======================================== */
+
+struct StringIntMap {
+    capacity: int;
+    count: int;
+    tomb_count: int;
+    states: ArrayBase*;
+    hashes: ArrayBase*;
+    keys: ArrayBase*;
+    values: ArrayBase*;
+}
+
+/* ----------------------------------------
+   Construction
+   ---------------------------------------- */
+
+func sim_create() -> StringIntMap* {
+    return _sim_alloc(HM_DEFAULT_CAP);
+}
+
+func sim_create_with_capacity(min_cap: int) -> StringIntMap* {
+    let cap = HM_DEFAULT_CAP;
+    while (cap < min_cap) {
+        cap = cap * 2;
+    }
+    return _sim_alloc(cap);
+}
+
+func _sim_alloc(cap: int) -> StringIntMap* {
+    let states = arr_create(sizeof(byte), cap);
+    let hashes = arr_create(sizeof(int), cap);
+    let keys   = arr_create(sizeof(string), cap);
+    let values = arr_create(sizeof(int), cap);
+    return new StringIntMap(cap, 0, 0, states, hashes, keys, values);
+}
+
+/* ----------------------------------------
+   Slot accessors (internal)
+   ---------------------------------------- */
+
+func _sim_get_state(self: StringIntMap*, i: int) -> byte {
+    return *(arr_get(self.states, i) as byte*);
+}
+
+func _sim_set_state(self: StringIntMap*, i: int, s: byte) {
+    let p = arr_get(self.states, i) as byte*;
+    *p = s;
+}
+
+func _sim_get_hash(self: StringIntMap*, i: int) -> int {
+    return *(arr_get(self.hashes, i) as int*);
+}
+
+func _sim_set_hash(self: StringIntMap*, i: int, h: int) {
+    let p = arr_get(self.hashes, i) as int*;
+    *p = h;
+}
+
+func _sim_get_key(self: StringIntMap*, i: int) -> string {
+    return *(arr_get(self.keys, i) as string*);
+}
+
+func _sim_set_key_retain(self: StringIntMap*, i: int, k: string) {
+    let p = arr_get(self.keys, i) as string*;
+    *p = k;
+}
+
+func _sim_release_key(self: StringIntMap*, i: int) {
+    let p = arr_get(self.keys, i) as string*;
+    rt_string_release(*p);
+    arr_zap(self.keys, i);
+}
+
+func _sim_get_value(self: StringIntMap*, i: int) -> int {
+    return *(arr_get(self.values, i) as int*);
+}
+
+func _sim_set_value(self: StringIntMap*, i: int, v: int) {
+    let p = arr_get(self.values, i) as int*;
+    *p = v;
+}
+
+/* ----------------------------------------
+   Probing (internal)
+   ---------------------------------------- */
+
+func _sim_find(self: StringIntMap*, key: string, h: int) -> int {
+    let cap = self.capacity;
+    let idx = _hm_slot(h, cap);
+
+    for (let i: int = 0; i < cap; i = i + 1) {
+        let state = _sim_get_state(self, idx);
+        if (state == HM_EMPTY) {
+            return -1;
+        }
+        if (state == HM_OCCUPIED) {
+            if (_sim_get_hash(self, idx) == h) {
+                if (eq_s(_sim_get_key(self, idx), key)) {
+                    return idx;
+                }
+            }
+        }
+        idx = (idx + 1) % cap;
+    }
+    return -1;
+}
+
+func _sim_find_insert(self: StringIntMap*, h: int) -> int {
+    let cap = self.capacity;
+    let idx = _hm_slot(h, cap);
+
+    for (let i: int = 0; i < cap; i = i + 1) {
+        if (_sim_get_state(self, idx) != HM_OCCUPIED) {
+            return idx;
+        }
+        idx = (idx + 1) % cap;
+    }
+    assert(false, "hashmap: no free slot found during insert probe");
+    return -1;
+}
+
+func _sim_needs_grow(self: StringIntMap*) -> bool {
+    return (self.count + self.tomb_count) * 4 > self.capacity * 3;
+}
+
+func _sim_rehash(self: StringIntMap*) {
+    let old_cap    = self.capacity;
+    let old_states = self.states;
+    let old_hashes = self.hashes;
+    let old_keys   = self.keys;
+    let old_values = self.values;
+
+    let new_cap = old_cap * 2;
+    self.capacity   = new_cap;
+    self.count      = 0;
+    self.tomb_count = 0;
+    self.states = arr_create(sizeof(byte), new_cap);
+    self.hashes = arr_create(sizeof(int), new_cap);
+    self.keys   = arr_create(sizeof(string), new_cap);
+    self.values = arr_create(sizeof(int), new_cap);
+
+    for (let i: int = 0; i < old_cap; i = i + 1) {
+        let sp = arr_get(old_states, i) as byte*;
+        if (*sp == HM_OCCUPIED) {
+            let h  = *(arr_get(old_hashes, i) as int*);
+            let kp = arr_get(old_keys, i) as string*;
+            let vp = arr_get(old_values, i) as int*;
+
+            let idx = _hm_slot(h, new_cap);
+            while (_sim_get_state(self, idx) != HM_EMPTY) {
+                idx = (idx + 1) % new_cap;
+            }
+
+            _sim_set_state(self, idx, HM_OCCUPIED);
+            _sim_set_hash(self, idx, h);
+            _sim_set_value(self, idx, *vp);
+
+            let dest_kp = arr_get(self.keys, idx) as string*;
+            rt_memcpy(dest_kp as void*, kp as void*, sizeof(string));
+
+            self.count = self.count + 1;
+        }
+    }
+
+    arr_free(old_states);
+    arr_free(old_hashes);
+    arr_free(old_keys);
+    arr_free(old_values);
+}
+
+/* ========================================
+   StringIntMap: public API
+   ======================================== */
+
+func sim_put(self: StringIntMap*, key: string, value: int) {
+    if (_sim_needs_grow(self)) {
+        _sim_rehash(self);
+    }
+
+    let h = rt_hash_string(key);
+    let found_idx = _sim_find(self, key, h);
+
+    if (found_idx >= 0) {
+        _sim_set_value(self, found_idx, value);
+    } else {
+        let idx = _sim_find_insert(self, h);
+        let state = _sim_get_state(self, idx);
+        if (state == HM_TOMBSTONE) {
+            self.tomb_count = self.tomb_count - 1;
+        }
+        _sim_set_state(self, idx, HM_OCCUPIED);
+        _sim_set_hash(self, idx, h);
+        _sim_set_key_retain(self, idx, key);
+        _sim_set_value(self, idx, value);
+        self.count = self.count + 1;
+    }
+}
+
+func sim_get(self: StringIntMap*, key: string) -> int? {
+    if (self.count == 0) {
+        return null;
+    }
+    let h = rt_hash_string(key);
+    let idx = _sim_find(self, key, h);
+    if (idx < 0) {
+        return null;
+    }
+    return _sim_get_value(self, idx);
+}
+
+func sim_has(self: StringIntMap*, key: string) -> bool {
+    if (self.count == 0) {
+        return false;
+    }
+    let h = rt_hash_string(key);
+    return _sim_find(self, key, h) >= 0;
+}
+
+func sim_remove(self: StringIntMap*, key: string) -> bool {
+    if (self.count == 0) {
+        return false;
+    }
+    let h = rt_hash_string(key);
+    let idx = _sim_find(self, key, h);
+    if (idx < 0) {
+        return false;
+    }
+
+    _sim_release_key(self, idx);
+    _sim_set_state(self, idx, HM_TOMBSTONE);
+    self.count = self.count - 1;
+    self.tomb_count = self.tomb_count + 1;
+    return true;
+}
+
+func sim_size(self: StringIntMap*) -> int {
+    return self.count;
+}
+
+func sim_capacity(self: StringIntMap*) -> int {
+    return self.capacity;
+}
+
+func sim_clear(self: StringIntMap*) {
+    for (let i: int = 0; i < self.capacity; i = i + 1) {
+        if (_sim_get_state(self, i) == HM_OCCUPIED) {
+            _sim_release_key(self, i);
+        }
+    }
+    rt_memset(self.states.data, 0, self.capacity * sizeof(byte));
+    rt_memset(self.hashes.data, 0, self.capacity * sizeof(int));
+    rt_memset(self.keys.data,   0, self.capacity * sizeof(string));
+    rt_memset(self.values.data, 0, self.capacity * sizeof(int));
+    self.count = 0;
+    self.tomb_count = 0;
+}
+
+func sim_keys(self: StringIntMap*) -> VectorString* {
+    let result = vs_create(self.count);
+    for (let i: int = 0; i < self.capacity; i = i + 1) {
+        if (_sim_get_state(self, i) == HM_OCCUPIED) {
+            vs_push(result, _sim_get_key(self, i));
+        }
+    }
+    return result;
+}
+
+func sim_free(self: StringIntMap*) {
+    for (let i: int = 0; i < self.capacity; i = i + 1) {
+        if (_sim_get_state(self, i) == HM_OCCUPIED) {
+            _sim_release_key(self, i);
+        }
+    }
+    arr_free(self.states);
+    arr_free(self.hashes);
+    arr_free(self.keys);
+    arr_free(self.values);
+    drop self;
+}
+
+func sim_slot_occupied(self: StringIntMap*, i: int) -> bool {
+    return _sim_get_state(self, i) == HM_OCCUPIED;
+}
+
+func sim_slot_key(self: StringIntMap*, i: int) -> string {
+    return _sim_get_key(self, i);
+}
+
+func sim_slot_value(self: StringIntMap*, i: int) -> int {
+    return _sim_get_value(self, i);
+}
