@@ -702,13 +702,14 @@ static l0_string rt_string_from_byte_array(l0_byte* bytes, l0_int len) {
 
 /**
  * Increment reference count for heap strings (no-op for static).
+ * Panics if the string is heap-allocated but has an invalid refcount state (e.g. double free detected).
  *
- * L0 signature: extern func rt_string_retain(s: string) -> string;
+ * L0 signature: extern func rt_string_retain(s: string) -> void;
  */
-static l0_string rt_string_retain(l0_string s) {
+static void rt_string_retain(l0_string s) {
     if (s.kind == L0_STRING_K_STATIC) {
         _RT_TRACE_ARC("op=retain kind=static ptr=%p rc_before=-1 rc_after=-1 action=noop", (void*)s.data.s_str.bytes);
-        return s;
+        return; /* Static strings are not reference counted */
     }
     _l0_h_string *hs = s.data.h_str;
     if (hs == NULL) {
@@ -748,7 +749,6 @@ static l0_string rt_string_retain(l0_string s) {
         );
         _rt_panic_fmt("rt_string_retain: invalid refcount state: %d", (int)hs->refcount);
     }
-    return s;
 }
 
 /**

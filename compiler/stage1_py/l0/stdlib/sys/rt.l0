@@ -30,7 +30,7 @@ extern func rt_string_from_byte(b: byte) -> string;
 
 // Increment reference count for heap strings.
 // No-op for static or non-reference-counted strings.
-extern func rt_string_retain(s: string) -> string;
+extern func rt_string_retain(s: string) -> void;
 
 // Decrement reference count for heap strings and free if count reaches zero.
 // No-op for static or non-reference-counted strings.

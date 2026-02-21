@@ -28,6 +28,8 @@ implementation status, read the relevant doc file(s).**
 Documentation policy:
 - `docs/README.md` for docs placement, naming, and attic rules.
 - `docs/attic/README.md` for archived/obsolete document policy details.
+- When changing stdlib modules or exported `extern func` signatures, update `docs/reference/standard-library.md` in the
+  same change.
 
 Also see: `CONTRIBUTING.md`, `SECURITY.md`.
 

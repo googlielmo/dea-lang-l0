@@ -202,7 +202,7 @@ All `extern func` symbols exposed to L0 from stdlib modules are listed here.
 | `rt_string_slice`           | `(s: string, start: int, end: int) -> string` |
 | `rt_string_from_byte_array` | `(bytes: byte*, len: int) -> string`          |
 | `rt_string_from_byte`       | `(b: byte) -> string`                         |
-| `rt_string_retain`          | `(s: string) -> string`                       |
+| `rt_string_retain`          | `(s: string) -> void`                         |
 | `rt_string_release`         | `(s: string) -> void`                         |
 | `rt_read_file_all`          | `(path: string) -> string?`                   |
 | `rt_write_file_all`         | `(path: string, data: string) -> bool`        |
