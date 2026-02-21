@@ -235,7 +235,7 @@ These are unsafe raw-memory primitives.
 |--------------------|---------------------------------------------------------------|
 | `rt_alloc`         | `(bytes: int) -> void*?`                                      |
 | `rt_realloc`       | `(ptr: void*, new_bytes: int) -> void*?`                      |
-| `rt_free`          | `(ptr: void*) -> void`                                        |
+| `rt_free`          | `(ptr: void*?) -> void`                                       |
 | `rt_calloc`        | `(count: int, elem_size: int) -> void*?`                      |
 | `rt_memcpy`        | `(dest: void*, src: void*, bytes: int) -> void*`              |
 | `rt_memset`        | `(dest: void*, value: int, bytes: int) -> void*`              |

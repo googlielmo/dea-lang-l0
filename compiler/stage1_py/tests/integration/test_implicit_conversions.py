@@ -243,6 +243,19 @@ class TestPointerOptionalConversion:
             }
         """)
 
+    def test_rt_free_accepts_optional_pointer(self):
+        """Passing void*? to rt_free should be accepted."""
+        analyze_and_check_no_errors(
+            self.tmp_path, self.write_l0_file, self.search_paths,
+            "main", """
+            module main;
+            import sys.unsafe;
+            func f() -> void {
+                let p: void*? = rt_alloc(8);
+                rt_free(p);
+            }
+        """)
+
 
 # ============================================================================
 # byte → int conversion

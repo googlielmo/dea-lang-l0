@@ -1236,7 +1236,7 @@ static void *rt_realloc(void *ptr, l0_int new_bytes) {
 /**
  * Free previously allocated memory.
  *
- * L0 signature: extern func rt_free(ptr: void*) -> void;
+ * L0 signature: extern func rt_free(ptr: void*?) -> void;
  */
 static void rt_free(void *ptr) {
     /* free(NULL) is a no-op in C */

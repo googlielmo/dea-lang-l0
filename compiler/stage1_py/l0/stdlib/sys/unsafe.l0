@@ -31,7 +31,7 @@ extern func rt_alloc(bytes: int) -> void*?;
 extern func rt_realloc(ptr: void*, new_bytes: int) -> void*?;
 
 // Free a previously allocated memory block
-extern func rt_free(ptr: void*) -> void;
+extern func rt_free(ptr: void*?) -> void;
 
 // Allocate zero-initialized memory for multiple elements
 extern func rt_calloc(count: int, elem_size: int) -> void*?;

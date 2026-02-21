@@ -98,3 +98,18 @@ def test_assign_nullable_into_non_nullable_requires_unwrap(analyze_single):
     result = analyze_single("main", src)
     assert result.has_errors()
     assert any("type mismatch" in d.message for d in result.diagnostics)
+
+
+def test_rt_string_release_rejects_optional_string(analyze_single):
+    src = """
+    module main;
+    import sys.rt;
+
+    func f(s: string?) -> void {
+        rt_string_release(s);
+    }
+    """
+
+    result = analyze_single("main", src)
+    assert result.has_errors()
+    assert any("expected 'string', got 'string?'" in d.message for d in result.diagnostics)
