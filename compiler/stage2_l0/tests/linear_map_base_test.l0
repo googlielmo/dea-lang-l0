@@ -5,7 +5,7 @@
 
 module linear_map_base_test;
 
-import std.hash;
+import sys.hash;
 import std.io;
 
 import util.linear_map;

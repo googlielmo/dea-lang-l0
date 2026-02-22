@@ -116,7 +116,6 @@ Common supported options:
 Current std/sys modules in tree:
 
 - `std.assert`
-- `std.hash`
 - `std.io`
 - `std.math`
 - `std.optional`
@@ -124,6 +123,7 @@ Current std/sys modules in tree:
 - `std.string`
 - `std.system`
 - `std.unit`
+- `sys.hash`
 - `sys.rt`
 - `sys.unsafe`
 

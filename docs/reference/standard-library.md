@@ -12,14 +12,14 @@ The standard library provides ergonomic L0 modules (`std.*`) and low-level runti
                              ▼
 ┌─────────────────────────────────────────────────────────┐
 │                      std.* Modules                      │
-│ assert, hash, io, math, optional, rand, string, system, │
+│ assert, io, math, optional, rand, string, system,       │
 │ unit                                                    │
 └─────────────────────────────────────────────────────────┘
                              │
                              ▼
 ┌─────────────────────────────────────────────────────────┐
 │                      sys.* Modules                      │
-│            rt (runtime API), unsafe (raw mem)           │
+│      hash, rt (runtime API), unsafe (raw mem)           │
 └─────────────────────────────────────────────────────────┘
                              │
                              ▼
@@ -38,7 +38,7 @@ The standard library provides ergonomic L0 modules (`std.*`) and low-level runti
 |----------|-------------------------------------|-----------------------------------------|
 | `assert` | `(cond: bool, msg: string) -> void` | Aborts with `msg` when `cond` is false. |
 
-### `std.hash`
+### `sys.hash`
 
 This module exposes runtime hash functions directly via `extern func` declarations.
 
@@ -247,9 +247,9 @@ These are unsafe raw-memory primitives.
 | `rt_memcmp`        | `(a: void*, b: void*, bytes: int) -> int`                     |
 | `rt_array_element` | `(array_data: void*, element_size: int, index: int) -> void*` |
 
-### Declared in `std.hash` (11)
+### Declared in `sys.hash` (11)
 
-These are runtime-backed hash externs declared directly in `std.hash`.
+These are runtime-backed hash externs declared directly in `sys.hash`.
 
 | Function             | Signature                         |
 |----------------------|-----------------------------------|

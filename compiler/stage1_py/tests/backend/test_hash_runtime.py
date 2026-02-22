@@ -8,7 +8,7 @@ def test_hash_deterministic_outputs(codegen_single, compile_and_run, tmp_path):
         """
         module hash_deterministic;
 
-        import std.hash;
+        import sys.hash;
         import std.io;
 
         func main() -> int {
@@ -52,7 +52,7 @@ def test_hash_opt_string_null_matches_empty(codegen_single, compile_and_run, tmp
         """
         module hash_opt_string;
 
-        import std.hash;
+        import sys.hash;
         import std.io;
 
         func main() -> int {
@@ -82,7 +82,7 @@ def test_hash_data_null_pointer_panics(codegen_single, compile_and_run, tmp_path
         """
         module hash_data_null;
 
-        import std.hash;
+        import sys.hash;
 
         func main() -> int {
             let ptr: void* = null;
@@ -106,7 +106,7 @@ def test_hash_data_negative_size_panics(codegen_single, compile_and_run, tmp_pat
         """
         module hash_data_negative_size;
 
-        import std.hash;
+        import sys.hash;
         import sys.unsafe;
 
         func main() -> int {
@@ -131,7 +131,7 @@ def test_hash_ptr_null_panics(codegen_single, compile_and_run, tmp_path):
         """
         module hash_ptr_null;
 
-        import std.hash;
+        import sys.hash;
 
         func main() -> int {
             let ptr: void* = null;
@@ -155,7 +155,7 @@ def test_hash_opt_ptr_null_panics(codegen_single, compile_and_run, tmp_path):
         """
         module hash_opt_ptr_null;
 
-        import std.hash;
+        import sys.hash;
 
         func main() -> int {
             let ptr: void*? = null;

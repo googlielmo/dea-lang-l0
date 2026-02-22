@@ -6,7 +6,7 @@
 /**
  * This module provides hashing functionality.
  */
-module std.hash;
+module sys.hash;
 
 // Hash functions for various types.
 

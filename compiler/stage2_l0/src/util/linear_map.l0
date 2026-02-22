@@ -10,7 +10,7 @@ import sys.unsafe;
 
 import std.assert;
 import std.string;
-import std.hash;
+import sys.hash;
 
 import util.vector;
 
