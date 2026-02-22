@@ -2377,7 +2377,9 @@ class Backend:
 
         # Value-optionals: empty is !has_value.
         c_src = self.emitter.emit_type(src_ty)
-        return self.emitter.emit_unwrap_opt(c_src, c_inner, format_type(src_ty))
+        tmp = self.emitter.fresh_tmp("unwrap")
+        self.emitter.emit_temp_decl(c_src, tmp, c_inner)
+        return self.emitter.emit_unwrap_opt(c_src, tmp, format_type(src_ty))
 
     def _emit_binary_op(self, expr_node: Expr, expr_op: str, expr_left: Expr, expr_right: Expr) -> str:
         # Special-case: nullable wrapper compared with null
