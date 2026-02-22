@@ -241,7 +241,7 @@ func ps_match_string(self: ParserState*) -> bool {
 func ps_expect(self: ParserState*, kind_ord: int, code: string, msg: string) -> Token? {
     if (!ps_check(self, kind_ord)) {
         let got = token_to_string(ps_peek(self));
-        ps_set_error(self, code, concat3_s(msg, ", got ", concat_s(got, " instead")), ps_peek(self));
+        ps_set_error(self, code, concat4_s(msg, ", got ", got, " instead"), ps_peek(self));
         return null;
     }
     return ps_advance(self);
@@ -250,7 +250,7 @@ func ps_expect(self: ParserState*, kind_ord: int, code: string, msg: string) -> 
 func ps_expect_ident(self: ParserState*, code: string, msg: string) -> Token? {
     if (!ps_check_ident(self)) {
         let got = token_to_string(ps_peek(self));
-        ps_set_error(self, code, concat3_s(msg, ", got ", concat_s(got, " instead")), ps_peek(self));
+        ps_set_error(self, code, concat4_s(msg, ", got ", got, " instead"), ps_peek(self));
         return null;
     }
     return ps_advance(self);

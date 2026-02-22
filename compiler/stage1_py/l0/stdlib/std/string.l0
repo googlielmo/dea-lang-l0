@@ -16,6 +16,10 @@ import sys.rt;
 
 import std.assert;
 
+/* -------------------------------------
+   Basic string operations
+   ------------------------------------ */
+
 // Returns the length of the given string.
 func len_s(s: string) -> int {
     return rt_strlen(s);
@@ -95,4 +99,134 @@ func ends_with_s(s: string, suffix: string) -> bool {
         return false;
     }
     return find_from_s(s, suffix, s_len - suffix_len) == s_len - suffix_len;
+}
+
+/* -------------------------------------
+   Character classification
+   ------------------------------------ */
+
+func is_space(c: byte) -> bool {
+    return c == ' ' || c == '\n' || c == '\t' || c == '\r';
+}
+
+func is_digit(c: byte) -> bool {
+    return c >= '0' && c <= '9';
+}
+
+func is_alpha(c: byte) -> bool {
+    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
+}
+
+func is_alnum(c: byte) -> bool {
+    return is_alpha(c) || is_digit(c);
+}
+
+/* -------------------------------------
+   Character manipulation
+   ------------------------------------ */
+
+func to_digit(c: byte) -> int {
+    return c - '0';
+}
+
+func to_upper(c: byte) -> byte {
+    if (c >= 'a' && c <= 'z') {
+        return (c - ('a' - 'A')) as byte;
+    }
+    return c;
+}
+
+func to_lower(c: byte) -> byte {
+    if (c >= 'A' && c <= 'Z') {
+        return (c + ('a' - 'A')) as byte;
+    }
+    return c;
+}
+
+/* -------------------------------------
+   String manipulation and conversion
+   ------------------------------------ */
+
+/*
+ * trim_s removes leading and trailing whitespace from the input string.
+ */
+func trim_s(s: string) -> string {
+    let start: int = 0;
+    let end: int = len_s(s) - 1;
+    while (start <= end && is_space(char_at_s(s, start))) {
+        start = start + 1;
+    }
+    while (end >= start && is_space(char_at_s(s, end))) {
+        end = end - 1;
+    }
+    if (start > end) {
+        return "";
+    }
+    return slice_s(s, start, end + 1);
+}
+
+/*
+ * string_to_int converts a numeric string to an integer.
+ * Handles optional leading '-' for negative numbers and ignores leading zeros.
+ * Checks for overflow and invalid characters.
+ * Returns null if the string is not a valid 32-bit signed integer.
+ */
+func string_to_int(s: string) -> int? {
+    let sign = 1; // 1 for positive, -1 for negative
+    let start_index: int = 0;
+    if (len_s(s) == 0) {
+        return null;
+    }
+    if (char_at_s(s, 0) == '-') {
+        if (len_s(s) == 1) {
+            return null; // Just a '-' is not valid
+        }
+        sign = -1;
+        start_index = 1;
+    }
+    // Ignore leading zeros
+    while (start_index < len_s(s) && char_at_s(s, start_index) == '0') {
+        start_index = start_index + 1;
+    }
+    if (start_index == len_s(s)) {
+        return 0; // The string is "0" or all zeros
+    }
+    // Check length to prevent overflow
+    if (len_s(s) - start_index > 10) { // More than 10 digits is automatic overflow
+        return null; // Overflow
+    }
+    let result: int = 0;
+    // read first digit
+    let first_char = char_at_s(s, start_index);
+    if (!is_digit(first_char)) {
+        return null; // Invalid character
+    }
+    result = sign * to_digit(first_char);
+    start_index = start_index + 1;
+    for (let i: int = start_index; i < len_s(s); i = i + 1) {
+        let c = char_at_s(s, i);
+        if (!is_digit(c)) {
+            return null; // Invalid character
+        }
+        let digit = to_digit(c);
+        // Check for overflow before multiplying and adding
+        if (sign < 0) {
+            if (result < (-2147483648 + digit) / 10) {
+                return null; // Underflow
+            }
+        } else {
+            if (result > (2147483647 - digit) / 10) {
+                return null; // Overflow
+            }
+        }
+        result = result * 10 + sign * digit;
+    }
+    return result;
+}
+
+func digit_to_char(d: int) -> byte {
+    if (d < 10) {
+        return ('0' + d) as byte;
+    }
+    return ('a' + d - 10) as byte;
 }

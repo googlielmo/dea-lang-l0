@@ -15,6 +15,14 @@ import util.hashmap;
 import util.hashset;
 import util.vector;
 
+func make_key(prefix: string, i: int) -> string {
+    with (let sb = sb_create() => sb_free(sb)) {
+        sb_append(sb, prefix);
+        sb_append_int(sb, i);
+        return sb_to_string(sb);
+    }
+}
+
 /* ========================================
    StringPtrMap tests
    ======================================== */
@@ -156,7 +164,7 @@ func test_spm_grow() {
 
     /* Insert enough entries to trigger rehash (>75% of 16 = >12) */
     for (let i: int = 0; i < 20; i = i + 1) {
-        let key = concat_s("key_", int_to_string(i));
+        let key = make_key("key_", i);
         let v = new int;
         *v = i * 10;
         spm_put(m, key, v as void*);
@@ -170,7 +178,7 @@ func test_spm_grow() {
 
     /* Verify all entries survive rehash */
     for (let i: int = 0; i < 20; i = i + 1) {
-        let key = concat_s("key_", int_to_string(i));
+        let key = make_key("key_", i);
         assert(spm_has(m, key), "key should survive rehash");
         let r = spm_get(m, key) as int*;
         assert(*r == i * 10, "value should survive rehash");
@@ -308,7 +316,7 @@ func test_sim_grow() -> Unit? {
     let m = sim_create();
 
     for (let i: int = 0; i < 50; i = i + 1) {
-        let key = concat_s("item_", int_to_string(i));
+        let key = make_key("item_", i);
         sim_put(m, key, i * 100);
     }
 
@@ -316,7 +324,7 @@ func test_sim_grow() -> Unit? {
     printl_si("  capacity after 50 inserts:", sim_capacity(m));
 
     for (let i: int = 0; i < 50; i = i + 1) {
-        let key = concat_s("item_", int_to_string(i));
+        let key = make_key("item_", i);
         let val = sim_get(m, key)?;
         assert(val == i * 100, "value should survive rehash");
     }
@@ -387,7 +395,7 @@ func test_ss_grow() {
     let s = ss_create();
 
     for (let i: int = 0; i < 30; i = i + 1) {
-        let key = concat_s("elem_", int_to_string(i));
+        let key = make_key("elem_", i);
         ss_add(s, key);
     }
 
@@ -395,7 +403,7 @@ func test_ss_grow() {
     printl_si("  capacity after 30 adds:", ss_capacity(s));
 
     for (let i: int = 0; i < 30; i = i + 1) {
-        let key = concat_s("elem_", int_to_string(i));
+        let key = make_key("elem_", i);
         assert(ss_has(s, key), "element should survive rehash");
     }
 
@@ -433,21 +441,21 @@ func test_stress() -> Unit? {
 
     /* Insert 200 entries */
     for (let i: int = 0; i < 200; i = i + 1) {
-        let key = concat_s("stress_", int_to_string(i));
+        let key = make_key("stress_", i);
         sim_put(m, key, i);
     }
     assert(sim_size(m) == 200, "size should be 200");
 
     /* Remove even-numbered entries */
     for (let i: int = 0; i < 200; i = i + 2) {
-        let key = concat_s("stress_", int_to_string(i));
+        let key = make_key("stress_", i);
         sim_remove(m, key);
     }
     assert(sim_size(m) == 100, "size should be 100 after removing evens");
 
     /* Verify odd entries remain */
     for (let i: int = 1; i < 200; i = i + 2) {
-        let key = concat_s("stress_", int_to_string(i));
+        let key = make_key("stress_", i);
         assert(sim_has(m, key), "odd key should remain");
         let val = sim_get(m, key)?;
         assert(val == i, "odd value should match");
@@ -455,20 +463,20 @@ func test_stress() -> Unit? {
 
     /* Verify even entries are gone */
     for (let i: int = 0; i < 200; i = i + 2) {
-        let key = concat_s("stress_", int_to_string(i));
+        let key = make_key("stress_", i);
         assert(!sim_has(m, key), "even key should be removed");
     }
 
     /* Re-insert even entries with new values */
     for (let i: int = 0; i < 200; i = i + 2) {
-        let key = concat_s("stress_", int_to_string(i));
+        let key = make_key("stress_", i);
         sim_put(m, key, i + 1000);
     }
     assert(sim_size(m) == 200, "size should be 200 after re-insert");
 
     /* Verify all entries */
     for (let i: int = 0; i < 200; i = i + 1) {
-        let key = concat_s("stress_", int_to_string(i));
+        let key = make_key("stress_", i);
         let val = sim_get(m, key)?;
         if (i % 2 == 1) {
             assert(val == i, "odd value should be original");

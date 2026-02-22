@@ -10,13 +10,14 @@ import std.string;
 import std.assert;
 
 import parser;
+import util.text;
 
 func expect_error_code(source: string, expected: string) {
     let result = parse_module_source(source, "<test>");
 
     match (result.error) {
         ParseNoError => {
-            assert(false, concat_s(concat_s("Expected parse error ", expected), " but parse succeeded"));
+            assert(false, concat3_s("Expected parse error ", expected, " but parse succeeded"));
         }
         ParseHasError(err) => {
             if (!eq_s(err.code, expected)) {

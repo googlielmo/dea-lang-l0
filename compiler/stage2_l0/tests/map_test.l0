@@ -8,6 +8,7 @@ module map_test;
 import std.io;
 import std.string;
 import util.linear_map;
+import util.text;
 
 func print_bool(label: string, val: bool) {
     if (val) {
@@ -74,7 +75,7 @@ func test_lmss() {
     for (let i = 0; i < lmss_len(m); i = i + 1) {
         let k = lmss_key_at(m, i);
         let v = lmss_value_at(m, i);
-        printl_s(concat_s(concat_s("  ", k), concat_s(" => ", v)));
+        printl_s(concat4_s("  ", k, " => ", v));
     }
 
     // Test remove
@@ -92,7 +93,7 @@ func test_lmss() {
     for (let i = 0; i < lmss_len(m); i = i + 1) {
         let k = lmss_key_at(m, i);
         let v = lmss_value_at(m, i);
-        printl_s(concat_s(concat_s("  ", k), concat_s(" => ", v)));
+        printl_s(concat4_s("  ", k, " => ", v));
     }
 
     // Free

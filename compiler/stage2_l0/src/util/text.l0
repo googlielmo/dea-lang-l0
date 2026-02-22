@@ -12,48 +12,6 @@ import std.assert;
 import util.vector;
 
 /* -------------------------------------
-   Character classification functions
-   ------------------------------------ */
-
-func is_space(c: byte) -> bool {
-    return c == ' ' || c == '\n' || c == '\t' || c == '\r';
-}
-
-func is_digit(c: byte) -> bool {
-    return c >= '0' && c <= '9';
-}
-
-func is_alpha(c: byte) -> bool {
-    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
-}
-
-func is_alnum(c: byte) -> bool {
-    return is_alpha(c) || is_digit(c);
-}
-
-/* -------------------------------------
-   Character manipulation functions
-   ------------------------------------ */
-
-func to_digit(c: byte) -> int {
-    return c - '0';
-}
-
-func to_upper(c: byte) -> byte {
-    if (c >= 'a' && c <= 'z') {
-        return (c - ('a' - 'A')) as byte;
-    }
-    return c;
-}
-
-func to_lower(c: byte) -> byte {
-    if (c >= 'A' && c <= 'Z') {
-        return (c + ('a' - 'A')) as byte;
-    }
-    return c;
-}
-
-/* -------------------------------------
    StringBuffer for efficient string building
    ------------------------------------ */
 
@@ -71,6 +29,14 @@ func sb_create() -> StringBuffer* {
 func sb_append(self: StringBuffer*, s: string) {
     vs_push(self.parts, s);
     self.size = self.size + len_s(s);
+}
+
+func sb_append_int(self: StringBuffer*, value: int) {
+    sb_append(self, int_to_string(value));
+}
+
+func sb_append_byte(self: StringBuffer*, b: byte){
+    sb_append(self, byte_to_s(b));
 }
 
 func sb_to_string(self: StringBuffer*) -> string {
@@ -130,6 +96,17 @@ func cb_append_s(self: CharBuffer*, s: string) {
     }
 }
 
+func cb_append_slice(self: CharBuffer*, s: string, start: int, length: int) {
+    for (let i: int = 0; i < length; i = i + 1) {
+        let c = char_at_s(s, start + i);
+        cb_append(self, c);
+    }
+}
+
+func cb_append_int(self: CharBuffer*, value: int) {
+    cb_append_s(self, int_to_string(value));
+}
+
 func cb_reverse(cb: CharBuffer*) {
     let size = cb_size(cb);
     for (let i: int = 0; i < size / 2; i = i + 1) {
@@ -164,123 +141,73 @@ func cb_free(self: CharBuffer*) {
  * concat3_s concatenates three strings and returns the result.
  */
 func concat3_s(a: string, b: string, c: string) -> string {
-    return concat_s(concat_s(a, b), c);
-}
-
-/*
- * repeat_s returns a new string that is the input string `s` repeated `count` times.
- */
-func repeat_s(s: string, count: int) -> string {
-    let result: string = "";
-    for (let i: int = 0; i < count; i = i + 1) {
-        result = concat_s(result, s);
-    }
-    return result;
-}
-
-/*
- * trim_s removes leading and trailing whitespace from the input string.
- */
-func trim_s(s: string) -> string {
-    let start: int = 0;
-    let end: int = len_s(s) - 1;
-    while (start <= end && is_space(char_at_s(s, start))) {
-        start = start + 1;
-    }
-    while (end >= start && is_space(char_at_s(s, end))) {
-        end = end - 1;
-    }
-    if (start > end) {
+    let total_len = len_s(a) + len_s(b) + len_s(c);
+    if (total_len == 0) {
         return "";
     }
-    return slice_s(s, start, end + 1);
+    with (let cb = cb_create() => cb_free(cb)) {
+        cb_reserve(cb, total_len);
+        cb_append_s(cb, a);
+        cb_append_s(cb, b);
+        cb_append_s(cb, c);
+        return cb_to_string(cb);
+    }
+}
+
+/*
+ * concat4_s concatenates four strings and returns the result.
+ */
+func concat4_s(a: string, b: string, c: string, d: string) -> string {
+    let total_len = len_s(a) + len_s(b) + len_s(c) + len_s(d);
+    if (total_len == 0) {
+        return "";
+    }
+    with (let cb = cb_create() => cb_free(cb)) {
+        cb_reserve(cb, total_len);
+        cb_append_s(cb, a);
+        cb_append_s(cb, b);
+        cb_append_s(cb, c);
+        cb_append_s(cb, d);
+        return cb_to_string(cb);
+    }
 }
 
 /*
  * to_upper_s converts all characters in the input string to uppercase.
  */
 func to_upper_s(s: string) -> string {
-    let result: StringBuffer* = sb_create();
-    for (let i: int = 0; i < len_s(s); i = i + 1) {
-        let c = char_at_s(s, i);
-        sb_append(result, byte_to_s(to_upper(c)));
+    with (let cb = cb_create() => cb_free(cb)) {
+        for (let i: int = 0; i < len_s(s); i = i + 1) {
+            let c = char_at_s(s, i);
+            cb_append(cb, to_upper(c));
+        }
+        return cb_to_string(cb);
     }
-    let upper_str = sb_to_string(result);
-    sb_free(result);
-    return upper_str;
 }
 
 /*
  * to_lower_s converts all characters in the input string to lowercase.
  */
 func to_lower_s(s: string) -> string {
-    let result: StringBuffer* = sb_create();
-    for (let i: int = 0; i < len_s(s); i = i + 1) {
-        let c = char_at_s(s, i);
-        sb_append(result, byte_to_s(to_lower(c)));
+    with (let cb = cb_create() => cb_free(cb)) {
+        for (let i: int = 0; i < len_s(s); i = i + 1) {
+            let c = char_at_s(s, i);
+            cb_append(cb, to_lower(c));
+        }
+        return cb_to_string(cb);
     }
-    let lower_str = sb_to_string(result);
-    sb_free(result);
-    return lower_str;
 }
 
 /*
- * string_to_int converts a numeric string to an integer.
- * Handles optional leading '-' for negative numbers and ignores leading zeros.
- * Checks for overflow and invalid characters.
- * Returns null if the string is not a valid 32-bit signed integer.
+ * repeat_s returns a new string that is the input string `s` repeated `count` times.
  */
-func string_to_int(s: string) -> int? {
-    let sign = 1; // 1 for positive, -1 for negative
-    let start_index: int = 0;
-    if (len_s(s) == 0) {
-        return null;
-    }
-    if (char_at_s(s, 0) == '-') {
-        if (len_s(s) == 1) {
-            return null; // Just a '-' is not valid
+func repeat_s(s: string, count: int) -> string {
+    with (let cb = cb_create() => cb_free(cb)) {
+        for (let i: int = 0; i < count; i = i + 1) {
+            cb_append_s(cb, s);
         }
-        sign = -1;
-        start_index = 1;
+        return cb_to_string(cb);
     }
-    // Ignore leading zeros
-    while (start_index < len_s(s) && char_at_s(s, start_index) == '0') {
-        start_index = start_index + 1;
-    }
-    if (start_index == len_s(s)) {
-        return 0; // The string is "0" or all zeros
-    }
-    // Check length to prevent overflow
-    if (len_s(s) - start_index > 10) { // More than 10 digits is automatic overflow
-        return null; // Overflow
-    }
-    let result: int = 0;
-    // read first digit
-    let first_char = char_at_s(s, start_index);
-    if (!is_digit(first_char)) {
-        return null; // Invalid character
-    }
-    result = sign * to_digit(first_char);
-    start_index = start_index + 1;
-    for (let i: int = start_index; i < len_s(s); i = i + 1) {
-        let c = char_at_s(s, i);
-        if (!is_digit(c)) {
-            return null; // Invalid character
-        }
-        let digit = to_digit(c);
-        // Check for overflow before multiplying and adding
-        if (sign < 0) {
-            if (result < (-2147483648 + digit) / 10) {
-                return null; // Underflow
-            }
-        } else {
-            if (result > (2147483647 - digit) / 10) {
-                return null; // Overflow
-            }
-        }
-        result = result * 10 + sign * digit;
-    }
-    return result;
 }
 
 func int_to_string_base(value: int, base: int) -> string {
@@ -317,11 +244,12 @@ func int_to_string_base(value: int, base: int) -> string {
     return result;
 }
 
-func digit_to_char(d: int) -> byte {
-    if (d < 10) {
-        return ('0' + d) as byte;
+func reverse_s(s: string) -> string {
+    with (let cb = cb_create() => cb_free(cb)) {
+        cb_append_s(cb, s);
+        cb_reverse(cb);
+        return cb_to_string(cb);
     }
-    return ('a' + d - 10) as byte;
 }
 
 func int_to_string(value: int) -> string {

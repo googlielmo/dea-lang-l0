@@ -458,8 +458,12 @@ func ls_read_valid_char_escape(self: LexerState*, single_byte: bool) -> EscapedC
             if (hex_digits != required_digits) {
                 let error_code = "LEX-0051"; // u
                 if (c == 'U') error_code = "LEX-0052"; // U
-                self.error = Error(error_code, concat3_s("invalid Unicode escape sequence, expected ",
-                                               int_to_string(required_digits), " hex digits"));
+                with (let sb = sb_create() => sb_free(sb)) {
+                    sb_append(sb, "invalid Unicode escape sequence, expected ");
+                    sb_append_int(sb, required_digits);
+                    sb_append(sb, " hex digits");
+                    self.error = Error(error_code, sb_to_string(sb));
+                }
                 return null;
             }
             if (char_value > 1114111) { // 0x10FFFF
