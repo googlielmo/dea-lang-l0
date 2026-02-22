@@ -192,7 +192,23 @@ def _get_module_names(args, cu) -> List[str]:
 
 
 def _find_cc() -> Optional[str]:
-    """Find the best available C compiler."""
+    """
+    Find the best available C compiler (to use in codegen and build stages
+    if the user didn't specify one explicitly with --c-compiler/-c).
+
+    The search order is:
+    1. L0_CC environment variable
+    2. Common compiler names in PATH in this order: tcc, gcc, clang, cc
+    3. CC environment variable (this step is meant for using a local
+       system C compiler in unusual environments that may or may not be
+       supported by L0; users of such environments may also choose to set
+       L0_CC directly to avoid any ambiguity)
+
+    Returns the compiler command if found, or None if no compiler is found.
+    """
+    from_env = os.environ.get("L0_CC")
+    if from_env:
+        return from_env
     for candidate in ("tcc", "gcc", "clang", "cc"):
         if shutil.which(candidate):
             return candidate
@@ -767,7 +783,8 @@ def _add_runtime_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--c-compiler", "-c",
         help=(
-            "C compiler to use (default: tcc, gcc, clang, cc from PATH, or $CC environment variable, in that order;"
+            "C compiler to use (default: $L0_CC has highest precedence if set;"
+            " then tcc, gcc, clang, cc from PATH, or $CC, in that order;"
             " valid in: --build, --run)"
         ),
     )
@@ -955,10 +972,10 @@ def _rewrite_legacy_run_argv(argv: Sequence[str], command_index: int) -> List[st
         if target_index + 1 >= len(tail):
             return rewritten
         return (
-            rewritten[:command_index + 1]
-            + tail[:target_index + 1]
-            + ["--"]
-            + tail[target_index + 1:]
+                rewritten[:command_index + 1]
+                + tail[:target_index + 1]
+                + ["--"]
+                + tail[target_index + 1:]
         )
 
     return rewritten
@@ -1027,7 +1044,8 @@ def main(argv=None) -> None:
     )
 
     mode_group = parser.add_mutually_exclusive_group()
-    mode_group.add_argument("--run", "-r", action="store_const", const="run", dest="mode", help="Build and run a module")
+    mode_group.add_argument("--run", "-r", action="store_const", const="run", dest="mode",
+                            help="Build and run a module")
     mode_group.add_argument("--build", action="store_const", const="build", dest="mode",
                             help="Build an executable (default mode)")
     mode_group.add_argument("--gen", "-g", "--codegen", action="store_const", const="gen", dest="mode",
@@ -1059,7 +1077,8 @@ def main(argv=None) -> None:
         help="Keep generated C file (valid in: --build, --run; run writes ./a.c by default, or <output>.c with -o)",
     )
     _add_all_modules_arg(parser)
-    parser.add_argument("--include-eof", action="store_true", help="Include the EOF token in tok output (valid in: --tok)")
+    parser.add_argument("--include-eof", action="store_true",
+                        help="Include the EOF token in tok output (valid in: --tok)")
     _add_target_args(parser)
 
     raw_argv = list(argv) if argv is not None else sys.argv[1:]

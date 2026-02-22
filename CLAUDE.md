@@ -51,7 +51,8 @@ All commands run from the repository root:
 
 Verbosity: `-v` (info), `-vvv` (debug).
 
-C compiler selection: `-c <compiler>`. Auto-detection order: tcc, gcc, clang, cc from PATH, then `$CC`.
+C compiler selection: `-c <compiler>`. Auto-detection order (used by `l0c` and Stage 1 tests): `$L0_CC`, then
+`tcc`, `gcc`, `clang`, `cc` from PATH, then `$CC`.
 
 Trace toggles (codegen/build/run): `--trace-arc`, `--trace-memory`.
 
@@ -77,8 +78,8 @@ all Stage 2 tests.
 When adding or moving tests, follow `compiler/stage1_py/tests/README.md` for placement and naming rules.
 
 Requires pytest >= 9.0.2, pytest-xdist >= 3.5, and a C compiler.
-TCC is used by default if present (fastest); Clang and GCC are also searched in the current $PATH if `tcc` is not
-available. Override with `./l0c --build -c <compiler>`.
+Compiler auto-detection matches the command section above (`$L0_CC`, then `tcc|gcc|clang|cc` from PATH, then `$CC`).
+Override with `./l0c --build -c <compiler>`.
 
 ## Important Constraints
 

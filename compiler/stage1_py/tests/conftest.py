@@ -19,14 +19,17 @@ import shutil
 
 
 def _find_cc() -> str:
-    """Find the best available C compiler for testing: CC env var, then tcc, cc, gcc, clang."""
+    """Find the best available C compiler for testing."""
+    from_env = os.environ.get("L0_CC")
+    if from_env:
+        return from_env
+    for candidate in ("tcc", "gcc", "clang", "cc"):
+        if shutil.which(candidate):
+            return candidate
     from_env = os.environ.get("CC")
     if from_env:
         return from_env
-    for candidate in ("tcc", "cc", "gcc", "clang"):
-        if shutil.which(candidate):
-            return candidate
-    return "gcc"
+    raise RuntimeError("No C compiler found. Please set L0_CC or CC environment variable.")
 
 
 @pytest.fixture

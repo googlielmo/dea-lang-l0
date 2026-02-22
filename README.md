@@ -138,6 +138,9 @@ If you prefer manual setup or want to override values, use:
    # Optional: override system and runtime include paths (defaults are relative to L0_HOME)
    export L0_SYSTEM=/path/to/l0/compiler/stage1_py/l0/stdlib
    export L0_RUNTIME_INCLUDE=/path/to/l0/compiler/stage1_py/runtime
+
+   # Optional: force a specific C compiler for build/run and compiler tests
+   export L0_CC=/usr/bin/clang
    ```
 
 If not set, defaults are relative to the repository root:
@@ -145,6 +148,7 @@ If not set, defaults are relative to the repository root:
 - `L0_HOME` → `compiler/stage1_py`
 - `L0_SYSTEM` → `$L0_HOME/l0/stdlib`
 - `L0_RUNTIME_INCLUDE` → `$L0_HOME/runtime`
+- `L0_CC` → unset (compiler auto-detection order: `L0_CC`, `tcc`, `gcc`, `clang`, `cc`, then `CC`)
 
 #### 3. Verify installation:
 
@@ -329,9 +333,9 @@ options:
                         it only for kept C filename with --keep-c and warns
                         otherwise)
   --c-compiler, -c C_COMPILER
-                        C compiler to use (default: tcc, gcc, clang, cc from
-                        PATH, or $CC environment variable, in that order;
-                        valid in: --build, --run)
+                        C compiler to use (default: $L0_CC has highest
+                        precedence if set; then tcc, gcc, clang, cc from PATH,
+                        or $CC, in that order; valid in: --build, --run)
   --c-options, -C C_OPTIONS
                         Extra options to pass to the C compiler (e.g. -C="-O2
                         -DDEBUG"; valid in: --build, --run)
