@@ -1,6 +1,6 @@
 # L0 Project Status
 
-Version: 2026-02-14
+Version: 2026-02-22
 
 This document summarizes what is implemented in this repository today and what remains open.
 
@@ -141,11 +141,11 @@ Current implemented assets:
     - `src/main.l0`
 - Utility modules:
     - `src/util/array.l0`
-    - `src/util/vector.l0`
+    - `src/util/vector.l0` (includes `vi_sort` for int vectors and `vs_sort` for string vectors)
     - `src/util/linear_map.l0`
     - `src/util/text.l0`
 - Test suite under `compiler/stage2_l0/tests` and test runner `run_tests.sh`.
-- Current Stage 2 test runner status: `8/8` tests passing.
+- Current Stage 2 test runner status: `9/9` tests passing.
 
 Stage 2 parser status:
 

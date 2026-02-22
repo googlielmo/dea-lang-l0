@@ -5,6 +5,7 @@
 
 module vector_string_test;
 
+import std.assert;
 import std.io;
 import std.string;
 import util.vector;
@@ -140,6 +141,52 @@ func test_single_element() {
     printl_s("Single element test passed!\n");
 }
 
+func test_vs_sort() {
+    printl_s("=== Test vs_sort ===");
+
+    let empty = vs_create(1);
+    vs_sort(empty);
+    assert(vs_size(empty) == 0, "vs_sort: empty vector size should remain 0");
+    vs_free(empty);
+
+    let single = vs_create(1);
+    vs_push(single, "only");
+    vs_sort(single);
+    assert(vs_size(single) == 1, "vs_sort: single vector size should remain 1");
+    assert(eq_s(vs_get(single, 0), "only"), "vs_sort: single value should remain unchanged");
+    vs_free(single);
+
+    let vs = vs_create(8);
+    vs_push(vs, "b");
+    vs_push(vs, "ab");
+    vs_push(vs, "a");
+    vs_push(vs, "aa");
+    vs_push(vs, "ab");
+    vs_push(vs, "");
+    vs_sort(vs);
+
+    assert(vs_size(vs) == 6, "vs_sort: size should remain unchanged");
+    assert(eq_s(vs_get(vs, 0), ""), "vs_sort: index 0 mismatch");
+    assert(eq_s(vs_get(vs, 1), "a"), "vs_sort: index 1 mismatch");
+    assert(eq_s(vs_get(vs, 2), "aa"), "vs_sort: index 2 mismatch");
+    assert(eq_s(vs_get(vs, 3), "ab"), "vs_sort: index 3 mismatch");
+    assert(eq_s(vs_get(vs, 4), "ab"), "vs_sort: index 4 mismatch");
+    assert(eq_s(vs_get(vs, 5), "b"), "vs_sort: index 5 mismatch");
+    vs_free(vs);
+
+    let sorted = vs_create(4);
+    vs_push(sorted, "alpha");
+    vs_push(sorted, "beta");
+    vs_push(sorted, "gamma");
+    vs_sort(sorted);
+    assert(eq_s(vs_get(sorted, 0), "alpha"), "vs_sort: sorted index 0 mismatch");
+    assert(eq_s(vs_get(sorted, 1), "beta"), "vs_sort: sorted index 1 mismatch");
+    assert(eq_s(vs_get(sorted, 2), "gamma"), "vs_sort: sorted index 2 mismatch");
+    vs_free(sorted);
+
+    printl_s("vs_sort tests passed!\n");
+}
+
 func main() {
     printl_s("==========================================");
     printl_s("       VectorString Test Suite");
@@ -149,6 +196,7 @@ func main() {
     test_empty_vector();
     test_multiple_resizes();
     test_single_element();
+    test_vs_sort();
 
     printl_s("==========================================");
     printl_s("   All VectorString tests passed!");

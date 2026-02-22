@@ -121,6 +121,33 @@ func vec_push_ptr(self: VectorBase*, val: void*) {
     *dest = val;
 }
 
+// Insertion sort on VectorBase with int elements (ascending).
+func vi_sort(self: VectorBase*) {
+    assert(self.arr.element_size == sizeof(int), "Element size mismatch in vi_sort");
+    let n = vec_size(self);
+    if (n <= 1) {
+        return;
+    }
+
+    for (let i = 1; i < n; i = i + 1) {
+        let key = *(vec_get(self, i) as int*);
+        let j = i - 1;
+
+        while (j >= 0) {
+            let cur_ptr = vec_get(self, j) as int*;
+            if (!(key < *cur_ptr)) {
+                break;
+            }
+            let dst_ptr = vec_get(self, j + 1) as int*;
+            *dst_ptr = *cur_ptr;
+            j = j - 1;
+        }
+
+        let ins_ptr = vec_get(self, j + 1) as int*;
+        *ins_ptr = key;
+    }
+}
+
 /* ------------------------------------
    String Vector specialization
    ------------------------------------ */
@@ -147,6 +174,58 @@ func vs_size(self: VectorString*) -> int {
 
 func vs_capacity(self: VectorString*) -> int {
     return vec_capacity(self);
+}
+
+func _vs_less(a: string, b: string) -> bool {
+    if (eq_s(a, b)) {
+        return false;
+    }
+
+    let a_len = len_s(a);
+    let b_len = len_s(b);
+    let limit = a_len;
+    if (b_len < limit) {
+        limit = b_len;
+    }
+
+    for (let i = 0; i < limit; i = i + 1) {
+        let ac = char_at_s(a, i);
+        let bc = char_at_s(b, i);
+        if (ac < bc) {
+            return true;
+        }
+        if (ac > bc) {
+            return false;
+        }
+    }
+
+    return a_len < b_len;
+}
+
+// Insertion sort on VectorString (lexicographic, ascending).
+func vs_sort(self: VectorString*) {
+    let n = vec_size(self);
+    if (n <= 1) {
+        return;
+    }
+
+    for (let i = 1; i < n; i = i + 1) {
+        let key = vs_get(self, i);
+        let j = i - 1;
+
+        while (j >= 0) {
+            let cur = vs_get(self, j);
+            if (!_vs_less(key, cur)) {
+                break;
+            }
+            let dst_ptr = vec_get(self, j + 1) as string*;
+            *dst_ptr = cur;
+            j = j - 1;
+        }
+
+        let ins_ptr = vec_get(self, j + 1) as string*;
+        *ins_ptr = key;
+    }
 }
 
 func vs_clear(self: VectorString*) {

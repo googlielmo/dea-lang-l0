@@ -151,4 +151,4 @@ Completed:
 1. `compiler/stage2_l0/src/ast.l0` implemented with hybrid storage model.
 2. `compiler/stage2_l0/src/parser.l0` implemented with Stage 1 style parsing behavior and diagnostics for covered paths.
 3. `compiler/stage2_l0/tests/parser_test.l0` added and expanded.
-4. Stage 2 test runner currently passing (`8/8`).
+4. Stage 2 test runner currently passing (`9/9`).

@@ -5,6 +5,7 @@
 
 module vector_test;
 
+import std.assert;
 import std.io;
 import std.string;
 import util.vector;
@@ -270,6 +271,56 @@ func test_many_elements() {
     printl_s("Many elements test passed!\n");
 }
 
+func test_vi_sort() {
+    printl_s("=== Test vi_sort ===");
+
+    let empty = vec_create(sizeof(int), 1);
+    vi_sort(empty);
+    assert(vec_size(empty) == 0, "vi_sort: empty vector size should remain 0");
+    vec_free(empty);
+
+    let single = vec_create(sizeof(int), 1);
+    vec_push_int(single, 42);
+    vi_sort(single);
+    assert(vec_size(single) == 1, "vi_sort: single vector size should remain 1");
+    assert(*(vec_get(single, 0) as int*) == 42, "vi_sort: single value should remain unchanged");
+    vec_free(single);
+
+    let vec = vec_create(sizeof(int), 8);
+    vec_push_int(vec, 7);
+    vec_push_int(vec, -2);
+    vec_push_int(vec, 0);
+    vec_push_int(vec, 7);
+    vec_push_int(vec, 11);
+    vec_push_int(vec, -5);
+    vec_push_int(vec, 3);
+    vi_sort(vec);
+
+    assert(vec_size(vec) == 7, "vi_sort: size should remain unchanged");
+    assert(*(vec_get(vec, 0) as int*) == -5, "vi_sort: index 0 mismatch");
+    assert(*(vec_get(vec, 1) as int*) == -2, "vi_sort: index 1 mismatch");
+    assert(*(vec_get(vec, 2) as int*) == 0, "vi_sort: index 2 mismatch");
+    assert(*(vec_get(vec, 3) as int*) == 3, "vi_sort: index 3 mismatch");
+    assert(*(vec_get(vec, 4) as int*) == 7, "vi_sort: index 4 mismatch");
+    assert(*(vec_get(vec, 5) as int*) == 7, "vi_sort: index 5 mismatch");
+    assert(*(vec_get(vec, 6) as int*) == 11, "vi_sort: index 6 mismatch");
+    vec_free(vec);
+
+    let sorted = vec_create(sizeof(int), 4);
+    vec_push_int(sorted, 1);
+    vec_push_int(sorted, 2);
+    vec_push_int(sorted, 3);
+    vec_push_int(sorted, 4);
+    vi_sort(sorted);
+    assert(*(vec_get(sorted, 0) as int*) == 1, "vi_sort: sorted index 0 mismatch");
+    assert(*(vec_get(sorted, 1) as int*) == 2, "vi_sort: sorted index 1 mismatch");
+    assert(*(vec_get(sorted, 2) as int*) == 3, "vi_sort: sorted index 2 mismatch");
+    assert(*(vec_get(sorted, 3) as int*) == 4, "vi_sort: sorted index 3 mismatch");
+    vec_free(sorted);
+
+    printl_s("vi_sort tests passed!\n");
+}
+
 func main() {
     printl_s("======================================");
     printl_s("       VectorBase Test Suite");
@@ -285,6 +336,7 @@ func main() {
     test_vec_zap();
     test_vec_clear();
     test_many_elements();
+    test_vi_sort();
 
     printl_s("======================================");
     printl_s("   All VectorBase tests passed!");
