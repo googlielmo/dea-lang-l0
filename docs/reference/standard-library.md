@@ -196,7 +196,7 @@ Low-level raw memory FFI. Misuse can cause undefined behavior.
 
 All `extern func` symbols exposed to L0 from stdlib modules are listed here.
 
-### Declared in `sys.rt` (31)
+### Declared in `sys.rt` (34)
 
 | Function                    | Signature                                     |
 |-----------------------------|-----------------------------------------------|
@@ -231,6 +231,9 @@ All `extern func` symbols exposed to L0 from stdlib modules are listed here.
 | `rt_get_env_var`            | `(name: string) -> string?`                   |
 | `rt_get_argc`               | `() -> int`                                   |
 | `rt_get_argv`               | `(i: int) -> string`                          |
+| `rt_system`                 | `(cmd: string) -> int`                        |
+| `rt_file_exists`            | `(path: string) -> bool`                      |
+| `rt_delete_file`            | `(path: string) -> bool`                      |
 
 ### Declared in `sys.unsafe` (8)
 

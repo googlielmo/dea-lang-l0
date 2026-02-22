@@ -101,3 +101,12 @@ extern func rt_get_argc() -> int;
 
 // Get the command-line argument at the given index
 extern func rt_get_argv(i: int) -> string;
+
+// Execute a system command and return its exit code
+extern func rt_system(cmd: string) -> int;
+
+// Check if a file exists at the given path
+extern func rt_file_exists(path: string) -> bool;
+
+// Delete the file at the given path, returning true on success
+extern func rt_delete_file(path: string) -> bool;

@@ -145,7 +145,7 @@ static l0_string L0_STRING_EMPTY = { 0, { .s_str = { 0, NULL } } };
 #define L0_STRING_CONST(str_data, str_len) { .kind = L0_STRING_K_STATIC, .data.s_str = { .len = (str_len), .bytes = (str_data) } }
 
 /* ============================================================================
- * Optional wrappers (T? as {has_value, value})
+ * Optional type wrappers (T? as {has_value, value})
  * ============================================================================ */
 
 #ifndef L0_OPT_BOOL_DEFINED
@@ -761,8 +761,19 @@ static void rt_string_release(l0_string s) {
 }
 
 /* ============================================================================
- * Environment variables and command-line arguments
+ * System interaction and environment
  * ============================================================================ */
+
+/**
+ * Execute a system command and return its exit code.
+ * Returns the exit code of the command, or a negative value on error.
+ *
+ * L0 signature: extern func rt_system(cmd: string) -> int;
+ */
+static l0_int rt_system(l0_string cmd) {
+    char *c = _rt_string_bytes(cmd);
+    return (l0_int)system(c);
+}
 
 /**
 * Get an environment variable as an L0 optional string.
@@ -913,6 +924,33 @@ static l0_bool rt_write_file_all(l0_string path, l0_string data) {
     }
 
     return 1;
+}
+
+/**
+ * Check if a file exists at the given path.
+ *
+ * L0 signature: extern func rt_file_exists(path: string) -> bool;
+ */
+static l0_bool rt_file_exists(l0_string path) {
+    char *c = _rt_string_bytes(path);
+    FILE *f = fopen(c, "rb");
+    if (f) {
+        fclose(f);
+        return 1;
+    }
+    return 0;
+}
+
+/**
+ * Delete the file at the given path.
+ * Returns 1 (true) on success, 0 (false) on error.
+ *
+ * L0 signature: extern func rt_delete_file(path: string) -> bool;
+ */
+static l0_bool rt_delete_file(l0_string path) {
+    char *c = _rt_string_bytes(path);
+    int result = remove(c);
+    return result == 0;
 }
 
 /* ============================================================================
