@@ -152,7 +152,8 @@ This module exposes runtime hash functions directly via `extern func` declaratio
 |---------------|----------------------------------------------------------|-----------------------------------------------------------------------------|
 | `len_s`       | `(s: string) -> int`                                     | Returns string byte length.                                                 |
 | `char_at_s`   | `(s: string, index: int) -> byte`                        | Returns byte at index.                                                      |
-| `eq_s`        | `(a: string, b: string) -> bool`                         | Compares strings.                                                           |
+| `eq_s`        | `(a: string, b: string) -> bool`                         | Compares strings for equality.                                              |
+| `cmp_s`       | `(a: string, b: string) -> int`                          | Compares strings lexicographically (`<0`, `0`, `>0`).                      |
 | `concat_s`    | `(a: string, b: string) -> string`                       | Concatenates strings.                                                       |
 | `slice_s`     | `(s: string, start: int, end: int) -> string`            | Returns substring `[start, end)`.                                           |
 | `byte_to_s`   | `(b: byte) -> string`                                    | Creates one-byte string.                                                    |
@@ -196,13 +197,14 @@ Low-level raw memory FFI. Misuse can cause undefined behavior.
 
 All `extern func` symbols exposed to L0 from stdlib modules are listed here.
 
-### Declared in `sys.rt` (34)
+### Declared in `sys.rt` (35)
 
 | Function                    | Signature                                     |
 |-----------------------------|-----------------------------------------------|
 | `rt_string_get`             | `(s: string, index: int) -> byte`             |
 | `rt_strlen`                 | `(str: string) -> int`                        |
 | `rt_string_equals`          | `(a: string, b: string) -> bool`              |
+| `rt_string_compare`         | `(a: string, b: string) -> int`               |
 | `rt_string_concat`          | `(a: string, b: string) -> string`            |
 | `rt_string_slice`           | `(s: string, start: int, end: int) -> string` |
 | `rt_string_from_byte_array` | `(bytes: byte*, len: int) -> string`          |

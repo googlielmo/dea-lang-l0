@@ -16,6 +16,9 @@ extern func rt_strlen(str: string) -> int;
 // Return whether two strings are equal
 extern func rt_string_equals(a: string, b: string) -> bool;
 
+// Compare two strings lexicographically
+extern func rt_string_compare(a: string, b: string) -> int;
+
 // Concatenate two strings and return the result
 extern func rt_string_concat(a: string, b: string) -> string;
 

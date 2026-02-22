@@ -597,6 +597,46 @@ static l0_bool rt_string_equals(l0_string a, l0_string b) {
 }
 
 /**
+ * Compare two strings lexicographically.
+ * Returns 0 if equal, <0 if a < b, >0 if a > b.
+ *
+ * L0 signature: extern func rt_string_compare(a: string, b: string) -> int;
+ */
+static l0_int rt_string_compare(l0_string a, l0_string b) {
+    l0_int a_len = rt_strlen(a);
+    l0_int b_len = rt_strlen(b);
+
+    l0_int min_len = a_len;
+    if (b_len < min_len) {
+        min_len = b_len;
+    }
+
+    if (min_len > 0) {
+        char *a_data = _rt_string_bytes(a);
+        char *b_data = _rt_string_bytes(b);
+        if (a_data == NULL || b_data == NULL) {
+            _rt_panic("rt_string_compare: string data is null");
+        }
+
+        int result = memcmp(a_data, b_data, (size_t)min_len);
+        if (result < 0) {
+            return -1;
+        }
+        if (result > 0) {
+            return 1;
+        }
+    }
+
+    if (a_len < b_len) {
+        return -1;
+    }
+    if (a_len > b_len) {
+        return 1;
+    }
+    return 0;
+}
+
+/**
  * Concatenate two strings (allocates new memory).
  * Returns a heap-allocated string containing a + b.
  *

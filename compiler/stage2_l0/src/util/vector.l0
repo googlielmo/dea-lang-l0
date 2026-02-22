@@ -177,29 +177,7 @@ func vs_capacity(self: VectorString*) -> int {
 }
 
 func _vs_less(a: string, b: string) -> bool {
-    if (eq_s(a, b)) {
-        return false;
-    }
-
-    let a_len = len_s(a);
-    let b_len = len_s(b);
-    let limit = a_len;
-    if (b_len < limit) {
-        limit = b_len;
-    }
-
-    for (let i = 0; i < limit; i = i + 1) {
-        let ac = char_at_s(a, i);
-        let bc = char_at_s(b, i);
-        if (ac < bc) {
-            return true;
-        }
-        if (ac > bc) {
-            return false;
-        }
-    }
-
-    return a_len < b_len;
+    return rt_string_compare(a, b) < 0;
 }
 
 // Insertion sort on VectorString (lexicographic, ascending).

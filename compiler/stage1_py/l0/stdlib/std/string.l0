@@ -35,6 +35,11 @@ func eq_s(a: string, b: string) -> bool {
     return rt_string_equals(a, b);
 }
 
+// Compares two strings lexicographically.
+func cmp_s(a: string, b: string) -> int {
+    return rt_string_compare(a, b);
+}
+
 // Concatenates two strings and returns the result.
 func concat_s(a: string, b: string) -> string {
     return rt_string_concat(a, b);
