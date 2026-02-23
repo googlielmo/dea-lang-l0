@@ -29,3 +29,5 @@ case ":${PATH}:" in
     *":${SCRIPT_DIR}:"*) ;;
     *) export PATH="${PATH}:${SCRIPT_DIR}" ;;
 esac
+
+export L0_CC="clang"

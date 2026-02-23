@@ -7,8 +7,6 @@ import sys
 from pathlib import Path
 from textwrap import dedent
 
-import pytest
-
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
@@ -16,6 +14,23 @@ from l0_driver import L0Driver
 from l0_paths import SourceSearchPaths
 
 import shutil
+import pytest
+import sys
+
+
+def pytest_configure(config) -> None:
+    if os.environ.get("PYTEST_XDIST_WORKER"):
+        return
+
+    cc = _find_cc()
+    msg = f"[L0] C compiler: {cc}\n"
+
+    tr = config.pluginmanager.getplugin("terminalreporter")
+    if tr is not None:
+        tr.write_line(msg.rstrip("\n"))
+    else:
+        sys.stderr.write(msg)
+        sys.stderr.flush()
 
 
 def _find_cc() -> str:
@@ -118,6 +133,7 @@ def compile_and_run(runtime_dir: Path):
             [
                 cc,
                 "-std=c99",
+                "-Og",
                 "-pedantic",
                 "-I",
                 str(runtime_dir),
