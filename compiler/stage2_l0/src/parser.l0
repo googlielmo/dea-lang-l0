@@ -7,28 +7,16 @@ module parser;
 
 import tokens;
 import ast;
+import util.diag;
 import parser.shared;
 import parser.decl;
-
-struct ParseError {
-    code: string;
-    message: string;
-    line: int;
-    column: int;
-    filename: string;
-}
-
-enum ParseErrorState {
-    ParseNoError;
-    ParseHasError(err: ParseError);
-}
 
 struct ParseResult {
     root_module: Module*?;
     expr_arena: ExprArena*;
     stmt_arena: StmtArena*;
     pattern_arena: PatternArena*;
-    error: ParseErrorState;
+    diags: DiagCollector*;
 }
 
 func parse_result_free(self: ParseResult*) {
@@ -38,21 +26,20 @@ func parse_result_free(self: ParseResult*) {
     expr_arena_free(self.expr_arena);
     stmt_arena_free(self.stmt_arena);
     pattern_arena_free(self.pattern_arena);
+    diag_free(self.diags);
     drop self;
 }
 
-func impl_error_to_public(err: ImplParseErrorState) -> ParseErrorState {
-    let out = ParseNoError;
-    match (err) {
-        ImplParseNoError => {
-            out = ParseNoError;
-        }
-        ImplParseHasError(e) => {
-            let pub = ParseError(e.code, e.message, e.line, e.column, e.filename);
-            out = ParseHasError(pub);
-        }
-    }
-    return out;
+func parse_has_errors(self: ParseResult*) -> bool {
+    return diag_has_errors(self.diags);
+}
+
+func parse_diag_count(self: ParseResult*) -> int {
+    return diag_count(self.diags);
+}
+
+func parse_diag_get(self: ParseResult*, index: int) -> Diagnostic* {
+    return diag_get(self.diags, index);
 }
 
 func impl_result_to_public(self: ImplParseResult*) -> ParseResult* {
@@ -61,7 +48,7 @@ func impl_result_to_public(self: ImplParseResult*) -> ParseResult* {
         self.expr_arena,
         self.stmt_arena,
         self.pattern_arena,
-        impl_error_to_public(self.error)
+        self.diags
     );
     drop self;
     return result;

@@ -7,6 +7,7 @@ module parser.decl;
 
 import util.text;
 import util.vector;
+import util.diag;
 
 import tokens;
 import lexer;
@@ -210,7 +211,7 @@ func ps_parse_top_level_decl(self: ParserState*) -> TopLevelDecl*? {
         return new TopLevelDecl(TD_LET, decl as void*);
     }
 
-    ps_set_error(self, "PAR-0020", concat3_s("[PAR-0020] unexpected token in top level: ", token_to_string(ps_peek(self)), ""), ps_peek(self));
+    ps_emit_error(self, "PAR-0020", concat3_s("[PAR-0020] unexpected token in top level: ", token_to_string(ps_peek(self)), ""), ps_peek(self));
     return null;
 }
 
@@ -237,8 +238,17 @@ func ps_parse_module(self: ParserState*) -> Module*? {
         }
 
         while (!ps_at_end(self)) {
-            let decl = ps_parse_top_level_decl(self)?;
-            ptr_vec_push(decls as VectorBase*, decl as void*);
+            let before = self.index;
+            let decl = ps_parse_top_level_decl(self);
+            if (decl != null) {
+                ptr_vec_push(decls as VectorBase*, decl as void*);
+                continue;
+            }
+
+            ps_sync_top_level(self);
+            if (self.index == before && !ps_at_end(self)) {
+                ps_advance(self);
+            }
         }
 
         let result = new Module(module_name, imports as VectorBase*, decls as VectorBase*, ps_extend_span(self, start), self.filename);
@@ -261,7 +271,7 @@ func impl_parse_module_tokens(tokens: TokenVector, filename: string) -> ImplPars
         ps.expr_arena,
         ps.stmt_arena,
         ps.pattern_arena,
-        ps.error
+        ps.diags
     );
 
     ps_destroy(ps);
@@ -272,26 +282,37 @@ func ps_lex_error_result(ls: LexerState*, filename: string) -> ImplParseResult* 
     let expr_ar = expr_arena_create(1);
     let stmt_ar = stmt_arena_create(1);
     let pat_ar = pattern_arena_create(1);
+    let diags = diag_create();
 
-    let err_state = ImplParseNoError;
-    match (ls.error) {
-        NoError => {
-            err_state = ImplParseHasError(ImplParseError("PAR-0000", "unknown parse/lex error", ls.line, ls.column, filename));
-        }
-        Error(code, message) => {
-            err_state = ImplParseHasError(ImplParseError(code, message, ls.line, ls.column, filename));
+    let source_count = diag_count(ls.diags);
+    for (let i = 0; i < source_count; i = i + 1) {
+        let src = diag_get(ls.diags, i);
+        match (src.severity) {
+            Error => {
+                diag_error(diags, src.phase, src.code, src.message, src.filename, src.line, src.column, src.line_end, src.column_end);
+            }
+            Warning => {
+                diag_warn(diags, src.phase, src.code, src.message, src.filename, src.line, src.column, src.line_end, src.column_end);
+            }
+            Note => {
+                diag_note(diags, src.phase, src.code, src.message, src.filename, src.line, src.column, src.line_end, src.column_end);
+            }
         }
     }
 
-    let result = new ImplParseResult(null, expr_ar, stmt_ar, pat_ar, err_state);
-    drop ls;
+    if (!diag_has_errors(diags)) {
+        diag_error(diags, "Parser", "PAR-0000", "unknown parse/lex error", filename, ls.line, ls.column, ls.line, ls.column);
+    }
+
+    let result = new ImplParseResult(null, expr_ar, stmt_ar, pat_ar, diags);
+    ls_free(ls);
     return result;
 }
 
 func ps_tokens_result(ls: LexerState*, toks: TokenVector, filename: string) -> ImplParseResult* {
     let result = impl_parse_module_tokens(toks, filename);
     tv_free(toks);
-    drop ls;
+    ls_free(ls);
     return result;
 }
 

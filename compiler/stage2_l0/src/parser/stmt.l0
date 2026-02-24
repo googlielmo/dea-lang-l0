@@ -70,7 +70,7 @@ func ps_parse_pattern(self: ParserState*) -> PatternId? {
         return pattern_arena_add(self.pattern_arena, node);
     }
 
-    ps_set_error(self, "PAR-0182", concat3_s("[PAR-0182] unexpected token in pattern: ", token_to_string(ps_peek(self)), ""), ps_peek(self));
+    ps_emit_error(self, "PAR-0182", concat3_s("[PAR-0182] unexpected token in pattern: ", token_to_string(ps_peek(self)), ""), ps_peek(self));
     return null;
 }
 
@@ -305,7 +305,7 @@ func ps_parse_match_stmt(self: ParserState*) -> StmtId? {
         ps_expect(self, ord(TT_RBRACE), "PAR-0175", "[PAR-0175] expected '}' after match")?;
 
         if (vec_size(arms as VectorBase*) == 0) {
-            ps_set_error(self, "PAR-0177", "[PAR-0177] match statement must have at least one arm", ps_peek(self));
+            ps_emit_error(self, "PAR-0177", "[PAR-0177] match statement must have at least one arm", ps_peek(self));
             return null;
         }
 
@@ -319,12 +319,12 @@ func ps_parse_match_stmt(self: ParserState*) -> StmtId? {
                 let pj = pattern_arena_get(self.pattern_arena, aj.pattern);
 
                 if (ord(pi.kind) == ord(PT_WILDCARD) && ord(pj.kind) == ord(PT_WILDCARD)) {
-                    ps_set_error(self, "PAR-0176", "[PAR-0176] duplicate variant patterns in match statement", ps_peek(self));
+                    ps_emit_error(self, "PAR-0176", "[PAR-0176] duplicate variant patterns in match statement", ps_peek(self));
                     return null;
                 }
 
                 if (ord(pi.kind) == ord(PT_VARIANT) && ord(pj.kind) == ord(PT_VARIANT) && eq_s(pi.name, pj.name)) {
-                    ps_set_error(self, "PAR-0176", "[PAR-0176] duplicate variant patterns in match statement", ps_peek(self));
+                    ps_emit_error(self, "PAR-0176", "[PAR-0176] duplicate variant patterns in match statement", ps_peek(self));
                     return null;
                 }
             }
@@ -390,17 +390,17 @@ func ps_parse_with_stmt(self: ParserState*) -> StmtId? {
         }
 
         if (has_arrows && has_bare) {
-            ps_set_error(self, "PAR-0503", "[PAR-0503] 'with': all items must use '=>' or none", ps_peek(self));
+            ps_emit_error(self, "PAR-0503", "[PAR-0503] 'with': all items must use '=>' or none", ps_peek(self));
             return null;
         }
 
         if (has_arrows && has_cleanup_body) {
-            ps_set_error(self, "PAR-0504", "[PAR-0504] 'with': cannot have both '=>' and cleanup block", ps_peek(self));
+            ps_emit_error(self, "PAR-0504", "[PAR-0504] 'with': cannot have both '=>' and cleanup block", ps_peek(self));
             return null;
         }
 
         if (!has_arrows && !has_cleanup_body) {
-            ps_set_error(self, "PAR-0505", "[PAR-0505] 'with': cleanup block required when '=>' is not used", ps_peek(self));
+            ps_emit_error(self, "PAR-0505", "[PAR-0505] 'with': cleanup block required when '=>' is not used", ps_peek(self));
             return null;
         }
 
@@ -450,7 +450,7 @@ func ps_parse_case_literal(self: ParserState*) -> ExprId? {
         return expr_arena_add(self.expr_arena, node);
     }
 
-    ps_set_error(self, "PAR-0241", "[PAR-0241] expected literal in 'case' arm", tok);
+    ps_emit_error(self, "PAR-0241", "[PAR-0241] expected literal in 'case' arm", tok);
     return null;
 }
 
@@ -469,13 +469,13 @@ func ps_parse_case_stmt(self: ParserState*) -> StmtId? {
         while (!ps_check(self, ord(TT_RBRACE))) {
             if (ps_match(self, ord(TT_ELSE))) {
                 if (seen_else) {
-                    ps_set_error(self, "PAR-0236", "[PAR-0236] duplicate 'else' arm in 'case' statement", ps_peek(self));
+                    ps_emit_error(self, "PAR-0236", "[PAR-0236] duplicate 'else' arm in 'case' statement", ps_peek(self));
                     return null;
                 }
 
                 let else_start = ps_span_start(self);
                 if (ps_match(self, ord(TT_ARROW_MATCH))) {
-                    ps_set_error(self, "PAR-0237", "[PAR-0237] '=>' not allowed in 'else' arm", ps_peek(self));
+                    ps_emit_error(self, "PAR-0237", "[PAR-0237] '=>' not allowed in 'else' arm", ps_peek(self));
                     return null;
                 }
 
@@ -486,7 +486,7 @@ func ps_parse_case_stmt(self: ParserState*) -> StmtId? {
             }
 
             if (seen_else) {
-                ps_set_error(self, "PAR-0234", "[PAR-0234] value arm cannot appear after 'else' in 'case' statement", ps_peek(self));
+                ps_emit_error(self, "PAR-0234", "[PAR-0234] value arm cannot appear after 'else' in 'case' statement", ps_peek(self));
                 return null;
             }
 
@@ -501,7 +501,7 @@ func ps_parse_case_stmt(self: ParserState*) -> StmtId? {
         ps_expect(self, ord(TT_RBRACE), "PAR-0239", "[PAR-0239] expected '}' after 'case' statement")?;
 
         if (vec_size(arms as VectorBase*) == 0 && else_arm == null) {
-            ps_set_error(self, "PAR-0240", "[PAR-0240] 'case' statement must have at least one arm", ps_peek(self));
+            ps_emit_error(self, "PAR-0240", "[PAR-0240] 'case' statement must have at least one arm", ps_peek(self));
             return null;
         }
 

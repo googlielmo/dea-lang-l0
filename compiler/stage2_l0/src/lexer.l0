@@ -12,6 +12,7 @@ import std.unit;
 import util.text;
 import util.vector;
 import util.linear_map;
+import util.diag;
 
 import tokens;
 
@@ -58,14 +59,6 @@ func hex_char_to_int(c: byte) -> int {
    ------------------------------------ */
 
 /**
- * Enum representing the current lexer error state.
- */
-enum LexerErrorState {
-    NoError;
-    Error(code: string, message: string);
-}
-
-/**
  * Lexer state object that keeps track of the current position in the source code being lexed.
  */
 struct LexerState {
@@ -76,7 +69,7 @@ struct LexerState {
     line: int;
     column: int;
     prev_kind: TokenType;
-    error: LexerErrorState;
+    diags: DiagCollector*;
 }
 
 func ls_create(source: string, filename: string) -> LexerState* {
@@ -88,9 +81,22 @@ func ls_create(source: string, filename: string) -> LexerState* {
         1,
         1,
         TT_EOF,
-        NoError
+        diag_create()
     );
     return self;
+}
+
+func ls_has_errors(self: LexerState*) -> bool {
+    return diag_has_errors(self.diags);
+}
+
+func ls_emit_error(self: LexerState*, code: string, message: string, line: int, column: int, line_end: int, column_end: int) {
+    diag_error(self.diags, "Lexer", code, message, self.filename, line, column, line_end, column_end);
+}
+
+func ls_free(self: LexerState*) {
+    diag_free(self.diags);
+    drop self;
 }
 
 func ls_at_end(self: LexerState*) -> bool {
@@ -322,7 +328,7 @@ func ls_next_token(self: LexerState*) -> Token? {
 
         else {
             // If we reach here, it's an unrecognized character
-            self.error = Error("LEX-0040", concat3_s("unexpected character '", byte_to_s(c), "'"));
+            ls_emit_error(self, "LEX-0040", concat3_s("unexpected character '", byte_to_s(c), "'"), start_line, start_column, start_line, start_column + 1);
             return null;
         }
     }
@@ -345,7 +351,7 @@ func ls_read_byte_literal(self: LexerState*, start_index: int, start_line: int, 
             // We know the following is safe because ls_read_valid_char_escape checks the range for single-byte escapes
             byte_value = esc.char_value as byte;
         } else if (c == '\0' || c == '\n') {
-            self.error = Error("LEX-0020", "unterminated byte literal");
+            ls_emit_error(self, "LEX-0020", "unterminated byte literal", start_line, start_column, start_line, start_column + 1);
             return null;
         } else {
             byte_value = ls_advance(self);
@@ -353,7 +359,7 @@ func ls_read_byte_literal(self: LexerState*, start_index: int, start_line: int, 
         }
 
         if (ls_peek(self) != '\'') {
-            self.error = Error("LEX-0021", "invalid byte literal, expected closing single quote");
+            ls_emit_error(self, "LEX-0021", "invalid byte literal, expected closing single quote", start_line, start_column, self.line, self.column);
             return null; // Invalid byte literal
         }
         ls_advance(self); // consume closing quote
@@ -375,7 +381,7 @@ func ls_read_string_literal(self: LexerState*, start_index: int, start_line: int
         while (true) {
             let c = ls_peek(self);
             if (c == '\0' || c == '\n') { // EOF or newline before closing quote
-                self.error = Error("LEX-0010", "unterminated string literal");
+                ls_emit_error(self, "LEX-0010", "unterminated string literal", start_line, start_column, self.line, self.column);
                 return null; // Unterminated string
             }
             case (c) {
@@ -434,12 +440,12 @@ func ls_read_valid_char_escape(self: LexerState*, single_byte: bool) -> EscapedC
                 char_value = char_value * 16 + hex_char_to_int(digit);
             }
             if (hex_digits < 1) {
-                self.error = Error("LEX-0050", "invalid hexadecimal escape sequence");
+                ls_emit_error(self, "LEX-0050", "invalid hexadecimal escape sequence", self.line, self.column, self.line, self.column);
                 return null;
             }
             if (single_byte && char_value > 255) {
-                self.error = Error("LEX-0031", concat3_s("character literal hexadecimal escape out of range (0-255): '\\x",
-                                               int_to_string_base(char_value, 16), "'"));
+                ls_emit_error(self, "LEX-0031", concat3_s("character literal hexadecimal escape out of range (0-255): '\\x",
+                                               int_to_string_base(char_value, 16), "'"), self.line, self.column, self.line, self.column);
                 return null;
             }
         }
@@ -462,17 +468,17 @@ func ls_read_valid_char_escape(self: LexerState*, single_byte: bool) -> EscapedC
                     sb_append(sb, "invalid Unicode escape sequence, expected ");
                     sb_append_int(sb, required_digits);
                     sb_append(sb, " hex digits");
-                    self.error = Error(error_code, sb_to_string(sb));
+                    ls_emit_error(self, error_code, sb_to_string(sb), self.line, self.column, self.line, self.column);
                 }
                 return null;
             }
             if (char_value > 1114111) { // 0x10FFFF
-                self.error = Error("LEX-0054", "Unicode code point out of range (must be <= 0x10FFFF)");
+                ls_emit_error(self, "LEX-0054", "Unicode code point out of range (must be <= 0x10FFFF)", self.line, self.column, self.line, self.column);
                 return null;
             }
             if (single_byte) {
                 if (char_value > 127) {
-                    self.error = Error("LEX-0030", "character literal must represent a single byte");
+                    ls_emit_error(self, "LEX-0030", "character literal must represent a single byte", self.line, self.column, self.line, self.column);
                     return null;
                 }
                 // For single-byte character literals, convert to the \xHH form
@@ -494,13 +500,13 @@ func ls_read_valid_char_escape(self: LexerState*, single_byte: bool) -> EscapedC
                 octal_digits = octal_digits + 1;
                 char_value = char_value * 8 + (digit - '0');
                 if (char_value > 255) {
-                    self.error = Error("LEX-0053", "octal escape sequence out of range (must be <= 377)");
+                    ls_emit_error(self, "LEX-0053", "octal escape sequence out of range (must be <= 377)", self.line, self.column, self.line, self.column);
                     return null;
                 }
             }
         }
         else {
-            self.error = Error("LEX-0059", concat3_s("unknown escape sequence '\\", byte_to_s(c), "'"));
+            ls_emit_error(self, "LEX-0059", concat3_s("unknown escape sequence '\\", byte_to_s(c), "'"), self.line, self.column, self.line, self.column);
             return null;
         }
 
@@ -530,14 +536,14 @@ func ls_read_number(self: LexerState*, first_char: byte, is_negative: bool,
 
         // Check for invalid characters immediately following the number (e.g., "123abc")
         if (is_ident_start(ls_peek(self))) {
-            self.error = Error("LEX-0061", concat3_s("invalid character '", byte_to_s(ls_peek(self)), "' after integer literal"));
+            ls_emit_error(self, "LEX-0061", concat3_s("invalid character '", byte_to_s(ls_peek(self)), "' after integer literal"), start_line, start_column, self.line, self.column);
             return null;
         }
 
         // Check for integer overflow
         let number_value : int? = string_to_int(number_str);
         if (number_value == null) {
-            self.error = Error("LEX-0060", concat3_s("integer literal '", number_str, "' exceeds 32-bit signed range"));
+            ls_emit_error(self, "LEX-0060", concat3_s("integer literal '", number_str, "' exceeds 32-bit signed range"), start_line, start_column, self.line, self.column);
             return null;
         }
 
@@ -573,7 +579,7 @@ func ls_skip_whitespace_and_comments(self: LexerState*) -> Unit? {
                     ls_advance(self); // consume '*'
                     while (true) {
                         if (ls_at_end(self)) {
-                            self.error = Error("LEX-0070", "unterminated block comment");
+                            ls_emit_error(self, "LEX-0070", "unterminated block comment", self.line, self.column, self.line, self.column);
                             return null; // Unterminated comment
                         }
                         if (ls_peek(self) == '*' && ls_peek_next(self) == '/') {

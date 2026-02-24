@@ -10,29 +10,17 @@ import std.unit;
 
 import util.text;
 import util.vector;
+import util.diag;
 
 import tokens;
 import ast;
-
-struct ImplParseError {
-    code: string;
-    message: string;
-    line: int;
-    column: int;
-    filename: string;
-}
-
-enum ImplParseErrorState {
-    ImplParseNoError;
-    ImplParseHasError(err: ImplParseError);
-}
 
 struct ImplParseResult {
     root_module: Module*?;
     expr_arena: ExprArena*;
     stmt_arena: StmtArena*;
     pattern_arena: PatternArena*;
-    error: ImplParseErrorState;
+    diags: DiagCollector*;
 }
 
 /* ------------------------------------
@@ -43,7 +31,7 @@ struct ParserState {
     tokens: TokenVector;
     index: int;
     filename: string;
-    error: ImplParseErrorState;
+    diags: DiagCollector*;
 
     expr_arena: ExprArena*;
     stmt_arena: StmtArena*;
@@ -55,7 +43,7 @@ func ps_create(tokens: TokenVector, filename: string) -> ParserState* {
         tokens,
         0,
         filename,
-        ImplParseNoError,
+        diag_create(),
         expr_arena_create(128),
         stmt_arena_create(128),
         pattern_arena_create(64)
@@ -66,14 +54,22 @@ func ps_destroy(self: ParserState*) {
     drop self;
 }
 
-func ps_set_error(self: ParserState*, code: string, message: string, tok: Token) {
-    if (ord(self.error) == ord(ImplParseNoError)) {
-        self.error = ImplParseHasError(ImplParseError(code, message, tok.line, tok.column, self.filename));
-    }
+func ps_emit_error(self: ParserState*, code: string, message: string, tok: Token) {
+    diag_error(
+        self.diags,
+        "Parser",
+        code,
+        message,
+        self.filename,
+        tok.line,
+        tok.column,
+        tok.line,
+        tok.column + token_width(tok)
+    );
 }
 
 func ps_has_error(self: ParserState*) -> bool {
-    return ord(self.error) != ord(ImplParseNoError);
+    return diag_has_errors(self.diags);
 }
 
 /* ------------------------------------
@@ -238,10 +234,34 @@ func ps_match_string(self: ParserState*) -> bool {
     return false;
 }
 
+func ps_is_top_level_start(self: ParserState*) -> bool {
+    return ps_check(self, ord(TT_EXTERN)) ||
+           ps_check(self, ord(TT_FUNC)) ||
+           ps_check(self, ord(TT_STRUCT)) ||
+           ps_check(self, ord(TT_ENUM)) ||
+           ps_check(self, ord(TT_TYPE)) ||
+           ps_check(self, ord(TT_LET));
+}
+
+func ps_sync_top_level(self: ParserState*) {
+    while (!ps_at_end(self)) {
+        if (ps_is_top_level_start(self)) {
+            return;
+        }
+
+        let consumed = ps_advance(self);
+        if (tok_is(consumed, ord(TT_SEMI)) || tok_is(consumed, ord(TT_RBRACE))) {
+            if (ps_is_top_level_start(self) || ps_at_end(self)) {
+                return;
+            }
+        }
+    }
+}
+
 func ps_expect(self: ParserState*, kind_ord: int, code: string, msg: string) -> Token? {
     if (!ps_check(self, kind_ord)) {
         let got = token_to_string(ps_peek(self));
-        ps_set_error(self, code, concat4_s(msg, ", got ", got, " instead"), ps_peek(self));
+        ps_emit_error(self, code, concat4_s(msg, ", got ", got, " instead"), ps_peek(self));
         return null;
     }
     return ps_advance(self);
@@ -250,7 +270,7 @@ func ps_expect(self: ParserState*, kind_ord: int, code: string, msg: string) -> 
 func ps_expect_ident(self: ParserState*, code: string, msg: string) -> Token? {
     if (!ps_check_ident(self)) {
         let got = token_to_string(ps_peek(self));
-        ps_set_error(self, code, concat4_s(msg, ", got ", got, " instead"), ps_peek(self));
+        ps_emit_error(self, code, concat4_s(msg, ", got ", got, " instead"), ps_peek(self));
         return null;
     }
     return ps_advance(self);
@@ -325,13 +345,13 @@ func ps_expect_variable_name(self: ParserState*, code: string, msg: string) -> T
     let tok = ps_peek(self);
     if (tok_is_future_extension(tok)) {
         let t = token_to_string(tok);
-        ps_set_error(self, "PAR-0010", concat3_s("invalid variable name '", t, "': reserved keyword"), tok);
+        ps_emit_error(self, "PAR-0010", concat3_s("invalid variable name '", t, "': reserved keyword"), tok);
         return null;
     }
     let got = ps_expect_ident(self, code, msg)?;
     if (is_reserved_keyword(got)) {
         let ident = token_ident_text(got) as string;
-        ps_set_error(self, "PAR-0011", concat3_s("invalid variable name '", ident, "': reserved identifier"), got);
+        ps_emit_error(self, "PAR-0011", concat3_s("invalid variable name '", ident, "': reserved identifier"), got);
         return null;
     }
     return got;
@@ -454,7 +474,7 @@ func ps_parse_type(self: ParserState*) -> TypeRef*? {
     }
 
     if (ps_check(self, ord(TT_LBRACKET))) {
-        ps_set_error(self, "PAR-9401", "[PAR-9401] array types not yet supported: use pointers and [] indexing in expressions", ps_peek(self));
+        ps_emit_error(self, "PAR-9401", "[PAR-9401] array types not yet supported: use pointers and [] indexing in expressions", ps_peek(self));
         vs_free_opt(module_path);
         vs_free_opt(name_qualifier);
         return null;
@@ -466,23 +486,23 @@ func ps_parse_type(self: ParserState*) -> TypeRef*? {
 func ps_check_reserved_binary_op(self: ParserState*) -> Unit? {
     let tok = ps_peek(self);
     if (tok_is(tok, ord(TT_AMP))) {
-        ps_set_error(self, "PAR-0226", "[PAR-0226] '&' (bitwise AND) operator is not yet supported", tok);
+        ps_emit_error(self, "PAR-0226", "[PAR-0226] '&' (bitwise AND) operator is not yet supported", tok);
         return null;
     }
     if (tok_is(tok, ord(TT_PIPE))) {
-        ps_set_error(self, "PAR-0226", "[PAR-0226] '|' (bitwise OR) operator is not yet supported", tok);
+        ps_emit_error(self, "PAR-0226", "[PAR-0226] '|' (bitwise OR) operator is not yet supported", tok);
         return null;
     }
     if (tok_is(tok, ord(TT_CARET))) {
-        ps_set_error(self, "PAR-0226", "[PAR-0226] '^' (bitwise XOR) operator is not yet supported", tok);
+        ps_emit_error(self, "PAR-0226", "[PAR-0226] '^' (bitwise XOR) operator is not yet supported", tok);
         return null;
     }
     if (tok_is(tok, ord(TT_LSHIFT))) {
-        ps_set_error(self, "PAR-0226", "[PAR-0226] '<<' (left shift) operator is not yet supported", tok);
+        ps_emit_error(self, "PAR-0226", "[PAR-0226] '<<' (left shift) operator is not yet supported", tok);
         return null;
     }
     if (tok_is(tok, ord(TT_RSHIFT))) {
-        ps_set_error(self, "PAR-0226", "[PAR-0226] '>>' (right shift) operator is not yet supported", tok);
+        ps_emit_error(self, "PAR-0226", "[PAR-0226] '>>' (right shift) operator is not yet supported", tok);
         return null;
     }
     return present();

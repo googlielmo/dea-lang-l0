@@ -14,17 +14,17 @@ import util.text;
 
 func expect_error_code(source: string, expected: string) {
     let result = parse_module_source(source, "<test>");
+    if (!parse_has_errors(result)) {
+        assert(false, concat3_s("Expected parse error ", expected, " but parse succeeded"));
+    }
+    if (parse_diag_count(result) < 1) {
+        assert(false, "Expected at least one diagnostic");
+    }
 
-    match (result.error) {
-        ParseNoError => {
-            assert(false, concat3_s("Expected parse error ", expected, " but parse succeeded"));
-        }
-        ParseHasError(err) => {
-            if (!eq_s(err.code, expected)) {
-                printl_ss("actual error code:", err.code);
-                assert(false, concat_s("Expected parse error code ", expected));
-            }
-        }
+    let diag = parse_diag_get(result, 0);
+    if (!eq_s(diag.code, expected)) {
+        printl_ss("actual error code:", diag.code);
+        assert(false, concat_s("Expected parse error code ", expected));
     }
 
     parse_result_free(result);
@@ -32,18 +32,29 @@ func expect_error_code(source: string, expected: string) {
 
 func expect_ok(source: string) {
     let result = parse_module_source(source, "<test>");
-
-    match (result.error) {
-        ParseNoError => {
-            assert(result.root_module != null, "Expected module for successful parse");
+    if (parse_has_errors(result)) {
+        if (parse_diag_count(result) > 0) {
+            let diag = parse_diag_get(result, 0);
+            printl_ss("unexpected parse error code:", diag.code);
+            printl_ss("unexpected parse error message:", diag.message);
         }
-        ParseHasError(err) => {
-            printl_ss("unexpected parse error code:", err.code);
-            printl_ss("unexpected parse error message:", err.message);
-            assert(false, "Expected parse to succeed");
-        }
+        assert(false, "Expected parse to succeed");
     }
+    assert(result.root_module != null, "Expected module for successful parse");
 
+    parse_result_free(result);
+}
+
+func expect_min_error_count(source: string, expected_min: int) {
+    let result = parse_module_source(source, "<test>");
+    if (!parse_has_errors(result)) {
+        assert(false, "Expected parse errors");
+    }
+    let count = parse_diag_count(result);
+    if (count < expected_min) {
+        printl_si("actual error count:", count);
+        assert(false, "Expected more parse diagnostics");
+    }
     parse_result_free(result);
 }
 
@@ -131,6 +142,11 @@ func test_new_expr_bad_arg_error() {
     expect_error_code(src, "PAR-0226");
 }
 
+func test_top_level_multi_error_collection() {
+    let src = "module main; struct Broken { x: 123; } type T = int func good() -> int { return 0; }";
+    expect_min_error_count(src, 2);
+}
+
 func main() {
     test_valid_module();
     test_module_decl_error();
@@ -149,5 +165,6 @@ func main() {
     test_struct_field_error();
     test_enum_variant_field_error();
     test_new_expr_bad_arg_error();
+    test_top_level_multi_error_collection();
     printl_s("parser_test: all tests passed");
 }

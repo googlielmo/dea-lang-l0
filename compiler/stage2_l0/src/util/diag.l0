@@ -1,0 +1,158 @@
+/*
+ * SPDX-License-Identifier: MIT OR Apache-2.0
+ * Copyright (c) 2026 gwz
+ */
+
+/**
+ * Diagnostic module for collecting and managing compiler diagnostics such as errors, warnings, and notes.
+ * It provides a structured way to represent diagnostics with relevant information and a collector to accumulate them.
+ */
+module util.diag;
+
+import util.vector;
+
+enum DiagnosticSeverity {
+    Error;
+    Warning;
+    Note;
+}
+
+/**
+ * Diagnostic represents an error, warning, or note message produced during compilation.
+ * It includes information about the phase of compilation, a code for the specific issue,
+ * the severity level, a human-readable message, and the location in the source code.
+ */
+struct Diagnostic {
+    phase: string;      // descriptive name of the compiler phase (e.g., "Lexer", "Parser", "TypeChecker")
+    code: string;       // a short code in the form "XXX-NNNN" for categorizing the diagnostic (e.g., "LEX-0001")
+    severity: DiagnosticSeverity;   // severity level of the diagnostic (Error, Warning, Note)
+    message: string;    // human-readable message describing the issue
+    filename: string;   // source file where the issue occurred, or empty string if not applicable
+    line: int;          // line number in the source file (1-based), or 0 if not applicable
+    column: int;        // column number in the source file (1-based), or 0 if not applicable
+    line_end: int;      // spanning line number for the diagnostic context, or 0 if not applicable
+    column_end: int;    // spanning column number for the diagnostic context, or 0 if not applicable
+}
+
+/* ------------------------------------
+   Vector of Diagnostics
+   ------------------------------------ */
+
+type DiagnosticVector = VectorBase;
+
+func dgv_create() -> DiagnosticVector* {
+    return vec_create(sizeof(Diagnostic), 4);
+}
+
+func dgv_push(self: DiagnosticVector*, diag: Diagnostic) {
+    vec_grow(self);
+    let index = self.length - 1;
+    let slot = vec_get(self, index) as Diagnostic*;
+    *slot = diag;  // copy the diagnostic into the vector
+}
+
+func dgv_get(self: DiagnosticVector*, index: int) -> Diagnostic* {
+    return vec_get(self, index) as Diagnostic*;
+}
+
+func dgv_length(self: DiagnosticVector*) -> int {
+    return self.length;
+}
+
+func dgv_free(self: DiagnosticVector*) {
+    // release all ARC resources held by diagnostics (e.g., strings)
+    for (let i = 0; i < self.length; i = i + 1) {
+        let diag = vec_get(self, i) as Diagnostic*;
+        diag.phase = "";
+        diag.code = "";
+        diag.message = "";
+        diag.filename = "";
+    }
+    vec_free(self);
+}
+
+/* ------------------------------------
+   DiagCollector: Collects Diagnostics
+   ------------------------------------ */
+
+struct DiagCollector {
+    items: DiagnosticVector*;
+    error_count: int;    // avoids scanning the vector
+}
+
+func diag_create() -> DiagCollector* {
+    let self = new DiagCollector(
+        dgv_create(),
+        0
+    );
+    return self;
+}
+
+func diag_error(dc: DiagCollector*, phase: string, code: string,
+                message: string, filename: string,
+                line: int, column: int, line_end: int, column_end: int) {
+    let diag = Diagnostic(
+        phase,
+        code,
+        Error,
+        message,
+        filename,
+        line,
+        column,
+        line_end,
+        column_end
+    );
+    dgv_push(dc.items, diag);
+    dc.error_count = dc.error_count + 1;
+}
+
+func diag_warn(dc: DiagCollector*, phase: string, code: string,
+               message: string, filename: string,
+               line: int, column: int, line_end: int, column_end: int) {
+    let diag = Diagnostic(
+        phase,
+        code,
+        Warning,
+        message,
+        filename,
+        line,
+        column,
+        line_end,
+        column_end
+    );
+    dgv_push(dc.items, diag);
+}
+
+func diag_note(dc: DiagCollector*, phase: string, code: string,
+               message: string, filename: string,
+               line: int, column: int, line_end: int, column_end: int) {
+    let diag = Diagnostic(
+        phase,
+        code,
+        Note,
+        message,
+        filename,
+        line,
+        column,
+        line_end,
+        column_end
+    );
+    dgv_push(dc.items, diag);
+}
+
+func diag_has_errors(dc: DiagCollector*) -> bool {
+    return dc.error_count > 0;
+}
+
+func diag_count(dc: DiagCollector*) -> int {
+    return dgv_length(dc.items);
+}
+
+func diag_get(dc: DiagCollector*, index: int) -> Diagnostic* {
+    return dgv_get(dc.items, index);
+}
+
+func diag_free(dc: DiagCollector*) {
+    dgv_free(dc.items);
+    drop dc;
+}
