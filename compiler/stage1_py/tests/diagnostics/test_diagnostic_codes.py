@@ -17,11 +17,27 @@ WARNING_CODES = {
     "TYP-0030", "TYP-0031", "TYP-0105",
 }
 
-# Internal codes unreachable from user source.  xfail immediately.
+# Codes emitted by `l0c` command paths (covered in CLI tests, not here).
+CLI_ONLY_CODES = set(DIAGNOSTIC_CODE_FAMILIES["L0C"])
+
+# Internal codes unreachable from user source.
 INTERNAL_CODES = {
+    # Parser precondition/guard code paths not reachable from source text.
+    "PAR-0030", "PAR-0040", "PAR-0050", "PAR-0056", "PAR-0060",
+    "PAR-0068", "PAR-0070", "PAR-0080", "PAR-0091", "PAR-0110",
+    "PAR-0120", "PAR-0130", "PAR-0140",
+    "PAR-0150", "PAR-0160", "PAR-0170", "PAR-0180", "PAR-0190",
+    "PAR-0200", "PAR-0230", "PAR-0500",
+    "PAR-0175", "PAR-0238", "PAR-0239",
+
+    # Resolver "shouldn't happen" path for malformed compilation units.
+    "RES-0029",
+
     "SIG-9029",
     "TYP-0001", "TYP-0002", "TYP-0103", "TYP-0139", "TYP-0149",
+    "TYP-0109",
     "TYP-0153",  # UNKNOWN_MODULE unreachable: require_import fires MODULE_NOT_IMPORTED first
+    "TYP-0182", "TYP-0190", "TYP-0200", "TYP-0260", "TYP-0282",
     "TYP-0300",  # same reason: UNKNOWN_MODULE path unreachable in sizeof
     "TYP-9209", "TYP-9288", "TYP-9289",
 }
@@ -67,27 +83,77 @@ PAR_TRIGGERS = {
         """
     ),
     "PAR-0020": "module main; +;",
+    "PAR-0042": "module main; func foo -> int { return 0; }",
+    "PAR-0043": "module main; func foo(: int) -> int { return 0; }",
+    "PAR-0044": "module main; func foo(a int) -> int { return 0; }",
     "PAR-0041": "module main; func () -> int { return 0; }",
     "PAR-0045": "module main; func foo(a: int -> int { return a; }",
+    "PAR-0046": "module main; extern func foo() -> int",
+    "PAR-0051": "module main; struct { x: int; }",
+    "PAR-0052": "module main; struct Point x: int; }",
     "PAR-0053": "module main; struct Point { : int; }",
+    "PAR-0054": "module main; struct Point { x int; }",
     "PAR-0055": "module main; struct Point { x: int }",
+    "PAR-0061": "module main; enum { None; }",
+    "PAR-0062": "module main; enum Option None; }",
     "PAR-0063": "module main; enum Option { ; }",
+    "PAR-0064": "module main; enum Option { Some(: int); }",
+    "PAR-0065": "module main; enum Option { Some(v int); }",
+    "PAR-0066": "module main; enum Option { Some(v: int; }",
     "PAR-0067": "module main; enum Option { None }",
+    "PAR-0071": "module main; type = int;",
+    "PAR-0072": "module main; type Alias int;",
+    "PAR-0073": "module main; type Alias = int",
+    "PAR-0081": "module main; let : int = 1;",
     "PAR-0082": "module main; let x: int 1;",
     "PAR-0083": "module main; let x: int = 1",
+    "PAR-0090": "module main; func main() -> int return 0; }",
+    "PAR-0100": dedent(
+        """
+        module main;
+
+        func main() -> int {
+            let x: int = 0
+            return x;
+        }
+        """
+    ),
+    "PAR-0111": "module main; func main() -> int { let : int = 0; return 0; }",
+    "PAR-0112": "module main; func main() -> int { let x: int 0; return 0; }",
+    "PAR-0121": "module main; func main() -> int { if true { return 1; } return 0; }",
     "PAR-0122": "module main; func main() -> int { if (true { return 1; } }",
+    "PAR-0131": "module main; func main() -> int { while true { return 1; } return 0; }",
     "PAR-0132": "module main; func main() -> int { while (true { return 1; } }",
+    "PAR-0141": "module main; func main() -> int { for let i: int = 0; i < 3; i = i + 1 { return 0; } }",
     "PAR-0142": "module main; func main() -> int { for (let i: int = 0 i < 3; i = i + 1) { return 0; } }",
     "PAR-0143": "module main; func main() -> int { for (let i: int = 0; i < 3 i = i + 1) { return 0; } }",
+    "PAR-0144": "module main; func main() -> int { for (let i: int = 0; i < 3; i = i + 1 { return 0; } }",
+    "PAR-0161": "module main; func main() -> int { drop ; return 0; }",
+    "PAR-0171": "module main; enum Option { None; } func main(opt: Option) -> int { match opt { None => { return 0; } } }",
+    "PAR-0172": "module main; enum Option { None; } func main(opt: Option) -> int { match (opt { None => { return 0; } } }",
+    "PAR-0173": "module main; enum Option { None; } func main(opt: Option) -> int { match (opt) None => { return 0; } }",
     "PAR-0174": "module main; enum Option { None; } func main(opt: Option) -> int { match (opt) { None { return 0; } } }",
     "PAR-0176": "module main; enum Option { None; } func main(opt: Option) -> int { match (opt) { None => { return 0; } None => { return 1; } } }",
     "PAR-0177": "module main; enum Option { None; } func main(opt: Option) -> int { match (opt) { } }",
+    "PAR-0181": "module main; enum Option { Some(v: int); } func main(opt: Option) -> int { match (opt) { Some(x => { return 0; } } }",
     "PAR-0182": "module main; enum Option { None; } func main(opt: Option) -> int { match (opt) { 123 => { return 0; } } }",
     "PAR-0210": "module main; func add(a: int, b: int) -> int { return a + b; } func main() -> int { return add(1, 2; }",
     "PAR-0211": "module main; func main() -> int { let v: int = arr[0; return v; }",
+    "PAR-0212": "module main; func main() -> int { let v: int = arr.; return v; }",
+    "PAR-0223": "module main; struct S { x: int; } func main() -> int { let p: S* = new S(1; return 0; }",
     "PAR-0224": "module main; func main() -> int { let x: int = (1 + 2; return x; }",
     "PAR-0225": "module main; func main() -> int { let x: int = ; return 0; }",
     "PAR-0226": "module main; func main() -> int { let x: int = 1 & 2; return x; }",
+    "PAR-0231": "module main; func main() -> int { case 42 { } return 0; }",
+    "PAR-0232": "module main; func main() -> int { case (42 { } return 0; }",
+    "PAR-0233": "module main; func main() -> int { case (42) 1 => { return 1; } return 0; }",
+    "PAR-0234": "module main; func main() -> int { case (42) { else { return 0; } 1 => { return 1; } } }",
+    "PAR-0235": "module main; func main() -> int { case (42) { 1 { return 1; } } }",
+    "PAR-0236": "module main; func main() -> int { case (42) { else { return 0; } else { return 1; } } }",
+    "PAR-0237": "module main; func main() -> int { case (42) { else => return 0; } }",
+    "PAR-0240": "module main; func main() -> int { case (42) { } return 0; }",
+    "PAR-0241": "module main; func main() -> int { case (42) { x => { return 0; } } }",
+    "PAR-0300": "module main.; func main() -> int { return 0; }",
     "PAR-0310": "import std.io;",
     "PAR-0311": "module ;",
     "PAR-0312": "module main\nfunc main() -> int { return 0; }",
@@ -95,12 +161,47 @@ PAR_TRIGGERS = {
     "PAR-0321": "module main; import std.io",
     "PAR-0400": "module main; type Alias = ;",
     "PAR-9401": "module main; func main() -> int { let x: int[] = 0; return x; }",
+    "PAR-0501": "module main; func main() -> int { with let x: int = 1 => x = 0 { return 0; } return 0; }",
+    "PAR-0502": "module main; func main() -> int { with (let x: int = 1 => x = 0 { return 0; } return 0; }",
+    "PAR-0503": dedent("""\
+        module main;
+        extern func open(name: string) -> int;
+        extern func close(f: int);
+        func main() -> int {
+            with (let f: int = open("a") => close(f),
+                  let g: int = open("b")) {
+                return f;
+            }
+        }
+    """),
+    "PAR-0504": dedent("""\
+        module main;
+        extern func open(name: string) -> int;
+        extern func close(f: int);
+        func main() -> int {
+            with (let f: int = open("a") => close(f)) {
+                return f;
+            } cleanup {
+                close(f);
+            }
+        }
+    """),
+    "PAR-0505": dedent("""\
+        module main;
+        extern func open(name: string) -> int;
+        func main() -> int {
+            with (let f: int = open("a")) {
+                return f;
+            }
+        }
+    """),
 }
 
 DRV_TRIGGERS = {
     "DRV-0010": "missing-file",
     "DRV-0020": "module-mismatch",
     "DRV-0030": "import-cycle",
+    "DRV-0040": "bad-encoding",
 }
 
 RES_TRIGGERS = {
@@ -249,6 +350,37 @@ TYP_TRIGGERS = {
             match (e) { A => { return 0; } B => { return 1; } _ => { return 2; } }
         }
     """),
+    "TYP-0106": dedent("""\
+        module main;
+        struct Point { x: int; y: int; }
+        func foo() -> int {
+            let p: Point = Point(1, 2);
+            case (p) {
+                else { return 0; }
+            }
+        }
+    """),
+    "TYP-0107": dedent("""\
+        module main;
+        func foo() -> int {
+            let x: int = 1;
+            case (x) {
+                "hello" => { return 1; }
+                else { return 0; }
+            }
+        }
+    """),
+    "TYP-0108": dedent("""\
+        module main;
+        func foo() -> int {
+            let x: int = 1;
+            case (x) {
+                1 => { return 1; }
+                1 => { return 2; }
+                else { return 0; }
+            }
+        }
+    """),
     "TYP-0110": dedent("""\
         module main;
         func foo() -> int { break; return 0; }
@@ -362,6 +494,14 @@ TYP_TRIGGERS = {
     "TYP-0210": dedent("""\
         module main;
         func foo(arr: int*) -> int { return arr[true]; }
+    """),
+    "TYP-0211": dedent("""\
+        module main;
+        extern func maybe_buf() -> int*?;
+        func foo(i: int) -> int {
+            let buf: int*? = maybe_buf();
+            return buf[i];
+        }
     """),
     "TYP-0212": dedent("""\
         module main;
@@ -493,6 +633,10 @@ def _analyze_with_driver(tmp_path: Path, mode: str):
         (tmp_path / "a.l0").write_text("module a;\nimport b;\n")
         (tmp_path / "b.l0").write_text("module b;\nimport a;\n")
         return driver.analyze("a")
+
+    if mode == "bad-encoding":
+        (tmp_path / "main.l0").write_bytes(b"module main;\nfunc main() -> int { return 0; }\n\xff")
+        return driver.analyze("main")
 
     if mode == "extern-shadow":
         (tmp_path / "helper.l0").write_text(dedent("""\
@@ -643,8 +787,11 @@ def _analyze_with_driver(tmp_path: Path, mode: str):
 
 @pytest.mark.parametrize("code", _all_codes())
 def test_diagnostic_code_triggers(code, analyze_single, tmp_path):
+    if code in CLI_ONLY_CODES:
+        return
+
     if code in INTERNAL_CODES:
-        pytest.xfail("internal code: not triggerable from user source")
+        return
 
     if code in DRV_TRIGGERS or code in MULTI_MODULE_TRIGGERS:
         mode = DRV_TRIGGERS.get(code) or MULTI_MODULE_TRIGGERS[code]
@@ -666,4 +813,7 @@ def test_diagnostic_code_triggers(code, analyze_single, tmp_path):
             f"expected [{code}] in diagnostics: {[d.message for d in result.diagnostics]}"
         return
 
-    pytest.xfail("TODO: add minimal trigger for this diagnostic code")
+    pytest.fail(
+        f"missing trigger/classification for diagnostic code {code}; "
+        "add to *_TRIGGERS, DRV/MULTI_MODULE triggers, or classification sets"
+    )

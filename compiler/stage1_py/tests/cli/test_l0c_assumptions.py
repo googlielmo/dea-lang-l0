@@ -3,8 +3,11 @@
 
 import argparse
 import textwrap
+from types import SimpleNamespace
 
-from l0c import cmd_build, cmd_check, cmd_run
+import l0c
+from l0_driver import SourceEncodingError
+from l0c import cmd_ast, cmd_build, cmd_check, cmd_run, cmd_tok
 
 
 def _write_module(root, module_name: str, source: str):
@@ -30,6 +33,21 @@ def _build_args(tmp_path, entry: str, **overrides):
         trace_arc=False,
         trace_memory=False,
         log=False,
+    )
+    base.update(overrides)
+    return argparse.Namespace(**base)
+
+
+def _inspect_args(tmp_path, entry: str, **overrides):
+    base = dict(
+        entry=entry,
+        verbosity=0,
+        project_root=[str(tmp_path)],
+        sys_root=[],
+        no_line_directives=False,
+        log=False,
+        all_modules=False,
+        include_eof=False,
     )
     base.update(overrides)
     return argparse.Namespace(**base)
@@ -276,3 +294,177 @@ def test_run_warns_when_output_is_set_without_keep_c(tmp_path, monkeypatch, caps
 
     assert rc == 1
     assert "[L0C-0017]" in capsys.readouterr().err
+
+
+def test_build_fails_when_no_c_compiler_is_available(tmp_path, monkeypatch, capsys):
+    _write_module(
+        tmp_path,
+        "main",
+        """
+        module main;
+        func main() -> int { return 0; }
+        """,
+    )
+    monkeypatch.setattr("l0c._find_cc", lambda: None)
+
+    rc = cmd_build(_build_args(tmp_path, "main", c_compiler=None))
+
+    assert rc == 1
+    assert "[L0C-0009]" in capsys.readouterr().err
+
+
+def test_build_fails_when_c_compilation_fails(tmp_path, monkeypatch, capsys):
+    _write_module(
+        tmp_path,
+        "main",
+        """
+        module main;
+        func main() -> int { return 0; }
+        """,
+    )
+    monkeypatch.setattr("l0c.subprocess.run", lambda *args, **kwargs: _RunResult(returncode=1, stderr="cc failed"))
+
+    rc = cmd_build(_build_args(tmp_path, "main"))
+
+    assert rc == 1
+    assert "[L0C-0010]" in capsys.readouterr().err
+
+
+def test_build_fails_when_runtime_lib_path_is_not_a_directory(tmp_path, monkeypatch, capsys):
+    _write_module(
+        tmp_path,
+        "main",
+        """
+        module main;
+        func main() -> int { return 0; }
+        """,
+    )
+    missing_dir = tmp_path / "missing_runtime_dir"
+    monkeypatch.setattr("l0c.subprocess.run", lambda *args, **kwargs: _RunResult(returncode=0))
+
+    rc = cmd_build(_build_args(tmp_path, "main", runtime_lib=str(missing_dir)))
+
+    assert rc == 1
+    assert "[L0C-0014]" in capsys.readouterr().err
+
+
+def test_build_fails_when_entry_main_type_info_is_missing(tmp_path, monkeypatch, capsys):
+    _write_module(
+        tmp_path,
+        "main",
+        """
+        module main;
+        func main() -> int { return 0; }
+        """,
+    )
+    orig_analyze = l0c.L0Driver.analyze
+
+    def _analyze_without_main_type(self, entry_module_name):
+        result = orig_analyze(self, entry_module_name)
+        result.func_types.pop((entry_module_name, "main"), None)
+        return result
+
+    monkeypatch.setattr("l0c.L0Driver.analyze", _analyze_without_main_type)
+    monkeypatch.setattr("l0c.subprocess.run", lambda *args, **kwargs: _RunResult(returncode=0))
+
+    rc = cmd_build(_build_args(tmp_path, "main"))
+
+    assert rc == 1
+    assert "[L0C-0016]" in capsys.readouterr().err
+
+
+def test_ast_reports_compilation_unit_build_error(tmp_path, monkeypatch, capsys):
+    def _boom(self, _entry):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr("l0c.L0Driver.build_compilation_unit", _boom)
+
+    rc = cmd_ast(_inspect_args(tmp_path, "main"))
+
+    assert rc == 1
+    assert "[L0C-0020]" in capsys.readouterr().err
+
+
+def test_ast_reports_missing_entry_module_in_compilation_unit(tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(
+        "l0c.L0Driver.build_compilation_unit",
+        lambda self, _entry: SimpleNamespace(modules={"other": object()}),
+    )
+
+    rc = cmd_ast(_inspect_args(tmp_path, "main"))
+
+    assert rc == 1
+    assert "[L0C-0030]" in capsys.readouterr().err
+
+
+def test_tok_reports_read_error_for_entry_file(tmp_path, monkeypatch, capsys):
+    _write_module(
+        tmp_path,
+        "main",
+        """
+        module main;
+        func main() -> int { return 0; }
+        """,
+    )
+    monkeypatch.setattr("l0c.load_source_utf8", lambda _path: (_ for _ in ()).throw(OSError("read failed")))
+
+    rc = cmd_tok(_inspect_args(tmp_path, "main"))
+
+    assert rc == 1
+    assert "[L0C-0040]" in capsys.readouterr().err
+
+
+def test_tok_reports_source_encoding_error_for_entry_file(tmp_path, monkeypatch, capsys):
+    _write_module(
+        tmp_path,
+        "main",
+        """
+        module main;
+        func main() -> int { return 0; }
+        """,
+    )
+    monkeypatch.setattr(
+        "l0c.load_source_utf8",
+        lambda _path: (_ for _ in ()).throw(SourceEncodingError("main.l0", "invalid UTF-8")),
+    )
+
+    rc = cmd_tok(_inspect_args(tmp_path, "main"))
+
+    assert rc == 1
+    assert "[L0C-0041]" in capsys.readouterr().err
+
+
+def test_tok_all_modules_reports_compilation_unit_build_error(tmp_path, monkeypatch, capsys):
+    def _boom(self, _entry):
+        raise RuntimeError("bad compilation unit")
+
+    monkeypatch.setattr("l0c.L0Driver.build_compilation_unit", _boom)
+
+    rc = cmd_tok(_inspect_args(tmp_path, "main", all_modules=True))
+
+    assert rc == 1
+    assert "[L0C-0050]" in capsys.readouterr().err
+
+
+def test_tok_all_modules_reports_resolve_errors_per_module(tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(
+        "l0c.L0Driver.build_compilation_unit",
+        lambda self, _entry: SimpleNamespace(modules={"ghost": object()}),
+    )
+
+    def _missing(self, module_name):
+        raise FileNotFoundError(f"missing module {module_name}")
+
+    monkeypatch.setattr("l0c.SourceSearchPaths.resolve", _missing)
+
+    rc = cmd_tok(_inspect_args(tmp_path, "main", all_modules=True))
+
+    assert rc == 1
+    assert "[L0C-0060]" in capsys.readouterr().err
+
+
+def test_tok_single_module_reports_resolve_error(tmp_path, capsys):
+    rc = cmd_tok(_inspect_args(tmp_path, "missing_module"))
+
+    assert rc == 1
+    assert "[L0C-0070]" in capsys.readouterr().err
