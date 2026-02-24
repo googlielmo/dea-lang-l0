@@ -7,8 +7,8 @@ module parser.stmt;
 
 import std.string;
 
-import util.text;
-import util.vector;
+import std.text;
+import std.vector;
 
 import tokens;
 import ast;

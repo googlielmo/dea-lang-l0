@@ -3,7 +3,7 @@
  * Copyright (c) 2025-2026 gwz
  */
 
-module util.array;
+module std.array;
 
 import sys.rt;
 import sys.unsafe;

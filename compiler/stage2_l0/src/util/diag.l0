@@ -9,7 +9,7 @@
  */
 module util.diag;
 
-import util.vector;
+import std.vector;
 
 enum DiagnosticSeverity {
     Error;

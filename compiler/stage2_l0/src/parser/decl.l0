@@ -5,8 +5,8 @@
 
 module parser.decl;
 
-import util.text;
-import util.vector;
+import std.text;
+import std.vector;
 import util.diag;
 
 import tokens;

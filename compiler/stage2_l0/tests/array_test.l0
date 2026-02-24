@@ -7,7 +7,7 @@ module array_test;
 
 import std.io;
 import std.string;
-import util.array;
+import std.array;
 
 func test_arr_create() {
     printl_s("=== Test arr_create ===");

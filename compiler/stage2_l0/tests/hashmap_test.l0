@@ -10,10 +10,10 @@ import std.string;
 import std.assert;
 import std.unit;
 
-import util.text;
-import util.hashmap;
-import util.hashset;
-import util.vector;
+import std.text;
+import std.hashmap;
+import std.hashset;
+import std.vector;
 
 func make_key(prefix: string, i: int) -> string {
     with (let sb = sb_create() => sb_free(sb)) {

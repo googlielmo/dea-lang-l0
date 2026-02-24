@@ -8,7 +8,7 @@ module vector_string_test;
 import std.assert;
 import std.io;
 import std.string;
-import util.vector;
+import std.vector;
 
 func test_basic() {
     printl_s("=== Basic VectorString Test ===");

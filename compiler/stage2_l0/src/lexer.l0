@@ -9,9 +9,9 @@ import std.io;
 import std.string;
 import std.unit;
 
-import util.text;
-import util.vector;
-import util.linear_map;
+import std.text;
+import std.vector;
+import std.linear_map;
 import util.diag;
 
 import tokens;

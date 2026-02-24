@@ -10,7 +10,7 @@ import std.string;
 import std.assert;
 
 import parser;
-import util.text;
+import std.text;
 
 func expect_error_code(source: string, expected: string) {
     let result = parse_module_source(source, "<test>");

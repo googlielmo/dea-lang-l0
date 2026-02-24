@@ -8,7 +8,7 @@ module vector_test;
 import std.assert;
 import std.io;
 import std.string;
-import util.vector;
+import std.vector;
 
 func test_vec_create() {
     printl_s("=== Test vec_create ===");

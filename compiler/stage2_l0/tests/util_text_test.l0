@@ -10,7 +10,7 @@ import std.string;
 import std.unit;
 import std.assert;
 
-import util.text;
+import std.text;
 
 func print_bool(label: string, val: bool) {
     if (val) {

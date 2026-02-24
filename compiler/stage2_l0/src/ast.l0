@@ -8,7 +8,7 @@ module ast;
 import std.assert;
 import std.string;
 
-import util.vector;
+import std.vector;
 
 /* ------------------------------------
    IDs and shared utilities

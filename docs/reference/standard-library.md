@@ -12,8 +12,8 @@ The standard library provides ergonomic L0 modules (`std.*`) and low-level runti
                              ▼
 ┌─────────────────────────────────────────────────────────┐
 │                      std.* Modules                      │
-│ assert, io, math, optional, rand, string, system,       │
-│ unit                                                    │
+│ array, assert, hashmap, hashset, io, linear_map, math,  │
+│ optional, rand, string, system, text, unit, vector      │
 └─────────────────────────────────────────────────────────┘
                              │
                              ▼
@@ -37,6 +37,89 @@ The standard library provides ergonomic L0 modules (`std.*`) and low-level runti
 | Function | Signature                           | Description                             |
 |----------|-------------------------------------|-----------------------------------------|
 | `assert` | `(cond: bool, msg: string) -> void` | Aborts with `msg` when `cond` is false. |
+
+### `std.array`
+
+**Imports:** `sys.rt`, `sys.unsafe`, `std.assert`, `std.string`
+
+| Type/Function | Signature                                                             | Description                                        |
+|---------------|-----------------------------------------------------------------------|----------------------------------------------------|
+| `ArrayBase`   | `struct ArrayBase { capacity: int; element_size: int; data: void*; }` | Untyped fixed-size backing storage.                |
+| `arr_create`  | `(element_size: int, length: int) -> ArrayBase*`                      | Allocates and zero-initializes storage.            |
+| `arr_check`   | `(self: ArrayBase*, index: int) -> void`                              | Bounds-check helper (`0 <= index < capacity`).     |
+| `arr_resize`  | `(self: ArrayBase*, new_length: int) -> void`                         | Reallocates backing storage and zero-fills growth. |
+| `arr_get`     | `(self: ArrayBase*, index: int) -> void*`                             | Returns element pointer at index.                  |
+| `arr_zap`     | `(self: ArrayBase*, index: int) -> void`                              | Zeroes one element slot.                           |
+| `arr_free`    | `(self: ArrayBase*) -> void`                                          | Frees backing storage and drops container.         |
+
+### `std.vector`
+
+**Imports:** `sys.rt`, `sys.unsafe`, `std.assert`, `std.string`, `std.array`
+
+| Type/Function                | Signature                                                   | Description                                     |
+|------------------------------|-------------------------------------------------------------|-------------------------------------------------|
+| `VectorBase`                 | `struct VectorBase { arr: ArrayBase*; length: int; }`       | Untyped growable vector.                        |
+| `vec_create`                 | `(element_size: int, initial_capacity: int) -> VectorBase*` | Creates vector storage.                         |
+| `vec_grow`                   | `(self: VectorBase*) -> void`                               | Ensures capacity and increments length.         |
+| `vec_reserve`                | `(self: VectorBase*, total_capacity: int) -> void`          | Ensures at least requested capacity.            |
+| `vec_get`                    | `(self: VectorBase*, index: int) -> void*`                  | Returns element pointer.                        |
+| `vec_push`                   | `(self: VectorBase*) -> void*`                              | Grows and returns pointer to new slot.          |
+| `vec_size`                   | `(self: VectorBase*) -> int`                                | Returns logical length.                         |
+| `vec_capacity`               | `(self: VectorBase*) -> int`                                | Returns current capacity.                       |
+| `vec_clear`                  | `(self: VectorBase*) -> void`                               | Clears vector and resets backing capacity to 1. |
+| `vec_free`                   | `(self: VectorBase*) -> void`                               | Frees vector storage.                           |
+| `vec_push_int/byte/bool/ptr` | typed push helpers                                          | Push typed scalar/pointer values.               |
+| `vi_sort`                    | `(self: VectorBase*) -> void`                               | Insertion sort for `int` vectors (ascending).   |
+| `VectorString`               | `type VectorString = VectorBase`                            | String-specialized vector alias.                |
+| `vs_*`                       | `vs_create/push/get/size/capacity/sort/clear/free`          | String vector API with ARC-aware clear/free.    |
+
+### `std.hashmap`
+
+**Imports:** `sys.rt`, `sys.unsafe`, `std.assert`, `std.string`, `sys.hash`, `std.array`, `std.vector`
+
+| Type/Function                     | Signature                                | Description                                  |
+|-----------------------------------|------------------------------------------|----------------------------------------------|
+| `StringPtrMap`                    | `struct`                                 | Open-addressed `string -> void*` map.        |
+| `spm_create/create_with_capacity` | constructors                             | Create map with default or minimum capacity. |
+| `spm_put/get/has/remove`          | map ops                                  | Insert/update/lookup/presence/remove.        |
+| `spm_size/capacity/clear/free`    | management                               | Size, capacity, clear entries, free map.     |
+| `spm_keys`                        | `(self: StringPtrMap*) -> VectorString*` | Returns keys as new string vector.           |
+| `spm_slot_occupied/key/value`     | iteration helpers                        | Slot-level iteration support.                |
+| `StringIntMap`                    | `struct`                                 | Open-addressed `string -> int` map.          |
+| `sim_create/create_with_capacity` | constructors                             | Create map with default or minimum capacity. |
+| `sim_put/get/has/remove`          | map ops                                  | Insert/update/lookup/presence/remove.        |
+| `sim_size/capacity/clear/free`    | management                               | Size, capacity, clear entries, free map.     |
+| `sim_keys`                        | `(self: StringIntMap*) -> VectorString*` | Returns keys as new string vector.           |
+| `sim_slot_occupied/key/value`     | iteration helpers                        | Slot-level iteration support.                |
+
+### `std.hashset`
+
+**Imports:** `sys.rt`, `sys.unsafe`, `std.assert`, `std.string`, `sys.hash`, `std.array`, `std.vector`
+
+| Type/Function                    | Signature                                 | Description                                  |
+|----------------------------------|-------------------------------------------|----------------------------------------------|
+| `StringSet`                      | `struct`                                  | Open-addressed set of strings.               |
+| `ss_create/create_with_capacity` | constructors                              | Create set with default or minimum capacity. |
+| `ss_add`                         | `(self: StringSet*, key: string) -> bool` | Adds key; returns false if already present.  |
+| `ss_has/remove`                  | set ops                                   | Presence check and removal.                  |
+| `ss_size/capacity/clear/free`    | management                                | Size, capacity, clear entries, free set.     |
+| `ss_to_vector`                   | `(self: StringSet*) -> VectorString*`     | Returns elements as new vector.              |
+| `ss_slot_occupied/key`           | iteration helpers                         | Slot-level iteration support.                |
+
+### `std.linear_map`
+
+**Imports:** `sys.rt`, `sys.unsafe`, `std.assert`, `std.string`, `sys.hash`, `std.vector`
+
+| Type/Function           | Signature                                                 | Description                                 |
+|-------------------------|-----------------------------------------------------------|---------------------------------------------|
+| `LinearMapBase`         | `struct`                                                  | Generic byte-comparison linear map storage. |
+| `lm_create/free/len`    | base lifecycle                                            | Create, free, and query length.             |
+| `lm_set/get/remove`     | base ops                                                  | Set/get/remove key-value by raw key bytes.  |
+| `lm_contains_key/value` | base queries                                              | Presence checks by key/value bytes.         |
+| `LinearMapStringString` | `struct`                                                  | `string -> string` specialization.          |
+| `lmss_*`                | `create/free/len/set/get/contains/remove/key_at/value_at` | ARC-aware string map API.                   |
+| `LinearMapIntString`    | `struct`                                                  | `int -> string` specialization.             |
+| `lmis_*`                | `create/free/len/set/get/contains/remove/key_at/value_at` | ARC-aware int/string map API.               |
 
 ### `sys.hash`
 
@@ -148,21 +231,37 @@ This module exposes runtime hash functions directly via `extern func` declaratio
 
 **Imports:** `sys.rt`, `std.assert`
 
-| Function      | Signature                                                | Description                                                                 |
-|---------------|----------------------------------------------------------|-----------------------------------------------------------------------------|
-| `len_s`       | `(s: string) -> int`                                     | Returns string byte length.                                                 |
-| `char_at_s`   | `(s: string, index: int) -> byte`                        | Returns byte at index.                                                      |
-| `eq_s`        | `(a: string, b: string) -> bool`                         | Compares strings for equality.                                              |
-| `cmp_s`       | `(a: string, b: string) -> int`                          | Compares strings lexicographically (`<0`, `0`, `>0`).                      |
-| `concat_s`    | `(a: string, b: string) -> string`                       | Concatenates strings.                                                       |
-| `slice_s`     | `(s: string, start: int, end: int) -> string`            | Returns substring `[start, end)`.                                           |
-| `byte_to_s`   | `(b: byte) -> string`                                    | Creates one-byte string.                                                    |
-| `bytes_to_s`  | `(bytes: byte*, len: int) -> string`                     | Creates string from byte buffer.                                            |
-| `find_s`      | `(haystack: string, needle: string) -> int`              | Returns first match index or `-1`.                                          |
-| `find_from_s` | `(haystack: string, needle: string, pos: int) -> int`    | Returns first match index at/after `pos`, or `-1`. Requires `pos >= 0`.    |
-| `contains_s`  | `(haystack: string, needle: string) -> bool`             | Returns whether `needle` occurs in `haystack`.                              |
-| `starts_with_s` | `(s: string, prefix: string) -> bool`                  | Returns whether `s` starts with `prefix`.                                   |
-| `ends_with_s` | `(s: string, suffix: string) -> bool`                    | Returns whether `s` ends with `suffix`.                                     |
+| Function        | Signature                                             | Description                                                             |
+|-----------------|-------------------------------------------------------|-------------------------------------------------------------------------|
+| `len_s`         | `(s: string) -> int`                                  | Returns string byte length.                                             |
+| `char_at_s`     | `(s: string, index: int) -> byte`                     | Returns byte at index.                                                  |
+| `eq_s`          | `(a: string, b: string) -> bool`                      | Compares strings for equality.                                          |
+| `cmp_s`         | `(a: string, b: string) -> int`                       | Compares strings lexicographically (`<0`, `0`, `>0`).                   |
+| `concat_s`      | `(a: string, b: string) -> string`                    | Concatenates strings.                                                   |
+| `slice_s`       | `(s: string, start: int, end: int) -> string`         | Returns substring `[start, end)`.                                       |
+| `byte_to_s`     | `(b: byte) -> string`                                 | Creates one-byte string.                                                |
+| `bytes_to_s`    | `(bytes: byte*, len: int) -> string`                  | Creates string from byte buffer.                                        |
+| `find_s`        | `(haystack: string, needle: string) -> int`           | Returns first match index or `-1`.                                      |
+| `find_from_s`   | `(haystack: string, needle: string, pos: int) -> int` | Returns first match index at/after `pos`, or `-1`. Requires `pos >= 0`. |
+| `contains_s`    | `(haystack: string, needle: string) -> bool`          | Returns whether `needle` occurs in `haystack`.                          |
+| `starts_with_s` | `(s: string, prefix: string) -> bool`                 | Returns whether `s` starts with `prefix`.                               |
+| `ends_with_s`   | `(s: string, suffix: string) -> bool`                 | Returns whether `s` ends with `suffix`.                                 |
+
+### `std.text`
+
+**Imports:** `std.string`, `std.math`, `std.assert`, `std.vector`
+
+| Type/Function                                       | Signature                                                                                           | Description                                         |
+|-----------------------------------------------------|-----------------------------------------------------------------------------------------------------|-----------------------------------------------------|
+| `StringBuffer`                                      | `struct`                                                                                            | String-part buffer with cached total size.          |
+| `sb_*`                                              | `create/append/append_int/append_byte/to_string/size/free`                                          | String buffer API.                                  |
+| `CharBuffer`                                        | `struct`                                                                                            | Byte-backed buffer for incremental string assembly. |
+| `cb_*`                                              | `create/capacity/size/reserve/append/append_s/append_slice/append_int/reverse/to_string/clear/free` | Char buffer API.                                    |
+| `concat3_s/concat4_s`                               | string concat helpers                                                                               | Concatenate 3 or 4 strings efficiently.             |
+| `to_upper_s/to_lower_s`                             | case helpers                                                                                        | Convert full string case.                           |
+| `repeat_s/reverse_s`                                | string helpers                                                                                      | Repeat or reverse string content.                   |
+| `int_to_string_base`                                | `(value: int, base: int) -> string`                                                                 | Base conversion for signed ints (`2..16`).          |
+| `int_to_string/int_to_hex_string/int_to_bin_string` | format helpers                                                                                      | Decimal, hex, and binary formatting helpers.        |
 
 ### `std.system`
 

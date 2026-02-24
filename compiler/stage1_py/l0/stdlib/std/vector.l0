@@ -3,7 +3,7 @@
  * Copyright (c) 2025-2026 gwz
  */
 
-module util.vector;
+module std.vector;
 
 import sys.rt;
 import sys.unsafe;
@@ -11,7 +11,7 @@ import sys.unsafe;
 import std.assert;
 import std.string;
 
-import util.array;
+import std.array;
 
 /* ------------------------------------
    Vector: Dynamic Array Implementation

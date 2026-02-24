@@ -8,8 +8,8 @@ module linear_map_base_test;
 import sys.hash;
 import std.io;
 
-import util.linear_map;
-import util.vector;
+import std.linear_map;
+import std.vector;
 
 func print_bool(label: string, val: bool) {
     if (val) {

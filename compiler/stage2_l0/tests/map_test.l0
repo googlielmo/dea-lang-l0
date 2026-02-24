@@ -7,8 +7,8 @@ module map_test;
 
 import std.io;
 import std.string;
-import util.linear_map;
-import util.text;
+import std.linear_map;
+import std.text;
 
 func print_bool(label: string, val: bool) {
     if (val) {

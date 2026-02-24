@@ -10,9 +10,9 @@ import std.string;
 import std.unit;
 import sys.rt;
 
-import util.text;
-import util.vector;
-import util.linear_map;
+import std.text;
+import std.vector;
+import std.linear_map;
 
 enum TokenType {
     TT_EOF;

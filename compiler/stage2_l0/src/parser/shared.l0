@@ -8,8 +8,8 @@ module parser.shared;
 import std.string;
 import std.unit;
 
-import util.text;
-import util.vector;
+import std.text;
+import std.vector;
 import util.diag;
 
 import tokens;
