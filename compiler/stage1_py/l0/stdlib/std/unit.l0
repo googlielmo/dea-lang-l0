@@ -6,8 +6,14 @@
 /**
  * Module: std.unit
  *
- * This module defines the Unit type, which represents a value with no information.
- * It also provides functions to create Unit values and optional Unit values.
+ * This module defines the Unit type, a value with no associated data.
+ * It also provides constructors for Unit and optional Unit values.
+ *
+ * Optional Unit is intended for functions that would otherwise return void:
+ * a present Unit denotes success; null denotes failure.
+ *
+ * The form `f()?;` evaluates f and causes an immediate `null` return
+ * from the current function if f fails.
  */
 module std.unit;
 
