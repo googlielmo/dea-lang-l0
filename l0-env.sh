@@ -23,7 +23,7 @@ if [[ -z "${script_src}" || "${sourced}" -eq 0 ]]; then
 fi
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${script_src}")" && pwd -P)"
-export L0_HOME="${SCRIPT_DIR}/compiler/stage1_py"
+export L0_HOME="${SCRIPT_DIR}/compiler"
 
 case ":${PATH}:" in
     *":${SCRIPT_DIR}:"*) ;;

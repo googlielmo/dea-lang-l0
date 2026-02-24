@@ -87,7 +87,7 @@ def test_driver_accepts_utf8_bom(write_l0_file, temp_project):
     assert module.name == "bom.main"
 
 
-def test_driver_reports_non_utf8_source(write_l0_file, temp_project, repo_root):
+def test_driver_reports_non_utf8_source(write_l0_file, temp_project, stage1_root):
     path = write_l0_file(
         "badenc.main",
         """
@@ -98,7 +98,7 @@ def test_driver_reports_non_utf8_source(write_l0_file, temp_project, repo_root):
     path.write_bytes(b"module badenc.main;\nfunc main() -> int { return 0; }\n\xff")
 
     driver = L0Driver()
-    driver.search_paths.add_system_root(repo_root / "l0" / "stdlib")
+    driver.search_paths.add_system_root(stage1_root.parent / "shared" / "l0" / "stdlib")
     driver.search_paths.add_project_root(temp_project)
 
     result = driver.analyze("badenc.main")

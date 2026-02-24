@@ -133,11 +133,11 @@ This sets `L0_HOME` and adds the repository root to `PATH` for the current shell
 If you prefer manual setup or want to override values, use:
 
    ```shell
-   export L0_HOME=/path/to/l0/compiler/stage1_py
+   export L0_HOME=/path/to/l0/compiler
    
    # Optional: override system and runtime include paths (defaults are relative to L0_HOME)
-   export L0_SYSTEM=/path/to/l0/compiler/stage1_py/l0/stdlib
-   export L0_RUNTIME_INCLUDE=/path/to/l0/compiler/stage1_py/runtime
+   export L0_SYSTEM=/path/to/l0/compiler/shared/l0/stdlib
+   export L0_RUNTIME_INCLUDE=/path/to/l0/compiler/shared/runtime
 
    # Optional: force a specific C compiler for build/run and compiler tests
    export L0_CC=/usr/bin/clang
@@ -145,9 +145,9 @@ If you prefer manual setup or want to override values, use:
 
 If not set, defaults are relative to the repository root:
 
-- `L0_HOME` → `compiler/stage1_py`
-- `L0_SYSTEM` → `$L0_HOME/l0/stdlib`
-- `L0_RUNTIME_INCLUDE` → `$L0_HOME/runtime`
+- `L0_HOME` → `compiler`
+- `L0_SYSTEM` → `$L0_HOME/shared/l0/stdlib`
+- `L0_RUNTIME_INCLUDE` → `$L0_HOME/shared/runtime`
 - `L0_CC` → unset (compiler auto-detection order: `L0_CC`, `tcc`, `gcc`, `clang`, `cc`, then `CC`)
 
 #### 3. Verify installation:

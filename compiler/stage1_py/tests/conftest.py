@@ -7,8 +7,8 @@ import sys
 from pathlib import Path
 from textwrap import dedent
 
-PROJECT_ROOT = Path(__file__).parent.parent
-sys.path.insert(0, str(PROJECT_ROOT))
+STAGE1_ROOT = Path(__file__).parent.parent
+sys.path.insert(0, str(STAGE1_ROOT))
 
 from l0_driver import L0Driver
 from l0_paths import SourceSearchPaths
@@ -48,13 +48,13 @@ def _find_cc() -> str:
 
 
 @pytest.fixture
-def repo_root() -> Path:
-    return PROJECT_ROOT
+def stage1_root() -> Path:
+    return STAGE1_ROOT
 
 
 @pytest.fixture
-def runtime_dir(repo_root: Path) -> Path:
-    return repo_root / "runtime"
+def runtime_dir(stage1_root: Path) -> Path:
+    return stage1_root.parent / "shared" / "runtime"
 
 
 @pytest.fixture
@@ -99,10 +99,10 @@ def write_l0_file_to():
 
 
 @pytest.fixture
-def search_paths(temp_project: Path, repo_root: Path) -> SourceSearchPaths:
+def search_paths(temp_project: Path, stage1_root: Path) -> SourceSearchPaths:
     paths = SourceSearchPaths()
     paths.add_project_root(temp_project)
-    paths.add_system_root(repo_root / "l0" / "stdlib")
+    paths.add_system_root(stage1_root.parent / "shared" / "l0" / "stdlib")
     return paths
 
 
@@ -112,10 +112,10 @@ def codegen_dir() -> Path:
 
 
 @pytest.fixture
-def codegen_search_paths(codegen_dir: Path, repo_root: Path) -> SourceSearchPaths:
+def codegen_search_paths(codegen_dir: Path, stage1_root: Path) -> SourceSearchPaths:
     paths = SourceSearchPaths()
     paths.add_project_root(codegen_dir)
-    paths.add_system_root(repo_root / "l0" / "stdlib")
+    paths.add_system_root(stage1_root.parent / "shared" / "l0" / "stdlib")
     return paths
 
 
@@ -162,7 +162,7 @@ def compile_and_run(runtime_dir: Path):
 
 
 @pytest.fixture
-def analyze_single(temp_project: Path, repo_root: Path):
+def analyze_single(temp_project: Path, stage1_root: Path):
     """Analyze a single L0 module from source string.
 
     Usage:
@@ -181,7 +181,7 @@ def analyze_single(temp_project: Path, repo_root: Path):
         file_path.write_text(dedent(src))
 
         driver = L0Driver()
-        driver.search_paths.add_system_root(repo_root / "l0" / "stdlib")
+        driver.search_paths.add_system_root(stage1_root.parent / "shared" / "l0" / "stdlib")
         driver.search_paths.add_project_root(temp_project)
         return driver.analyze(module_name)
 

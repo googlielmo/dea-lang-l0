@@ -66,7 +66,7 @@ Current backend target is a **single C translation unit**.
 - `string` -> `l0_string`
 - `void` -> `void`
 
-(typedefs/runtime definitions live in `compiler/stage1_py/runtime/l0_runtime.h`.)
+(typedefs/runtime definitions live in `compiler/shared/runtime/l0_runtime.h`.)
 
 ### Structs and enums
 

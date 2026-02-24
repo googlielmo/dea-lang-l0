@@ -100,7 +100,7 @@ Rationale:
 - avoids premature API surface complexity.
 
 Concrete runtime API names are available in the `sys.rt` module and implemented in
-`compiler/stage1_py/runtime/l0_runtime.h`.
+`compiler/shared/runtime/l0_runtime.h`.
 
 See also: [reference/standard-library.md](standard-library.md) for the current `std`/`sys` module API surface.
 
@@ -126,7 +126,7 @@ Policy:
 
 Implementation details of generated helpers and typedef mapping are canonical
 in [reference/c-backend-design.md](c-backend-design.md) and
-`runtime/l0_runtime.h`.
+`compiler/shared/runtime/l0_runtime.h`.
 
 ## 8. Toolchain and Portability Policy
 

@@ -26,7 +26,7 @@ is available.
 
 Examples of security-relevant issues:
 
-- Memory safety bugs in the C runtime (`compiler/stage1_py/runtime/`)
+- Memory safety bugs in the C runtime (`compiler/shared/runtime/`)
 - Compiler vulnerabilities that enable arbitrary code execution during compilation
 - Generated C code that introduces exploitable undefined behavior
 - Supply-chain issues in build scripts or release artifacts

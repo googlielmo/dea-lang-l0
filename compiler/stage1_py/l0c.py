@@ -32,9 +32,9 @@ def _init_env_defaults() -> None:
     if not l0_home:
         return
     if not os.getenv("L0_SYSTEM"):
-        os.environ["L0_SYSTEM"] = os.path.join(l0_home, "l0", "stdlib")
+        os.environ["L0_SYSTEM"] = os.path.join(l0_home, "shared", "l0", "stdlib")
     if not os.getenv("L0_RUNTIME_INCLUDE"):
-        os.environ["L0_RUNTIME_INCLUDE"] = os.path.join(l0_home, "runtime")
+        os.environ["L0_RUNTIME_INCLUDE"] = os.path.join(l0_home, "shared", "runtime")
 
 
 def _load_file_lines(path: str, cache: Dict[str, List[str]]) -> List[str]:
