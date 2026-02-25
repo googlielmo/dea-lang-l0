@@ -26,6 +26,13 @@ This directory is organized by document intent first, then subsystem.
 - Avoid duplicating type in file names when path already encodes it.
 - Keep names concise and domain-focused.
 
+## Core References
+
+- [reference/architecture.md](reference/architecture.md): compiler pipeline and pass structure.
+- [reference/c-backend-design.md](reference/c-backend-design.md): Stage 1 lowering/runtime interaction details.
+- [reference/standard-library.md](reference/standard-library.md): `std.*` and `sys.*` API surface.
+- [reference/ownership.md](reference/ownership.md): canonical ownership rules for `new`/`drop`, ARC strings, and container patterns.
+
 ### Bug-Fix Plans
 
 Use:

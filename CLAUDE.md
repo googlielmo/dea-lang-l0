@@ -23,6 +23,7 @@ implementation status, read the relevant doc file(s).**
 | `docs/reference/grammar/l0.md`           | Formal EBNF grammar                                           |
 | `docs/reference/project-status.md`       | Implementation status, known limitations, roadmap             |
 | `docs/reference/standard-library.md`     | stdlib module reference (`std.*`, `sys.*`)                    |
+| `docs/reference/ownership.md`            | Ownership rules for `new`/`drop`, ARC strings, and containers |
 | `docs/specs/runtime/trace.md`            | Trace flags, generated defines, runtime trace contract        |
 
 Documentation policy:
@@ -31,6 +32,8 @@ Documentation policy:
 - `docs/attic/README.md` for archived/obsolete document policy details.
 - When changing stdlib modules or exported `extern func` signatures, update `docs/reference/standard-library.md` in the
   same change.
+- When changing ownership-sensitive behavior (ARC/codegen/container contracts), update `docs/reference/ownership.md` in
+  the same change.
 
 Also see: `CONTRIBUTING.md`, `SECURITY.md`.
 
@@ -75,6 +78,10 @@ For Stage 2 (`compiler/stage2_l0`) changes, finalization checks should include:
 `run_trace_tests.sh` is an important finalization gate because it validates ARC/memory traces and leak triage across
 all Stage 2 tests.
 
+For Stage 1 ownership-sensitive changes (ARC lowering, `drop` behavior, container ownership paths), run targeted ARC
+trace tests from `compiler/stage1_py/tests/backend/test_trace_arc.py` and prefer the full file when touching shared
+ARC pathways.
+
 When adding or moving tests, follow `compiler/stage1_py/tests/README.md` for placement and naming rules.
 
 Requires pytest >= 9.0.2, pytest-xdist >= 3.5, and a C compiler.
@@ -91,6 +98,16 @@ Override with `./l0c --build -c <compiler>`.
 - No generics, traits, or macros in Stage 1.
 - Auto-dereference: `ptr.field` works without `(*ptr).field`.
 - Qualified names: single `module::Name` form only.
+
+## Ownership Guardrails
+
+- Treat `docs/reference/ownership.md` as normative for ownership and memory-management behavior.
+- Normal L0 assignment over ARC-managed strings is usually compiler-balanced; avoid manual retain/release in regular
+  assignment paths.
+- Raw-memory/container internals require explicit ownership discipline (release before zero/remove, and clear owner
+  contracts for moved bytes).
+- If observed behavior contradicts ownership docs, report with a minimal `.l0` reproducer, generated C excerpt, and
+  trace output.
 
 ## Diagnostic Codes
 

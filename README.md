@@ -283,6 +283,9 @@ implementation architecture and data flow.
 
 See also [reference/design-decisions.md](docs/reference/design-decisions.md) for additional context.
 
+See [reference/ownership.md](docs/reference/ownership.md) for the canonical ownership and memory-management reference
+(`new`/`drop`, ARC strings, and container patterns).
+
 See [specs/compiler/stage1-contract.md](docs/specs/compiler/stage1-contract.md) for the compact Stage 1 contract/index.
 
 ## CLI

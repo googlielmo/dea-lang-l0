@@ -2,6 +2,9 @@
 
 The standard library provides ergonomic L0 modules (`std.*`) and low-level runtime bindings (`sys.*`).
 
+For canonical ownership behavior around `new`/`drop`, ARC strings, and container-specific retain/release patterns, see
+[ownership.md](ownership.md).
+
 ## Architecture Overview
 
 ```
@@ -142,6 +145,8 @@ This module exposes runtime hash functions directly via `extern func` declaratio
 ### `std.io`
 
 **Imports:** `sys.rt`, `std.unit`
+
+`std.io` classifies I/O success/failure from direct runtime return values (optional/boolean/sentinel results).
 
 | Function           | Signature                               | Description                                 |
 |--------------------|-----------------------------------------|---------------------------------------------|
