@@ -48,7 +48,7 @@ func test_import_cycle_reports_error() {
     let result = driver_analyze_entry(sp, "cycle_a");
 
     assert(driver_has_errors(result), "expected cycle errors");
-    assert(has_driver_diag_code(result, "DRV-2030"), "expected DRV-2030 for cycle");
+    assert(has_driver_diag_code(result, "DRV-0030"), "expected DRV-0030 for cycle");
 
     driver_state_free(result);
     sp_free(sp);
@@ -59,7 +59,18 @@ func test_module_name_mismatch_reports_error() {
     let result = driver_analyze_entry(sp, "mismatch");
 
     assert(driver_has_errors(result), "expected mismatch errors");
-    assert(has_driver_diag_code(result, "DRV-2040"), "expected DRV-2040 for module mismatch");
+    assert(has_driver_diag_code(result, "DRV-0020"), "expected DRV-0020 for module mismatch");
+
+    driver_state_free(result);
+    sp_free(sp);
+}
+
+func test_read_failure_reports_error() {
+    let sp = make_paths();
+    let result = driver_analyze_entry(sp, "read_fail");
+
+    assert(driver_has_errors(result), "expected read failure errors");
+    assert(has_driver_diag_code(result, "DRV-0011"), "expected DRV-0011 for read failure");
 
     driver_state_free(result);
     sp_free(sp);
@@ -69,5 +80,6 @@ func main() {
     test_transitive_import_closure_ok();
     test_import_cycle_reports_error();
     test_module_name_mismatch_reports_error();
+    test_read_failure_reports_error();
     printl_s("driver_test: all tests passed");
 }

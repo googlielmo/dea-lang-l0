@@ -308,6 +308,12 @@ func cli_parse(argv: VectorString*) -> CliParseResult* {
                 continue;
             }
 
+            if (eq_s(token, "--verbose")) {
+                (opts as CliOptions*).verbosity = (opts as CliOptions*).verbosity + 1;
+                i = i + 1;
+                continue;
+            }
+
             let vcount = cli_verbose_cluster_count(token);
             if (vcount > 0) {
                 (opts as CliOptions*).verbosity = (opts as CliOptions*).verbosity + vcount;
@@ -358,12 +364,11 @@ func cli_parse(argv: VectorString*) -> CliParseResult* {
             }
 
             if (eq_s(token, "-P") || eq_s(token, "--project-root")) {
-                if (i + 1 >= vs_size(argv)) {
-                    cli_emit_error(diags as DiagCollector*, "L0C-2003", "missing value for option '--project-root'");
+                let value = cli_require_next_value(argv, i, "--project-root", diags as DiagCollector*);
+                if (value == null) {
                     i = i + 1;
                 } else {
-                    let root = vs_get(argv, i + 1);
-                    vs_push((opts as CliOptions*).project_roots, root);
+                    vs_push((opts as CliOptions*).project_roots, value as string);
                     i = i + 2;
                 }
                 continue;
@@ -377,12 +382,11 @@ func cli_parse(argv: VectorString*) -> CliParseResult* {
             }
 
             if (eq_s(token, "-S") || eq_s(token, "--sys-root")) {
-                if (i + 1 >= vs_size(argv)) {
-                    cli_emit_error(diags as DiagCollector*, "L0C-2003", "missing value for option '--sys-root'");
+                let value = cli_require_next_value(argv, i, "--sys-root", diags as DiagCollector*);
+                if (value == null) {
                     i = i + 1;
                 } else {
-                    let root = vs_get(argv, i + 1);
-                    vs_push((opts as CliOptions*).sys_roots, root);
+                    vs_push((opts as CliOptions*).sys_roots, value as string);
                     i = i + 2;
                 }
                 continue;

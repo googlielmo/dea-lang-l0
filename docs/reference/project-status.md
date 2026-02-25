@@ -160,6 +160,15 @@ Stage 2 parser status:
 - Qualified names are implemented in types, expressions, and patterns.
 - Parser diagnostics mirror Stage 1 error-code style (`PAR-xxxx`) for covered paths.
 
+Stage 2 diagnostics status:
+
+- Parser/lexer diagnostics preserve `PAR-*`/`LEX-*` code families.
+- Driver diagnostics reuse Stage 1 `DRV-*` codes for equivalent conditions (`DRV-0010`, `DRV-0020`, `DRV-0030`) and
+  add `DRV-0011` for resolved-path read failures.
+- CLI diagnostics reuse Stage 1 `L0C-*` codes where equivalent (`L0C-0011`, `L0C-0040`, `L0C-0070`), keep `L0C-2xxx`
+  for Stage 2 parser/validation errors without Stage 1 code counterparts, and use `L0C-9510` for Stage 2 NYI mode
+  diagnostics.
+
 Stage 2 AST storage status:
 
 - Hybrid representation is implemented:

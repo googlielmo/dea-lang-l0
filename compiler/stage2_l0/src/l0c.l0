@@ -219,7 +219,7 @@ func l0c_cmd_nyi(mode: CliMode) -> int {
         diag_error(
             diags,
             "l0c",
-            "L0C-2090",
+            "L0C-9510",
             concat3_s("mode '", cli_mode_flag(mode), "' is not implemented in Stage 2 yet"),
             "",
             0,

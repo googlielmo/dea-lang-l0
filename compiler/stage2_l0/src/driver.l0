@@ -133,7 +133,7 @@ func dr_load_module(state: DriverState*, search_paths: SourceSearchPaths*, loadi
 
     let cycle_token = concat3_s("|", module_name, "|");
     if (contains_s(loading_chain, cycle_token)) {
-        dr_emit_error(state.diags, "DRV-2030", concat3_s("Cyclic import detected involving '", module_name, "'"), "");
+        dr_emit_error(state.diags, "DRV-0030", concat3_s("Cyclic import detected involving '", module_name, "'"), "");
         return false;
     }
 
@@ -142,14 +142,14 @@ func dr_load_module(state: DriverState*, search_paths: SourceSearchPaths*, loadi
 
     let path_opt = sp_resolve(search_paths, module_name);
     if (path_opt == null) {
-        dr_emit_error(state.diags, "DRV-2010", concat3_s("Module '", module_name, "' not found in system_roots or project_roots"), "");
+        dr_emit_error(state.diags, "DRV-0010", concat3_s("Module '", module_name, "' not found in system_roots or project_roots"), "");
         ok = false;
     } else {
         let path = path_opt as string;
 
         let source_opt = read_file(path);
         if (source_opt == null) {
-            dr_emit_error(state.diags, "DRV-2020", concat_s("cannot read source file: ", path), path);
+            dr_emit_error(state.diags, "DRV-0011", concat_s("cannot read source file: ", path), path);
             ok = false;
         } else {
             let source_raw = source_opt as string;
@@ -171,7 +171,7 @@ func dr_load_module(state: DriverState*, search_paths: SourceSearchPaths*, loadi
                 let mod = pr.root_module as Module*;
                 if (!eq_s(mod.name, module_name)) {
                     let msg = concat4_s("module name mismatch: file ", path, " declares '", mod.name);
-                    dr_emit_error(state.diags, "DRV-2040", concat4_s(msg, "' but was loaded as '", module_name, "'"), path);
+                    dr_emit_error(state.diags, "DRV-0020", concat4_s(msg, "' but was loaded as '", module_name, "'"), path);
                     ok = false;
                 } else {
                     for (let i = 0; i < vec_size(mod.imports); i = i + 1) {

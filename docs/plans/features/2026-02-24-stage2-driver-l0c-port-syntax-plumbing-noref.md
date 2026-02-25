@@ -180,8 +180,11 @@ The repository root `./l0c` wrapper remains unchanged and continues to invoke St
 
 1. This plan intentionally excludes Stage 2 semantic passes and code generation.
 2. Stage 2 CLI keeps Stage 1 parity at interface/validation level, not execution parity yet.
-3. Diagnostic code namespaces for Stage 2 CLI/driver are introduced in this change (for example `L0C-2xxx`, `DRV-2xxx`) while
-   preserving existing parser/lexer codes (`PAR-*`, `LEX-*`).
+3. Diagnostic code namespaces: `l0c.l0` reuses Stage 1 codes (`L0C-0011`, `L0C-0040`, `L0C-0070`) for equivalent
+   operations and uses `L0C-9510` for Stage 2 NYI mode diagnostics. `cli_args.l0` keeps `L0C-2xxx` codes for CLI
+   parsing/validation errors that have no Stage 1 counterpart (Stage 1 uses Python argparse for these). `driver.l0`
+   reuses Stage 1 `DRV-0010`, `DRV-0020`, and `DRV-0030` for equivalent conditions and introduces `DRV-0011` for
+   resolved-path read failures. Existing parser/lexer codes (`PAR-*`, `LEX-*`) are preserved.
 4. Root CLI migration (switching `./l0c` to Stage 2) is deferred to a separate feature.
 
 ## Non-Goals
