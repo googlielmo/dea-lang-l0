@@ -55,17 +55,10 @@ func dp_print_header(diag: Diagnostic*) {
     }
 }
 
-func dp_print_snippet(diag: Diagnostic*) {
-    if (len_s(diag.filename) == 0 || diag.line <= 0) {
+func dp_render_snippet(diag: Diagnostic*, src: string) {
+    if (len_s(src) == 0) {
         return;
     }
-
-    let src_opt = read_file(diag.filename);
-    if (src_opt == null) {
-        return;
-    }
-
-    let src = src_opt as string;
 
     with (let lines = us_split_lines(src) => vs_free(lines)) {
         let line_index = diag.line - 1;
@@ -104,13 +97,58 @@ func dp_print_snippet(diag: Diagnostic*) {
     }
 }
 
+func dp_print_snippet(diag: Diagnostic*) {
+    if (len_s(diag.filename) == 0 || diag.line <= 0) {
+        return;
+    }
+
+    let src_opt = read_file(diag.filename);
+    if (src_opt == null) {
+        return;
+    }
+
+    dp_render_snippet(diag, src_opt as string);
+}
+
+func dp_source_cached(cache_names: VectorString*, cache_texts: VectorString*, filename: string) -> string {
+    for (let i = 0; i < vs_size(cache_names); i = i + 1) {
+        if (eq_s(vs_get(cache_names, i), filename)) {
+            return vs_get(cache_texts, i);
+        }
+    }
+
+    let text = "";
+    let src_opt = read_file(filename);
+    if (src_opt != null) {
+        text = src_opt as string;
+    }
+    vs_push(cache_names, filename);
+    vs_push(cache_texts, text);
+    return text;
+}
+
 func dp_print_diag(diag: Diagnostic*) {
     dp_print_header(diag);
     dp_print_snippet(diag);
 }
 
-func dp_print_collector(dc: DiagCollector*) {
+func dp_print_collector_with_sources(dc: DiagCollector*,
+    source_names: VectorString*, source_texts: VectorString*)
+{
     for (let i = 0; i < diag_count(dc); i = i + 1) {
-        dp_print_diag(diag_get(dc, i));
+        let d = diag_get(dc, i);
+        dp_print_header(d);
+        if (len_s(d.filename) > 0 && d.line > 0) {
+            dp_render_snippet(d, dp_source_cached(source_names, source_texts, d.filename));
+        }
+    }
+}
+
+func dp_print_collector(dc: DiagCollector*) {
+    with (
+        let cache_names = vs_create(4) => vs_free(cache_names),
+        let cache_texts = vs_create(4) => vs_free(cache_texts)
+    ) {
+        dp_print_collector_with_sources(dc, cache_names, cache_texts);
     }
 }

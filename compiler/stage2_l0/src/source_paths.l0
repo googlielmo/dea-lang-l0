@@ -76,14 +76,14 @@ func sp_resolve(self: SourceSearchPaths*, module_name: string) -> string? {
     for (let i = 0; i < vs_size(self.system_roots); i = i + 1) {
         let candidate = up_join(vs_get(self.system_roots, i), rel);
         if (rt_file_exists(candidate)) {
-            return concat_s(candidate, "");
+            return candidate;
         }
     }
 
     for (let i = 0; i < vs_size(self.project_roots); i = i + 1) {
         let candidate = up_join(vs_get(self.project_roots, i), rel);
         if (rt_file_exists(candidate)) {
-            return concat_s(candidate, "");
+            return candidate;
         }
     }
 
@@ -194,7 +194,7 @@ func sp_normalize_entry_target(target: string, project_roots: VectorString*, dia
             );
             return null;
         }
-        return concat_s(module_name, "");
+        return module_name;
     }
 
     if (!sp_is_valid_module_name(target)) {
@@ -212,5 +212,5 @@ func sp_normalize_entry_target(target: string, project_roots: VectorString*, dia
         return null;
     }
 
-    return concat_s(target, "");
+    return target;
 }

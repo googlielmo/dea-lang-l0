@@ -152,6 +152,20 @@ func diag_get(dc: DiagCollector*, index: int) -> Diagnostic* {
     return dgv_get(dc.items, index);
 }
 
+func diag_copy(dst: DiagCollector*, src: Diagnostic*) {
+    match (src.severity) {
+        Error => {
+            diag_error(dst, src.phase, src.code, src.message, src.filename, src.line, src.column, src.line_end, src.column_end);
+        }
+        Warning => {
+            diag_warn(dst, src.phase, src.code, src.message, src.filename, src.line, src.column, src.line_end, src.column_end);
+        }
+        Note => {
+            diag_note(dst, src.phase, src.code, src.message, src.filename, src.line, src.column, src.line_end, src.column_end);
+        }
+    }
+}
+
 func diag_free(dc: DiagCollector*) {
     dgv_free(dc.items);
     drop dc;

@@ -24,10 +24,13 @@ struct DriverUnit {
     parse_result: ParseResult*;
 }
 
-struct DriverResult {
+struct DriverState {
     entry_module: string;
     units: VectorBase*; // DriverUnit*
+    loaded: VectorString*; // used during analysis, inert afterward
     diags: DiagCollector*;
+    source_names: VectorString*; // source cache: file paths
+    source_texts: VectorString*; // source cache: file contents
 }
 
 func dr_unit_free(self: DriverUnit*) {
@@ -48,33 +51,36 @@ func dr_units_free(units: VectorBase*?) {
     vec_free(v);
 }
 
-func driver_result_free(self: DriverResult*) {
+func driver_state_free(self: DriverState*) {
     dr_units_free(self.units);
+    vs_free(self.loaded);
     diag_free(self.diags);
+    vs_free(self.source_names);
+    vs_free(self.source_texts);
     drop self;
 }
 
-func driver_result_has_errors(self: DriverResult*) -> bool {
+func driver_has_errors(self: DriverState*) -> bool {
     return diag_has_errors(self.diags);
 }
 
-func driver_diag_count(self: DriverResult*) -> int {
+func driver_diag_count(self: DriverState*) -> int {
     return diag_count(self.diags);
 }
 
-func driver_diag_get(self: DriverResult*, index: int) -> Diagnostic* {
+func driver_diag_get(self: DriverState*, index: int) -> Diagnostic* {
     return diag_get(self.diags, index);
 }
 
-func driver_unit_count(self: DriverResult*) -> int {
+func driver_unit_count(self: DriverState*) -> int {
     return vec_size(self.units);
 }
 
-func driver_unit_get(self: DriverResult*, index: int) -> DriverUnit* {
+func driver_unit_get(self: DriverState*, index: int) -> DriverUnit* {
     return ptr_vec_get(self.units, index) as DriverUnit*;
 }
 
-func driver_find_unit(self: DriverResult*, module_name: string) -> DriverUnit*? {
+func driver_find_unit(self: DriverState*, module_name: string) -> DriverUnit*? {
     for (let i = 0; i < vec_size(self.units); i = i + 1) {
         let unit = ptr_vec_get(self.units, i) as DriverUnit*;
         if (eq_s(unit.module_name, module_name)) {
@@ -84,7 +90,7 @@ func driver_find_unit(self: DriverResult*, module_name: string) -> DriverUnit*? 
     return null;
 }
 
-func driver_module_names_sorted(self: DriverResult*) -> VectorString* {
+func driver_module_names_sorted(self: DriverState*) -> VectorString* {
     let out = vs_create(vec_size(self.units));
     for (let i = 0; i < vec_size(self.units); i = i + 1) {
         let unit = ptr_vec_get(self.units, i) as DriverUnit*;
@@ -94,24 +100,9 @@ func driver_module_names_sorted(self: DriverResult*) -> VectorString* {
     return out;
 }
 
-func dr_copy_diag(dst: DiagCollector*, src: Diagnostic*) {
-    match (src.severity) {
-        Error => {
-            diag_error(dst, src.phase, src.code, src.message, src.filename, src.line, src.column, src.line_end, src.column_end);
-        }
-        Warning => {
-            diag_warn(dst, src.phase, src.code, src.message, src.filename, src.line, src.column, src.line_end, src.column_end);
-        }
-        Note => {
-            diag_note(dst, src.phase, src.code, src.message, src.filename, src.line, src.column, src.line_end, src.column_end);
-        }
-    }
-}
-
 func dr_copy_parse_diags(dst: DiagCollector*, pr: ParseResult*) {
     for (let i = 0; i < parse_diag_count(pr); i = i + 1) {
-        let d = parse_diag_get(pr, i);
-        dr_copy_diag(dst, d);
+        diag_copy(dst, parse_diag_get(pr, i));
     }
 }
 
@@ -130,19 +121,19 @@ func dr_vs_has(items: VectorString*, module_name: string) -> bool {
 
 func dr_mark_loaded(loaded: VectorString*, module_name: string) {
     if (!dr_vs_has(loaded, module_name)) {
-        vs_push(loaded, concat_s(module_name, ""));
+        vs_push(loaded, module_name);
     }
 }
 
-func dr_load_module(search_paths: SourceSearchPaths*, units: VectorBase*, loaded: VectorString*, loading_chain: string,
-                    diags: DiagCollector*, module_name: string) -> bool {
-    if (dr_vs_has(loaded, module_name)) {
+func dr_load_module(state: DriverState*, search_paths: SourceSearchPaths*, loading_chain: string,
+                    module_name: string) -> bool {
+    if (dr_vs_has(state.loaded, module_name)) {
         return true;
     }
 
     let cycle_token = concat3_s("|", module_name, "|");
     if (contains_s(loading_chain, cycle_token)) {
-        dr_emit_error(diags, "DRV-2030", concat3_s("Cyclic import detected involving '", module_name, "'"), "");
+        dr_emit_error(state.diags, "DRV-2030", concat3_s("Cyclic import detected involving '", module_name, "'"), "");
         return false;
     }
 
@@ -151,25 +142,28 @@ func dr_load_module(search_paths: SourceSearchPaths*, units: VectorBase*, loaded
 
     let path_opt = sp_resolve(search_paths, module_name);
     if (path_opt == null) {
-        dr_emit_error(diags, "DRV-2010", concat3_s("Module '", module_name, "' not found in system_roots or project_roots"), "");
+        dr_emit_error(state.diags, "DRV-2010", concat3_s("Module '", module_name, "' not found in system_roots or project_roots"), "");
         ok = false;
     } else {
         let path = path_opt as string;
 
         let source_opt = read_file(path);
         if (source_opt == null) {
-            dr_emit_error(diags, "DRV-2020", concat_s("cannot read source file: ", path), path);
+            dr_emit_error(state.diags, "DRV-2020", concat_s("cannot read source file: ", path), path);
             ok = false;
         } else {
             let source_raw = source_opt as string;
             let source = us_strip_utf8_bom(source_raw);
 
+            vs_push(state.source_names, path);
+            vs_push(state.source_texts, source);
+
             let pr = parse_module_source(source, path);
 
-            let unit = new DriverUnit(concat_s(module_name, ""), concat_s(path, ""), pr);
-            ptr_vec_push(units, unit as void*);
+            let unit = new DriverUnit(module_name, path, pr);
+            ptr_vec_push(state.units, unit as void*);
 
-            dr_copy_parse_diags(diags, pr);
+            dr_copy_parse_diags(state.diags, pr);
 
             if (pr.root_module == null) {
                 ok = false;
@@ -177,12 +171,12 @@ func dr_load_module(search_paths: SourceSearchPaths*, units: VectorBase*, loaded
                 let mod = pr.root_module as Module*;
                 if (!eq_s(mod.name, module_name)) {
                     let msg = concat4_s("module name mismatch: file ", path, " declares '", mod.name);
-                    dr_emit_error(diags, "DRV-2040", concat4_s(msg, "' but was loaded as '", module_name, "'"), path);
+                    dr_emit_error(state.diags, "DRV-2040", concat4_s(msg, "' but was loaded as '", module_name, "'"), path);
                     ok = false;
                 } else {
                     for (let i = 0; i < vec_size(mod.imports); i = i + 1) {
                         let imp = ptr_vec_get(mod.imports, i) as Import*;
-                        let child_ok = dr_load_module(search_paths, units, loaded, next_loading_chain, diags, concat_s(imp.name, ""));
+                        let child_ok = dr_load_module(state, search_paths, next_loading_chain, imp.name);
                         if (!child_ok) {
                             ok = false;
                         }
@@ -196,17 +190,15 @@ func dr_load_module(search_paths: SourceSearchPaths*, units: VectorBase*, loaded
         }
     }
 
-    dr_mark_loaded(loaded, module_name);
+    dr_mark_loaded(state.loaded, module_name);
     return ok;
 }
 
-func driver_analyze_entry(search_paths: SourceSearchPaths*, entry_module: string) -> DriverResult* {
-    let units = ptr_vec_create(8);
-    let loaded = vs_create(8);
-    let diags = diag_create();
-
-    dr_load_module(search_paths, units, loaded, "|", diags, concat_s(entry_module, ""));
-
-    vs_free(loaded);
-    return new DriverResult(entry_module, units, diags);
+func driver_analyze_entry(search_paths: SourceSearchPaths*, entry_module: string) -> DriverState* {
+    let state = new DriverState(
+        entry_module, ptr_vec_create(8), vs_create(8),
+        diag_create(), vs_create(4), vs_create(4)
+    );
+    dr_load_module(state, search_paths, "|", entry_module);
+    return state;
 }

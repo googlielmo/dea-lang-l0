@@ -22,7 +22,7 @@ func make_paths() -> SourceSearchPaths* {
     return sp;
 }
 
-func has_driver_diag_code(result: DriverResult*, code: string) -> bool {
+func has_driver_diag_code(result: DriverState*, code: string) -> bool {
     for (let i = 0; i < driver_diag_count(result); i = i + 1) {
         let d = driver_diag_get(result, i);
         if (eq_s(d.code, code)) {
@@ -36,10 +36,10 @@ func test_transitive_import_closure_ok() {
     let sp = make_paths();
     let result = driver_analyze_entry(sp, "ok_main");
 
-    assert(!driver_result_has_errors(result), "expected no driver errors for ok_main");
+    assert(!driver_has_errors(result), "expected no driver errors for ok_main");
     assert(driver_unit_count(result) == 4, "expected 4 loaded modules in closure");
 
-    driver_result_free(result);
+    driver_state_free(result);
     sp_free(sp);
 }
 
@@ -47,10 +47,10 @@ func test_import_cycle_reports_error() {
     let sp = make_paths();
     let result = driver_analyze_entry(sp, "cycle_a");
 
-    assert(driver_result_has_errors(result), "expected cycle errors");
+    assert(driver_has_errors(result), "expected cycle errors");
     assert(has_driver_diag_code(result, "DRV-2030"), "expected DRV-2030 for cycle");
 
-    driver_result_free(result);
+    driver_state_free(result);
     sp_free(sp);
 }
 
@@ -58,10 +58,10 @@ func test_module_name_mismatch_reports_error() {
     let sp = make_paths();
     let result = driver_analyze_entry(sp, "mismatch");
 
-    assert(driver_result_has_errors(result), "expected mismatch errors");
+    assert(driver_has_errors(result), "expected mismatch errors");
     assert(has_driver_diag_code(result, "DRV-2040"), "expected DRV-2040 for module mismatch");
 
-    driver_result_free(result);
+    driver_state_free(result);
     sp_free(sp);
 }
 

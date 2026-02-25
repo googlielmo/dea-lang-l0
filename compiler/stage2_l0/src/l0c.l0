@@ -38,23 +38,9 @@ func prepared_input_free_opt(self: PreparedInput*?) {
     }
 }
 
-func l0c_copy_diag(dst: DiagCollector*, src: Diagnostic*) {
-    match (src.severity) {
-        Error => {
-            diag_error(dst, src.phase, src.code, src.message, src.filename, src.line, src.column, src.line_end, src.column_end);
-        }
-        Warning => {
-            diag_warn(dst, src.phase, src.code, src.message, src.filename, src.line, src.column, src.line_end, src.column_end);
-        }
-        Note => {
-            diag_note(dst, src.phase, src.code, src.message, src.filename, src.line, src.column, src.line_end, src.column_end);
-        }
-    }
-}
-
 func l0c_copy_collector(dst: DiagCollector*, src: DiagCollector*) {
     for (let i = 0; i < diag_count(src); i = i + 1) {
-        l0c_copy_diag(dst, diag_get(src, i));
+        diag_copy(dst, diag_get(src, i));
     }
 }
 
@@ -145,14 +131,14 @@ func l0c_cmd_check(opts: CliOptions*) -> int {
         let result = driver_analyze_entry(prep.search_paths, prep.entry_module);
         prepared_input_free(prep);
         prepared = null;
-        dp_print_collector(result.diags);
+        dp_print_collector_with_sources(result.diags, result.source_names, result.source_texts);
 
         let rc = 0;
-        if (driver_result_has_errors(result)) {
+        if (driver_has_errors(result)) {
             rc = 1;
         }
 
-        driver_result_free(result);
+        driver_state_free(result);
         return rc;
     }
 }
@@ -170,9 +156,9 @@ func l0c_cmd_tok(opts: CliOptions*) -> int {
             let result = driver_analyze_entry(prep.search_paths, prep.entry_module);
             prepared_input_free(prep);
             prepared = null;
-            if (driver_result_has_errors(result)) {
-                dp_print_collector(result.diags);
-                driver_result_free(result);
+            if (driver_has_errors(result)) {
+                dp_print_collector_with_sources(result.diags, result.source_names, result.source_texts);
+                driver_state_free(result);
                 return 1;
             }
 
@@ -195,7 +181,7 @@ func l0c_cmd_tok(opts: CliOptions*) -> int {
                 }
 
                 dp_print_collector(diags);
-                driver_result_free(result);
+                driver_state_free(result);
                 return rc;
             }
         }
