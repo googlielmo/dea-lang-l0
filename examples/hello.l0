@@ -7,7 +7,7 @@ module hello;
 
 import std.io;
 
-func main() -> void {
-    let hello: string = "Hello, World!";
+func main() {
+    let hello = "Hello, World!";
     printl_s(hello);
 }

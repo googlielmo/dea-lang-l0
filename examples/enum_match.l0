@@ -26,5 +26,5 @@ func main() -> void {
     let r2: int = f(c2);
     let r3: int = f(c3);
 
-    printl_i(r1 + r2 + r3); // Should print 6
+    printl_i(r1 + r2 + r3); // prints 6
 }

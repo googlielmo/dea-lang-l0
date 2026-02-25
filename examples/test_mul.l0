@@ -63,31 +63,14 @@ func test_negative_negative() -> void {
 func test_mixed_signs() -> void {
     print_s("Testing mixed signs...\n");
 
-//    print_s("  r1 = 1 * -1...\n");
     let r1: int = 1 * -1;
-
-//    print_s("  r2 = -1 * 1...\n");
     let r2: int = -1 * 1;
-
-//    print_s("  r3 = 2 * -3...\n");
     let r3: int = 2 * -3;
-
-//    print_s("  r4 = -3 * 2...\n");
     let r4: int = -3 * 2;
-
-//    print_s("  r5 = 10 * -10...\n");
     let r5: int = 10 * -10;
-
-//    print_s("  r6 = -10 * 10...\n");
     let r6: int = -10 * 10;
-
-//    print_s("  r7 = 46340 * -46340...\n");
     let r7: int = 46340 * -46340;
-//    print_s("  r7 done\n");
-
-//    print_s("  r8 = -46340 * 46340...\n");
     let r8: int = -46340 * 46340;
-//    print_s("  r8 done\n");
 
     if (r1 == -1 && r2 == -1 && r3 == -6 && r4 == -6 &&
         r5 == -100 && r6 == -100 && r7 == -2147395600 && r8 == -2147395600) {

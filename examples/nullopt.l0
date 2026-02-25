@@ -79,8 +79,6 @@ func main() -> void {
 
     let z = test_Unit_return();
     if (z == null) {
-        z = null; // it is allowed to assign `null` to z of type `Unit?`, it's the only value it can take explicitly
-                  // (other than the implicit "nothing" (Unit) of a "return;" statement)
         printl_s("test_Unit_return returned null");
     } else {
         printl_s("test_Unit_return did not return null, unexpectedly!!!");
@@ -124,13 +122,11 @@ func main() -> void {
         printl_s("u3 is null, unexpectedly!!!");
     }
 
-    // sizeof Unit should be 1 (to distinguish from null)
-    print_s("sizof(Unit) = ");
+    print_s("sizeof(Unit) = ");
     print_i(sizeof(Unit));
     print_s("\n");
 
-    // sizeof Unit? should be same as sizeof(Unit?)
-    print_s("sizof(Unit?) = ");
+    print_s("sizeof(Unit?) = ");
     print_i(sizeof(Unit?));
     print_s("\n");
 

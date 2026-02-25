@@ -7,11 +7,6 @@ module fact;
 
 import std.io;
 
-func printsil(s: string, i: int) -> void {
-    print_s(s);
-    printl_i(i);
-}
-
 func factorial(n: int) -> int {
     if (n <= 1) {
         return 1;
@@ -22,5 +17,5 @@ func factorial(n: int) -> int {
 
 func main() -> void {
     let fact5: int = factorial(5);
-    printsil("Factorial of 5 is: ", fact5);
+    printl_si("Factorial of 5 is:", fact5);
 }
