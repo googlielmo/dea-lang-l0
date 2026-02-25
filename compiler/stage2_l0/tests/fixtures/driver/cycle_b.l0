@@ -1,0 +1,12 @@
+/*
+ * SPDX-License-Identifier: MIT OR Apache-2.0
+ * Copyright (c) 2026 gwz
+ */
+
+module cycle_b;
+
+import cycle_a;
+
+func b() -> int {
+    return 0;
+}

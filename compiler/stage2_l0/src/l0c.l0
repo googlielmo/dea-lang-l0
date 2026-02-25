@@ -1,0 +1,304 @@
+/*
+ * SPDX-License-Identifier: MIT OR Apache-2.0
+ * Copyright (c) 2026 gwz
+ */
+
+module l0c;
+
+import sys.rt;
+
+import std.io;
+import std.system;
+import std.string;
+import std.text;
+import std.vector;
+import util.diag;
+
+import util.strings;
+import source_paths;
+import driver;
+import cli_args;
+import diag_print;
+import lexer;
+import tokens;
+
+struct PreparedInput {
+    entry_module: string;
+    search_paths: SourceSearchPaths*;
+}
+
+func prepared_input_free(self: PreparedInput*) {
+    sp_free(self.search_paths);
+    drop self;
+}
+
+func prepared_input_free_opt(self: PreparedInput*?) {
+    if (self != null) {
+        prepared_input_free(self as PreparedInput*);
+    }
+}
+
+func l0c_copy_diag(dst: DiagCollector*, src: Diagnostic*) {
+    match (src.severity) {
+        Error => {
+            diag_error(dst, src.phase, src.code, src.message, src.filename, src.line, src.column, src.line_end, src.column_end);
+        }
+        Warning => {
+            diag_warn(dst, src.phase, src.code, src.message, src.filename, src.line, src.column, src.line_end, src.column_end);
+        }
+        Note => {
+            diag_note(dst, src.phase, src.code, src.message, src.filename, src.line, src.column, src.line_end, src.column_end);
+        }
+    }
+}
+
+func l0c_copy_collector(dst: DiagCollector*, src: DiagCollector*) {
+    for (let i = 0; i < diag_count(src); i = i + 1) {
+        l0c_copy_diag(dst, diag_get(src, i));
+    }
+}
+
+func l0c_prepare_input(opts: CliOptions*, diags: DiagCollector*) -> PreparedInput*? {
+    with (
+        let project_roots = us_vs_clone(opts.project_roots) => vs_free(project_roots),
+        let sys_roots = us_vs_clone(opts.sys_roots) => vs_free(sys_roots)
+    ) {
+        sp_apply_default_project_roots(project_roots);
+        sp_apply_default_sys_roots(sys_roots);
+
+        let entry_target = opts.entry_target as string;
+
+        let entry_opt = sp_normalize_entry_target(entry_target, project_roots, diags);
+        if (entry_opt == null) {
+            return null;
+        }
+
+        let entry_module = entry_opt as string;
+        let sp = sp_build_from_roots(project_roots, sys_roots);
+        return new PreparedInput(entry_module, sp);
+    }
+}
+
+func l0c_print_token(path: string, tok: Token) {
+    with (let sb = sb_create() => sb_free(sb)) {
+        sb_append(sb, path);
+        sb_append(sb, ":");
+        sb_append_int(sb, tok.line);
+        sb_append(sb, ":");
+        sb_append_int(sb, tok.column);
+        sb_append(sb, ":\t");
+        sb_append(sb, token_to_string(tok));
+        printl_s(sb_to_string(sb));
+    }
+}
+
+func l0c_print_module_token_header(module_name: string, path: string) {
+    with (let sb = sb_create() => sb_free(sb)) {
+        sb_append(sb, "=== Tokens for module ");
+        sb_append(sb, module_name);
+        sb_append(sb, " (");
+        sb_append(sb, path);
+        sb_append(sb, ") ===");
+        printl_s(sb_to_string(sb));
+    }
+}
+
+func l0c_dump_tokens_for_path(path: string, include_eof: bool, diags: DiagCollector*) -> int {
+    let text_opt = read_file(path);
+    if (text_opt == null) {
+        diag_error(diags, "l0c", "L0C-0040", concat_s("cannot read source file: ", path), path, 0, 0, 0, 0);
+        return 1;
+    }
+
+    let text = text_opt as string;
+    let ls = ls_create(us_strip_utf8_bom(text), path);
+    let toks = tokenize(ls);
+    if (toks == null) {
+        l0c_copy_collector(diags, ls.diags);
+        ls_free(ls);
+        return 1;
+    }
+
+    let tv = toks as TokenVector;
+    for (let i = 0; i < tv_len(tv); i = i + 1) {
+        let tok = tv_get(tv, i);
+        if (!include_eof && ord(tok.token_type) == ord(TT_EOF)) {
+            continue;
+        }
+        l0c_print_token(path, tok);
+    }
+
+    tv_free(tv);
+    ls_free(ls);
+    return 0;
+}
+
+func l0c_cmd_check(opts: CliOptions*) -> int {
+    with (let diags = diag_create() => diag_free(diags)) {
+        let prepared = l0c_prepare_input(opts, diags);
+        if (prepared == null) {
+            dp_print_collector(diags);
+            return 1;
+        }
+        let prep = prepared as PreparedInput*;
+
+        let result = driver_analyze_entry(prep.search_paths, prep.entry_module);
+        prepared_input_free(prep);
+        prepared = null;
+        dp_print_collector(result.diags);
+
+        let rc = 0;
+        if (driver_result_has_errors(result)) {
+            rc = 1;
+        }
+
+        driver_result_free(result);
+        return rc;
+    }
+}
+
+func l0c_cmd_tok(opts: CliOptions*) -> int {
+    with (let diags = diag_create() => diag_free(diags)) {
+        let prepared = l0c_prepare_input(opts, diags);
+        if (prepared == null) {
+            dp_print_collector(diags);
+            return 1;
+        }
+        let prep = prepared as PreparedInput*;
+
+        if (opts.all_modules) {
+            let result = driver_analyze_entry(prep.search_paths, prep.entry_module);
+            prepared_input_free(prep);
+            prepared = null;
+            if (driver_result_has_errors(result)) {
+                dp_print_collector(result.diags);
+                driver_result_free(result);
+                return 1;
+            }
+
+            with (let names = driver_module_names_sorted(result) => vs_free(names)) {
+                let rc = 0;
+                for (let i = 0; i < vs_size(names); i = i + 1) {
+                    let name = vs_get(names, i);
+                    let unit = driver_find_unit(result, name);
+                    if (unit == null) {
+                        continue;
+                    }
+
+                    l0c_print_module_token_header(name, (unit as DriverUnit*).path);
+
+                    let one_rc = l0c_dump_tokens_for_path((unit as DriverUnit*).path, opts.include_eof, diags);
+                    if (one_rc != 0) {
+                        rc = one_rc;
+                    }
+                    printl_s("");
+                }
+
+                dp_print_collector(diags);
+                driver_result_free(result);
+                return rc;
+            }
+        }
+
+        let path_opt = sp_resolve(prep.search_paths, prep.entry_module);
+        if (path_opt == null) {
+            diag_error(
+                diags,
+                "l0c",
+                "L0C-0070",
+                concat3_s("Module '", prep.entry_module, "' not found in system_roots or project_roots"),
+                "",
+                0,
+                0,
+                0,
+                0
+            );
+            prepared_input_free(prep);
+            prepared = null;
+            dp_print_collector(diags);
+            return 1;
+        }
+
+        let path = path_opt as string;
+        prepared_input_free(prep);
+        prepared = null;
+        let rc = l0c_dump_tokens_for_path(path, opts.include_eof, diags);
+        dp_print_collector(diags);
+        return rc;
+    }
+}
+
+func l0c_cmd_nyi(mode: CliMode) -> int {
+    with (let diags = diag_create() => diag_free(diags)) {
+        diag_error(
+            diags,
+            "l0c",
+            "L0C-2090",
+            concat3_s("mode '", cli_mode_flag(mode), "' is not implemented in Stage 2 yet"),
+            "",
+            0,
+            0,
+            0,
+            0
+        );
+        dp_print_collector(diags);
+        return 1;
+    }
+}
+
+func run_with_argv(argv: VectorString*) -> int {
+    let parsed = cli_parse(argv);
+    if (diag_has_errors(parsed.diags) || parsed.options == null) {
+        dp_print_collector(parsed.diags);
+        cli_parse_result_free(parsed);
+        return 2;
+    }
+
+    let opts = parsed.options as CliOptions*;
+    parsed.options = null;
+
+    let rc = 1;
+    match (opts.mode) {
+        CM_CHECK => {
+            rc = l0c_cmd_check(opts);
+        }
+        CM_TOK => {
+            rc = l0c_cmd_tok(opts);
+        }
+        CM_RUN => {
+            rc = l0c_cmd_nyi(opts.mode);
+        }
+        CM_BUILD => {
+            rc = l0c_cmd_nyi(opts.mode);
+        }
+        CM_GEN => {
+            rc = l0c_cmd_nyi(opts.mode);
+        }
+        CM_AST => {
+            rc = l0c_cmd_nyi(opts.mode);
+        }
+        CM_SYM => {
+            rc = l0c_cmd_nyi(opts.mode);
+        }
+        CM_TYPE => {
+            rc = l0c_cmd_nyi(opts.mode);
+        }
+    }
+
+    cli_options_free(opts);
+    cli_parse_result_free(parsed);
+    return rc;
+}
+
+func main() {
+    with (let argv_vec = vs_create(argc()) => vs_free(argv_vec)) {
+        for (let i = 1; i < argc(); i = i + 1) {
+            vs_push(argv_vec, argv(i));
+        }
+
+        let rc = run_with_argv(argv_vec);
+        if (rc != 0) {
+            exit(rc);
+        }
+    }
+}

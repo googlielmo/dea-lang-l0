@@ -1,0 +1,82 @@
+/*
+ * SPDX-License-Identifier: MIT OR Apache-2.0
+ * Copyright (c) 2026 gwz
+ */
+
+module l0c_test;
+
+import std.io;
+import std.assert;
+import std.vector;
+
+import l0c;
+
+func fixture_root() -> string {
+    return "compiler/stage2_l0/tests/fixtures/driver";
+}
+
+func test_check_ok() {
+    with (let argv = vs_create(8) => vs_free(argv)) {
+        vs_push(argv, "--check");
+        vs_push(argv, "-P");
+        vs_push(argv, fixture_root());
+        vs_push(argv, "ok_main");
+
+        let rc = run_with_argv(argv);
+        assert(rc == 0, "--check should succeed for ok_main");
+    }
+}
+
+func test_check_cycle_fails() {
+    with (let argv = vs_create(8) => vs_free(argv)) {
+        vs_push(argv, "--check");
+        vs_push(argv, "-P");
+        vs_push(argv, fixture_root());
+        vs_push(argv, "cycle_a");
+
+        let rc = run_with_argv(argv);
+        assert(rc == 1, "--check should fail for cycle_a");
+    }
+}
+
+func test_tok_ok() {
+    with (let argv = vs_create(10) => vs_free(argv)) {
+        vs_push(argv, "--tok");
+        vs_push(argv, "--include-eof");
+        vs_push(argv, "-P");
+        vs_push(argv, fixture_root());
+        vs_push(argv, "ok_main");
+
+        let rc = run_with_argv(argv);
+        assert(rc == 0, "--tok should succeed for ok_main");
+    }
+}
+
+func test_parse_error_exit_code() {
+    with (let argv = vs_create(8) => vs_free(argv)) {
+        vs_push(argv, "--check");
+        vs_push(argv, "--keep-c");
+        vs_push(argv, "ok_main");
+
+        let rc = run_with_argv(argv);
+        assert(rc == 2, "CLI parse/validation errors should return 2");
+    }
+}
+
+func test_nyi_mode_exit_code() {
+    with (let argv = vs_create(8) => vs_free(argv)) {
+        vs_push(argv, "ok_main");
+
+        let rc = run_with_argv(argv);
+        assert(rc == 1, "default --build mode is NYI and should return 1");
+    }
+}
+
+func main() {
+    test_check_ok();
+    test_check_cycle_fails();
+    test_tok_ok();
+    test_parse_error_exit_code();
+    test_nyi_mode_exit_code();
+    printl_s("l0c_test: all tests passed");
+}

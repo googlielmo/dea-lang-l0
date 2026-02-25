@@ -1,0 +1,216 @@
+/*
+ * SPDX-License-Identifier: MIT OR Apache-2.0
+ * Copyright (c) 2026 gwz
+ */
+
+module source_paths;
+
+import sys.rt;
+
+import std.string;
+import std.system;
+import std.text;
+import std.vector;
+import util.diag;
+
+import util.path;
+import util.strings;
+
+struct SourceSearchPaths {
+    system_roots: VectorString*;
+    project_roots: VectorString*;
+}
+
+func sp_create() -> SourceSearchPaths* {
+    return new SourceSearchPaths(vs_create(2), vs_create(2));
+}
+
+func sp_free(self: SourceSearchPaths*) {
+    vs_free(self.system_roots);
+    vs_free(self.project_roots);
+    drop self;
+}
+
+func sp_add_system_root(self: SourceSearchPaths*, root: string) {
+    vs_push(self.system_roots, root);
+}
+
+func sp_add_project_root(self: SourceSearchPaths*, root: string) {
+    vs_push(self.project_roots, root);
+}
+
+func sp_system_root_count(self: SourceSearchPaths*) -> int {
+    return vs_size(self.system_roots);
+}
+
+func sp_project_root_count(self: SourceSearchPaths*) -> int {
+    return vs_size(self.project_roots);
+}
+
+func sp_system_root_get(self: SourceSearchPaths*, index: int) -> string {
+    return vs_get(self.system_roots, index);
+}
+
+func sp_project_root_get(self: SourceSearchPaths*, index: int) -> string {
+    return vs_get(self.project_roots, index);
+}
+
+func sp_module_relpath(module_name: string) -> string {
+    with (let cb = cb_create() => cb_free(cb)) {
+        for (let i = 0; i < len_s(module_name); i = i + 1) {
+            let c = char_at_s(module_name, i);
+            if (c == '.') {
+                cb_append(cb, '/');
+            } else {
+                cb_append(cb, c);
+            }
+        }
+        cb_append_s(cb, ".l0");
+        return cb_to_string(cb);
+    }
+}
+
+func sp_resolve(self: SourceSearchPaths*, module_name: string) -> string? {
+    let rel = sp_module_relpath(module_name);
+
+    for (let i = 0; i < vs_size(self.system_roots); i = i + 1) {
+        let candidate = up_join(vs_get(self.system_roots, i), rel);
+        if (rt_file_exists(candidate)) {
+            return concat_s(candidate, "");
+        }
+    }
+
+    for (let i = 0; i < vs_size(self.project_roots); i = i + 1) {
+        let candidate = up_join(vs_get(self.project_roots, i), rel);
+        if (rt_file_exists(candidate)) {
+            return concat_s(candidate, "");
+        }
+    }
+
+    return null;
+}
+
+func sp_is_valid_ident_component(component: string) -> bool {
+    let n = len_s(component);
+    if (n == 0) {
+        return false;
+    }
+
+    let first = char_at_s(component, 0);
+    if (!(is_alpha(first) || first == '_')) {
+        return false;
+    }
+
+    for (let i = 1; i < n; i = i + 1) {
+        let c = char_at_s(component, i);
+        if (!(is_alnum(c) || c == '_')) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+func sp_is_valid_module_name(module_name: string) -> bool {
+    if (len_s(module_name) == 0) {
+        return false;
+    }
+
+    with (let parts = us_split_char(module_name, '.', true) => vs_free(parts)) {
+        for (let i = 0; i < vs_size(parts); i = i + 1) {
+            if (!sp_is_valid_ident_component(vs_get(parts, i))) {
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
+func sp_apply_default_project_roots(project_roots: VectorString*) {
+    if (vs_size(project_roots) == 0) {
+        vs_push(project_roots, ".");
+    }
+}
+
+func sp_apply_default_sys_roots(sys_roots: VectorString*) {
+    if (vs_size(sys_roots) > 0) {
+        return;
+    }
+
+    let env_opt = env_get("L0_SYSTEM");
+    if (env_opt == null) {
+        return;
+    }
+
+    let env_value = env_opt as string;
+
+    with (let roots = us_split_chars2_non_empty(env_value, ':', ';') => vs_free(roots)) {
+        for (let i = 0; i < vs_size(roots); i = i + 1) {
+            vs_push(sys_roots, vs_get(roots, i));
+        }
+    }
+}
+
+func sp_build_from_roots(project_roots: VectorString*, sys_roots: VectorString*) -> SourceSearchPaths* {
+    let sp = sp_create();
+
+    for (let i = 0; i < vs_size(sys_roots); i = i + 1) {
+        sp_add_system_root(sp, vs_get(sys_roots, i));
+    }
+
+    for (let i = 0; i < vs_size(project_roots); i = i + 1) {
+        sp_add_project_root(sp, vs_get(project_roots, i));
+    }
+
+    return sp;
+}
+
+func sp_normalize_entry_target(target: string, project_roots: VectorString*, diags: DiagCollector*) -> string? {
+    if (up_is_l0_file(target) || up_is_absolute(target) || up_has_parent(target)) {
+        let module_name = "";
+        if (up_is_l0_file(target)) {
+            module_name = up_stem(target);
+        } else {
+            module_name = up_basename(target);
+        }
+
+        let parent = up_parent(target);
+        if (!eq_s(parent, ".")) {
+            vs_push(project_roots, parent);
+        }
+
+        if (!sp_is_valid_module_name(module_name)) {
+            diag_error(
+                diags,
+                "l0c",
+                "L0C-0011",
+                concat3_s("invalid entry module name '", module_name, "': module components must be valid identifiers"),
+                "",
+                0,
+                0,
+                0,
+                0
+            );
+            return null;
+        }
+        return concat_s(module_name, "");
+    }
+
+    if (!sp_is_valid_module_name(target)) {
+        diag_error(
+            diags,
+            "l0c",
+            "L0C-0011",
+            concat3_s("invalid entry module name '", target, "': module components must be valid identifiers"),
+            "",
+            0,
+            0,
+            0,
+            0
+        );
+        return null;
+    }
+
+    return concat_s(target, "");
+}

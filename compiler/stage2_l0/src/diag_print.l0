@@ -1,0 +1,116 @@
+/*
+ * SPDX-License-Identifier: MIT OR Apache-2.0
+ * Copyright (c) 2026 gwz
+ */
+
+module diag_print;
+
+import sys.rt;
+
+import std.io;
+import std.string;
+import std.text;
+import std.vector;
+import util.diag;
+
+import util.strings;
+
+func dp_severity_name(sev: DiagnosticSeverity) -> string {
+    match (sev) {
+        Error => { return "error"; }
+        Warning => { return "warning"; }
+        Note => { return "note"; }
+    }
+}
+
+func dp_print_header(diag: Diagnostic*) {
+    with (let sb = sb_create() => sb_free(sb)) {
+        sb_append(sb, dp_severity_name(diag.severity));
+        sb_append(sb, ": ");
+
+        if (len_s(diag.phase) > 0) {
+            sb_append(sb, "[");
+            sb_append(sb, diag.phase);
+            sb_append(sb, ":");
+            sb_append(sb, diag.code);
+            sb_append(sb, "] ");
+        } else if (len_s(diag.code) > 0) {
+            sb_append(sb, "[");
+            sb_append(sb, diag.code);
+            sb_append(sb, "] ");
+        }
+
+        sb_append(sb, diag.message);
+        if (len_s(diag.filename) > 0 && diag.line > 0 && diag.column > 0) {
+            sb_append(sb, " (");
+            sb_append(sb, diag.filename);
+            sb_append(sb, ":");
+            sb_append_int(sb, diag.line);
+            sb_append(sb, ":");
+            sb_append_int(sb, diag.column);
+            sb_append(sb, ")");
+        }
+
+        err_printl_s(sb_to_string(sb));
+    }
+}
+
+func dp_print_snippet(diag: Diagnostic*) {
+    if (len_s(diag.filename) == 0 || diag.line <= 0) {
+        return;
+    }
+
+    let src_opt = read_file(diag.filename);
+    if (src_opt == null) {
+        return;
+    }
+
+    let src = src_opt as string;
+
+    with (let lines = us_split_lines(src) => vs_free(lines)) {
+        let line_index = diag.line - 1;
+        if (line_index < 0 || line_index >= vs_size(lines)) {
+            return;
+        }
+
+        let src_line = vs_get(lines, line_index);
+        let line_no = int_to_string(diag.line);
+        err_printl_s(concat4_s(line_no, " | ", src_line, ""));
+
+        let start_col = diag.column;
+        if (start_col < 1) {
+            start_col = 1;
+        }
+
+        let end_col = start_col;
+        if (diag.line_end > 0 && diag.column_end > 0) {
+            if (diag.line_end == diag.line) {
+                if (diag.column_end > start_col) {
+                    end_col = diag.column_end;
+                }
+            } else {
+                end_col = len_s(src_line) + 1;
+            }
+        }
+
+        let caret_width = end_col - start_col;
+        if (caret_width < 1) {
+            caret_width = 1;
+        }
+
+        let caret_prefix = repeat_s(" ", len_s(line_no) + 3 + (start_col - 1));
+        let carets = repeat_s("^", caret_width);
+        err_printl_s(concat_s(caret_prefix, carets));
+    }
+}
+
+func dp_print_diag(diag: Diagnostic*) {
+    dp_print_header(diag);
+    dp_print_snippet(diag);
+}
+
+func dp_print_collector(dc: DiagCollector*) {
+    for (let i = 0; i < diag_count(dc); i = i + 1) {
+        dp_print_diag(diag_get(dc, i));
+    }
+}

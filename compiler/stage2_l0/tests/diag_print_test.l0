@@ -1,0 +1,29 @@
+/*
+ * SPDX-License-Identifier: MIT OR Apache-2.0
+ * Copyright (c) 2026 gwz
+ */
+
+module diag_print_test;
+
+import std.io;
+import std.assert;
+import util.diag;
+
+import diag_print;
+
+func fixture_file() -> string {
+    return "compiler/stage2_l0/tests/fixtures/driver/ok_main.l0";
+}
+
+func test_prints_snippet_for_located_diag() {
+    with (let diags = diag_create() => diag_free(diags)) {
+        diag_error(diags, "diag_print_test", "DPT-0001", "synthetic located diagnostic", fixture_file(), 1, 1, 1, 6);
+        assert(diag_count(diags) == 1, "expected one diagnostic");
+        dp_print_collector(diags);
+    }
+}
+
+func main() {
+    test_prints_snippet_for_located_diag();
+    printl_s("diag_print_test: all tests passed");
+}

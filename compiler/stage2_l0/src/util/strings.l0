@@ -1,0 +1,104 @@
+/*
+ * SPDX-License-Identifier: MIT OR Apache-2.0
+ * Copyright (c) 2026 gwz
+ */
+
+module util.strings;
+
+import sys.rt;
+import std.string;
+import std.vector;
+
+func us_vs_clone(src: VectorString*) -> VectorString* {
+    let out = vs_create(vs_size(src));
+    for (let i = 0; i < vs_size(src); i = i + 1) {
+        vs_push(out, vs_get(src, i));
+    }
+    return out;
+}
+
+func us_split_char(s: string, sep: byte, keep_empty: bool) -> VectorString* {
+    let out = vs_create(4);
+    let n = len_s(s);
+    let start = 0;
+
+    for (let i = 0; i < n; i = i + 1) {
+        if (char_at_s(s, i) == sep) {
+            let part = slice_s(s, start, i);
+            if (keep_empty || len_s(part) > 0) {
+                vs_push(out, part);
+            }
+            start = i + 1;
+        }
+    }
+
+    let tail = slice_s(s, start, n);
+    if (keep_empty || len_s(tail) > 0) {
+        vs_push(out, tail);
+    }
+
+    return out;
+}
+
+func us_split_chars2_non_empty(s: string, sep1: byte, sep2: byte) -> VectorString* {
+    let out = vs_create(4);
+    let n = len_s(s);
+    let start = 0;
+
+    for (let i = 0; i < n; i = i + 1) {
+        let c = char_at_s(s, i);
+        if (c == sep1 || c == sep2) {
+            if (i > start) {
+                vs_push(out, slice_s(s, start, i));
+            }
+            start = i + 1;
+        }
+    }
+
+    if (start < n) {
+        vs_push(out, slice_s(s, start, n));
+    }
+
+    return out;
+}
+
+func us_strip_trailing_cr(s: string) -> string {
+    let n = len_s(s);
+    if (n > 0 && char_at_s(s, n - 1) == '\r') {
+        return slice_s(s, 0, n - 1);
+    }
+    return s;
+}
+
+func us_split_lines(s: string) -> VectorString* {
+    let out = vs_create(16);
+    let n = len_s(s);
+    if (n == 0) {
+        return out;
+    }
+
+    let start = 0;
+    for (let i = 0; i < n; i = i + 1) {
+        if (char_at_s(s, i) == '\n') {
+            let line = us_strip_trailing_cr(slice_s(s, start, i));
+            vs_push(out, line);
+            start = i + 1;
+        }
+    }
+
+    if (start < n) {
+        vs_push(out, us_strip_trailing_cr(slice_s(s, start, n)));
+    }
+
+    return out;
+}
+
+func us_strip_utf8_bom(s: string) -> string {
+    if (len_s(s) >= 3 &&
+        char_at_s(s, 0) == (239 as byte) &&
+        char_at_s(s, 1) == (187 as byte) &&
+        char_at_s(s, 2) == (191 as byte)) {
+        return slice_s(s, 3, len_s(s));
+    }
+    return s;
+}

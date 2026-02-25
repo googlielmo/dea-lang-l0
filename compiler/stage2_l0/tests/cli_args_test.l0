@@ -1,0 +1,116 @@
+/*
+ * SPDX-License-Identifier: MIT OR Apache-2.0
+ * Copyright (c) 2026 gwz
+ */
+
+module cli_args_test;
+
+import std.io;
+import std.string;
+import std.vector;
+import std.assert;
+import util.diag;
+
+import cli_args;
+
+func test_default_mode_build() {
+    with (let argv = vs_create(2) => vs_free(argv)) {
+        vs_push(argv, "app.main");
+
+        let parsed = cli_parse(argv);
+        assert(!diag_has_errors(parsed.diags), "expected CLI parse success");
+        assert(parsed.options != null, "expected parsed options");
+
+        let opts = parsed.options as CliOptions*;
+        assert(ord(opts.mode) == ord(CM_BUILD), "default mode must be build");
+        assert(opts.entry_target != null, "expected entry target");
+        assert(eq_s(opts.entry_target as string, "app.main"), "expected app.main target");
+
+        cli_parse_result_free(parsed);
+    }
+}
+
+func test_run_accepts_program_args_after_separator() {
+    with (let argv = vs_create(8) => vs_free(argv)) {
+        vs_push(argv, "--run");
+        vs_push(argv, "app.main");
+        vs_push(argv, "--");
+        vs_push(argv, "alpha");
+        vs_push(argv, "--beta");
+
+        let parsed = cli_parse(argv);
+        assert(!diag_has_errors(parsed.diags), "expected run parse success");
+        let opts = parsed.options as CliOptions*;
+
+        assert(ord(opts.mode) == ord(CM_RUN), "expected run mode");
+        assert(eq_s(opts.entry_target as string, "app.main"), "expected run target");
+        assert(vs_size(opts.program_args) == 2, "expected 2 program args");
+        assert(eq_s(vs_get(opts.program_args, 0), "alpha"), "expected alpha arg");
+        assert(eq_s(vs_get(opts.program_args, 1), "--beta"), "expected --beta arg");
+
+        cli_parse_result_free(parsed);
+    }
+}
+
+func test_non_run_rejects_program_args_separator() {
+    with (let argv = vs_create(8) => vs_free(argv)) {
+        vs_push(argv, "--check");
+        vs_push(argv, "app.main");
+        vs_push(argv, "--");
+        vs_push(argv, "x");
+
+        let parsed = cli_parse(argv);
+        assert(diag_has_errors(parsed.diags), "expected parse errors for -- outside run");
+        assert(parsed.options == null, "options must be null on parse errors");
+
+        cli_parse_result_free(parsed);
+    }
+}
+
+func test_mode_scoped_flag_validation() {
+    with (let argv = vs_create(8) => vs_free(argv)) {
+        vs_push(argv, "--check");
+        vs_push(argv, "--keep-c");
+        vs_push(argv, "app.main");
+
+        let parsed = cli_parse(argv);
+        assert(diag_has_errors(parsed.diags), "expected parse errors for invalid scoped flag");
+        assert(parsed.options == null, "options must be null on parse errors");
+
+        cli_parse_result_free(parsed);
+    }
+}
+
+func test_multiple_targets_rejected() {
+    with (let argv = vs_create(8) => vs_free(argv)) {
+        vs_push(argv, "--check");
+        vs_push(argv, "a");
+        vs_push(argv, "b");
+
+        let parsed = cli_parse(argv);
+        assert(diag_has_errors(parsed.diags), "expected parse errors for multi-target");
+
+        cli_parse_result_free(parsed);
+    }
+}
+
+func test_no_legacy_command_rewrite() {
+    with (let argv = vs_create(8) => vs_free(argv)) {
+        vs_push(argv, "run");
+        vs_push(argv, "app.main");
+
+        let parsed = cli_parse(argv);
+        assert(diag_has_errors(parsed.diags), "legacy command words should not be rewritten");
+        cli_parse_result_free(parsed);
+    }
+}
+
+func main() {
+    test_default_mode_build();
+    test_run_accepts_program_args_after_separator();
+    test_non_run_rejects_program_args_separator();
+    test_mode_scoped_flag_validation();
+    test_multiple_targets_rejected();
+    test_no_legacy_command_rewrite();
+    printl_s("cli_args_test: all tests passed");
+}
