@@ -154,6 +154,19 @@ class Backend:
         # CallExpr, literals, cast, etc. produce fresh values
         return False
 
+    def _is_unwrap_cast_from_place(self, expr: Expr) -> bool:
+        """Return True for `T? as T` casts where the optional source is a place."""
+        if not isinstance(expr, CastExpr):
+            return False
+
+        src_ty = self.analysis.expr_types.get(id(expr.expr))
+        dst_ty = self.analysis.expr_types.get(id(expr))
+        if not isinstance(src_ty, NullableType) or dst_ty is None:
+            return False
+        if not self._types_equal(dst_ty, src_ty.inner):
+            return False
+        return self._is_place_expr(expr.expr)
+
     def _needs_arc_temp(self, expr: Expr) -> bool:
         """Check if a non-place rvalue with ARC data needs temp materialization.
 
@@ -162,6 +175,15 @@ class Backend:
         if isinstance(expr, StringLiteral):
             return False
         return True
+
+    def _should_materialize_arc_temp(self, expr: Expr, expr_type: Type) -> bool:
+        """Return True when an ARC expression should be hoisted to a cleanup temp."""
+        return (
+            self.analysis.has_arc_data(expr_type)
+            and not self._is_place_expr(expr)
+            and not self._is_unwrap_cast_from_place(expr)
+            and self._needs_arc_temp(expr)
+        )
 
     def _materialize_arc_temp(self, c_expr: str, expr_type: Type) -> str:
         """Materialize an ARC rvalue into a scope-owned temporary for automatic cleanup."""
@@ -935,9 +957,7 @@ class Backend:
             c_expr = self._emit_expr(stmt.expr, is_statement=True)
             if c_expr:  # Only emit if not empty (empty for no-op comments)
                 expr_ty = self.analysis.expr_types.get(id(stmt.expr))
-                if (expr_ty and self.analysis.has_arc_data(expr_ty)
-                        and not self._is_place_expr(stmt.expr)
-                        and self._needs_arc_temp(stmt.expr)):
+                if expr_ty and self._should_materialize_arc_temp(stmt.expr, expr_ty):
                     self._materialize_arc_temp(c_expr, expr_ty)
                 else:
                     self.emitter.emit_expr_stmt(c_expr)
@@ -2106,8 +2126,9 @@ class Backend:
             return self._emit_expr_with_expected_type(e, expected)
 
         c_expr = self._emit_expr(e)
+        place_like = self._is_place_expr(e) or self._is_unwrap_cast_from_place(e)
 
-        if natural_ty is None or not self._is_place_expr(e):
+        if natural_ty is None or not place_like:
             return self._convert_expr_with_expected_type(c_expr, natural_ty, expected)
 
         if self._types_equal(natural_ty, expected):
@@ -2228,9 +2249,7 @@ class Backend:
                             for a, p in zip(expr.args, func_ty.params):
                                 c_a = self._emit_expr_with_expected_type(a, p)
                                 a_ty = self.analysis.expr_types.get(id(a))
-                                if (a_ty and self.analysis.has_arc_data(a_ty)
-                                        and not self._is_place_expr(a)
-                                        and self._needs_arc_temp(a)):
+                                if a_ty and self._should_materialize_arc_temp(a, a_ty):
                                     c_a = self._materialize_arc_temp(c_a, a_ty)
                                 c_arg_parts.append(c_a)
                             c_args = ", ".join(c_arg_parts)
@@ -2239,9 +2258,7 @@ class Backend:
                             for a in expr.args:
                                 c_a = self._emit_expr(a)
                                 a_ty = self.analysis.expr_types.get(id(a))
-                                if (a_ty and self.analysis.has_arc_data(a_ty)
-                                        and not self._is_place_expr(a)
-                                        and self._needs_arc_temp(a)):
+                                if a_ty and self._should_materialize_arc_temp(a, a_ty):
                                     c_a = self._materialize_arc_temp(c_a, a_ty)
                                 c_arg_parts.append(c_a)
                             c_args = ", ".join(c_arg_parts)
@@ -2255,9 +2272,7 @@ class Backend:
                 for a in expr.args:
                     c_a = self._emit_expr(a)
                     a_ty = self.analysis.expr_types.get(id(a))
-                    if (a_ty and self.analysis.has_arc_data(a_ty)
-                            and not self._is_place_expr(a)
-                            and self._needs_arc_temp(a)):
+                    if a_ty and self._should_materialize_arc_temp(a, a_ty):
                         c_a = self._materialize_arc_temp(c_a, a_ty)
                     c_arg_parts.append(c_a)
                 c_args = ", ".join(c_arg_parts)

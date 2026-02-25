@@ -35,6 +35,21 @@ def parse_arc_lines(stderr: str) -> list[dict[str, str]]:
     return results
 
 
+def _heap_rc_values(arc_lines: list[dict[str, str]]) -> list[int]:
+    """Collect integer rc_before/rc_after values from heap ARC events."""
+    values: list[int] = []
+    for ev in arc_lines:
+        if ev.get("kind") != "heap":
+            continue
+        for key in ("rc_before", "rc_after"):
+            raw = ev.get(key)
+            if raw is None:
+                continue
+            if re.fullmatch(r"-?\d+", raw):
+                values.append(int(raw))
+    return values
+
+
 def _compile_with_trace_arc(analyze_single, compile_and_run, tmp_path, src):
     """Shared pipeline: analyze → set trace_arc → codegen → compile → run → parse."""
     result = analyze_single("main", src)
@@ -406,7 +421,99 @@ def test_trace_arc_null_optional_no_heap_release(
 
 
 # ---------------------------------------------------------------------------
-# I – Nested concat: intermediary freed
+# I – Optional unwrap ownership boundaries
+# ---------------------------------------------------------------------------
+
+
+def test_trace_arc_optional_unwrap_return_stabilized(
+    analyze_single, compile_and_run, tmp_path
+):
+    """`return opt as string` from a local optional must retain before cleanup."""
+    ok, stdout, _stderr, arc = _compile_with_trace_arc(
+        analyze_single,
+        compile_and_run,
+        tmp_path,
+        """
+        module main;
+        import std.string;
+        import std.io;
+
+        func make() -> string {
+            let opt: string? = concat_s("p", "q") as string?;
+            return opt as string;
+        }
+
+        func main() -> int {
+            let x: string = make();
+            printl_s(x);
+            return 0;
+        }
+        """,
+    )
+    assert ok, _stderr
+    assert stdout == "pq\n", f"unexpected output for optional unwrap return: {stdout!r}"
+
+    heap_retains = [e for e in arc if e["kind"] == "heap" and e["op"] == "retain"]
+    assert any(
+        e["action"] == "retain" and e["rc_before"] == "1" and e["rc_after"] == "2"
+        for e in heap_retains
+    ), f"expected retain 1→2 before optional cleanup: {heap_retains}"
+
+    panic_actions = [e for e in arc if e.get("action", "").startswith("panic")]
+    assert len(panic_actions) == 0, f"unexpected ARC panic action(s): {panic_actions}"
+
+    rc_values = _heap_rc_values(arc)
+    assert all(0 <= rc <= 8 for rc in rc_values), f"suspicious heap refcounts: {rc_values}"
+
+
+def test_trace_arc_optional_unwrap_into_vector_stabilized(
+    analyze_single, compile_and_run, tmp_path
+):
+    """`vs_push(v, opt as string)` must not leave vector entries dangling."""
+    ok, stdout, _stderr, arc = _compile_with_trace_arc(
+        analyze_single,
+        compile_and_run,
+        tmp_path,
+        """
+        module main;
+        import std.string;
+        import std.vector;
+        import std.io;
+
+        func build() -> VectorString* {
+            let v = vs_create(0);
+            let opt: string? = concat_s("c", "d") as string?;
+            vs_push(v, opt as string);
+            return v;
+        }
+
+        func main() -> int {
+            let v = build();
+            let s = vs_get(v, 0);
+            printl_s(s);
+            vs_free(v);
+            return 0;
+        }
+        """,
+    )
+    assert ok, _stderr
+    assert stdout == "cd\n", f"unexpected output for vector unwrap push: {stdout!r}"
+
+    panic_actions = [e for e in arc if e.get("action", "").startswith("panic")]
+    assert len(panic_actions) == 0, f"unexpected ARC panic action(s): {panic_actions}"
+
+    rc_values = _heap_rc_values(arc)
+    assert all(0 <= rc <= 8 for rc in rc_values), f"suspicious heap refcounts: {rc_values}"
+
+    frees = [
+        e for e in arc
+        if e["kind"] == "heap" and e["op"] == "release" and e["action"] == "free"
+    ]
+    assert len(frees) >= 1, f"expected at least one heap free: {arc}"
+
+
+# ---------------------------------------------------------------------------
+# J – Nested concat: intermediary freed
 # ---------------------------------------------------------------------------
 
 
