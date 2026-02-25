@@ -119,3 +119,56 @@ def test_string_byte_conversions_runtime(codegen_single, compile_and_run, tmp_pa
         "89",
         "90",
     ]
+
+
+def test_std_io_stale_errno_does_not_cause_false_failures(
+    codegen_single, compile_and_run, tmp_path
+):
+    missing_path = (tmp_path / "definitely-missing-for-errno-probe.txt").as_posix()
+    valid_path = (tmp_path / "io-errno-probe.txt").as_posix()
+
+    c_code, _ = codegen_single(
+        "std_io_errno_probe",
+        f"""
+        module std_io_errno_probe;
+
+        import std.io;
+        import std.string;
+        import sys.rt;
+
+        func main() -> int {{
+            // Seed errno with a failing file probe before std.io calls.
+            let missing = rt_file_exists("{missing_path}");
+            if (missing) {{
+                return 11;
+            }}
+
+            let w = write_file("{valid_path}", "ok");
+            if (w == null) {{
+                printl_s("write-null");
+                return 12;
+            }}
+
+            let rd = read_file("{valid_path}");
+            if (rd == null) {{
+                printl_s("read-null");
+                return 13;
+            }}
+
+            if (!eq_s(rd as string, "ok")) {{
+                printl_s("mismatch");
+                return 14;
+            }}
+
+            printl_s("ok");
+            return 0;
+        }}
+        """,
+    )
+
+    if c_code is None:
+        return
+
+    success, stdout, stderr = compile_and_run(c_code, tmp_path)
+    assert success, stderr
+    assert stdout.strip() == "ok"
