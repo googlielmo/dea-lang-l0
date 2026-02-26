@@ -1,6 +1,18 @@
-# Stage 2 Parser Specification
+# Feature Plan
 
-Version: 2026-02-14
+## Stage 2 Parser Specification
+
+- Date: 2026-02-14
+- Status: Implemented
+- Title: Stage 2 Parser Specification
+- Kind: Feature
+- Severity: Medium
+- Stage: 2
+- Subsystem: Frontend Parser
+- Modules: `compiler/stage2_l0/src/parser.l0`, `compiler/stage2_l0/src/ast.l0`
+- Test modules: `compiler/stage2_l0/tests/parser_test.l0`
+
+## Summary
 
 This document captures the detailed specification to implement Stage 2 parser work in `compiler/stage2_l0` as a
 straightforward port of Stage 1 parser behavior.
