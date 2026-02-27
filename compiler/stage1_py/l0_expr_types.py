@@ -362,6 +362,7 @@ class ExpressionTypeChecker:
                 # Infer initializer type in the context of annotation
                 value_ty = self._infer_expr(stmt.value,
                                             widening_type=annot_ty,
+                                            context_code="TYP-0310",
                                             context_descriptor=f"initializer for variable '{stmt.name}'")
                 if value_ty is None:
                     # Error already reported by _infer_expr
@@ -400,6 +401,7 @@ class ExpressionTypeChecker:
                 # Use target type as widening context for the value
                 self._infer_expr(stmt.value,
                                  widening_type=target_ty,
+                                 context_code="TYP-0311",
                                  context_descriptor=f"assignment to {self._describe_lvalue(stmt.target)}")
             else:
                 # Target type inference failed, still check value for errors
@@ -790,7 +792,9 @@ class ExpressionTypeChecker:
         return None
 
     def _infer_expr(self, expr: Optional[Expr], *,
-                    widening_type: Optional[Type] = None, context_descriptor="expression") -> Optional[Type]:
+                    widening_type: Optional[Type] = None,
+                    context_code="TYP-0319",
+                    context_descriptor="expression") -> Optional[Type]:
         if expr is None:
             return self._error(Expr(), "[TYP-0149] cannot infer type of None expression")
 
@@ -861,7 +865,7 @@ class ExpressionTypeChecker:
             if not self._can_assign(widening_type, result):
                 return self._error(
                     expr,
-                    f"{context_descriptor} type mismatch: "
+                    f"[{context_code}] {context_descriptor} type mismatch: "
                     f"expected '{format_type(widening_type)}', got '{format_type(result)}'",
                 )
 
@@ -1323,6 +1327,7 @@ class ExpressionTypeChecker:
             if index < len(callee_ty.params):
                 param_ty = callee_ty.params[index]
                 self._infer_expr(arg, widening_type=param_ty,
+                                 context_code="TYP-0312",
                                  context_descriptor=f"argument {index + 1} to function '{expr.callee.name}'")
         return callee_ty.result
 
@@ -1366,6 +1371,7 @@ class ExpressionTypeChecker:
             if index < len(info.fields):
                 field_info = info.fields[index]
                 self._infer_expr(arg, widening_type=field_info.type,
+                                 context_code="TYP-0313",
                                  context_descriptor=f"argument {index + 1} to struct constructor '{struct_name}' for field '{field_info.name}'")
 
         return struct_type
@@ -1409,6 +1415,7 @@ class ExpressionTypeChecker:
                 param_ty = variant_type.params[index]
                 self._infer_expr(arg,
                                  widening_type=param_ty,
+                                 context_code="TYP-0314",
                                  context_descriptor=f"argument {index + 1} to variant constructor '{variant_name}'")
 
         return enum_type
@@ -1527,6 +1534,7 @@ class ExpressionTypeChecker:
             # Use expected type as widening context for return value
             actual = self._infer_expr(stmt.value,
                                       widening_type=expected,
+                                      context_code="TYP-0315",
                                       context_descriptor="return value")
             # If _infer_expr returns None, it already reported the error
             if actual is None:
@@ -1816,6 +1824,7 @@ class ExpressionTypeChecker:
 
                 for field, arg in zip(info.fields, expr.args):
                     self._infer_expr(arg, widening_type=field.type,
+                                     context_code="TYP-0316",
                                      context_descriptor=f"field '{field.name}' of struct '{base_ty.name}'")
 
         else:

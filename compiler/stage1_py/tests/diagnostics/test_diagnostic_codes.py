@@ -39,6 +39,7 @@ INTERNAL_CODES = {
     "TYP-0153",  # UNKNOWN_MODULE unreachable: require_import fires MODULE_NOT_IMPORTED first
     "TYP-0182", "TYP-0190", "TYP-0200", "TYP-0260", "TYP-0282",
     "TYP-0300",  # same reason: UNKNOWN_MODULE path unreachable in sizeof
+    "TYP-0319",  # default widening mismatch code; all current call sites pass a specific code
     "TYP-9209", "TYP-9288", "TYP-9289",
 }
 
@@ -592,6 +593,38 @@ TYP_TRIGGERS = {
         module main;
         func bar(x: int) -> int { return x; }
         func foo() -> int { return bar(int); }
+    """),
+    "TYP-0310": dedent("""\
+        module main;
+        func foo() -> int { let x: int = true; return 0; }
+    """),
+    "TYP-0311": dedent("""\
+        module main;
+        func foo() -> int { let x: int = 0; x = true; return x; }
+    """),
+    "TYP-0312": dedent("""\
+        module main;
+        func bar(x: int) -> int { return x; }
+        func foo() -> int { return bar(true); }
+    """),
+    "TYP-0313": dedent("""\
+        module main;
+        struct S { v: int; }
+        func foo() -> int { let s: S = S(true); return 0; }
+    """),
+    "TYP-0314": dedent("""\
+        module main;
+        enum E { Some(v: int); }
+        func foo() -> int { let e: E = Some(true); return 0; }
+    """),
+    "TYP-0315": dedent("""\
+        module main;
+        func foo() -> int { return true; }
+    """),
+    "TYP-0316": dedent("""\
+        module main;
+        struct S { v: int; }
+        func foo() -> int { let p: S* = new S(true); return 0; }
     """),
 }
 
