@@ -19,6 +19,7 @@ implementation status, read the relevant doc file(s).**
 | Doc file                                 | Covers                                                        |
 |------------------------------------------|---------------------------------------------------------------|
 | `docs/reference/architecture.md`         | Compiler pipeline, passes, data flow, file layout             |
+| `docs/specs/compiler/diagnostic-format.md` | Normative diagnostic output format (header, snippet, gutter)  |
 | `docs/specs/compiler/stage1-contract.md` | Stage 1 compact contract, interfaces, guarantees, doc routing |
 | `docs/reference/c-backend-design.md`     | C backend architecture, emission strategy                     |
 | `docs/reference/design-decisions.md`     | Runtime, pointer model, integer model, I/O, rationale         |

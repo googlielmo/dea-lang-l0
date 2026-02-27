@@ -7,12 +7,49 @@ module diag_print_test;
 
 import std.io;
 import std.assert;
+import std.string;
 import util.diag;
 
 import diag_print;
 
 func fixture_file() -> string {
     return "compiler/stage2_l0/tests/fixtures/driver/ok_main.l0";
+}
+
+func test_format_header_full_location() {
+    with (let dc = diag_create() => diag_free(dc)) {
+        diag_error(dc, "Parser", "PAR-0010", "message", "path", 10, 5, 0, 0);
+        let header = dp_format_header(diag_get(dc, 0));
+        assert(eq_s(header, "path:10:5: error: [PAR-0010] message"),
+            "full location header mismatch");
+    }
+}
+
+func test_format_header_no_file() {
+    with (let dc = diag_create() => diag_free(dc)) {
+        diag_error(dc, "Parser", "PAR-0010", "message", "", 0, 0, 0, 0);
+        let header = dp_format_header(diag_get(dc, 0));
+        assert(eq_s(header, "error: [PAR-0010] message"),
+            "no-file header mismatch");
+    }
+}
+
+func test_format_header_no_column() {
+    with (let dc = diag_create() => diag_free(dc)) {
+        diag_error(dc, "Parser", "PAR-0010", "message", "path", 10, 0, 0, 0);
+        let header = dp_format_header(diag_get(dc, 0));
+        assert(eq_s(header, "path:10: error: [PAR-0010] message"),
+            "no-column header mismatch");
+    }
+}
+
+func test_format_header_no_code() {
+    with (let dc = diag_create() => diag_free(dc)) {
+        diag_error(dc, "", "", "message", "path", 10, 5, 0, 0);
+        let header = dp_format_header(diag_get(dc, 0));
+        assert(eq_s(header, "path:10:5: error: message"),
+            "no-code header mismatch");
+    }
 }
 
 func test_prints_snippet_for_located_diag() {
@@ -24,6 +61,10 @@ func test_prints_snippet_for_located_diag() {
 }
 
 func main() {
+    test_format_header_full_location();
+    test_format_header_no_file();
+    test_format_header_no_column();
+    test_format_header_no_code();
     test_prints_snippet_for_located_diag();
     printl_s("diag_print_test: all tests passed");
 }

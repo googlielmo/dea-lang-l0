@@ -23,36 +23,42 @@ func dp_severity_name(sev: DiagnosticSeverity) -> string {
     }
 }
 
-func dp_print_header(diag: Diagnostic*) {
+func dp_format_header(diag: Diagnostic*) -> string {
     with (let sb = sb_create() => sb_free(sb)) {
+        // Location prefix: path:line:column
+        if (len_s(diag.filename) > 0) {
+            sb_append(sb, diag.filename);
+            if (diag.line > 0) {
+                sb_append(sb, ":");
+                sb_append_int(sb, diag.line);
+                if (diag.column > 0) {
+                    sb_append(sb, ":");
+                    sb_append_int(sb, diag.column);
+                }
+            }
+            sb_append(sb, ": ");
+        }
+
+        // Severity
         sb_append(sb, dp_severity_name(diag.severity));
         sb_append(sb, ": ");
 
-        if (len_s(diag.phase) > 0) {
-            sb_append(sb, "[");
-            sb_append(sb, diag.phase);
-            sb_append(sb, ":");
-            sb_append(sb, diag.code);
-            sb_append(sb, "] ");
-        } else if (len_s(diag.code) > 0) {
+        // Code bracket (phase not rendered — XXX- prefix identifies the phase)
+        if (len_s(diag.code) > 0) {
             sb_append(sb, "[");
             sb_append(sb, diag.code);
             sb_append(sb, "] ");
         }
 
+        // Message
         sb_append(sb, diag.message);
-        if (len_s(diag.filename) > 0 && diag.line > 0 && diag.column > 0) {
-            sb_append(sb, " (");
-            sb_append(sb, diag.filename);
-            sb_append(sb, ":");
-            sb_append_int(sb, diag.line);
-            sb_append(sb, ":");
-            sb_append_int(sb, diag.column);
-            sb_append(sb, ")");
-        }
 
-        err_printl_s(sb_to_string(sb));
+        return sb_to_string(sb);
     }
+}
+
+func dp_print_header(diag: Diagnostic*) {
+    err_printl_s(dp_format_header(diag));
 }
 
 func dp_render_snippet(diag: Diagnostic*, src: string) {
@@ -68,13 +74,23 @@ func dp_render_snippet(diag: Diagnostic*, src: string) {
 
         let src_line = vs_get(lines, line_index);
         let line_no = int_to_string(diag.line);
-        err_printl_s(concat4_s(line_no, " | ", src_line, ""));
 
-        let start_col = diag.column;
-        if (start_col < 1) {
-            start_col = 1;
+        // gutter_width = max(5, len(line_no_str))
+        let gutter_width = len_s(line_no);
+        if (gutter_width < 5) {
+            gutter_width = 5;
         }
 
+        // Right-align line number within gutter
+        let pad = repeat_s(" ", gutter_width - len_s(line_no));
+        err_printl_s(concat4_s(pad, line_no, " | ", src_line));
+
+        // Omit caret line when no column info
+        if (diag.column < 1) {
+            return;
+        }
+
+        let start_col = diag.column;
         let end_col = start_col;
         if (diag.line_end > 0 && diag.column_end > 0) {
             if (diag.line_end == diag.line) {
@@ -91,7 +107,8 @@ func dp_render_snippet(diag: Diagnostic*, src: string) {
             caret_width = 1;
         }
 
-        let caret_prefix = repeat_s(" ", len_s(line_no) + 3 + (start_col - 1));
+        // Caret line: gutter_width spaces + " | " + offset spaces + carets
+        let caret_prefix = repeat_s(" ", gutter_width + 3 + (start_col - 1));
         let carets = repeat_s("^", caret_width);
         err_printl_s(concat_s(caret_prefix, carets));
     }
