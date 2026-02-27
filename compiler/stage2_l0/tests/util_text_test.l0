@@ -9,6 +9,7 @@ import std.io;
 import std.string;
 import std.unit;
 import std.assert;
+import std.vector;
 
 import std.text;
 
@@ -304,6 +305,142 @@ func test_trim_s() {
     assert(eq_s(t5, ""), "Expected trim_s('') to be ''");
 
     printl_s("trim_s tests passed!\n");
+}
+
+func test_is_empty_s() {
+    printl_s("=== Test is_empty_s ===");
+
+    assert(is_empty_s(""), "Expected is_empty_s('') to be true");
+    assert(!is_empty_s(" "), "Expected is_empty_s(' ') to be false");
+    assert(!is_empty_s("x"), "Expected is_empty_s('x') to be false");
+
+    printl_s("is_empty_s tests passed!\n");
+}
+
+func test_split_s() {
+    printl_s("=== Test split_s ===");
+
+    with (let p1 = split_s("a,b,c", ",") => vs_free(p1)) {
+        assert(vs_size(p1) == 3, "Expected split_s('a,b,c', ',') to return 3 parts");
+        assert(eq_s(vs_get(p1, 0), "a"), "Expected first part to be 'a'");
+        assert(eq_s(vs_get(p1, 1), "b"), "Expected second part to be 'b'");
+        assert(eq_s(vs_get(p1, 2), "c"), "Expected third part to be 'c'");
+    }
+
+    with (let p2 = split_s("a,,b", ",") => vs_free(p2)) {
+        assert(vs_size(p2) == 3, "Expected split_s('a,,b', ',') to keep empty middle item");
+        assert(eq_s(vs_get(p2, 0), "a"), "Expected first part to be 'a'");
+        assert(eq_s(vs_get(p2, 1), ""), "Expected second part to be empty");
+        assert(eq_s(vs_get(p2, 2), "b"), "Expected third part to be 'b'");
+    }
+
+    with (let p3 = split_s(",a,", ",") => vs_free(p3)) {
+        assert(vs_size(p3) == 3, "Expected split_s(',a,', ',') to keep edge empties");
+        assert(eq_s(vs_get(p3, 0), ""), "Expected first part to be empty");
+        assert(eq_s(vs_get(p3, 1), "a"), "Expected middle part to be 'a'");
+        assert(eq_s(vs_get(p3, 2), ""), "Expected last part to be empty");
+    }
+
+    with (let p4 = split_s("", ",") => vs_free(p4)) {
+        assert(vs_size(p4) == 1, "Expected split_s('', ',') to return one empty part");
+        assert(eq_s(vs_get(p4, 0), ""), "Expected only part to be empty");
+    }
+
+    with (let p5 = split_s("a--b----c", "--") => vs_free(p5)) {
+        assert(vs_size(p5) == 4, "Expected split_s('a--b----c', '--') to return 4 parts");
+        assert(eq_s(vs_get(p5, 0), "a"), "Expected first part to be 'a'");
+        assert(eq_s(vs_get(p5, 1), "b"), "Expected second part to be 'b'");
+        assert(eq_s(vs_get(p5, 2), ""), "Expected third part to be empty");
+        assert(eq_s(vs_get(p5, 3), "c"), "Expected fourth part to be 'c'");
+    }
+
+    printl_s("split_s tests passed!\n");
+}
+
+func test_find_last_s() {
+    printl_s("=== Test find_last_s ===");
+
+    assert(find_last_s("banana", "ana") == 3, "Expected find_last_s('banana', 'ana') to be 3");
+    assert(find_last_s("banana", "ban") == 0, "Expected find_last_s('banana', 'ban') to be 0");
+    assert(find_last_s("banana", "") == 6, "Expected find_last_s('banana', '') to be 6");
+    assert(find_last_s("banana", "zzz") == -1, "Expected find_last_s('banana', 'zzz') to be -1");
+    assert(find_last_s("aaaa", "aa") == 2, "Expected find_last_s('aaaa', 'aa') to be 2");
+
+    printl_s("find_last_s tests passed!\n");
+}
+
+func test_lines_s() {
+    printl_s("=== Test lines_s ===");
+
+    with (let l1 = lines_s("") => vs_free(l1)) {
+        assert(vs_size(l1) == 0, "Expected lines_s('') to return empty vector");
+    }
+
+    with (let l2 = lines_s("a\n") => vs_free(l2)) {
+        assert(vs_size(l2) == 1, "Expected lines_s('a\\n') to return one line");
+        assert(eq_s(vs_get(l2, 0), "a"), "Expected first line to be 'a'");
+    }
+
+    with (let l3 = lines_s("a\n\nb") => vs_free(l3)) {
+        assert(vs_size(l3) == 3, "Expected lines_s('a\\n\\nb') to keep middle empty line");
+        assert(eq_s(vs_get(l3, 0), "a"), "Expected first line to be 'a'");
+        assert(eq_s(vs_get(l3, 1), ""), "Expected second line to be empty");
+        assert(eq_s(vs_get(l3, 2), "b"), "Expected third line to be 'b'");
+    }
+
+    with (let l4 = lines_s("a\r\nb\r\n") => vs_free(l4)) {
+        assert(vs_size(l4) == 2, "Expected lines_s('a\\r\\nb\\r\\n') to return two lines");
+        assert(eq_s(vs_get(l4, 0), "a"), "Expected first CRLF line to be 'a'");
+        assert(eq_s(vs_get(l4, 1), "b"), "Expected second CRLF line to be 'b'");
+    }
+
+    with (let l5 = lines_s("x\r") => vs_free(l5)) {
+        assert(vs_size(l5) == 1, "Expected lines_s('x\\r') to return one line");
+        assert(eq_s(vs_get(l5, 0), "x"), "Expected trailing CR to be stripped");
+    }
+
+    printl_s("lines_s tests passed!\n");
+}
+
+func test_join_s() {
+    printl_s("=== Test join_s ===");
+
+    with (let empty = vs_create(0) => vs_free(empty)) {
+        assert(eq_s(join_s(empty, ","), ""), "Expected join_s(empty, ',') to be empty");
+    }
+
+    with (let one = vs_create(1) => vs_free(one)) {
+        vs_push(one, "one");
+        assert(eq_s(join_s(one, ","), "one"), "Expected join_s(singleton, ',') to return the item");
+    }
+
+    with (let many = vs_create(3) => vs_free(many)) {
+        vs_push(many, "a");
+        vs_push(many, "b");
+        vs_push(many, "c");
+        assert(eq_s(join_s(many, "--"), "a--b--c"), "Expected join_s(['a','b','c'], '--') to be 'a--b--c'");
+    }
+
+    with (let with_empty = vs_create(3) => vs_free(with_empty)) {
+        vs_push(with_empty, "a");
+        vs_push(with_empty, "");
+        vs_push(with_empty, "b");
+        assert(eq_s(join_s(with_empty, ","), "a,,b"), "Expected join_s(['a','','b'], ',') to be 'a,,b'");
+    }
+
+    printl_s("join_s tests passed!\n");
+}
+
+func test_replace_s() {
+    printl_s("=== Test replace_s ===");
+
+    assert(eq_s(replace_s("banana", "na", "X"), "baXX"), "Expected replace_s('banana', 'na', 'X') to be 'baXX'");
+    assert(eq_s(replace_s("aaaa", "aa", "b"), "bb"), "Expected non-overlapping replace in 'aaaa'");
+    assert(eq_s(replace_s("abc", "z", "q"), "abc"), "Expected replace_s with missing pattern to return original");
+    assert(eq_s(replace_s("foo", "o", "oo"), "foooo"), "Expected replace_s('foo', 'o', 'oo') to expand");
+    assert(eq_s(replace_s("abcabc", "abc", ""), ""), "Expected replace_s('abcabc', 'abc', '') to be empty");
+
+    printl_s("replace_s tests passed!\n");
 }
 
 func test_to_upper_s() {
@@ -744,6 +881,12 @@ func main() -> int {
     test_concat3_s();
     test_repeat_s();
     test_trim_s();
+    test_is_empty_s();
+    test_split_s();
+    test_find_last_s();
+    test_lines_s();
+    test_join_s();
+    test_replace_s();
     test_to_upper_s();
     test_to_lower_s();
 

@@ -25,6 +25,10 @@ func len_s(s: string) -> int {
     return rt_strlen(s);
 }
 
+func is_empty_s(s: string) -> bool {
+    return len_s(s) == 0;
+}
+
 // Returns the character code (0-255) at the specified index in the string.
 func char_at_s(s: string, index: int) -> byte {
     return rt_string_get(s, index);
@@ -61,6 +65,36 @@ func bytes_to_s(bytes: byte*, len: int) -> string {
 // Returns the index of the first occurrence of 'needle' in 'haystack', or -1 if not found.
 func find_s(haystack: string, needle: string) -> int {
     return find_from_s(haystack, needle, 0);
+}
+
+// Returns the index of the last occurrence of 'needle' in 'haystack', or -1 if not found.
+// For empty needle, returns len_s(haystack).
+func find_last_s(haystack: string, needle: string) -> int {
+    let haystack_len = len_s(haystack);
+    let needle_len = len_s(needle);
+
+    if (needle_len == 0) {
+        return haystack_len;
+    }
+
+    if (needle_len > haystack_len) {
+        return -1;
+    }
+
+    for (let i = haystack_len - needle_len; i >= 0; i = i - 1) {
+        let found = true;
+        for (let j = 0; j < needle_len; j = j + 1) {
+            if (char_at_s(haystack, i + j) != char_at_s(needle, j)) {
+                found = false;
+                break;
+            }
+        }
+        if (found) {
+            return i;
+        }
+    }
+
+    return -1;
 }
 
 // Returns the index of the first occurrence of 'needle' in 'haystack' starting from 'pos', or -1 if not found.

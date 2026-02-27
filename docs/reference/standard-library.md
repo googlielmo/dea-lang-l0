@@ -239,6 +239,7 @@ This module exposes runtime hash functions directly via `extern func` declaratio
 | Function        | Signature                                             | Description                                                             |
 |-----------------|-------------------------------------------------------|-------------------------------------------------------------------------|
 | `len_s`         | `(s: string) -> int`                                  | Returns string byte length.                                             |
+| `is_empty_s`    | `(s: string) -> bool`                                 | Returns whether string length is zero.                                  |
 | `char_at_s`     | `(s: string, index: int) -> byte`                     | Returns byte at index.                                                  |
 | `eq_s`          | `(a: string, b: string) -> bool`                      | Compares strings for equality.                                          |
 | `cmp_s`         | `(a: string, b: string) -> int`                       | Compares strings lexicographically (`<0`, `0`, `>0`).                   |
@@ -247,6 +248,7 @@ This module exposes runtime hash functions directly via `extern func` declaratio
 | `byte_to_s`     | `(b: byte) -> string`                                 | Creates one-character string from a byte value.                         |
 | `bytes_to_s`    | `(bytes: byte*, len: int) -> string`                  | Creates string from byte buffer.                                        |
 | `find_s`        | `(haystack: string, needle: string) -> int`           | Returns first match index or `-1`.                                      |
+| `find_last_s`   | `(haystack: string, needle: string) -> int`           | Returns last match index or `-1` (`len_s(haystack)` for empty needle).  |
 | `find_from_s`   | `(haystack: string, needle: string, pos: int) -> int` | Returns first match index at/after `pos`, or `-1`. Requires `pos >= 0`. |
 | `contains_s`    | `(haystack: string, needle: string) -> bool`          | Returns whether `needle` occurs in `haystack`.                          |
 | `starts_with_s` | `(s: string, prefix: string) -> bool`                 | Returns whether `s` starts with `prefix`.                               |
@@ -260,6 +262,7 @@ This module exposes runtime hash functions directly via `extern func` declaratio
 | `to_digit_base` | `(c: byte, base: int) -> int?`                        | Converts base `2..16` digit byte to integer value or `null`.            |
 | `to_upper`      | `(c: byte) -> byte`                                   | Uppercases ASCII letter; returns input otherwise.                       |
 | `to_lower`      | `(c: byte) -> byte`                                   | Lowercases ASCII letter; returns input otherwise.                       |
+| `trim_s`        | `(s: string) -> string`                               | Trims leading/trailing ASCII whitespace (`' '`, `'\n'`, `'\t'`, `'\r'`). |
 
 ### `std.text`
 
@@ -274,6 +277,10 @@ This module exposes runtime hash functions directly via `extern func` declaratio
 | `concat3_s/concat4_s`                               | string concat helpers                                                                               | Concatenate 3 or 4 strings efficiently.                                                                   |
 | `to_upper_s/to_lower_s`                             | case helpers                                                                                        | Convert full string case.                                                                                 |
 | `repeat_s/reverse_s`                                | string helpers                                                                                      | Repeat or reverse string content.                                                                         |
+| `split_s`                                           | `(s: string, sep: string) -> VectorString*`                                                         | Splits by non-empty separator and keeps empty tokens. Caller owns result (`vs_free`).                    |
+| `lines_s`                                           | `(s: string) -> VectorString*`                                                                      | Splits on `\n`, strips trailing `\r` per line. Caller owns result (`vs_free`).                           |
+| `join_s`                                            | `(parts: VectorString*, sep: string) -> string`                                                     | Joins vector elements with separator.                                                                     |
+| `replace_s`                                         | `(s: string, old: string, replacement: string) -> string`                                           | Replaces all non-overlapping matches of non-empty `old` with `replacement`.                              |
 | `int_to_string_base`                                | `(value: int, base: int) -> string`                                                                 | Base conversion for signed ints (`2..16`).                                                                |
 | `int_to_string/int_to_hex_string/int_to_bin_string` | format helpers                                                                                      | Decimal, hex, and binary formatting helpers.                                                              |
 | `bool_to_string/string_to_bool`                     | `(bool) -> string`, `(string) -> bool?`                                                             | Converts booleans to `"true"`/`"false"` and parses strict lowercase boolean text.                         |

@@ -41,6 +41,12 @@ def test_string_search_helpers_runtime(codegen_single, compile_and_run, tmp_path
             printl_i(bool_to_int(ends_with_s("banana", "")));
             printl_i(bool_to_int(ends_with_s("abcabc", "abc")));
 
+            printl_i(find_last_s("banana", "ana"));
+            printl_i(find_last_s("banana", "ban"));
+            printl_i(find_last_s("banana", ""));
+            printl_i(find_last_s("banana", "zzz"));
+            printl_i(find_last_s("aaaa", "aa"));
+
             return 0;
         }
         """,
@@ -69,6 +75,11 @@ def test_string_search_helpers_runtime(codegen_single, compile_and_run, tmp_path
         "0",
         "1",
         "1",
+        "3",
+        "0",
+        "6",
+        "-1",
+        "2",
     ]
 
 
@@ -172,3 +183,141 @@ def test_std_io_stale_errno_does_not_cause_false_failures(
     success, stdout, stderr = compile_and_run(c_code, tmp_path)
     assert success, stderr
     assert stdout.strip() == "ok"
+
+
+def test_string_text_helpers_runtime(codegen_single, compile_and_run, tmp_path):
+    c_code, _ = codegen_single(
+        "string_text_helpers",
+        """
+        module string_text_helpers;
+
+        import std.io;
+        import std.string;
+        import std.text;
+        import std.vector;
+
+        func bool_to_int(v: bool) -> int {
+            if (v) {
+                return 1;
+            }
+            return 0;
+        }
+
+        func emit_vec(v: VectorString*) {
+            printl_i(vs_size(v));
+            for (let i = 0; i < vs_size(v); i = i + 1) {
+                printl_s(concat3_s("[", vs_get(v, i), "]"));
+            }
+        }
+
+        func main() -> int {
+            printl_i(bool_to_int(is_empty_s("")));
+            printl_i(bool_to_int(is_empty_s("x")));
+            printl_s(trim_s(" \\t hi \\n"));
+
+            with (let p1 = split_s("a,,b", ",") => vs_free(p1)) {
+                emit_vec(p1);
+            }
+
+            with (let p2 = split_s("a--b----c", "--") => vs_free(p2)) {
+                emit_vec(p2);
+            }
+
+            with (let p3 = split_s("", ",") => vs_free(p3)) {
+                emit_vec(p3);
+            }
+
+            with (let lines = lines_s("a\\r\\n\\r\\nb\\n") => vs_free(lines)) {
+                emit_vec(lines);
+            }
+
+            with (let parts = vs_create(3) => vs_free(parts)) {
+                vs_push(parts, "x");
+                vs_push(parts, "");
+                vs_push(parts, "z");
+                printl_s(join_s(parts, ":"));
+            }
+
+            printl_s(replace_s("banana", "na", "X"));
+            printl_s(replace_s("aaaa", "aa", "b"));
+            printl_s(replace_s("abc", "q", "w"));
+            return 0;
+        }
+        """,
+    )
+
+    if c_code is None:
+        return
+
+    success, stdout, stderr = compile_and_run(c_code, tmp_path)
+    assert success, stderr
+    assert stdout.strip().splitlines() == [
+        "1",
+        "0",
+        "hi",
+        "3",
+        "[a]",
+        "[]",
+        "[b]",
+        "4",
+        "[a]",
+        "[b]",
+        "[]",
+        "[c]",
+        "1",
+        "[]",
+        "3",
+        "[a]",
+        "[]",
+        "[b]",
+        "x::z",
+        "baXX",
+        "bb",
+        "abc",
+    ]
+
+
+def test_split_s_empty_separator_panics(codegen_single, compile_and_run, tmp_path):
+    c_code, _ = codegen_single(
+        "split_empty_separator_panics",
+        """
+        module split_empty_separator_panics;
+
+        import std.text;
+
+        func main() -> int {
+            split_s("abc", "");
+            return 0;
+        }
+        """,
+    )
+
+    if c_code is None:
+        return
+
+    success, stdout, stderr = compile_and_run(c_code, tmp_path)
+    assert not success
+    assert stderr.strip().splitlines()[-1] == "Software Failure: split_s: separator must be non-empty"
+
+
+def test_replace_s_empty_old_pattern_panics(codegen_single, compile_and_run, tmp_path):
+    c_code, _ = codegen_single(
+        "replace_empty_old_panics",
+        """
+        module replace_empty_old_panics;
+
+        import std.text;
+
+        func main() -> int {
+            replace_s("abc", "", "x");
+            return 0;
+        }
+        """,
+    )
+
+    if c_code is None:
+        return
+
+    success, stdout, stderr = compile_and_run(c_code, tmp_path)
+    assert not success
+    assert stderr.strip().splitlines()[-1] == "Software Failure: replace_s: old pattern must be non-empty"

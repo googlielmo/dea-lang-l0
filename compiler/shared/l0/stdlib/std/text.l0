@@ -210,6 +210,106 @@ func repeat_s(s: string, count: int) -> string {
     }
 }
 
+func split_s(s: string, sep: string) -> VectorString* {
+    assert(!is_empty_s(sep), "split_s: separator must be non-empty");
+
+    let out = vs_create(4);
+    let n = len_s(s);
+    let sep_len = len_s(sep);
+
+    let start = 0;
+    let search_pos = 0;
+
+    while (search_pos <= n) {
+        let hit = find_from_s(s, sep, search_pos);
+        if (hit < 0) {
+            break;
+        }
+        vs_push(out, slice_s(s, start, hit));
+        start = hit + sep_len;
+        search_pos = start;
+    }
+
+    vs_push(out, slice_s(s, start, n));
+    return out;
+}
+
+func _line_strip_trailing_cr(s: string) -> string {
+    let n = len_s(s);
+    if (n > 0 && char_at_s(s, n - 1) == '\r') {
+        return slice_s(s, 0, n - 1);
+    }
+    return s;
+}
+
+func lines_s(s: string) -> VectorString* {
+    let out = vs_create(16);
+    let n = len_s(s);
+    if (n == 0) {
+        return out;
+    }
+
+    let start = 0;
+    for (let i = 0; i < n; i = i + 1) {
+        if (char_at_s(s, i) == '\n') {
+            vs_push(out, _line_strip_trailing_cr(slice_s(s, start, i)));
+            start = i + 1;
+        }
+    }
+
+    if (start < n) {
+        vs_push(out, _line_strip_trailing_cr(slice_s(s, start, n)));
+    }
+
+    return out;
+}
+
+func join_s(parts: VectorString*, sep: string) -> string {
+    let count = vs_size(parts);
+    if (count == 0) {
+        return "";
+    }
+
+    let sep_len = len_s(sep);
+    let total_len = sep_len * (count - 1);
+    for (let i = 0; i < count; i = i + 1) {
+        total_len = total_len + len_s(vs_get(parts, i));
+    }
+
+    with (let cb = cb_create() => cb_free(cb)) {
+        cb_reserve(cb, total_len);
+        for (let i = 0; i < count; i = i + 1) {
+            if (i > 0) {
+                cb_append_s(cb, sep);
+            }
+            cb_append_s(cb, vs_get(parts, i));
+        }
+        return cb_to_string(cb);
+    }
+}
+
+func replace_s(s: string, old: string, replacement: string) -> string {
+    assert(!is_empty_s(old), "replace_s: old pattern must be non-empty");
+
+    let n = len_s(s);
+    let old_len = len_s(old);
+    with (let cb = cb_create() => cb_free(cb)) {
+        let start = 0;
+        while (start <= n) {
+            let hit = find_from_s(s, old, start);
+            if (hit < 0) {
+                cb_append_slice(cb, s, start, n - start);
+                break;
+            }
+
+            cb_append_slice(cb, s, start, hit - start);
+            cb_append_s(cb, replacement);
+            start = hit + old_len;
+        }
+        return cb_to_string(cb);
+    }
+}
+
 func int_to_string_base(value: int, base: int) -> string {
     assert(base >= 2 && base <= 16, "Base must be between 2 and 16");
     if (value == 0) {
