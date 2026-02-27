@@ -21,6 +21,7 @@ import cli_args;
 import diag_print;
 import lexer;
 import tokens;
+import util.log;
 
 struct PreparedInput {
     entry_module: string;
@@ -119,7 +120,7 @@ func l0c_dump_tokens_for_path(path: string, include_eof: bool, diags: DiagCollec
     return 0;
 }
 
-func l0c_cmd_check(opts: CliOptions*) -> int {
+func l0c_cmd_check(opts: CliOptions*, cfg: LogConfig*) -> int {
     with (let diags = diag_create() => diag_free(diags)) {
         let prepared = l0c_prepare_input(opts, diags);
         if (prepared == null) {
@@ -128,7 +129,7 @@ func l0c_cmd_check(opts: CliOptions*) -> int {
         }
         let prep = prepared as PreparedInput*;
 
-        let result = driver_analyze_entry(prep.search_paths, prep.entry_module);
+        let result = driver_analyze_entry(prep.search_paths, prep.entry_module, cfg);
         prepared_input_free(prep);
         prepared = null;
         dp_print_collector_with_sources(result.diags, result.source_names, result.source_texts);
@@ -138,12 +139,15 @@ func l0c_cmd_check(opts: CliOptions*) -> int {
             rc = 1;
         }
 
+        log_info(cfg, concat4_s("Analysis complete: ", int_to_string(driver_diag_count(result)),
+            " diagnostic(s), ", concat_s(int_to_string(result.diags.error_count), " error(s)")));
+
         driver_state_free(result);
         return rc;
     }
 }
 
-func l0c_cmd_tok(opts: CliOptions*) -> int {
+func l0c_cmd_tok(opts: CliOptions*, cfg: LogConfig*) -> int {
     with (let diags = diag_create() => diag_free(diags)) {
         let prepared = l0c_prepare_input(opts, diags);
         if (prepared == null) {
@@ -153,7 +157,7 @@ func l0c_cmd_tok(opts: CliOptions*) -> int {
         let prep = prepared as PreparedInput*;
 
         if (opts.all_modules) {
-            let result = driver_analyze_entry(prep.search_paths, prep.entry_module);
+            let result = driver_analyze_entry(prep.search_paths, prep.entry_module, cfg);
             prepared_input_free(prep);
             prepared = null;
             if (driver_has_errors(result)) {
@@ -214,7 +218,7 @@ func l0c_cmd_tok(opts: CliOptions*) -> int {
     }
 }
 
-func l0c_cmd_nyi(mode: CliMode) -> int {
+func l0c_cmd_nyi(mode: CliMode, cfg: LogConfig*) -> int {
     with (let diags = diag_create() => diag_free(diags)) {
         diag_error(
             diags,
@@ -243,37 +247,39 @@ func run_with_argv(argv: VectorString*) -> int {
     let opts = parsed.options as CliOptions*;
     parsed.options = null;
 
-    let rc = 1;
-    match (opts.mode) {
-        CM_CHECK => {
-            rc = l0c_cmd_check(opts);
+    with (let cfg = log_config_create(log_level_from_verbosity(opts.verbosity), opts.log) => log_config_free(cfg)) {
+        let rc = 1;
+        match (opts.mode) {
+            CM_CHECK => {
+                rc = l0c_cmd_check(opts, cfg);
+            }
+            CM_TOK => {
+                rc = l0c_cmd_tok(opts, cfg);
+            }
+            CM_RUN => {
+                rc = l0c_cmd_nyi(opts.mode, cfg);
+            }
+            CM_BUILD => {
+                rc = l0c_cmd_nyi(opts.mode, cfg);
+            }
+            CM_GEN => {
+                rc = l0c_cmd_nyi(opts.mode, cfg);
+            }
+            CM_AST => {
+                rc = l0c_cmd_nyi(opts.mode, cfg);
+            }
+            CM_SYM => {
+                rc = l0c_cmd_nyi(opts.mode, cfg);
+            }
+            CM_TYPE => {
+                rc = l0c_cmd_nyi(opts.mode, cfg);
+            }
         }
-        CM_TOK => {
-            rc = l0c_cmd_tok(opts);
-        }
-        CM_RUN => {
-            rc = l0c_cmd_nyi(opts.mode);
-        }
-        CM_BUILD => {
-            rc = l0c_cmd_nyi(opts.mode);
-        }
-        CM_GEN => {
-            rc = l0c_cmd_nyi(opts.mode);
-        }
-        CM_AST => {
-            rc = l0c_cmd_nyi(opts.mode);
-        }
-        CM_SYM => {
-            rc = l0c_cmd_nyi(opts.mode);
-        }
-        CM_TYPE => {
-            rc = l0c_cmd_nyi(opts.mode);
-        }
-    }
 
-    cli_options_free(opts);
-    cli_parse_result_free(parsed);
-    return rc;
+        cli_options_free(opts);
+        cli_parse_result_free(parsed);
+        return rc;
+    }
 }
 
 func main() {

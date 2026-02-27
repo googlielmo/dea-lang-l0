@@ -11,6 +11,7 @@ import std.assert;
 
 import source_paths;
 import driver;
+import util.log;
 
 func fixture_root() -> string {
     return "compiler/stage2_l0/tests/fixtures/driver";
@@ -34,45 +35,53 @@ func has_driver_diag_code(result: DriverState*, code: string) -> bool {
 
 func test_transitive_import_closure_ok() {
     let sp = make_paths();
-    let result = driver_analyze_entry(sp, "ok_main");
+    with (let cfg = log_config_create(LL_SILENT, false) => log_config_free(cfg)) {
+        let result = driver_analyze_entry(sp, "ok_main", cfg);
 
-    assert(!driver_has_errors(result), "expected no driver errors for ok_main");
-    assert(driver_unit_count(result) == 4, "expected 4 loaded modules in closure");
+        assert(!driver_has_errors(result), "expected no driver errors for ok_main");
+        assert(driver_unit_count(result) == 4, "expected 4 loaded modules in closure");
 
-    driver_state_free(result);
+        driver_state_free(result);
+    }
     sp_free(sp);
 }
 
 func test_import_cycle_reports_error() {
     let sp = make_paths();
-    let result = driver_analyze_entry(sp, "cycle_a");
+    with (let cfg = log_config_create(LL_SILENT, false) => log_config_free(cfg)) {
+        let result = driver_analyze_entry(sp, "cycle_a", cfg);
 
-    assert(driver_has_errors(result), "expected cycle errors");
-    assert(has_driver_diag_code(result, "DRV-0030"), "expected DRV-0030 for cycle");
+        assert(driver_has_errors(result), "expected cycle errors");
+        assert(has_driver_diag_code(result, "DRV-0030"), "expected DRV-0030 for cycle");
 
-    driver_state_free(result);
+        driver_state_free(result);
+    }
     sp_free(sp);
 }
 
 func test_module_name_mismatch_reports_error() {
     let sp = make_paths();
-    let result = driver_analyze_entry(sp, "mismatch");
+    with (let cfg = log_config_create(LL_SILENT, false) => log_config_free(cfg)) {
+        let result = driver_analyze_entry(sp, "mismatch", cfg);
 
-    assert(driver_has_errors(result), "expected mismatch errors");
-    assert(has_driver_diag_code(result, "DRV-0020"), "expected DRV-0020 for module mismatch");
+        assert(driver_has_errors(result), "expected mismatch errors");
+        assert(has_driver_diag_code(result, "DRV-0020"), "expected DRV-0020 for module mismatch");
 
-    driver_state_free(result);
+        driver_state_free(result);
+    }
     sp_free(sp);
 }
 
 func test_read_failure_reports_error() {
     let sp = make_paths();
-    let result = driver_analyze_entry(sp, "read_fail");
+    with (let cfg = log_config_create(LL_SILENT, false) => log_config_free(cfg)) {
+        let result = driver_analyze_entry(sp, "read_fail", cfg);
 
-    assert(driver_has_errors(result), "expected read failure errors");
-    assert(has_driver_diag_code(result, "DRV-0011"), "expected DRV-0011 for read failure");
+        assert(driver_has_errors(result), "expected read failure errors");
+        assert(has_driver_diag_code(result, "DRV-0011"), "expected DRV-0011 for read failure");
 
-    driver_state_free(result);
+        driver_state_free(result);
+    }
     sp_free(sp);
 }
 

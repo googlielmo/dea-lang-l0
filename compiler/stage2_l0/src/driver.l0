@@ -14,6 +14,7 @@ import std.vector;
 import util.diag;
 
 import util.strings;
+import util.log;
 import source_paths;
 import parser;
 import ast;
@@ -126,10 +127,13 @@ func dr_mark_loaded(loaded: VectorString*, module_name: string) {
 }
 
 func dr_load_module(state: DriverState*, search_paths: SourceSearchPaths*, loading_chain: string,
-                    module_name: string) -> bool {
+                    module_name: string, cfg: LogConfig*) -> bool {
     if (dr_vs_has(state.loaded, module_name)) {
+        log_debug(cfg, concat3_s("Module '", module_name, "' already loaded (cached)"));
         return true;
     }
+
+    log_stage(cfg, "Loading", module_name);
 
     let cycle_token = concat3_s("|", module_name, "|");
     if (contains_s(loading_chain, cycle_token)) {
@@ -176,7 +180,7 @@ func dr_load_module(state: DriverState*, search_paths: SourceSearchPaths*, loadi
                 } else {
                     for (let i = 0; i < vec_size(mod.imports); i = i + 1) {
                         let imp = ptr_vec_get(mod.imports, i) as Import*;
-                        let child_ok = dr_load_module(state, search_paths, next_loading_chain, imp.name);
+                        let child_ok = dr_load_module(state, search_paths, next_loading_chain, imp.name, cfg);
                         if (!child_ok) {
                             ok = false;
                         }
@@ -194,11 +198,12 @@ func dr_load_module(state: DriverState*, search_paths: SourceSearchPaths*, loadi
     return ok;
 }
 
-func driver_analyze_entry(search_paths: SourceSearchPaths*, entry_module: string) -> DriverState* {
+func driver_analyze_entry(search_paths: SourceSearchPaths*, entry_module: string, cfg: LogConfig*) -> DriverState* {
+    log_info(cfg, concat3_s("Starting analysis for entry module '", entry_module, "'"));
     let state = new DriverState(
         entry_module, ptr_vec_create(8), vs_create(8),
         diag_create(), vs_create(4), vs_create(4)
     );
-    dr_load_module(state, search_paths, "|", entry_module);
+    dr_load_module(state, search_paths, "|", entry_module, cfg);
     return state;
 }
