@@ -370,7 +370,7 @@ func ps_parse_primary_expr(self: ParserState*) -> ExprId? {
             node.text_value = token_ident_text(q.name_tok) as string;
             node.module_path = q.module_path;
             node.name_qualifier = q.name_qualifier;
-            qn_result_free_only_container(q);
+            drop q;
             return expr_arena_add(self.expr_arena, node);
         }
 

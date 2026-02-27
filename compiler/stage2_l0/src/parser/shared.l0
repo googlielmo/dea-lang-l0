@@ -377,10 +377,6 @@ struct QualifiedNameResult {
     name_tok: Token;
 }
 
-func qn_result_free_only_container(self: QualifiedNameResult*) {
-    drop self;
-}
-
 func qn_result_free_all(self: QualifiedNameResult*) {
     vs_free(self.module_path);
     vs_free_opt(self.name_qualifier);
@@ -458,7 +454,7 @@ func ps_parse_type(self: ParserState*) -> TypeRef*? {
         module_path = q.module_path;
         name_qualifier = q.name_qualifier;
         name_tok = q.name_tok;
-        qn_result_free_only_container(q);
+        drop q;
     } else {
         name_tok = ps_expect_ident(self, "PAR-0400", "[PAR-0400] expected type name")?;
     }

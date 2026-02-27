@@ -183,7 +183,7 @@ func datetime_from_unix_sec(unix_sec: int, nsec: int, utc_offset_sec: int, is_ds
 }
 
 func wall_now() -> WallTime? {
-    with (let parts = new RtTimeParts(0, 0)) {
+    with (let parts = new RtTimeParts(0, 0) => drop parts) {
         let ok = rt_time_unix(parts);
         if (!ok) {
             return null;
@@ -192,9 +192,6 @@ func wall_now() -> WallTime? {
             return null;
         }
         return WallTime(parts.sec, parts.nsec);
-    }
-    cleanup {
-        drop parts;
     }
 }
 
@@ -207,7 +204,7 @@ func monotonic_now() -> MonotonicTime? {
         return null;
     }
 
-    with (let parts = new RtTimeParts(0, 0)) {
+    with (let parts = new RtTimeParts(0, 0) => drop parts) {
         let ok = rt_time_monotonic(parts);
         if (!ok) {
             return null;
@@ -216,9 +213,6 @@ func monotonic_now() -> MonotonicTime? {
             return null;
         }
         return MonotonicTime(parts.sec, parts.nsec);
-    }
-    cleanup {
-        drop parts;
     }
 }
 

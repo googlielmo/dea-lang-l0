@@ -247,7 +247,7 @@ func run_with_argv(argv: VectorString*) -> int {
     let opts = parsed.options as CliOptions*;
     parsed.options = null;
 
-    with (let cfg = log_config_create(log_level_from_verbosity(opts.verbosity), opts.log) => log_config_free(cfg)) {
+    with (let cfg = log_config_create(log_level_from_verbosity(opts.verbosity), opts.log) => drop cfg) {
         let rc = 1;
         match (opts.mode) {
             CM_CHECK => {

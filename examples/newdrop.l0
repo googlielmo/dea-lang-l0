@@ -104,7 +104,7 @@ func main() -> void {
     print_s(*t);
     print_s("<-\n");
 
-    drop_var(t); // delegate drop to drop_var function (t is dead after this point)
+    drop_var(t); // delegate drop to drop_var function (t is effectively dead after this point)
 
 //    drop t; // t is already dead here --> panic!
 

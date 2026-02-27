@@ -26,10 +26,6 @@ func log_config_create(level: LogLevel, rich: bool) -> LogConfig* {
     return new LogConfig(level, rich);
 }
 
-func log_config_free(cfg: LogConfig*) {
-    drop cfg;
-}
-
 func log_level_from_verbosity(verbosity: int) -> LogLevel {
     if (verbosity >= 3) { return LL_DEBUG; }
     if (verbosity >= 1) { return LL_INFO; }

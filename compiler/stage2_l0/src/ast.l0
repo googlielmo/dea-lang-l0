@@ -412,10 +412,6 @@ func type_ref_free(self: TypeRef*?) {
     }
 }
 
-func import_free(self: Import*) {
-    drop self;
-}
-
 func param_free(self: Param*) {
     type_ref_free(self.type_ref);
     drop self;
@@ -497,7 +493,7 @@ func top_level_decl_free(self: TopLevelDecl*) {
 func module_free(self: Module*) {
     for (let i = 0; i < vec_size(self.imports); i = i + 1) {
         let imp = ptr_vec_get(self.imports, i) as Import*;
-        import_free(imp);
+        drop imp;
     }
     vec_free(self.imports);
 
@@ -507,25 +503,6 @@ func module_free(self: Module*) {
     }
     vec_free(self.decls);
 
-    drop self;
-}
-
-func match_arm_free(self: MatchArm*) {
-    drop self;
-}
-
-func case_arm_free(self: CaseArm*) {
-    drop self;
-}
-
-func case_else_free(self: CaseElse*?) {
-    if (self != null) {
-        let case_else = self as CaseElse*;
-        drop case_else;
-    }
-}
-
-func with_item_free(self: WithItem*) {
     drop self;
 }
 
@@ -540,7 +517,7 @@ func import_vec_free(v: VectorBase*?) {
         let vec = v as VectorBase*;
         for (let i = 0; i < vec_size(vec); i = i + 1) {
             let imp = ptr_vec_get(vec, i) as Import*;
-            import_free(imp);
+            drop imp;
         }
         vec_free(vec);
     }
@@ -595,7 +572,7 @@ func match_arm_vec_free(v: VectorBase*?) {
         let vec = v as VectorBase*;
         for (let i = 0; i < vec_size(vec); i = i + 1) {
             let arm = ptr_vec_get(vec, i) as MatchArm*;
-            match_arm_free(arm);
+            drop arm;
         }
         vec_free(vec);
     }
@@ -606,7 +583,7 @@ func case_arm_vec_free(v: VectorBase*?) {
         let vec = v as VectorBase*;
         for (let i = 0; i < vec_size(vec); i = i + 1) {
             let arm = ptr_vec_get(vec, i) as CaseArm*;
-            case_arm_free(arm);
+            drop arm;
         }
         vec_free(vec);
     }
@@ -617,7 +594,7 @@ func with_item_vec_free(v: VectorBase*?) {
         let vec = v as VectorBase*;
         for (let i = 0; i < vec_size(vec); i = i + 1) {
             let it = ptr_vec_get(vec, i) as WithItem*;
-            with_item_free(it);
+            drop it;
         }
         vec_free(vec);
     }
@@ -636,7 +613,8 @@ func stmt_node_free(self: StmtNode*) {
     id_vec_free(self.ids);
     match_arm_vec_free(self.match_arms);
     case_arm_vec_free(self.case_arms);
-    case_else_free(self.case_else);
+    let case_else = self.case_else;
+    drop case_else;
     with_item_vec_free(self.with_items);
 
     drop self;

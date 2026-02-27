@@ -38,7 +38,7 @@ func ps_parse_pattern(self: ParserState*) -> PatternId? {
             module_path = q.module_path;
             name_qualifier = q.name_qualifier;
             name_tok = q.name_tok;
-            qn_result_free_only_container(q);
+            drop q;
         } else {
             name_tok = ps_advance(self);
         }
@@ -463,7 +463,7 @@ func ps_parse_case_stmt(self: ParserState*) -> StmtId? {
     ps_expect(self, ord(TT_LBRACE), "PAR-0233", "[PAR-0233] expected '{' after 'case' expression")?;
 
     with (let arms: VectorBase*? = ptr_vec_create(4) => case_arm_vec_free(arms),
-          let else_arm: CaseElse*? = null => case_else_free(else_arm)) {
+          let else_arm: CaseElse*? = null => drop else_arm) {
         let seen_else = false;
 
         while (!ps_check(self, ord(TT_RBRACE))) {

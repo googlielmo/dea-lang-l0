@@ -43,7 +43,8 @@ How it lowers at runtime:
 
 - `new` → `_rt_alloc_obj(bytes)`.
 - `drop` → `_rt_drop(ptr)`.
-- `_rt_drop(NULL)` is a safe no-op.
+- The `drop` statement accepts both standard pointers (`T*`) and nullable pointers (`T*?`).
+- `_rt_drop(NULL)` is a safe no-op (e.g. `drop p` where `p` is `null` does nothing).
 - Dropping a pointer that was not allocated by `new` triggers a runtime panic.
 
 Before calling `_rt_drop`, the compiler may emit field cleanup automatically:

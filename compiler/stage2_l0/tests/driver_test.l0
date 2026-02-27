@@ -35,7 +35,7 @@ func has_driver_diag_code(result: DriverState*, code: string) -> bool {
 
 func test_transitive_import_closure_ok() {
     let sp = make_paths();
-    with (let cfg = log_config_create(LL_SILENT, false) => log_config_free(cfg)) {
+    with (let cfg = log_config_create(LL_SILENT, false) => drop cfg) {
         let result = driver_analyze_entry(sp, "ok_main", cfg);
 
         assert(!driver_has_errors(result), "expected no driver errors for ok_main");
@@ -48,7 +48,7 @@ func test_transitive_import_closure_ok() {
 
 func test_import_cycle_reports_error() {
     let sp = make_paths();
-    with (let cfg = log_config_create(LL_SILENT, false) => log_config_free(cfg)) {
+    with (let cfg = log_config_create(LL_SILENT, false) => drop cfg) {
         let result = driver_analyze_entry(sp, "cycle_a", cfg);
 
         assert(driver_has_errors(result), "expected cycle errors");
@@ -61,7 +61,7 @@ func test_import_cycle_reports_error() {
 
 func test_module_name_mismatch_reports_error() {
     let sp = make_paths();
-    with (let cfg = log_config_create(LL_SILENT, false) => log_config_free(cfg)) {
+    with (let cfg = log_config_create(LL_SILENT, false) => drop cfg) {
         let result = driver_analyze_entry(sp, "mismatch", cfg);
 
         assert(driver_has_errors(result), "expected mismatch errors");
@@ -74,7 +74,7 @@ func test_module_name_mismatch_reports_error() {
 
 func test_read_failure_reports_error() {
     let sp = make_paths();
-    with (let cfg = log_config_create(LL_SILENT, false) => log_config_free(cfg)) {
+    with (let cfg = log_config_create(LL_SILENT, false) => drop cfg) {
         let result = driver_analyze_entry(sp, "read_fail", cfg);
 
         assert(driver_has_errors(result), "expected read failure errors");

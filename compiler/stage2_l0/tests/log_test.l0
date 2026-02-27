@@ -50,7 +50,7 @@ func test_format_stage_without_module() {
 
 func test_log_msg_respects_level() {
     // LL_ERROR config should not emit INFO messages (visual: no output expected)
-    with (let cfg = log_config_create(LL_ERROR, false) => log_config_free(cfg)) {
+    with (let cfg = log_config_create(LL_ERROR, false) => drop cfg) {
         log_info(cfg, "this should be suppressed");
         log_debug(cfg, "this should also be suppressed");
         // If we reach here without crash, gating works
@@ -59,7 +59,7 @@ func test_log_msg_respects_level() {
 
 func test_log_msg_emits_at_level() {
     // LL_DEBUG config should emit everything (visual: output on stderr)
-    with (let cfg = log_config_create(LL_DEBUG, false) => log_config_free(cfg)) {
+    with (let cfg = log_config_create(LL_DEBUG, false) => drop cfg) {
         log_error(cfg, "test error output");
         log_info(cfg, "test info output");
         log_debug(cfg, "test debug output");
@@ -68,7 +68,7 @@ func test_log_msg_emits_at_level() {
 
 func test_log_rich_format() {
     // Rich format prepends [LEVEL] prefix (visual: check stderr)
-    with (let cfg = log_config_create(LL_INFO, true) => log_config_free(cfg)) {
+    with (let cfg = log_config_create(LL_INFO, true) => drop cfg) {
         log_info(cfg, "rich info message");
     }
 }
