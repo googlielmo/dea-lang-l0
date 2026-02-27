@@ -13,8 +13,6 @@ import std.text;
 import std.vector;
 import util.diag;
 
-import util.strings;
-
 func dp_severity_name(sev: DiagnosticSeverity) -> string {
     match (sev) {
         Error => { return "error"; }
@@ -26,7 +24,7 @@ func dp_severity_name(sev: DiagnosticSeverity) -> string {
 func dp_format_header(diag: Diagnostic*) -> string {
     with (let sb = sb_create() => sb_free(sb)) {
         // Location prefix: path:line:column
-        if (len_s(diag.filename) > 0) {
+        if (!is_empty_s(diag.filename)) {
             sb_append(sb, diag.filename);
             if (diag.line > 0) {
                 sb_append(sb, ":");
@@ -44,7 +42,7 @@ func dp_format_header(diag: Diagnostic*) -> string {
         sb_append(sb, ": ");
 
         // Code bracket (phase not rendered — XXX- prefix identifies the phase)
-        if (len_s(diag.code) > 0) {
+        if (!is_empty_s(diag.code)) {
             sb_append(sb, "[");
             sb_append(sb, diag.code);
             sb_append(sb, "] ");
@@ -62,11 +60,11 @@ func dp_print_header(diag: Diagnostic*) {
 }
 
 func dp_render_snippet(diag: Diagnostic*, src: string) {
-    if (len_s(src) == 0) {
+    if (is_empty_s(src)) {
         return;
     }
 
-    with (let lines = us_split_lines(src) => vs_free(lines)) {
+    with (let lines = lines_s(src) => vs_free(lines)) {
         let line_index = diag.line - 1;
         if (line_index < 0 || line_index >= vs_size(lines)) {
             return;
@@ -115,7 +113,7 @@ func dp_render_snippet(diag: Diagnostic*, src: string) {
 }
 
 func dp_print_snippet(diag: Diagnostic*) {
-    if (len_s(diag.filename) == 0 || diag.line <= 0) {
+    if (is_empty_s(diag.filename) || diag.line <= 0) {
         return;
     }
 
@@ -155,7 +153,7 @@ func dp_print_collector_with_sources(dc: DiagCollector*,
     for (let i = 0; i < diag_count(dc); i = i + 1) {
         let d = diag_get(dc, i);
         dp_print_header(d);
-        if (len_s(d.filename) > 0 && d.line > 0) {
+        if (!is_empty_s(d.filename) && d.line > 0) {
             dp_render_snippet(d, dp_source_cached(source_names, source_texts, d.filename));
         }
     }

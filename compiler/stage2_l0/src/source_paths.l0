@@ -112,7 +112,7 @@ func sp_is_valid_ident_component(component: string) -> bool {
 }
 
 func sp_is_valid_module_name(module_name: string) -> bool {
-    if (len_s(module_name) == 0) {
+    if (is_empty_s(module_name)) {
         return false;
     }
 

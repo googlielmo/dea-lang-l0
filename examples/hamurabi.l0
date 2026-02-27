@@ -64,6 +64,7 @@ module hamurabi;
 
 import std.io;
 import std.string;
+import std.text;
 import std.rand;
 import std.unit;
 import std.system;
@@ -139,49 +140,16 @@ func get_int_input(prompt: string) -> int? {
     let RETRY = -1 as int?; // sentinel for retry
     print_s(prompt);
     let line: string = read_line()?; // propagate null on EOF
-    if (len_s(line) == 0 || len_s(line) > 6) {
+    if (is_empty_s(line) || len_s(line) > 6) {
         // Empty input (just Enter) or too long
         return RETRY;
     }
-    let n = parse_int(line);
+    let n = string_to_int(line);
     if (n == null || (n as int) < 0) {
         // parse error or negative number
         return RETRY;
     }
     return n;
-}
-
-func parse_int(s: string) -> int? {
-    let result: int = 0;
-    let i: int = 0;
-    let len: int = len_s(s);
-    let is_negative: bool = false;
-
-    if (len == 0) return null;
-
-    let first_ch: int = char_at_s(s, 0);
-    if (first_ch == 45) {
-        is_negative = true;
-        i = 1;
-    }
-
-    while (i < len) {
-        let ch: int = char_at_s(s, i);
-        if (ch >= 48 && ch <= 57) {
-            result = result * 10 + (ch - 48);
-        }
-        else {
-            // Non-digit character, stop parsing
-            return null;
-        }
-        i = i + 1;
-    }
-
-    if (is_negative) {
-        result = -result;
-    }
-
-    return result as int?;
 }
 
 func handle_land_trading(state: GameState*) -> bool? {

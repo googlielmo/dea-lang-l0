@@ -107,7 +107,7 @@ func up_stem(path: string) -> string {
 }
 
 func up_join(root: string, rel: string) -> string {
-    if (len_s(root) == 0) {
+    if (is_empty_s(root)) {
         return rel;
     }
 
