@@ -7,6 +7,11 @@ module sys.rt;
 
 // Runtime support functions for string manipulation, I/O, and system operations
 
+struct RtTimeParts {
+    sec: int;
+    nsec: int;
+}
+
 // Return the character at the given index in the string as an integer (0-255)
 extern func rt_string_get(s: string, index: int) -> byte;
 
@@ -104,6 +109,23 @@ extern func rt_get_argc() -> int;
 
 // Get the command-line argument at the given index
 extern func rt_get_argv(i: int) -> string;
+
+// Capture current unix wall time into `out`.
+// Returns true on success.
+extern func rt_time_unix(out: RtTimeParts*) -> bool;
+
+// Capture monotonic time into `out`.
+// Returns true on success.
+extern func rt_time_monotonic(out: RtTimeParts*) -> bool;
+
+// Returns true if monotonic clock is supported by the runtime.
+extern func rt_time_monotonic_supported() -> bool;
+
+// Returns local UTC offset in seconds for the given unix second, or null on error.
+extern func rt_time_local_offset_sec(unix_sec: int) -> int?;
+
+// Returns whether local time is in DST for the given unix second, or null on error.
+extern func rt_time_local_is_dst(unix_sec: int) -> bool?;
 
 // Execute a system command and return its exit code
 extern func rt_system(cmd: string) -> int;

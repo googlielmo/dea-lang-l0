@@ -18,6 +18,7 @@
  * - String type and operations
  * - Optional type support
  * - Random number generation
+ * - Wall/monotonic time snapshots and local-time metadata
  * - Support for L0 `new` and `drop` semantics
  * - Environment variable access
  * - Reading from stdin
@@ -173,6 +174,15 @@ typedef struct { l0_bool has_value; } _l0_base_opt;
 /* Static instances for common optional strings */
 static l0_opt_string L0_OPT_STRING_NULL = { .has_value = 0, .value = { 0 } };
 static l0_opt_string L0_OPT_STRING_EMPTY = { .has_value = 1, .value = { 0 } };
+
+/* Definition for `sys.rt::RtTimeParts` */
+#ifndef L0_DEFINED_l0_sys_rt_RtTimeParts
+#define L0_DEFINED_l0_sys_rt_RtTimeParts
+struct l0_sys_rt_RtTimeParts {
+    l0_int sec;
+    l0_int nsec;
+};
+#endif
 
 /* ============================================================================
  * Argument handling
@@ -864,6 +874,173 @@ static l0_string rt_get_argv(l0_int i) {
         _rt_panic_fmt("rt_get_argv: index %d out of bounds (argc=%d)", (int)i, _rt_argc);
     }
     return _rt_l0_string_from_const_literal(_rt_argv[i]);
+}
+
+/* ============================================================================
+ * Time APIs
+ * ============================================================================ */
+
+static l0_bool _rt_time_to_l0_int_sec(time_t value, l0_int *out) {
+    long long sec = (long long)value;
+    if (sec < INT32_MIN || sec > INT32_MAX) {
+        return 0;
+    }
+    *out = (l0_int)sec;
+    return 1;
+}
+
+static l0_bool _rt_time_to_l0_int_nsec(long value, l0_int *out) {
+    long long nsec = (long long)value;
+    if (nsec < 0 || nsec > 999999999LL) {
+        return 0;
+    }
+    *out = (l0_int)nsec;
+    return 1;
+}
+
+static l0_bool _rt_time_write_parts(struct l0_sys_rt_RtTimeParts *out, l0_int sec, l0_int nsec) {
+    if (out == NULL) {
+        _rt_panic("_rt_time_write_parts: out-parameter is null");
+    }
+    out->sec = sec;
+    out->nsec = nsec;
+    return 1;
+}
+
+/**
+ * Capture current unix wall clock into `out`.
+ *
+ * L0 signature: extern func rt_time_unix(out: RtTimeParts*) -> bool;
+ */
+static l0_bool rt_time_unix(struct l0_sys_rt_RtTimeParts *out) {
+    if (out == NULL) {
+        _rt_panic("rt_time_unix: out-parameter is null");
+    }
+
+#if defined(CLOCK_REALTIME)
+    struct timespec ts;
+    if (clock_gettime(CLOCK_REALTIME, &ts) == 0) {
+        l0_int sec = 0;
+        l0_int nsec = 0;
+        if (!_rt_time_to_l0_int_sec(ts.tv_sec, &sec)) {
+            return 0;
+        }
+        if (!_rt_time_to_l0_int_nsec(ts.tv_nsec, &nsec)) {
+            return 0;
+        }
+        return _rt_time_write_parts(out, sec, nsec);
+    }
+#endif
+
+    time_t now = time(NULL);
+    if (now == (time_t)-1) {
+        return 0;
+    }
+
+    l0_int sec = 0;
+    if (!_rt_time_to_l0_int_sec(now, &sec)) {
+        return 0;
+    }
+    return _rt_time_write_parts(out, sec, 0);
+}
+
+/**
+ * Capture current monotonic clock into `out`.
+ *
+ * L0 signature: extern func rt_time_monotonic(out: RtTimeParts*) -> bool;
+ */
+static l0_bool rt_time_monotonic(struct l0_sys_rt_RtTimeParts *out) {
+    if (out == NULL) {
+        _rt_panic("rt_time_monotonic: out-parameter is null");
+    }
+
+#if defined(CLOCK_MONOTONIC)
+    struct timespec ts;
+    if (clock_gettime(CLOCK_MONOTONIC, &ts) != 0) {
+        return 0;
+    }
+
+    l0_int sec = 0;
+    l0_int nsec = 0;
+    if (!_rt_time_to_l0_int_sec(ts.tv_sec, &sec)) {
+        return 0;
+    }
+    if (!_rt_time_to_l0_int_nsec(ts.tv_nsec, &nsec)) {
+        return 0;
+    }
+    return _rt_time_write_parts(out, sec, nsec);
+#else
+    (void)out;
+    return 0;
+#endif
+}
+
+/**
+ * Returns whether a monotonic clock source is available.
+ *
+ * L0 signature: extern func rt_time_monotonic_supported() -> bool;
+ */
+static l0_bool rt_time_monotonic_supported(void) {
+#if defined(CLOCK_MONOTONIC)
+    return 1;
+#else
+    return 0;
+#endif
+}
+
+/**
+ * Returns local UTC offset in seconds for `unix_sec`.
+ *
+ * L0 signature: extern func rt_time_local_offset_sec(unix_sec: int) -> int?;
+ */
+static l0_opt_int rt_time_local_offset_sec(l0_int unix_sec) {
+    time_t t = (time_t)unix_sec;
+    if ((l0_int)t != unix_sec) {
+        return (l0_opt_int){ .has_value = 0 };
+    }
+
+    struct tm *utc_ptr = gmtime(&t);
+    if (utc_ptr == NULL) {
+        return (l0_opt_int){ .has_value = 0 };
+    }
+
+    struct tm utc_tm = *utc_ptr;
+    utc_tm.tm_isdst = -1;
+
+    errno = 0;
+    time_t local_interpretation = mktime(&utc_tm);
+    if (local_interpretation == (time_t)-1 && errno != 0) {
+        return (l0_opt_int){ .has_value = 0 };
+    }
+
+    long long offset = (long long)t - (long long)local_interpretation;
+    if (offset < INT32_MIN || offset > INT32_MAX) {
+        return (l0_opt_int){ .has_value = 0 };
+    }
+
+    return (l0_opt_int){ .has_value = 1, .value = (l0_int)offset };
+}
+
+/**
+ * Returns whether local time is daylight-saving time for `unix_sec`.
+ *
+ * L0 signature: extern func rt_time_local_is_dst(unix_sec: int) -> bool?;
+ */
+static l0_opt_bool rt_time_local_is_dst(l0_int unix_sec) {
+    time_t t = (time_t)unix_sec;
+    if ((l0_int)t != unix_sec) {
+        return (l0_opt_bool){ .has_value = 0 };
+    }
+
+    struct tm *local_ptr = localtime(&t);
+    if (local_ptr == NULL) {
+        return (l0_opt_bool){ .has_value = 0 };
+    }
+
+    if (local_ptr->tm_isdst < 0) {
+        return (l0_opt_bool){ .has_value = 0 };
+    }
+    return (l0_opt_bool){ .has_value = 1, .value = local_ptr->tm_isdst > 0 ? 1 : 0 };
 }
 
 /* ============================================================================

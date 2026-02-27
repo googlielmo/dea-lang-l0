@@ -122,6 +122,7 @@ Current std/sys modules in tree:
 - `std.rand`
 - `std.string`
 - `std.system`
+- `std.time`
 - `std.unit`
 - `sys.hash`
 - `sys.rt`

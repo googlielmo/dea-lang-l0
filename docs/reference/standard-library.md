@@ -16,7 +16,7 @@ For canonical ownership behavior around `new`/`drop`, ARC strings, and container
 ┌─────────────────────────────────────────────────────────┐
 │                      std.* Modules                      │
 │ array, assert, hashmap, hashset, io, linear_map, math,  │
-│ optional, rand, string, system, text, unit, vector      │
+│ optional, rand, string, system, text, time, unit, vector │
 └─────────────────────────────────────────────────────────┘
                              │
                              ▼
@@ -302,6 +302,25 @@ This module exposes runtime hash functions directly via `extern func` declaratio
 | `abort`   | `(message: string) -> void`     | Aborts program with message.                   |
 | `errno`   | `() -> int`                     | Returns runtime error number.                  |
 
+### `std.time`
+
+**Imports:** `sys.rt`, `std.math`
+
+| Type/Function         | Signature                                                     | Description                                                   |
+|-----------------------|---------------------------------------------------------------|---------------------------------------------------------------|
+| `WallTime`            | `struct { sec: int; nsec: int; }`                            | Unix wall-clock snapshot with nanosecond fraction.            |
+| `MonotonicTime`       | `struct { sec: int; nsec: int; }`                            | Monotonic-clock snapshot with nanosecond fraction.            |
+| `Duration`            | `struct { sec: int; nsec: int; }`                            | Non-negative normalized duration (`0 <= nsec < 1e9`).         |
+| `DateTime`            | `struct`                                                     | Calendar breakdown (date/time, weekday, yearday, offset, DST). |
+| `wall_now`            | `() -> WallTime?`                                            | Captures current wall-clock time.                             |
+| `monotonic_supported` | `() -> bool`                                                 | Returns monotonic clock capability.                           |
+| `monotonic_now`       | `() -> MonotonicTime?`                                       | Captures current monotonic time when supported.               |
+| `monotonic_diff`      | `(start: MonotonicTime, end: MonotonicTime) -> Duration?`    | Returns `end - start` or `null` for invalid/reversed inputs.  |
+| `wall_to_utc_datetime`| `(t: WallTime) -> DateTime?`                                 | Converts wall time to UTC calendar representation.             |
+| `wall_to_local_datetime`| `(t: WallTime) -> DateTime?`                               | Converts wall time to local calendar representation.           |
+| `utc_now_datetime`    | `() -> DateTime?`                                            | Convenience wrapper for current UTC calendar time.             |
+| `local_now_datetime`  | `() -> DateTime?`                                            | Convenience wrapper for current local calendar time.           |
+
 ### `std.unit`
 
 | Type/Function | Signature        | Description                     |
@@ -312,7 +331,8 @@ This module exposes runtime hash functions directly via `extern func` declaratio
 
 ### `sys.rt`
 
-Low-level runtime FFI for strings, I/O, process/system, and errors.
+Low-level runtime FFI for strings, I/O, process/system, time, and errors.
+Also defines `RtTimeParts` (`struct { sec: int; nsec: int; }`) used by time snapshot externs.
 
 ### `sys.unsafe`
 
@@ -322,7 +342,7 @@ Low-level raw memory FFI. Misuse can cause undefined behavior.
 
 All `extern func` symbols exposed to L0 from stdlib modules are listed here.
 
-### Declared in `sys.rt` (35)
+### Declared in `sys.rt` (41)
 
 | Function                    | Signature                                     |
 |-----------------------------|-----------------------------------------------|
@@ -358,6 +378,11 @@ All `extern func` symbols exposed to L0 from stdlib modules are listed here.
 | `rt_get_env_var`            | `(name: string) -> string?`                   |
 | `rt_get_argc`               | `() -> int`                                   |
 | `rt_get_argv`               | `(i: int) -> string`                          |
+| `rt_time_unix`              | `(out: RtTimeParts*) -> bool`                 |
+| `rt_time_monotonic`         | `(out: RtTimeParts*) -> bool`                 |
+| `rt_time_monotonic_supported` | `() -> bool`                                |
+| `rt_time_local_offset_sec`  | `(unix_sec: int) -> int?`                     |
+| `rt_time_local_is_dst`      | `(unix_sec: int) -> bool?`                    |
 | `rt_system`                 | `(cmd: string) -> int`                        |
 | `rt_file_exists`            | `(path: string) -> bool`                      |
 | `rt_delete_file`            | `(path: string) -> bool`                      |

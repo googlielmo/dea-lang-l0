@@ -414,6 +414,9 @@ class CEmitter:
     def emit_struct(self, module_name: str, decl: StructDecl, struct_info) -> None:
         """Emit a single struct definition."""
         c_name = self.mangle_struct_name(module_name, decl.name)
+        guard = f"L0_DEFINED_{c_name}"
+        self.out.emit(f"#ifndef {guard}")
+        self.out.emit(f"#define {guard}")
         self.out.emit(f"struct {c_name} {{")
         self.out.indent()
 
@@ -428,6 +431,7 @@ class CEmitter:
 
         self.out.dedent()
         self.out.emit("};")
+        self.out.emit("#endif")
         self.out.emit()
 
     def emit_enum(self, module_name: str, decl: EnumDecl, enum_info) -> None:
@@ -455,7 +459,11 @@ class CEmitter:
             };
         """
         c_name = self.mangle_enum_name(module_name, decl.name)
+        guard = f"L0_DEFINED_{c_name}"
         tag_enum_name = f"{c_name}_tag"
+
+        self.out.emit(f"#ifndef {guard}")
+        self.out.emit(f"#define {guard}")
 
         # Emit tag enum
         self.out.emit(f"enum {tag_enum_name} {{")
@@ -501,6 +509,7 @@ class CEmitter:
 
         self.out.dedent()
         self.out.emit("};")
+        self.out.emit("#endif")
         self.out.emit()
 
     def emit_let_declaration(self, module_name: str, decl: LetDecl, let_type: Type, let_initializer_callback) -> None:
