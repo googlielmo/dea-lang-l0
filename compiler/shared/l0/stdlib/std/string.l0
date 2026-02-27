@@ -118,6 +118,28 @@ func is_digit(c: byte) -> bool {
     return c >= '0' && c <= '9';
 }
 
+func is_digit_base(c: byte, base: int) -> bool {
+    assert(base >= 2 && base <= 16, "Base must be between 2 and 16");
+
+    if (base <= 10) {
+        return c >= '0' && c < ('0' + base);
+    }
+
+    if (c >= '0' && c <= '9') {
+        return true;
+    }
+
+    if (c >= 'a' && c < ('a' + base - 10)) {
+        return true;
+    }
+
+    if (c >= 'A' && c < ('A' + base - 10)) {
+        return true;
+    }
+
+    return false;
+}
+
 func is_alpha(c: byte) -> bool {
     return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
 }
@@ -132,6 +154,31 @@ func is_alnum(c: byte) -> bool {
 
 func to_digit(c: byte) -> int {
     return c - '0';
+}
+
+func to_digit_base(c: byte, base: int) -> int? {
+    assert(base >= 2 && base <= 16, "Base must be between 2 and 16");
+
+    if (base <= 10) {
+        if (is_digit(c) && c < ('0' + base)) {
+            return to_digit(c);
+        }
+        return null;
+    }
+
+    if (c >= '0' && c <= '9') {
+        return to_digit(c);
+    }
+
+    if (c >= 'a' && c < ('a' + base - 10)) {
+        return 10 + (c - 'a');
+    }
+
+    if (c >= 'A' && c < ('A' + base - 10)) {
+        return 10 + (c - 'A');
+    }
+
+    return null;
 }
 
 func to_upper(c: byte) -> byte {
@@ -168,65 +215,6 @@ func trim_s(s: string) -> string {
         return "";
     }
     return slice_s(s, start, end + 1);
-}
-
-/*
- * string_to_int converts a numeric string to an integer.
- * Handles optional leading '-' for negative numbers and ignores leading zeros.
- * Checks for overflow and invalid characters.
- * Returns null if the string is not a valid 32-bit signed integer.
- */
-func string_to_int(s: string) -> int? {
-    let sign = 1; // 1 for positive, -1 for negative
-    let start_index: int = 0;
-    if (len_s(s) == 0) {
-        return null;
-    }
-    if (char_at_s(s, 0) == '-') {
-        if (len_s(s) == 1) {
-            return null; // Just a '-' is not valid
-        }
-        sign = -1;
-        start_index = 1;
-    }
-    // Ignore leading zeros
-    while (start_index < len_s(s) && char_at_s(s, start_index) == '0') {
-        start_index = start_index + 1;
-    }
-    if (start_index == len_s(s)) {
-        return 0; // The string is "0" or all zeros
-    }
-    // Check length to prevent overflow
-    if (len_s(s) - start_index > 10) { // More than 10 digits is automatic overflow
-        return null; // Overflow
-    }
-    let result: int = 0;
-    // read first digit
-    let first_char = char_at_s(s, start_index);
-    if (!is_digit(first_char)) {
-        return null; // Invalid character
-    }
-    result = sign * to_digit(first_char);
-    start_index = start_index + 1;
-    for (let i: int = start_index; i < len_s(s); i = i + 1) {
-        let c = char_at_s(s, i);
-        if (!is_digit(c)) {
-            return null; // Invalid character
-        }
-        let digit = to_digit(c);
-        // Check for overflow before multiplying and adding
-        if (sign < 0) {
-            if (result < (-2147483648 + digit) / 10) {
-                return null; // Underflow
-            }
-        } else {
-            if (result > (2147483647 - digit) / 10) {
-                return null; // Overflow
-            }
-        }
-        result = result * 10 + sign * digit;
-    }
-    return result;
 }
 
 func digit_to_char(d: int) -> byte {

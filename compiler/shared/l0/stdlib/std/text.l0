@@ -263,3 +263,108 @@ func int_to_hex_string(value: int) -> string {
 func int_to_bin_string(value: int) -> string {
     return int_to_string_base(value, 2);
 }
+
+func bool_to_string(value: bool) -> string {
+    if (value) {
+        return "true";
+    }
+    return "false";
+}
+
+func string_to_bool(s: string) -> bool? {
+    if (eq_s(s, "true")) {
+        return true;
+    }
+    if (eq_s(s, "false")) {
+        return false;
+    }
+    return null;
+}
+
+func byte_to_string(value: byte) -> string {
+    return byte_to_string_base(value, 10);
+}
+
+func byte_to_string_base(value: byte, base: int) -> string {
+    assert(base >= 2 && base <= 16, "Base must be between 2 and 16");
+    return int_to_string_base(value as int, base);
+}
+
+/*
+ * string_to_int converts a decimal numeric string to an integer.
+ * Returns null when parsing fails or overflows 32-bit signed range.
+ */
+func string_to_int(s: string) -> int? {
+    return string_to_int_base(s, 10);
+}
+
+func string_to_byte(s: string) -> byte? {
+    return string_to_byte_base(s, 10);
+}
+
+func string_to_byte_base(s: string, base: int) -> byte? {
+    assert(base >= 2 && base <= 16, "Base must be between 2 and 16");
+    let parsed = string_to_int_base(s, base)?;
+    if (parsed < 0 || parsed > 255) {
+        return null;
+    }
+    return parsed as byte;
+}
+
+/*
+ * string_to_int_base converts a numeric string 's' expressed in base 'base' to an integer.
+ * Handles optional leading '-' for negative numbers and ignores leading zeros.
+ * No special prefixes like "0x" for hex or "0b" for binary are expected or allowed.
+ * Checks for overflow and invalid characters.
+ * Returns null if the string is not a valid 32-bit signed integer.
+ */
+func string_to_int_base(s: string, base: int) -> int? {
+    assert(base >= 2 && base <= 16, "Base must be between 2 and 16");
+
+    let sign = 1; // 1 for positive, -1 for negative
+    let start_index: int = 0;
+    if (len_s(s) == 0) {
+        return null;
+    }
+    if (char_at_s(s, 0) == '-') {
+        if (len_s(s) == 1) {
+            return null; // Just a '-' is not valid
+        }
+        sign = -1;
+        start_index = 1;
+    }
+    // Ignore leading zeros
+    while (start_index < len_s(s) && char_at_s(s, start_index) == '0') {
+        start_index = start_index + 1;
+    }
+    if (start_index == len_s(s)) {
+        return 0; // The string is "0" or all zeros
+    }
+    let result: int = 0;
+    // read first digit
+    let first_char = char_at_s(s, start_index);
+    if (!is_digit_base(first_char, base)) {
+        return null; // Invalid character
+    }
+    result = sign * to_digit_base(first_char, base)?;
+    start_index = start_index + 1;
+    for (let i: int = start_index; i < len_s(s); i = i + 1) {
+        let c = char_at_s(s, i);
+        if (!is_digit_base(c, base)) {
+            return null; // Invalid character
+        }
+        let digit = to_digit_base(c, base)?;
+        // Check for overflow before multiplying and adding
+        if (sign < 0) {
+            if (result < (-2147483648 + digit) / base) {
+                return null; // Underflow
+            }
+        } else {
+            if (result > (2147483647 - digit) / base) {
+                return null; // Overflow
+            }
+        }
+        result = result * base + sign * digit;
+    }
+    return result;
+}

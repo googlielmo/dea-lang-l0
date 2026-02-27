@@ -362,6 +362,176 @@ func test_to_lower_s() {
     printl_s("to_lower_s tests passed!\n");
 }
 
+func test_is_digit_base() {
+    printl_s("=== Test is_digit_base ===");
+
+    assert(is_digit_base('0', 2), "Expected is_digit_base('0', 2) to be true");
+    assert(is_digit_base('1', 2), "Expected is_digit_base('1', 2) to be true");
+    assert(!is_digit_base('2', 2), "Expected is_digit_base('2', 2) to be false");
+
+    assert(is_digit_base('9', 10), "Expected is_digit_base('9', 10) to be true");
+    assert(!is_digit_base('a', 10), "Expected is_digit_base('a', 10) to be false");
+
+    assert(is_digit_base('a', 16), "Expected is_digit_base('a', 16) to be true");
+    assert(is_digit_base('F', 16), "Expected is_digit_base('F', 16) to be true");
+    assert(!is_digit_base('g', 16), "Expected is_digit_base('g', 16) to be false");
+    assert(!is_digit_base('-', 16), "Expected is_digit_base('-', 16) to be false");
+
+    printl_s("is_digit_base tests passed!\n");
+}
+
+func test_to_digit_base() -> Unit? {
+    printl_s("=== Test to_digit_base ===");
+
+    let d1 = to_digit_base('1', 2)?;
+    let d2 = to_digit_base('7', 8)?;
+    let d3 = to_digit_base('9', 10)?;
+    let d4 = to_digit_base('a', 16)?;
+    let d5 = to_digit_base('F', 16)?;
+
+    assert(d1 == 1, "Expected to_digit_base('1', 2) to be 1");
+    assert(d2 == 7, "Expected to_digit_base('7', 8) to be 7");
+    assert(d3 == 9, "Expected to_digit_base('9', 10) to be 9");
+    assert(d4 == 10, "Expected to_digit_base('a', 16) to be 10");
+    assert(d5 == 15, "Expected to_digit_base('F', 16) to be 15");
+
+    assert(to_digit_base('2', 2) == null, "Expected to_digit_base('2', 2) to be null");
+    assert(to_digit_base('8', 8) == null, "Expected to_digit_base('8', 8) to be null");
+    assert(to_digit_base('g', 16) == null, "Expected to_digit_base('g', 16) to be null");
+    assert(to_digit_base('-', 16) == null, "Expected to_digit_base('-', 16) to be null");
+
+    printl_s("to_digit_base tests passed!\n");
+    return std.unit::present();
+}
+
+func test_string_to_int_base_valid() -> Unit? {
+    printl_s("=== Test string_to_int_base (valid) ===");
+
+    let v1 = string_to_int_base("101101", 2)?;
+    let v2 = string_to_int_base("-101101", 2)?;
+    let v3 = string_to_int_base("777", 8)?;
+    let v4 = string_to_int_base("00000123", 10)?;
+    let v5 = string_to_int_base("-00000123", 10)?;
+    let v6 = string_to_int_base("7fffffff", 16)?;
+    let v7 = string_to_int_base("-80000000", 16)?;
+    let v8 = string_to_int_base("A", 16)?;
+    let v9 = string_to_int_base("0000", 2)?;
+    let v10 = string_to_int_base("-0000", 16)?;
+
+    assert(v1 == 45, "Expected string_to_int_base('101101', 2) to be 45");
+    assert(v2 == -45, "Expected string_to_int_base('-101101', 2) to be -45");
+    assert(v3 == 511, "Expected string_to_int_base('777', 8) to be 511");
+    assert(v4 == 123, "Expected string_to_int_base('00000123', 10) to be 123");
+    assert(v5 == -123, "Expected string_to_int_base('-00000123', 10) to be -123");
+    assert(v6 == 2147483647, "Expected string_to_int_base('7fffffff', 16) to be 2147483647");
+    assert(v7 == -2147483648, "Expected string_to_int_base('-80000000', 16) to be -2147483648");
+    assert(v8 == 10, "Expected string_to_int_base('A', 16) to be 10");
+    assert(v9 == 0, "Expected string_to_int_base('0000', 2) to be 0");
+    assert(v10 == 0, "Expected string_to_int_base('-0000', 16) to be 0");
+
+    printl_s("string_to_int_base valid tests passed!\n");
+    return std.unit::present();
+}
+
+func test_string_to_int_base_invalid() {
+    printl_s("=== Test string_to_int_base (invalid) ===");
+
+    assert(string_to_int_base("", 10) == null, "Expected string_to_int_base('', 10) to be null");
+    assert(string_to_int_base("-", 10) == null, "Expected string_to_int_base('-', 10) to be null");
+    assert(string_to_int_base("+1", 10) == null, "Expected string_to_int_base('+1', 10) to be null");
+    assert(string_to_int_base("2", 2) == null, "Expected string_to_int_base('2', 2) to be null");
+    assert(string_to_int_base("08", 8) == null, "Expected string_to_int_base('08', 8) to be null");
+    assert(string_to_int_base("1g", 16) == null, "Expected string_to_int_base('1g', 16) to be null");
+    assert(string_to_int_base("0x10", 16) == null, "Expected string_to_int_base('0x10', 16) to be null");
+    assert(string_to_int_base("--1", 10) == null, "Expected string_to_int_base('--1', 10) to be null");
+    assert(string_to_int_base(" 1", 10) == null, "Expected string_to_int_base(' 1', 10) to be null");
+    assert(string_to_int_base("1 ", 10) == null, "Expected string_to_int_base('1 ', 10) to be null");
+
+    printl_s("string_to_int_base invalid tests passed!\n");
+}
+
+func test_string_to_int_base_limits() -> Unit? {
+    printl_s("=== Test string_to_int_base (limits) ===");
+
+    let dec_max = string_to_int_base("2147483647", 10)?;
+    let dec_min = string_to_int_base("-2147483648", 10)?;
+    let bin_max = string_to_int_base("1111111111111111111111111111111", 2)?;
+    let bin_min = string_to_int_base("-10000000000000000000000000000000", 2)?;
+
+    assert(dec_max == 2147483647, "Expected decimal INT_MAX parse");
+    assert(dec_min == -2147483648, "Expected decimal INT_MIN parse");
+    assert(bin_max == 2147483647, "Expected binary INT_MAX parse");
+    assert(bin_min == -2147483648, "Expected binary INT_MIN parse");
+
+    assert(string_to_int_base("2147483648", 10) == null, "Expected decimal overflow to return null");
+    assert(string_to_int_base("-2147483649", 10) == null, "Expected decimal underflow to return null");
+    assert(string_to_int_base("80000000", 16) == null, "Expected hex overflow to return null");
+    assert(string_to_int_base("-80000001", 16) == null, "Expected hex underflow to return null");
+    assert(string_to_int_base("10000000000000000000000000000000", 2) == null, "Expected binary overflow to return null");
+    assert(string_to_int_base("-10000000000000000000000000000001", 2) == null, "Expected binary underflow to return null");
+
+    printl_s("string_to_int_base limits tests passed!\n");
+    return std.unit::present();
+}
+
+func test_bool_string_conversions() -> Unit? {
+    printl_s("=== Test bool string conversions ===");
+
+    let s_true = bool_to_string(true);
+    let s_false = bool_to_string(false);
+    assert(eq_s(s_true, "true"), "Expected bool_to_string(true) to be 'true'");
+    assert(eq_s(s_false, "false"), "Expected bool_to_string(false) to be 'false'");
+
+    let b_true = string_to_bool("true")?;
+    let b_false = string_to_bool("false")?;
+    assert(b_true, "Expected string_to_bool('true') to be true");
+    assert(!b_false, "Expected string_to_bool('false') to be false");
+
+    assert(string_to_bool("True") == null, "Expected string_to_bool('True') to be null");
+    assert(string_to_bool("FALSE") == null, "Expected string_to_bool('FALSE') to be null");
+    assert(string_to_bool("") == null, "Expected string_to_bool('') to be null");
+    assert(string_to_bool("0") == null, "Expected string_to_bool('0') to be null");
+    assert(string_to_bool("yes") == null, "Expected string_to_bool('yes') to be null");
+
+    printl_s("bool string conversion tests passed!\n");
+    return std.unit::present();
+}
+
+func test_byte_string_conversions() -> Unit? {
+    printl_s("=== Test byte string conversions ===");
+
+    let b0 = 0 as byte;
+    let b255 = 255 as byte;
+    let s0 = byte_to_string(b0);
+    let s255 = byte_to_string(b255);
+    let shex = byte_to_string_base(b255, 16);
+    let sbin = byte_to_string_base(b255, 2);
+
+    assert(eq_s(s0, "0"), "Expected byte_to_string(0) to be '0'");
+    assert(eq_s(s255, "255"), "Expected byte_to_string(255) to be '255'");
+    assert(eq_s(shex, "ff"), "Expected byte_to_string_base(255, 16) to be 'ff'");
+    assert(eq_s(sbin, "11111111"), "Expected byte_to_string_base(255, 2) to be '11111111'");
+
+    let p0 = string_to_byte("0")?;
+    let p255 = string_to_byte("255")?;
+    let phex = string_to_byte_base("ff", 16)?;
+    let pbin = string_to_byte_base("11111111", 2)?;
+
+    assert((p0 as int) == 0, "Expected string_to_byte('0') to be 0");
+    assert((p255 as int) == 255, "Expected string_to_byte('255') to be 255");
+    assert((phex as int) == 255, "Expected string_to_byte_base('ff', 16) to be 255");
+    assert((pbin as int) == 255, "Expected string_to_byte_base('11111111', 2) to be 255");
+
+    assert(string_to_byte("256") == null, "Expected string_to_byte('256') to be null");
+    assert(string_to_byte("-1") == null, "Expected string_to_byte('-1') to be null");
+    assert(string_to_byte_base("1ff", 16) == null, "Expected string_to_byte_base('1ff', 16) to be null");
+    assert(string_to_byte_base("gg", 16) == null, "Expected string_to_byte_base('gg', 16) to be null");
+    assert(string_to_byte("") == null, "Expected string_to_byte('') to be null");
+
+    printl_s("byte string conversion tests passed!\n");
+    return std.unit::present();
+}
+
 func test_string_to_int() -> Unit? {
     printl_s("=== Test string_to_int ===");
 
@@ -578,6 +748,13 @@ func main() -> int {
     test_to_lower_s();
 
     // String <-> int conversions
+    test_is_digit_base();
+    test_to_digit_base();
+    test_string_to_int_base_valid();
+    test_string_to_int_base_invalid();
+    test_string_to_int_base_limits();
+    test_bool_string_conversions();
+    test_byte_string_conversions();
     test_string_to_int();
     test_int_to_string();
     test_int_to_bin_string();

@@ -244,29 +244,43 @@ This module exposes runtime hash functions directly via `extern func` declaratio
 | `cmp_s`         | `(a: string, b: string) -> int`                       | Compares strings lexicographically (`<0`, `0`, `>0`).                   |
 | `concat_s`      | `(a: string, b: string) -> string`                    | Concatenates strings.                                                   |
 | `slice_s`       | `(s: string, start: int, end: int) -> string`         | Returns substring `[start, end)`.                                       |
-| `byte_to_s`     | `(b: byte) -> string`                                 | Creates one-byte string.                                                |
+| `byte_to_s`     | `(b: byte) -> string`                                 | Creates one-character string from a byte value.                         |
 | `bytes_to_s`    | `(bytes: byte*, len: int) -> string`                  | Creates string from byte buffer.                                        |
 | `find_s`        | `(haystack: string, needle: string) -> int`           | Returns first match index or `-1`.                                      |
 | `find_from_s`   | `(haystack: string, needle: string, pos: int) -> int` | Returns first match index at/after `pos`, or `-1`. Requires `pos >= 0`. |
 | `contains_s`    | `(haystack: string, needle: string) -> bool`          | Returns whether `needle` occurs in `haystack`.                          |
 | `starts_with_s` | `(s: string, prefix: string) -> bool`                 | Returns whether `s` starts with `prefix`.                               |
 | `ends_with_s`   | `(s: string, suffix: string) -> bool`                 | Returns whether `s` ends with `suffix`.                                 |
+| `is_space`      | `(c: byte) -> bool`                                   | Whitespace check (`' '`, `'\n'`, `'\t'`, `'\r'`).                       |
+| `is_digit`      | `(c: byte) -> bool`                                   | Decimal digit check (`'0'..'9'`).                                       |
+| `is_digit_base` | `(c: byte, base: int) -> bool`                        | Valid digit check for base `2..16`.                                     |
+| `is_alpha`      | `(c: byte) -> bool`                                   | ASCII alphabetic check.                                                 |
+| `is_alnum`      | `(c: byte) -> bool`                                   | ASCII alphanumeric check.                                               |
+| `to_digit`      | `(c: byte) -> int`                                    | Converts decimal ASCII digit byte to integer value.                     |
+| `to_digit_base` | `(c: byte, base: int) -> int?`                        | Converts base `2..16` digit byte to integer value or `null`.            |
+| `to_upper`      | `(c: byte) -> byte`                                   | Uppercases ASCII letter; returns input otherwise.                       |
+| `to_lower`      | `(c: byte) -> byte`                                   | Lowercases ASCII letter; returns input otherwise.                       |
 
 ### `std.text`
 
 **Imports:** `std.string`, `std.math`, `std.assert`, `std.vector`
 
-| Type/Function                                       | Signature                                                                                           | Description                                         |
-|-----------------------------------------------------|-----------------------------------------------------------------------------------------------------|-----------------------------------------------------|
-| `StringBuffer`                                      | `struct`                                                                                            | String-part buffer with cached total size.          |
-| `sb_*`                                              | `create/append/append_int/append_byte/to_string/size/free`                                          | String buffer API.                                  |
-| `CharBuffer`                                        | `struct`                                                                                            | Byte-backed buffer for incremental string assembly. |
-| `cb_*`                                              | `create/capacity/size/reserve/append/append_s/append_slice/append_int/reverse/to_string/clear/free` | Char buffer API.                                    |
-| `concat3_s/concat4_s`                               | string concat helpers                                                                               | Concatenate 3 or 4 strings efficiently.             |
-| `to_upper_s/to_lower_s`                             | case helpers                                                                                        | Convert full string case.                           |
-| `repeat_s/reverse_s`                                | string helpers                                                                                      | Repeat or reverse string content.                   |
-| `int_to_string_base`                                | `(value: int, base: int) -> string`                                                                 | Base conversion for signed ints (`2..16`).          |
-| `int_to_string/int_to_hex_string/int_to_bin_string` | format helpers                                                                                      | Decimal, hex, and binary formatting helpers.        |
+| Type/Function                                       | Signature                                                                                           | Description                                                                                               |
+|-----------------------------------------------------|-----------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------|
+| `StringBuffer`                                      | `struct`                                                                                            | String-part buffer with cached total size.                                                                |
+| `sb_*`                                              | `create/append/append_int/append_byte/to_string/size/free`                                          | String buffer API.                                                                                        |
+| `CharBuffer`                                        | `struct`                                                                                            | Byte-backed buffer for incremental string assembly.                                                       |
+| `cb_*`                                              | `create/capacity/size/reserve/append/append_s/append_slice/append_int/reverse/to_string/clear/free` | Char buffer API.                                                                                          |
+| `concat3_s/concat4_s`                               | string concat helpers                                                                               | Concatenate 3 or 4 strings efficiently.                                                                   |
+| `to_upper_s/to_lower_s`                             | case helpers                                                                                        | Convert full string case.                                                                                 |
+| `repeat_s/reverse_s`                                | string helpers                                                                                      | Repeat or reverse string content.                                                                         |
+| `int_to_string_base`                                | `(value: int, base: int) -> string`                                                                 | Base conversion for signed ints (`2..16`).                                                                |
+| `int_to_string/int_to_hex_string/int_to_bin_string` | format helpers                                                                                      | Decimal, hex, and binary formatting helpers.                                                              |
+| `bool_to_string/string_to_bool`                     | `(bool) -> string`, `(string) -> bool?`                                                             | Converts booleans to `"true"`/`"false"` and parses strict lowercase boolean text.                         |
+| `byte_to_string/byte_to_string_base`                | `(byte) -> string`, `(byte, base: int) -> string`                                                   | Numeric byte formatting (decimal or base `2..16`).                                                        |
+| `string_to_int`                                     | `(s: string) -> int?`                                                                               | Parses decimal signed integer text; returns `null` on invalid input or 32-bit overflow/underflow.         |
+| `string_to_int_base`                                | `(s: string, base: int) -> int?`                                                                    | Parses signed integer text in base `2..16`; returns `null` on invalid input or 32-bit overflow/underflow. |
+| `string_to_byte/string_to_byte_base`                | `(s: string) -> byte?`, `(s: string, base: int) -> byte?`                                           | Parses numeric byte text; returns `null` on invalid input or out-of-range values (`0..255`).              |
 
 ### `std.system`
 
