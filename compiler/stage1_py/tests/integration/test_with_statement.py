@@ -946,6 +946,45 @@ def test_with_cleanup_block_header_try_failure_nullable_vars(codegen_single, com
     assert "inside" not in stdout
 
 
+def test_typecheck_with_drop_in_cleanup_allowed(analyze_single):
+    """Verifies that 'drop' in a 'with' cleanup clause is allowed and doesn't mark the variable as dropped in the body."""
+    result = analyze_single("main", """
+        module main;
+        import std.io;
+        struct S { field: string; }
+        func main() -> int {
+            with(let s = new S("hello") => drop s) {
+                printl_s(s.field);
+            }
+            return 0;
+        }
+    """)
+    errors = [d for d in result.diagnostics if d.kind == "error"]
+    assert len(errors) == 0, [d.message for d in errors]
+
+
+def test_typecheck_with_drop_in_cleanup_use_after_drop_rejected(analyze_single):
+    """Verifies that use-after-drop in cleanup clauses is still caught (LIFO order)."""
+    result = analyze_single("main", """
+        module main;
+        import std.io;
+        struct S { field: string; }
+        func free_s(s: S*) { drop s; }
+        func use_s(s: S*) { printl_s(s.field); }
+        func main() -> int {
+            with(
+                let s1 = new S("S1") => use_s(s1),
+                let s2 = new S("S2") => drop s1
+            ) {
+                printl_s("Body");
+            }
+            return 0;
+        }
+    """)
+    errors = [d for d in result.diagnostics if d.kind == "error"]
+    assert any("TYP-0150" in d.message for d in errors), [d.message for d in errors]
+
+
 def test_typecheck_with_cleanup_block_header_try_failure_nonnullable_ref_rejected(analyze_single):
     """Cleanup references to maybe-uninitialized non-nullable header lets are rejected."""
     result = analyze_single("main", """

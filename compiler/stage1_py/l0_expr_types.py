@@ -726,8 +726,6 @@ class ExpressionTypeChecker:
                 for item in stmt.items:
                     init_has_try = self._stmt_contains_try(item.init)
                     self._check_stmt(item.init)
-                    if item.cleanup is not None:
-                        self._check_stmt(item.cleanup)
 
                     if init_has_try:
                         seen_header_try = True
@@ -742,6 +740,12 @@ class ExpressionTypeChecker:
 
                 # Body in a nested scope
                 self._check_block(stmt.body, check_return_paths=check_return_paths)
+
+                # Inline cleanups (=>) in reverse order (LIFO), only if reachable.
+                # Actually, cleanups are always analyzed as they are part of the scope exit.
+                for item in reversed(stmt.items):
+                    if item.cleanup is not None:
+                        self._check_stmt(item.cleanup)
 
                 # Cleanup body in the item scope (not body scope)
                 if stmt.cleanup_body is not None:
