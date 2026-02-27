@@ -2443,6 +2443,15 @@ class Backend:
         if left_ty is None or right_ty is None:
             self.ice("[ICE-1013] missing inferred type for binary operation", node=expr_node)
 
+        # Typechecker allows mixed int/byte for numeric comparisons and equality.
+        # Lower those directly instead of tripping the strict same-type ICE guard.
+        if (
+                expr_op in ("<", "<=", ">", ">=", "==", "!=")
+                and self._is_int_assignable(left_ty)
+                and self._is_int_assignable(right_ty)
+        ):
+            return self.emitter.emit_binary_op(expr_op, c_left, c_right)
+
         if left_ty != right_ty:
             self.ice("[ICE-1014] type mismatch in binary operation", node=expr_node)
 

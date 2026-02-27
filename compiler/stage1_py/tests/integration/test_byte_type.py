@@ -649,3 +649,81 @@ def test_build_byte_program_special(codegen_single, compile_and_run, tmp_path):
 
     success, stdout, stderr = compile_and_run(c_code, tmp_path)
     assert success, f"Runtime failed.\nstdout: {stdout}\nstderr: {stderr}"
+
+
+def test_build_mixed_byte_int_comparison_lt(codegen_single, compile_and_run, tmp_path):
+    """Regression: mixed byte/int '<' must not trigger ICE in backend."""
+    src = """
+    module main;
+    func main() -> int {
+        let c: byte = '5';
+        let base: int = 10;
+        if (c < ('0' + base)) {
+            return 0;
+        }
+        return 1;
+    }
+    """
+    c_code, diags = codegen_single("main", src)
+    assert c_code is not None, f"Codegen failed: {[d.message for d in diags]}"
+
+    success, stdout, stderr = compile_and_run(c_code, tmp_path)
+    assert success, f"Runtime failed.\nstdout: {stdout}\nstderr: {stderr}"
+
+
+def test_build_mixed_byte_int_equality_eq(codegen_single, compile_and_run, tmp_path):
+    """Regression: mixed byte/int '==' must not trigger ICE in backend."""
+    src = """
+    module main;
+    func main() -> int {
+        let c: byte = '5';
+        if (c == 53) {
+            return 0;
+        }
+        return 1;
+    }
+    """
+    c_code, diags = codegen_single("main", src)
+    assert c_code is not None, f"Codegen failed: {[d.message for d in diags]}"
+
+    success, stdout, stderr = compile_and_run(c_code, tmp_path)
+    assert success, f"Runtime failed.\nstdout: {stdout}\nstderr: {stderr}"
+
+
+def test_build_mixed_int_byte_comparison_ge(codegen_single, compile_and_run, tmp_path):
+    """Regression: mixed int/byte '>=' must not trigger ICE in backend."""
+    src = """
+    module main;
+    func main() -> int {
+        let c: byte = '5';
+        let threshold: int = 53;
+        if (threshold >= c) {
+            return 0;
+        }
+        return 1;
+    }
+    """
+    c_code, diags = codegen_single("main", src)
+    assert c_code is not None, f"Codegen failed: {[d.message for d in diags]}"
+
+    success, stdout, stderr = compile_and_run(c_code, tmp_path)
+    assert success, f"Runtime failed.\nstdout: {stdout}\nstderr: {stderr}"
+
+
+def test_build_mixed_byte_int_equality_ne(codegen_single, compile_and_run, tmp_path):
+    """Regression: mixed byte/int '!=' must not trigger ICE in backend."""
+    src = """
+    module main;
+    func main() -> int {
+        let c: byte = 'A';
+        if (c != 66) {
+            return 0;
+        }
+        return 1;
+    }
+    """
+    c_code, diags = codegen_single("main", src)
+    assert c_code is not None, f"Codegen failed: {[d.message for d in diags]}"
+
+    success, stdout, stderr = compile_and_run(c_code, tmp_path)
+    assert success, f"Runtime failed.\nstdout: {stdout}\nstderr: {stderr}"
