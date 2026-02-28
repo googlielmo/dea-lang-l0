@@ -643,6 +643,146 @@ def test_trace_arc_loop_continue_skips_uninitialized_arc_cleanup(
     )
 
 
+def test_trace_arc_loop_continue_cleans_only_acquired_arc_locals(
+    analyze_single, compile_and_run, tmp_path
+):
+    """Each continue path should release exactly the ARC locals acquired on that path."""
+    ok, stdout, stderr, arc = _compile_with_trace_arc(
+        analyze_single,
+        compile_and_run,
+        tmp_path,
+        """
+        module main;
+        import std.string;
+
+        func mk_a(n: int) -> string {
+            return concat_s("a", "1");
+        }
+
+        func mk_b(n: int) -> string {
+            return concat_s("b", "2");
+        }
+
+        func main() -> int {
+            for (let i = 0; i < 3; i = i + 1) {
+                if (i == 0) {
+                    continue;
+                }
+
+                let a = mk_a(i);
+                if (i == 1) {
+                    continue;
+                }
+
+                let b = mk_b(i);
+                if (len_s(b) > 0) {
+                    continue;
+                }
+            }
+            return 0;
+        }
+        """,
+    )
+    assert ok, stderr
+    assert stdout == ""
+
+    heap_rcs = _heap_rc_values(arc)
+    assert heap_rcs, f"expected heap ARC events, stderr={stderr}"
+    assert all(0 <= rc < 1000 for rc in heap_rcs), (
+        f"unexpected heap refcount values: {heap_rcs}"
+    )
+
+    heap_frees = [
+        e for e in arc
+        if e["kind"] == "heap" and e["op"] == "release" and e["action"] == "free"
+    ]
+    assert len(heap_frees) >= 3, (
+        f"expected frees for two `a` values and one `b` value, got: {heap_frees}"
+    )
+    for f in heap_frees:
+        assert f["rc_before"] == "1" and f["rc_after"] == "0", (
+            f"expected rc 1→0 free: {f}"
+        )
+
+
+def test_trace_arc_loop_break_after_single_arc_local_cleans_that_local(
+    analyze_single, compile_and_run, tmp_path
+):
+    """A break after one ARC acquisition must free that value before leaving the loop."""
+    ok, stdout, stderr, arc = _compile_with_trace_arc(
+        analyze_single,
+        compile_and_run,
+        tmp_path,
+        """
+        module main;
+        import std.string;
+
+        func mk_a(n: int) -> string {
+            return concat_s("a", "1");
+        }
+
+        func main() -> int {
+            for (let i = 0; i < 2; i = i + 1) {
+                let a = mk_a(i);
+                break;
+            }
+            return 0;
+        }
+        """,
+    )
+    assert ok, stderr
+    assert stdout == ""
+
+    heap_frees = [
+        e for e in arc
+        if e["kind"] == "heap" and e["op"] == "release" and e["action"] == "free"
+    ]
+    assert len(heap_frees) >= 1, f"expected a heap free for `a`, got: {heap_frees}"
+    for f in heap_frees:
+        assert f["rc_before"] == "1" and f["rc_after"] == "0", (
+            f"expected rc 1→0 free: {f}"
+        )
+
+
+def test_trace_arc_loop_return_after_single_arc_local_cleans_that_local(
+    analyze_single, compile_and_run, tmp_path
+):
+    """A return after one ARC acquisition in a loop must free that value before returning."""
+    ok, stdout, stderr, arc = _compile_with_trace_arc(
+        analyze_single,
+        compile_and_run,
+        tmp_path,
+        """
+        module main;
+        import std.string;
+
+        func mk_a(n: int) -> string {
+            return concat_s("a", "1");
+        }
+
+        func main() -> int {
+            for (let i = 0; i < 2; i = i + 1) {
+                let a = mk_a(i);
+                return 0;
+            }
+            return 0;
+        }
+        """,
+    )
+    assert ok, stderr
+    assert stdout == ""
+
+    heap_frees = [
+        e for e in arc
+        if e["kind"] == "heap" and e["op"] == "release" and e["action"] == "free"
+    ]
+    assert len(heap_frees) >= 1, f"expected a heap free for `a`, got: {heap_frees}"
+    for f in heap_frees:
+        assert f["rc_before"] == "1" and f["rc_after"] == "0", (
+            f"expected rc 1→0 free: {f}"
+        )
+
+
 # ---------------------------------------------------------------------------
 # J – Return borrowed param retains
 # ---------------------------------------------------------------------------

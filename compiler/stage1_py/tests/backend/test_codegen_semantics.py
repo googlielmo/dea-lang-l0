@@ -793,6 +793,237 @@ def test_codegen_loop_continue_does_not_release_uninitialized_arc_local(codegen_
     )
 
 
+def test_codegen_loop_continue_cleans_only_acquired_arc_locals(codegen_single):
+    c_code, _ = codegen_single(
+        "main",
+        """
+        module main;
+
+        import std.string;
+
+        func mk_a(n: int) -> string {
+            return concat_s("a", "1");
+        }
+
+        func mk_b(n: int) -> string {
+            return concat_s("b", "2");
+        }
+
+        func main() -> int {
+            for (let i = 0; i < 3; i = i + 1) {
+                if (i == 0) {
+                    continue;
+                }
+
+                let a = mk_a(i);
+                if (i == 1) {
+                    continue;
+                }
+
+                let b = mk_b(i);
+                if (len_s(b) > 0) {
+                    continue;
+                }
+            }
+            return 0;
+        }
+        """,
+    )
+
+    if c_code is None:
+        return
+
+    main_start = c_code.find("l0_int l0_main_main(")
+    assert main_start != -1
+    main_body = c_code[main_start:]
+
+    skipped_a_cleanup = re.search(
+        r"goto (__lcont_\d+);.*?l0_string a = .*?\1:;.*?rt_string_release\(a\);",
+        main_body,
+        re.DOTALL,
+    )
+    assert skipped_a_cleanup is None, (
+        "continue before the first ARC local must not reach a shared label that "
+        "later unconditionally releases `a`"
+    )
+
+    skipped_b_cleanup = re.search(
+        r"goto (__lcont_\d+);.*?l0_string b = .*?\1:;.*?rt_string_release\(b\);",
+        main_body,
+        re.DOTALL,
+    )
+    assert skipped_b_cleanup is None, (
+        "continue before the second ARC local must not reach a shared label that "
+        "later unconditionally releases `b`"
+    )
+
+    mid_continue_cleanup = re.search(
+        r"if \(\(i == 1\)\)\s*\{.*?rt_string_release\(a\);.*?goto __lcont_\d+;",
+        main_body,
+        re.DOTALL,
+    )
+    assert mid_continue_cleanup is not None, (
+        "continue after acquiring only `a` must release `a` before jumping"
+    )
+    assert "if ((i == 1))" in mid_continue_cleanup.group(0)
+    assert "rt_string_release(b);" not in mid_continue_cleanup.group(0)
+
+    late_continue_cleanup = re.search(
+        r"if \(\(l0_std_string_len_s\(b\) > 0\)\)\s*\{.*?rt_string_release\(b\);"
+        r".*?rt_string_release\(a\);.*?goto __lcont_\d+;",
+        main_body,
+        re.DOTALL,
+    )
+    assert late_continue_cleanup is not None, (
+        "continue after acquiring `a` and `b` must release both before jumping"
+    )
+
+
+def test_codegen_loop_break_cleans_only_acquired_arc_locals(codegen_single):
+    c_code, _ = codegen_single(
+        "main",
+        """
+        module main;
+
+        import std.string;
+
+        func mk_a(n: int) -> string {
+            return concat_s("a", "1");
+        }
+
+        func mk_b(n: int) -> string {
+            return concat_s("b", "2");
+        }
+
+        func main() -> int {
+            for (let i = 0; i < 3; i = i + 1) {
+                if (i == 0) {
+                    break;
+                }
+
+                let a = mk_a(i);
+                if (i == 1) {
+                    break;
+                }
+
+                let b = mk_b(i);
+                if (len_s(b) > 0) {
+                    break;
+                }
+            }
+            return 0;
+        }
+        """,
+    )
+
+    if c_code is None:
+        return
+
+    main_start = c_code.find("l0_int l0_main_main(")
+    assert main_start != -1
+    main_body = c_code[main_start:]
+
+    early_break = re.search(
+        r"if \(\(i == 0\)\)\s*\{.*?goto __lbrk_\d+;",
+        main_body,
+        re.DOTALL,
+    )
+    assert early_break is not None, "break before any ARC local should jump directly"
+    assert "rt_string_release(a);" not in early_break.group(0)
+    assert "rt_string_release(b);" not in early_break.group(0)
+
+    mid_break = re.search(
+        r"if \(\(i == 1\)\)\s*\{.*?rt_string_release\(a\);.*?goto __lbrk_\d+;",
+        main_body,
+        re.DOTALL,
+    )
+    assert mid_break is not None, "break after acquiring only `a` must release `a`"
+    assert "rt_string_release(b);" not in mid_break.group(0)
+
+    late_break = re.search(
+        r"if \(\(l0_std_string_len_s\(b\) > 0\)\)\s*\{.*?rt_string_release\(b\);"
+        r".*?rt_string_release\(a\);.*?goto __lbrk_\d+;",
+        main_body,
+        re.DOTALL,
+    )
+    assert late_break is not None, (
+        "break after acquiring `a` and `b` must release both before jumping"
+    )
+
+
+def test_codegen_loop_return_cleans_only_acquired_arc_locals(codegen_single):
+    c_code, _ = codegen_single(
+        "main",
+        """
+        module main;
+
+        import std.string;
+
+        func mk_a(n: int) -> string {
+            return concat_s("a", "1");
+        }
+
+        func mk_b(n: int) -> string {
+            return concat_s("b", "2");
+        }
+
+        func main() -> int {
+            for (let i = 0; i < 3; i = i + 1) {
+                if (i == 0) {
+                    return 10;
+                }
+
+                let a = mk_a(i);
+                if (i == 1) {
+                    return 11;
+                }
+
+                let b = mk_b(i);
+                if (len_s(b) > 0) {
+                    return 12;
+                }
+            }
+            return 0;
+        }
+        """,
+    )
+
+    if c_code is None:
+        return
+
+    main_start = c_code.find("l0_int l0_main_main(")
+    assert main_start != -1
+    main_body = c_code[main_start:]
+
+    early_return = re.search(
+        r"if \(\(i == 0\)\)\s*\{.*?return 10;",
+        main_body,
+        re.DOTALL,
+    )
+    assert early_return is not None, "return before any ARC local should return directly"
+    assert "rt_string_release(a);" not in early_return.group(0)
+    assert "rt_string_release(b);" not in early_return.group(0)
+
+    mid_return = re.search(
+        r"if \(\(i == 1\)\)\s*\{.*?l0_int l0_ret_\d+ = 11;.*?rt_string_release\(a\);"
+        r".*?return l0_ret_\d+;",
+        main_body,
+        re.DOTALL,
+    )
+    assert mid_return is not None, "return after acquiring only `a` must release `a`"
+    assert "rt_string_release(b);" not in mid_return.group(0)
+
+    late_return = re.search(
+        r"if \(\(l0_std_string_len_s\(b\) > 0\)\)\s*\{.*?l0_int l0_ret_\d+ = 12;"
+        r".*?rt_string_release\(b\);.*?rt_string_release\(a\);.*?return l0_ret_\d+;",
+        main_body,
+        re.DOTALL,
+    )
+    assert late_return is not None, (
+        "return after acquiring `a` and `b` must release both before returning"
+    )
+
+
 def test_codegen_return_borrowed_param_retains(codegen_single, compile_and_run, tmp_path):
     c_code, _ = codegen_single(
         "main",

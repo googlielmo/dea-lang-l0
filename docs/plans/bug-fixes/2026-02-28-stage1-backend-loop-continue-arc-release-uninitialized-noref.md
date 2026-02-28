@@ -86,9 +86,12 @@ Before the Stage 2 workaround, the generated trace showed corrupted releases ori
 
 1. Fix Stage 1 loop lowering so ARC cleanup is emitted only for locals definitely initialized on the current path.
 2. Add a direct Stage 1 backend regression for the `continue-before-ARC-local` loop shape.
-3. Add a trace regression that would fail if an uninitialized ARC local is released.
-4. Keep language semantics unchanged.
-5. Keep the Stage 2 workaround in place until the Stage 1 fix is validated, then decide separately whether to simplify it.
+3. Add regressions for multi-resource loop bodies where ARC locals are initialized at different steps and control may
+   exit between acquisitions.
+4. Add trace regressions that would fail if an uninitialized ARC local is released or if an early exit skips required
+   cleanup for already-acquired locals.
+5. Keep language semantics unchanged.
+6. Keep the Stage 2 workaround in place until the Stage 1 fix is validated, then decide separately whether to simplify it.
 
 ## Fix implemented
 
@@ -142,6 +145,19 @@ Added `test_codegen_loop_continue_does_not_release_uninitialized_arc_local`.
 The test builds the failing loop shape and asserts the generated C no longer contains a `continue` jump to a shared
 label that later unconditionally releases an ARC local declared after the `continue`.
 
+Follow-up coverage added:
+
+1. `test_codegen_loop_continue_cleans_only_acquired_arc_locals`
+2. `test_codegen_loop_break_cleans_only_acquired_arc_locals`
+3. `test_codegen_loop_return_cleans_only_acquired_arc_locals`
+
+These tests cover loop bodies where multiple ARC locals are initialized at different points and verify the generated C
+cleans only the locals acquired on the active control-flow path:
+
+1. early `continue`/`break`/`return` before any ARC local emits no cleanup for later locals,
+2. mid-body exits after acquiring only `a` release only `a`,
+3. later exits after acquiring both `a` and `b` release both in reverse order.
+
 ### D. Add a runtime trace regression
 
 File: `compiler/stage1_py/tests/backend/test_trace_arc.py`
@@ -151,13 +167,30 @@ Added `test_trace_arc_loop_continue_skips_uninitialized_arc_cleanup`.
 The test executes the problematic loop shape under ARC tracing, takes the early `continue` path, asserts the program
 runs successfully, and checks that heap ARC refcount values stay in a sane range.
 
+Follow-up coverage added:
+
+1. `test_trace_arc_loop_continue_cleans_only_acquired_arc_locals`
+2. `test_trace_arc_loop_break_after_single_arc_local_cleans_that_local`
+3. `test_trace_arc_loop_return_after_single_arc_local_cleans_that_local`
+
+These trace tests validate the runtime behavior of the lowered control flow:
+
+1. multi-`continue` paths in a loop with two ARC locals do not produce corrupted refcounts and free the expected heap
+   values,
+2. `break` after one ARC acquisition frees that value before leaving the loop,
+3. `return` after one ARC acquisition frees that value before returning from the function.
+
 ## Verification
 
 Executed:
 
 ```bash
 pytest -q compiler/stage1_py/tests/backend/test_codegen_semantics.py -k "loop_continue_does_not_release_uninitialized_arc_local"
+pytest -q compiler/stage1_py/tests/backend/test_codegen_semantics.py -k "loop_continue_cleans_only_acquired_arc_locals"
+pytest -q compiler/stage1_py/tests/backend/test_codegen_semantics.py -k "loop_break_cleans_only_acquired_arc_locals or loop_return_cleans_only_acquired_arc_locals"
 pytest -q compiler/stage1_py/tests/backend/test_trace_arc.py -k "loop_continue_skips_uninitialized_arc_cleanup"
+pytest -q compiler/stage1_py/tests/backend/test_trace_arc.py -k "loop_continue_cleans_only_acquired_arc_locals"
+pytest -q compiler/stage1_py/tests/backend/test_trace_arc.py -k "loop_break_after_single_arc_local_cleans_that_local or loop_return_after_single_arc_local_cleans_that_local"
 pytest -q compiler/stage1_py/tests/integration/test_case_statement.py -k "continue_inside_while or break_inside_for"
 pytest -n auto compiler/stage1_py
 ./compiler/stage2_l0/run_trace_tests.sh
@@ -165,11 +198,13 @@ pytest -n auto compiler/stage1_py
 
 Observed:
 
-1. new Stage 1 regressions pass,
-2. existing loop control-flow regressions pass,
-3. full Stage 1 test suite passes (`1017 passed`),
-4. Stage 2 trace suite still passes,
-5. no generated C path releases an ARC local before initialization.
+1. the original `continue-before-ARC-local` regressions pass,
+2. the new multi-resource `continue` codegen and trace regressions pass,
+3. the new `break` and `return` cleanup regressions pass,
+4. existing loop control-flow regressions pass,
+5. full Stage 1 test suite passes (`1017 passed`),
+6. Stage 2 trace suite still passes,
+7. no generated C path releases an ARC local before initialization or skips cleanup for already-acquired loop-body ARC locals on `continue`, `break`, or `return`.
 
 ## Current workaround
 
