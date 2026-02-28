@@ -47,6 +47,7 @@ def _validate_events(events: list[dict[str, str]]) -> tuple[list[str], list[str]
     obj_new_meta: dict[str, dict[str, str]] = {}
     obj_last_ptr_line: dict[str, str] = {}
     str_alloc_line: dict[str, str] = {}
+    str_alloc_loc: dict[str, str] = {}
     str_last_ptr_line: dict[str, str] = {}
 
     for ev in events:
@@ -73,6 +74,7 @@ def _validate_events(events: list[dict[str, str]]) -> tuple[list[str], list[str]
                 obj_new_meta[ptr] = {
                     "new_line": line_no,
                     "bytes": ev.get("bytes", "?"),
+                    "loc": ev.get("loc", "?"),
                 }
             elif op == "drop" and action == "free":
                 obj_balance[ptr] -= 1  # type: ignore[index]
@@ -92,6 +94,7 @@ def _validate_events(events: list[dict[str, str]]) -> tuple[list[str], list[str]
                 str_balance[ptr] += 1  # type: ignore[index]
                 if ptr not in str_alloc_line:
                     str_alloc_line[ptr] = line_no
+                    str_alloc_loc[ptr] = ev.get("loc", "?")
             elif op == "free_string" and action == "free":
                 str_balance[ptr] -= 1  # type: ignore[index]
                 if str_balance[ptr] < 0:  # type: ignore[index]
@@ -150,6 +153,7 @@ def _validate_events(events: list[dict[str, str]]) -> tuple[list[str], list[str]
                         "remaining": str(bal),
                         "new_line": meta.get("new_line", "?"),
                         "bytes": obj_bytes,
+                        "loc": meta.get("loc", "?"),
                         "last_ptr_line": obj_last_ptr_line.get(ptr, "?"),
                     }
                 )
@@ -164,6 +168,7 @@ def _validate_events(events: list[dict[str, str]]) -> tuple[list[str], list[str]
                         "ptr": ptr,
                         "remaining": str(bal),
                         "alloc_line": str_alloc_line.get(ptr, "?"),
+                        "loc": str_alloc_loc.get(ptr, "?"),
                         "last_ptr_line": str_last_ptr_line.get(ptr, "?"),
                     }
                 )
@@ -246,7 +251,7 @@ def _print_report(
                 print(
                     "    "
                     f"ptr={item['ptr']} remaining={item['remaining']} bytes={item['bytes']} "
-                    f"new_line={item['new_line']} last_ptr_line={item['last_ptr_line']}"
+                    f"new_line={item['new_line']} loc={item['loc']} last_ptr_line={item['last_ptr_line']}"
                 )
             if len(leaked_objects) > max_details:
                 print(f"    ... {len(leaked_objects) - max_details} more")
@@ -257,7 +262,7 @@ def _print_report(
                 print(
                     "    "
                     f"ptr={item['ptr']} remaining={item['remaining']} "
-                    f"alloc_line={item['alloc_line']} last_ptr_line={item['last_ptr_line']}"
+                    f"alloc_line={item['alloc_line']} loc={item['loc']} last_ptr_line={item['last_ptr_line']}"
                 )
             if len(leaked_strings) > max_details:
                 print(f"    ... {len(leaked_strings) - max_details} more")

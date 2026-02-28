@@ -106,10 +106,10 @@ def test_codegen_extern_function_declaration(codegen_single):
         return
 
     # Should have extern C declaration
-    assert "void rt_print(l0_int x);" in c_code
+    assert "void (rt_print)(l0_int x);" in c_code
 
     # Should NOT have definition body
-    count = c_code.count("void rt_print(")
+    count = c_code.count("void (rt_print)(")
     assert count == 1  # Once in declaration only
 
 

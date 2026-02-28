@@ -615,8 +615,8 @@ def test_codegen_extern_function_calls(codegen_single):
         pytest.skip(f"Errors: " + ", ".join(d.format() for d in diag))
 
     # Extern declarations should be present
-    assert "void rt_print(l0_string msg);" in c_code
-    assert "l0_int* rt_alloc(l0_int size);" in c_code
+    assert "void (rt_print)(l0_string msg);" in c_code
+    assert "l0_int* (rt_alloc)(l0_int size);" in c_code
 
     # Call to extern should pass an inline static l0_string value.
     assert 'rt_print(((l0_string)L0_STRING_CONST("test", 4)))' in c_code
@@ -640,7 +640,7 @@ def test_codegen_extern_with_pointer_return(codegen_single):
     assert c_code is not None
 
     # Return type should be pointer
-    assert "l0_int* allocate(void);" in c_code
+    assert "l0_int* (allocate)(void);" in c_code
 
     # Call and dereference should be present
     assert "allocate()" in c_code

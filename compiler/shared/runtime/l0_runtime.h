@@ -65,8 +65,16 @@
         fprintf(stderr, __VA_ARGS__); \
         fprintf(stderr, "\n"); \
     } while (0)
+#define _RT_TRACE_ARC_LOC(loc_file, loc_line, ...) \
+    do { \
+        fprintf(stderr, "[l0][arc] "); \
+        fprintf(stderr, __VA_ARGS__); \
+        fprintf(stderr, " loc=\"%s\":%d", loc_file, loc_line); \
+        fprintf(stderr, "\n"); \
+    } while (0)
 #else
 #define _RT_TRACE_ARC(...) ((void)0)
+#define _RT_TRACE_ARC_LOC(loc_file, loc_line, ...) ((void)0)
 #endif
 
 #ifdef L0_TRACE_MEMORY
@@ -76,8 +84,16 @@
         fprintf(stderr, __VA_ARGS__); \
         fprintf(stderr, "\n"); \
     } while (0)
+#define _RT_TRACE_MEM_LOC(loc_file, loc_line, ...) \
+    do { \
+        fprintf(stderr, "[l0][mem] "); \
+        fprintf(stderr, __VA_ARGS__); \
+        fprintf(stderr, " loc=\"%s\":%d", loc_file, loc_line); \
+        fprintf(stderr, "\n"); \
+    } while (0)
 #else
 #define _RT_TRACE_MEM(...) ((void)0)
+#define _RT_TRACE_MEM_LOC(loc_file, loc_line, ...) ((void)0)
 #endif
 
 /* ============================================================================
@@ -389,6 +405,21 @@ static l0_string _rt_init_heap_string(void *mem, l0_int s_len) {
  * The returned string is of kind L0_STRING_K_HEAP and
  * its data is null-terminated in advance.
  */
+#ifdef L0_TRACE_MEMORY
+static l0_string _rt_alloc_string_impl(l0_int len, const char *_loc_file, int _loc_line) {
+    if (len < 0) {
+        _rt_panic("_rt_alloc_string: negative length");
+    }
+    void *mem = malloc(sizeof(_l0_h_string) + len + 1);
+    if (mem == NULL) {
+        _rt_panic("_rt_alloc_string: out of memory");
+    }
+    l0_string s = _rt_init_heap_string(mem, len);
+    _RT_TRACE_MEM_LOC(_loc_file, _loc_line, "op=alloc_string len=%d ptr=%p", (int)len, (void*)s.data.h_str);
+    return s;
+}
+#define _rt_alloc_string(len) _rt_alloc_string_impl((len), __FILE__, __LINE__)
+#else
 static l0_string _rt_alloc_string(l0_int len) {
     if (len < 0) {
         _rt_panic("_rt_alloc_string: negative length");
@@ -401,11 +432,77 @@ static l0_string _rt_alloc_string(l0_int len) {
     _RT_TRACE_MEM("op=alloc_string len=%d ptr=%p", (int)len, (void*)s.data.h_str);
     return s;
 }
+#endif
 
 /**
  * Free a string's allocated data, if applicable.
  * If reference counted, decrements reference count and frees when it reaches zero.
  */
+#if defined(L0_TRACE_ARC) || defined(L0_TRACE_MEMORY)
+static void _rt_free_string_impl(l0_string str, const char *_loc_file, int _loc_line) {
+    if (str.kind == L0_STRING_K_STATIC) {
+        /* Static string: do nothing */
+        _RT_TRACE_ARC_LOC(_loc_file, _loc_line, "op=release kind=static ptr=%p rc_before=-1 rc_after=-1 action=noop", (void*)str.data.s_str.bytes);
+        return;
+    }
+    _l0_h_string *hs = str.data.h_str;
+    if (hs == NULL) {
+        _RT_TRACE_ARC_LOC(_loc_file, _loc_line, "op=release kind=heap ptr=%p rc_before=-1 rc_after=-1 action=panic-null-ptr", (void*)hs);
+        _RT_TRACE_MEM_LOC(_loc_file, _loc_line, "op=free_string ptr=%p action=panic-null-ptr", (void*)hs);
+        _rt_panic("_rt_free_string: null heap string pointer");
+    }
+    l0_int rc_before = hs->refcount;
+    if (rc_before > 0 && rc_before < INT32_MAX) {
+        /* Reference counted string */
+        hs->refcount--;
+        if (hs->refcount == 0) {
+            _RT_TRACE_ARC_LOC(
+                _loc_file, _loc_line,
+                "op=release kind=heap ptr=%p rc_before=%d rc_after=0 action=free",
+                (void*)hs, (int)rc_before
+            );
+            _RT_TRACE_MEM_LOC(_loc_file, _loc_line, "op=free_string ptr=%p action=free", (void*)hs);
+            hs->refcount = _RT_MEM_SENTINEL; /* prevent double free */
+            free((void*)hs);
+        } else {
+            _RT_TRACE_ARC_LOC(
+                _loc_file, _loc_line,
+                "op=release kind=heap ptr=%p rc_before=%d rc_after=%d action=keep",
+                (void*)hs, (int)rc_before, (int)hs->refcount
+            );
+            _RT_TRACE_MEM_LOC(_loc_file, _loc_line, "op=free_string ptr=%p action=decrement-only", (void*)hs);
+        }
+        return;
+    }
+    if (rc_before == INT32_MAX) {
+        /* Non-reference counted string: do nothing */
+        _RT_TRACE_ARC_LOC(
+            _loc_file, _loc_line,
+            "op=release kind=heap ptr=%p rc_before=%d rc_after=%d action=noop-nonref",
+            (void*)hs, (int)rc_before, (int)rc_before
+        );
+        _RT_TRACE_MEM_LOC(_loc_file, _loc_line, "op=free_string ptr=%p action=noop-nonref", (void*)hs);
+        return;
+    }
+    if (rc_before == _RT_MEM_SENTINEL) {
+        _RT_TRACE_ARC_LOC(
+            _loc_file, _loc_line,
+            "op=release kind=heap ptr=%p rc_before=%d rc_after=%d action=panic-double-free",
+            (void*)hs, (int)rc_before, (int)rc_before
+        );
+        _RT_TRACE_MEM_LOC(_loc_file, _loc_line, "op=free_string ptr=%p action=panic-double-free", (void*)hs);
+        _rt_panic("_rt_free_string: double free detected");
+    }
+    _RT_TRACE_ARC_LOC(
+        _loc_file, _loc_line,
+        "op=release kind=heap ptr=%p rc_before=%d rc_after=%d action=panic-invalid-state",
+        (void*)hs, (int)rc_before, (int)rc_before
+    );
+    _RT_TRACE_MEM_LOC(_loc_file, _loc_line, "op=free_string ptr=%p action=panic-invalid-state", (void*)hs);
+    _rt_panic_fmt("_rt_free_string: invalid string refcount state: %d", (int)hs->refcount);
+}
+#define _rt_free_string(str) _rt_free_string_impl((str), __FILE__, __LINE__)
+#else
 static void _rt_free_string(l0_string str) {
     if (str.kind == L0_STRING_K_STATIC) {
         /* Static string: do nothing */
@@ -463,6 +560,7 @@ static void _rt_free_string(l0_string str) {
     _RT_TRACE_MEM("op=free_string ptr=%p action=panic-invalid-state", (void*)hs);
     _rt_panic_fmt("_rt_free_string: invalid string refcount state: %d", (int)hs->refcount);
 }
+#endif
 
 static l0_string _rt_realloc_string(l0_string s, l0_int new_len) {
     if (new_len < 0) {
@@ -480,11 +578,14 @@ static l0_string _rt_realloc_string(l0_string s, l0_int new_len) {
         _RT_TRACE_MEM("op=realloc_string old_ptr=%p new_len=%d action=panic-invalid-string", (void*)s.data.h_str, (int)new_len);
         _rt_panic("_rt_realloc_string: string is not heap-allocated");
     }
-    _l0_h_string *old_hs = s.data.h_str;
+    
+    /* Use volatile to prevent the compiler from tracking the pointer across realloc 
+       and complaining about use-after-free when tracing the old pointer value. */
+    volatile uintptr_t old_ptr_addr = (uintptr_t)s.data.h_str;
     size_t new_size = sizeof(_l0_h_string) + new_len + 1;
-    void *new_mem = realloc((void*)old_hs, new_size);
+    void *new_mem = realloc((void*)old_ptr_addr, new_size);
     if (new_mem == NULL) {
-        _RT_TRACE_MEM("op=realloc_string old_ptr=%p new_len=%d action=panic-oom", (void*)old_hs, (int)new_len);
+        _RT_TRACE_MEM("op=realloc_string old_ptr=%p new_len=%d action=panic-oom", (void*)old_ptr_addr, (int)new_len);
         _rt_panic("_rt_realloc_string: out of memory");
     }
     _l0_h_string *new_hs = (_l0_h_string *)new_mem;
@@ -493,7 +594,7 @@ static l0_string _rt_realloc_string(l0_string s, l0_int new_len) {
     s.data.h_str = new_hs;
     _RT_TRACE_MEM(
         "op=realloc_string old_ptr=%p new_ptr=%p new_len=%d action=ok",
-        (void*)old_hs, (void*)new_hs, (int)new_len
+        (void*)old_ptr_addr, (void*)new_hs, (int)new_len
     );
     return s;
 }
@@ -652,6 +753,40 @@ static l0_int rt_string_compare(l0_string a, l0_string b) {
  *
  * L0 signature: extern func rt_string_concat(a: string, b: string) -> string;
  */
+#ifdef L0_TRACE_MEMORY
+static l0_string _rt_string_concat_impl(l0_string a, l0_string b, const char *_loc_file, int _loc_line) {
+    l0_int a_len = rt_strlen(a);
+    l0_int b_len = rt_strlen(b);
+    
+    /* Check for overflow in total length */
+    if (a_len > INT32_MAX - b_len) {
+        _rt_panic("rt_string_concat: combined length too large for l0_int");
+    }
+
+    l0_int total_len = a_len + b_len;
+
+    if (total_len == 0) {
+        return L0_STRING_EMPTY;
+    }
+
+    l0_string s = _rt_alloc_string_impl(total_len, _loc_file, _loc_line); /* result string */
+    char *s_data = _rt_string_bytes(s);
+    char *a_data = _rt_string_bytes(a);
+    char *b_data = _rt_string_bytes(b);
+    if (s_data == NULL) {
+        _rt_panic("rt_string_concat: result string data is null");
+    }
+    if (a_data != NULL && a_len > 0) {
+        memcpy(s_data, a_data, (size_t)a_len);
+    }
+    if (b_data != NULL && b_len > 0) {
+        memcpy(s_data + a_len, b_data, (size_t)b_len);
+    }
+    s_data[total_len] = '\0'; /* null-terminate */
+    return s;
+}
+#define rt_string_concat(a, b) _rt_string_concat_impl((a), (b), __FILE__, __LINE__)
+#else
 static l0_string rt_string_concat(l0_string a, l0_string b) {
     l0_int a_len = rt_strlen(a);
     l0_int b_len = rt_strlen(b);
@@ -683,6 +818,7 @@ static l0_string rt_string_concat(l0_string a, l0_string b) {
     s_data[total_len] = '\0'; /* null-terminate */
     return s;
 }
+#endif
 
 /**
  * Create a substring (allocates new memory).
@@ -756,6 +892,53 @@ static l0_string rt_string_from_byte_array(l0_byte* bytes, l0_int len) {
  *
  * L0 signature: extern func rt_string_retain(s: string) -> void;
  */
+#ifdef L0_TRACE_ARC
+static void _rt_string_retain_impl(l0_string s, const char *_loc_file, int _loc_line) {
+    if (s.kind == L0_STRING_K_STATIC) {
+        _RT_TRACE_ARC("op=retain kind=static ptr=%p rc_before=-1 rc_after=-1 action=noop loc=\"%s\":%d", (void*)s.data.s_str.bytes, _loc_file, _loc_line);
+        return; /* Static strings are not reference counted */
+    }
+    _l0_h_string *hs = s.data.h_str;
+    if (hs == NULL) {
+        _RT_TRACE_ARC("op=retain kind=heap ptr=%p rc_before=-1 rc_after=-1 action=panic-null-ptr loc=\"%s\":%d", (void*)hs, _loc_file, _loc_line);
+        _rt_panic("rt_string_retain: null heap string pointer");
+    }
+    l0_int rc_before = hs->refcount;
+    if (rc_before == _RT_MEM_SENTINEL) {
+        _RT_TRACE_ARC(
+            "op=retain kind=heap ptr=%p rc_before=%d rc_after=%d action=panic-use-after-free loc=\"%s\":%d",
+            (void*)hs, (int)rc_before, (int)rc_before, _loc_file, _loc_line
+        );
+        _rt_panic("rt_string_retain: use after free");
+    }
+    if (rc_before > 0 && rc_before < INT32_MAX - 1) {
+        hs->refcount++;
+        _RT_TRACE_ARC(
+            "op=retain kind=heap ptr=%p rc_before=%d rc_after=%d action=retain loc=\"%s\":%d",
+            (void*)hs, (int)rc_before, (int)hs->refcount, _loc_file, _loc_line
+        );
+    } else if (rc_before == INT32_MAX - 1) {
+        _RT_TRACE_ARC(
+            "op=retain kind=heap ptr=%p rc_before=%d rc_after=%d action=panic-overflow loc=\"%s\":%d",
+            (void*)hs, (int)rc_before, (int)rc_before, _loc_file, _loc_line
+        );
+        _rt_panic_fmt("rt_string_retain: invalid refcount state: %d", (int)hs->refcount);
+    } else if (hs->refcount == INT32_MAX) {
+        /* Non-refcounted heap string: no-op */
+        _RT_TRACE_ARC(
+            "op=retain kind=heap ptr=%p rc_before=%d rc_after=%d action=noop-nonref loc=\"%s\":%d",
+            (void*)hs, (int)rc_before, (int)rc_before, _loc_file, _loc_line
+        );
+    } else {
+        _RT_TRACE_ARC(
+            "op=retain kind=heap ptr=%p rc_before=%d rc_after=%d action=panic-invalid-state loc=\"%s\":%d",
+            (void*)hs, (int)rc_before, (int)rc_before, _loc_file, _loc_line
+        );
+        _rt_panic_fmt("rt_string_retain: invalid refcount state: %d", (int)hs->refcount);
+    }
+}
+#define rt_string_retain(s) _rt_string_retain_impl((s), __FILE__, __LINE__)
+#else
 static void rt_string_retain(l0_string s) {
     if (s.kind == L0_STRING_K_STATIC) {
         _RT_TRACE_ARC("op=retain kind=static ptr=%p rc_before=-1 rc_after=-1 action=noop", (void*)s.data.s_str.bytes);
@@ -800,15 +983,23 @@ static void rt_string_retain(l0_string s) {
         _rt_panic_fmt("rt_string_retain: invalid refcount state: %d", (int)hs->refcount);
     }
 }
+#endif
 
 /**
  * Decrement reference count, freeing if zero.
  *
  * L0 signature: extern func rt_string_release(s: string) -> void;
  */
+#ifdef L0_TRACE_ARC
+static void _rt_string_release_impl(l0_string s, const char *_loc_file, int _loc_line) {
+    _rt_free_string_impl(s, _loc_file, _loc_line);
+}
+#define rt_string_release(s) _rt_string_release_impl((s), __FILE__, __LINE__)
+#else
 static void rt_string_release(l0_string s) {
     _rt_free_string(s);
 }
+#endif
 
 /* ============================================================================
  * System interaction and environment
@@ -1433,6 +1624,32 @@ static l0_int rt_errno(void) {
  *
  * L0 signature: extern func rt_alloc(bytes: int) -> void*?;
  */
+#ifdef L0_TRACE_MEMORY
+static void *_rt_alloc_impl(l0_int bytes, const char *_loc_file, int _loc_line) {
+    /* zero-size allocations are not allowed */
+    if (bytes <= 0) {
+        _rt_panic("rt_alloc: invalid allocation size");
+    }
+
+    /* Check for overflow when converting to size_t */
+    if ((uint64_t)bytes > SIZE_MAX) {
+        _rt_panic_fmt("rt_alloc: allocation size overflow (%d bytes requested)", (int)bytes);
+    }
+
+    size_t size = (size_t)bytes;
+    void *ptr = malloc(size);
+
+    if (ptr == NULL) {
+        /* Allocation failed - return NULL and let caller handle it */
+        _RT_TRACE_MEM("op=alloc bytes=%d ptr=%p action=fail loc=\"%s\":%d", (int)bytes, (void*)ptr, _loc_file, _loc_line);
+        return NULL;
+    }
+
+    _RT_TRACE_MEM("op=alloc bytes=%d ptr=%p action=ok loc=\"%s\":%d", (int)bytes, ptr, _loc_file, _loc_line);
+    return ptr;
+}
+#define rt_alloc(bytes) _rt_alloc_impl((bytes), __FILE__, __LINE__)
+#else
 static void *rt_alloc(l0_int bytes) {
     /* zero-size allocations are not allowed */
     if (bytes <= 0) {
@@ -1456,6 +1673,7 @@ static void *rt_alloc(l0_int bytes) {
     _RT_TRACE_MEM("op=alloc bytes=%d ptr=%p action=ok", (int)bytes, ptr);
     return ptr;
 }
+#endif
 
 /**
  * Reallocate memory to a new size.
@@ -1465,6 +1683,32 @@ static void *rt_alloc(l0_int bytes) {
  *
  * L0 signature: extern func rt_realloc(ptr: void*, new_bytes: int) -> void*?;
  */
+#ifdef L0_TRACE_MEMORY
+static void *_rt_realloc_impl(void *ptr, l0_int new_bytes, const char *_loc_file, int _loc_line) {
+    /* zero-size allocations are not allowed */
+    if (new_bytes <= 0) {
+        _rt_panic("rt_realloc: invalid allocation size");
+    }
+
+    if ((uint64_t)new_bytes > SIZE_MAX) {
+        _rt_panic_fmt("rt_realloc: allocation size overflow (%d bytes requested)", (int)new_bytes);
+    }
+
+    volatile uintptr_t old_ptr_addr = (uintptr_t)ptr;
+    size_t new_size = (size_t)new_bytes;
+    void *new_ptr = realloc((void*)old_ptr_addr, new_size);
+
+    if (new_ptr == NULL) {
+        /* Real failure! original pointer is still valid */
+        _RT_TRACE_MEM("op=realloc old_ptr=%p bytes=%d new_ptr=%p action=fail loc=\"%s\":%d", (void*)old_ptr_addr, (int)new_bytes, (void*)new_ptr, _loc_file, _loc_line);
+        return NULL;
+    }
+
+    _RT_TRACE_MEM("op=realloc old_ptr=%p bytes=%d new_ptr=%p action=ok loc=\"%s\":%d", (void*)old_ptr_addr, (int)new_bytes, new_ptr, _loc_file, _loc_line);
+    return new_ptr;
+}
+#define rt_realloc(ptr, new_bytes) _rt_realloc_impl((ptr), (new_bytes), __FILE__, __LINE__)
+#else
 static void *rt_realloc(void *ptr, l0_int new_bytes) {
     /* zero-size allocations are not allowed */
     if (new_bytes <= 0) {
@@ -1475,29 +1719,40 @@ static void *rt_realloc(void *ptr, l0_int new_bytes) {
         _rt_panic_fmt("rt_realloc: allocation size overflow (%d bytes requested)", (int)new_bytes);
     }
 
+    volatile uintptr_t old_ptr_addr = (uintptr_t)ptr;
     size_t new_size = (size_t)new_bytes;
-    void *new_ptr = realloc(ptr, new_size);
+    void *new_ptr = realloc((void*)old_ptr_addr, new_size);
 
     if (new_ptr == NULL) {
         /* Real failure! original pointer is still valid */
-        _RT_TRACE_MEM("op=realloc old_ptr=%p bytes=%d new_ptr=%p action=fail", ptr, (int)new_bytes, (void*)new_ptr);
+        _RT_TRACE_MEM("op=realloc old_ptr=%p bytes=%d new_ptr=%p action=fail", (void*)old_ptr_addr, (int)new_bytes, (void*)new_ptr);
         return NULL;
     }
 
-    _RT_TRACE_MEM("op=realloc old_ptr=%p bytes=%d new_ptr=%p action=ok", ptr, (int)new_bytes, new_ptr);
+    _RT_TRACE_MEM("op=realloc old_ptr=%p bytes=%d new_ptr=%p action=ok", (void*)old_ptr_addr, (int)new_bytes, new_ptr);
     return new_ptr;
 }
+#endif
 
 /**
  * Free previously allocated memory.
  *
  * L0 signature: extern func rt_free(ptr: void*?) -> void;
  */
+#ifdef L0_TRACE_MEMORY
+static void _rt_free_impl(void *ptr, const char *_loc_file, int _loc_line) {
+    /* free(NULL) is a no-op in C */
+    _RT_TRACE_MEM("op=free ptr=%p action=call loc=\"%s\":%d", ptr, _loc_file, _loc_line);
+    free(ptr);
+}
+#define rt_free(ptr) _rt_free_impl((ptr), __FILE__, __LINE__)
+#else
 static void rt_free(void *ptr) {
     /* free(NULL) is a no-op in C */
     _RT_TRACE_MEM("op=free ptr=%p action=call", ptr);
     free(ptr);
 }
+#endif
 
 /**
  * Allocate zeroed memory for an array of elements.
@@ -1505,6 +1760,30 @@ static void rt_free(void *ptr) {
  *
  * L0 signature: extern func rt_calloc(count: int, elem_size: int) -> void*?;
  */
+#ifdef L0_TRACE_MEMORY
+static void *_rt_calloc_impl(l0_int count, l0_int elem_size, const char *_loc_file, int _loc_line) {
+    if (count <= 0 || elem_size <= 0) {
+        _rt_panic("rt_calloc: invalid count or element size");
+    }
+
+    /* Check for overflow in multiplication*/
+    if ((uint64_t)count * (uint64_t)elem_size > SIZE_MAX) {
+        _rt_panic_fmt("rt_calloc: allocation size overflow (%d elements of size %d requested)",
+                     (int)count, (int)elem_size);
+    }
+
+    size_t n = (size_t)count;
+    size_t size = (size_t)elem_size;
+
+    void *ptr = calloc(n, size);
+    _RT_TRACE_MEM(
+        "op=calloc count=%d elem_size=%d ptr=%p action=%s loc=\"%s\":%d",
+        (int)count, (int)elem_size, ptr, ptr == NULL ? "fail" : "ok", _loc_file, _loc_line
+    );
+    return ptr;
+}
+#define rt_calloc(count, elem_size) _rt_calloc_impl((count), (elem_size), __FILE__, __LINE__)
+#else
 static void *rt_calloc(l0_int count, l0_int elem_size) {
     if (count <= 0 || elem_size <= 0) {
         _rt_panic("rt_calloc: invalid count or element size");
@@ -1526,6 +1805,7 @@ static void *rt_calloc(l0_int count, l0_int elem_size) {
     );
     return ptr;
 }
+#endif
 
 /**
  * Set memory to a specific byte value.
@@ -1645,6 +1925,32 @@ static _rt_alloc_node *_rt_alloc_list = NULL;
  * Allocate a single zero-initialized object for L0 `new`.
  * Panics on failure, and registers the returned pointer for `_rt_drop`.
  */
+#ifdef L0_TRACE_MEMORY
+static void *_rt_alloc_obj_impl(l0_int bytes, const char *_loc_file, int _loc_line) {
+    if (bytes <= 0) {
+        _rt_panic("new: invalid allocation size");
+    }
+
+    void *ptr = _rt_calloc_impl(1, bytes, _loc_file, _loc_line);
+    if (ptr == NULL) {
+        _rt_free_impl(ptr, _loc_file, _loc_line);
+        _RT_TRACE_MEM("op=new_alloc bytes=%d ptr=%p action=panic-oom loc=\"%s\":%d", (int)bytes, ptr, _loc_file, _loc_line);
+        _rt_panic("new: out of memory");
+    }
+
+    _rt_alloc_node *node = (_rt_alloc_node*)malloc(sizeof(_rt_alloc_node));
+    if (node == NULL) {
+        _rt_panic("new: out of memory (tracker)");
+    }
+    node->ptr = ptr;
+    node->next = _rt_alloc_list;
+    _rt_alloc_list = node;
+
+    _RT_TRACE_MEM("op=new_alloc bytes=%d ptr=%p action=ok loc=\"%s\":%d", (int)bytes, ptr, _loc_file, _loc_line);
+    return ptr;
+}
+#define _rt_alloc_obj(bytes) _rt_alloc_obj_impl((bytes), __FILE__, __LINE__)
+#else
 static void *_rt_alloc_obj(l0_int bytes) {
     if (bytes <= 0) {
         _rt_panic("new: invalid allocation size");
@@ -1668,6 +1974,7 @@ static void *_rt_alloc_obj(l0_int bytes) {
     _RT_TRACE_MEM("op=new_alloc bytes=%d ptr=%p action=ok", (int)bytes, ptr);
     return ptr;
 }
+#endif
 
 /**
  * Drop a heap-allocated object created by `new`.
@@ -1675,6 +1982,32 @@ static void *_rt_alloc_obj(l0_int bytes) {
  * A NULL pointer is a no-op.
  * Panics on invalid pointers (not previously allocated by `new`).
  */
+#ifdef L0_TRACE_MEMORY
+static void _rt_drop_impl(void *ptr, const char *_loc_file, int _loc_line) {
+    if (ptr == NULL) {
+        _RT_TRACE_MEM("op=drop ptr=%p action=noop-null loc=\"%s\":%d", ptr, _loc_file, _loc_line);
+        return; /* covers drop of null optional pointers (T*?) */
+    }
+
+    _rt_alloc_node** cur = &_rt_alloc_list;
+    while (*cur != NULL && (*cur)->ptr != ptr) {
+        cur = &((*cur)->next);
+    }
+
+    if (*cur == NULL) {
+        _RT_TRACE_MEM("op=drop ptr=%p action=panic-not-found loc=\"%s\":%d", ptr, _loc_file, _loc_line);
+        _rt_panic("drop: pointer not allocated by 'new'");
+    }
+
+    _rt_alloc_node *dead = *cur;
+    *cur = dead->next;
+    free(dead);
+
+    _RT_TRACE_MEM("op=drop ptr=%p action=free loc=\"%s\":%d", ptr, _loc_file, _loc_line);
+    _rt_free_impl(ptr, _loc_file, _loc_line);
+}
+#define _rt_drop(ptr) _rt_drop_impl((ptr), __FILE__, __LINE__)
+#else
 static void _rt_drop(void *ptr) {
     if (ptr == NULL) {
         _RT_TRACE_MEM("op=drop ptr=%p action=noop-null", ptr);
@@ -1698,6 +2031,7 @@ static void _rt_drop(void *ptr) {
     _RT_TRACE_MEM("op=drop ptr=%p action=free", ptr);
     free(ptr);
 }
+#endif
 
 /* ============================================================================
  * Runtime support for hashing (using SipHash-1-3)

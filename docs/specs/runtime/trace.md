@@ -67,6 +67,7 @@ Typical fields include:
 - pointer identity
 - reference count transition (`rc_before`/`rc_after`) where applicable
 - action (`retain`, `keep`, `free`, `noop-*`, or `panic-*`)
+- source location (`loc="file":line`) where available
 
 ### 5.2 Memory (`L0_TRACE_MEMORY`)
 
@@ -90,6 +91,7 @@ Typical fields include:
 - size/count arguments
 - pointer identities (old/new for realloc)
 - action (`ok`, `fail`, `free`, `noop-*`, `panic-*`)
+- source location (`loc="file":line`) where available
 
 ## 6. Compatibility and Defaults
 
@@ -100,7 +102,6 @@ Typical fields include:
 ## 7. Non-goals (Current Stage)
 
 - Structured trace output formats (JSON/binary).
-- Source-location tagging on each trace line.
 - Configurable runtime filtering levels/categories.
 
 ## 8. Candidate Future Flags

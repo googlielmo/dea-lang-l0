@@ -531,7 +531,9 @@ class CEmitter:
         """Emit a single function declaration."""
         # CRITICAL: extern functions are NOT mangled - they're the FFI boundary
         if decl.is_extern:
-            c_name = decl.name
+            # Wrap extern function names in parens to prevent macro expansion
+            # (e.g. if an extern function is implemented as a macro in the C runtime)
+            c_name = f"({decl.name})"
         else:
             c_name = self.mangle_function_name(module_name, decl.name)
 
