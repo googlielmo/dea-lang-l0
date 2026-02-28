@@ -1,0 +1,60 @@
+/*
+ * SPDX-License-Identifier: MIT OR Apache-2.0
+ * Copyright (c) 2026 gwz
+ */
+
+module symbols;
+
+import util.strings;
+
+import ast;
+import types;
+
+enum SymbolKind {
+    SYM_FUNC;
+    SYM_STRUCT;
+    SYM_ENUM;
+    SYM_ENUM_VARIANT;
+    SYM_TYPE_ALIAS;
+    SYM_LET;
+}
+
+struct Symbol {
+    name: string;
+    kind: SymbolKind;
+    module_name: string;
+    owner_name: string;
+    decl_ptr: void*;
+    span: Span;
+    resolved_type: Type*?;
+}
+
+func symbol_create(name: string, kind: SymbolKind, module_name: string, owner_name: string, decl_ptr: void*,
+                   span: Span) -> Symbol* {
+    return new Symbol(us_clone_s(name), kind, us_clone_s(module_name), us_clone_s(owner_name), decl_ptr, span, null);
+}
+
+func symbol_set_type_clone(self: Symbol*, resolved_type: Type*) {
+    if (self.resolved_type != null) {
+        type_free(self.resolved_type as Type*);
+    }
+    self.resolved_type = type_clone(resolved_type);
+}
+
+func symbol_kind_name(kind: SymbolKind) -> string {
+    match (kind) {
+        SYM_FUNC => { return "FUNC"; }
+        SYM_STRUCT => { return "STRUCT"; }
+        SYM_ENUM => { return "ENUM"; }
+        SYM_ENUM_VARIANT => { return "ENUM_VARIANT"; }
+        SYM_TYPE_ALIAS => { return "TYPE_ALIAS"; }
+        SYM_LET => { return "LET"; }
+    }
+}
+
+func symbol_free(self: Symbol*) {
+    if (self.resolved_type != null) {
+        type_free(self.resolved_type as Type*);
+    }
+    drop self;
+}

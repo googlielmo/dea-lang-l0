@@ -3,7 +3,7 @@
 ## Stage 2 Semantic Foundation Milestone
 
 - Date: 2026-02-28
-- Status: Planned
+- Status: Implemented (2026-02-28)
 - Title: Stage 2 semantic foundation milestone
 - Kind: Feature
 - Severity: Medium

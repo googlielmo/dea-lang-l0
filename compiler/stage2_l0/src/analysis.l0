@@ -1,0 +1,98 @@
+/*
+ * SPDX-License-Identifier: MIT OR Apache-2.0
+ * Copyright (c) 2026 gwz
+ */
+
+module analysis;
+
+import std.vector;
+import util.diag;
+
+import driver;
+import locals;
+import name_resolver;
+import signatures;
+import source_paths;
+import util.log;
+
+struct AnalysisResult {
+    driver_state: DriverState*;
+    diags: DiagCollector*;
+    names: NameResolution*?;
+    signatures: SignatureTables*?;
+    locals_result: LocalsResult*?;
+}
+
+func analysis_result_free(self: AnalysisResult*) {
+    if (self.locals_result != null) {
+        locals_free(self.locals_result as LocalsResult*);
+    }
+    if (self.signatures != null) {
+        sig_tables_free(self.signatures as SignatureTables*);
+    }
+    if (self.names != null) {
+        nr_free(self.names as NameResolution*);
+    }
+    diag_free(self.diags);
+    driver_state_free(self.driver_state);
+    drop self;
+}
+
+func analysis_has_errors(self: AnalysisResult*) -> bool {
+    return diag_has_errors(self.diags);
+}
+
+func analysis_diag_count(self: AnalysisResult*) -> int {
+    return diag_count(self.diags);
+}
+
+func analysis_diag_get(self: AnalysisResult*, index: int) -> Diagnostic* {
+    return diag_get(self.diags, index);
+}
+
+func analysis_source_names(self: AnalysisResult*) -> VectorString* {
+    return self.driver_state.source_names;
+}
+
+func analysis_source_texts(self: AnalysisResult*) -> VectorString* {
+    return self.driver_state.source_texts;
+}
+
+func analysis_name_resolution(self: AnalysisResult*) -> NameResolution*? {
+    return self.names;
+}
+
+func analysis_signature_tables(self: AnalysisResult*) -> SignatureTables*? {
+    return self.signatures;
+}
+
+func analysis_locals(self: AnalysisResult*) -> LocalsResult*? {
+    return self.locals_result;
+}
+
+func analysis_copy_driver_diags(dst: DiagCollector*, src: DriverState*) {
+    for (let i = 0; i < driver_diag_count(src); i = i + 1) {
+        diag_copy(dst, driver_diag_get(src, i));
+    }
+}
+
+func analysis_analyze_entry(search_paths: SourceSearchPaths*, entry_module: string, cfg: LogConfig*) -> AnalysisResult* {
+    let driver_state = driver_analyze_entry(search_paths, entry_module, cfg);
+    let result = new AnalysisResult(driver_state, diag_create(), null, null, null);
+    analysis_copy_driver_diags(result.diags, driver_state);
+
+    if (driver_has_errors(driver_state)) {
+        return result;
+    }
+
+    let names = nr_resolve(driver_state, result.diags);
+    result.names = names;
+
+    let sigs = sig_resolve(driver_state, names, result.diags);
+    result.signatures = sigs;
+
+    let local_envs = locals_resolve(driver_state, result.diags);
+    result.locals_result = local_envs;
+
+    return result;
+}

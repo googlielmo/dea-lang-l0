@@ -1,0 +1,213 @@
+/*
+ * SPDX-License-Identifier: MIT OR Apache-2.0
+ * Copyright (c) 2026 gwz
+ */
+
+module types;
+
+import std.string;
+import std.text;
+import std.vector;
+
+enum TypeKind {
+    TY_BUILTIN;
+    TY_STRUCT;
+    TY_ENUM;
+    TY_POINTER;
+    TY_NULLABLE;
+    TY_FUNC;
+    TY_NULL;
+}
+
+struct Type {
+    kind: TypeKind;
+    module_name: string;
+    name: string;
+    inner: Type*?;
+    params: VectorBase*?; // Type*
+    result: Type*?;
+}
+
+func type_param_vec_free(items: VectorBase*?) {
+    if (items == null) {
+        return;
+    }
+
+    let vec = items as VectorBase*;
+    for (let i = 0; i < vec_size(vec); i = i + 1) {
+        let item = *(vec_get(vec, i) as Type**);
+        type_free(item);
+    }
+    vec_free(vec);
+}
+
+func type_new(kind: TypeKind, module_name: string, name: string, inner: Type*?, params: VectorBase*?,
+              result: Type*?) -> Type* {
+    return new Type(kind, module_name, name, inner, params, result);
+}
+
+func type_new_builtin(name: string) -> Type* {
+    return type_new(TY_BUILTIN, "", name, null, null, null);
+}
+
+func type_builtin_bool() -> Type* {
+    return type_new_builtin("bool");
+}
+
+func type_builtin_byte() -> Type* {
+    return type_new_builtin("byte");
+}
+
+func type_builtin_int() -> Type* {
+    return type_new_builtin("int");
+}
+
+func type_builtin_string() -> Type* {
+    return type_new_builtin("string");
+}
+
+func type_builtin_void() -> Type* {
+    return type_new_builtin("void");
+}
+
+func type_new_null() -> Type* {
+    return type_new(TY_NULL, "", "null", null, null, null);
+}
+
+func type_new_struct(module_name: string, name: string) -> Type* {
+    return type_new(TY_STRUCT, module_name, name, null, null, null);
+}
+
+func type_new_enum(module_name: string, name: string) -> Type* {
+    return type_new(TY_ENUM, module_name, name, null, null, null);
+}
+
+func type_new_pointer(inner: Type*) -> Type* {
+    return type_new(TY_POINTER, "", "", inner, null, null);
+}
+
+func type_new_nullable(inner: Type*) -> Type* {
+    return type_new(TY_NULLABLE, "", "", inner, null, null);
+}
+
+func type_new_func(params: VectorBase*, result: Type*) -> Type* {
+    return type_new(TY_FUNC, "", "", null, params, result);
+}
+
+func type_is_builtin(self: Type*, name: string) -> bool {
+    return ord(self.kind) == ord(TY_BUILTIN) && eq_s(self.name, name);
+}
+
+func type_is_builtin_name(name: string) -> bool {
+    return eq_s(name, "bool") || eq_s(name, "byte") || eq_s(name, "int") || eq_s(name, "string") || eq_s(name, "void");
+}
+
+func type_clone(self: Type*) -> Type* {
+    if (ord(self.kind) == ord(TY_BUILTIN)) {
+        return type_new_builtin(self.name);
+    }
+    if (ord(self.kind) == ord(TY_STRUCT)) {
+        return type_new_struct(self.module_name, self.name);
+    }
+    if (ord(self.kind) == ord(TY_ENUM)) {
+        return type_new_enum(self.module_name, self.name);
+    }
+    if (ord(self.kind) == ord(TY_NULL)) {
+        return type_new_null();
+    }
+    if (ord(self.kind) == ord(TY_POINTER)) {
+        return type_new_pointer(type_clone(self.inner as Type*));
+    }
+    if (ord(self.kind) == ord(TY_NULLABLE)) {
+        return type_new_nullable(type_clone(self.inner as Type*));
+    }
+
+    let params = vec_create(sizeof(void*), 2);
+    let src_params = self.params as VectorBase*;
+    for (let i = 0; i < vec_size(src_params); i = i + 1) {
+        let param = *(vec_get(src_params, i) as Type**);
+        vec_push_ptr(params, type_clone(param) as void*);
+    }
+    return type_new_func(params, type_clone(self.result as Type*));
+}
+
+func type_equals(a: Type*?, b: Type*?) -> bool {
+    if (a == null || b == null) {
+        return a == null && b == null;
+    }
+
+    let left = a as Type*;
+    let right = b as Type*;
+    if (ord(left.kind) != ord(right.kind)) {
+        return false;
+    }
+
+    if (ord(left.kind) == ord(TY_BUILTIN) || ord(left.kind) == ord(TY_NULL)) {
+        return eq_s(left.name, right.name);
+    }
+
+    if (ord(left.kind) == ord(TY_STRUCT) || ord(left.kind) == ord(TY_ENUM)) {
+        return eq_s(left.module_name, right.module_name) && eq_s(left.name, right.name);
+    }
+
+    if (ord(left.kind) == ord(TY_POINTER) || ord(left.kind) == ord(TY_NULLABLE)) {
+        return type_equals(left.inner, right.inner);
+    }
+
+    let left_params = left.params as VectorBase*;
+    let right_params = right.params as VectorBase*;
+    if (vec_size(left_params) != vec_size(right_params)) {
+        return false;
+    }
+    for (let i = 0; i < vec_size(left_params); i = i + 1) {
+        if (!type_equals(
+            *(vec_get(left_params, i) as Type**),
+            *(vec_get(right_params, i) as Type**)
+        )) {
+            return false;
+        }
+    }
+    return type_equals(left.result, right.result);
+}
+
+func type_format(self: Type*) -> string {
+    if (ord(self.kind) == ord(TY_BUILTIN) || ord(self.kind) == ord(TY_NULL)) {
+        return self.name;
+    }
+    if (ord(self.kind) == ord(TY_STRUCT) || ord(self.kind) == ord(TY_ENUM)) {
+        return concat3_s(self.module_name, "::", self.name);
+    }
+    if (ord(self.kind) == ord(TY_POINTER)) {
+        return concat_s(type_format(self.inner as Type*), "*");
+    }
+    if (ord(self.kind) == ord(TY_NULLABLE)) {
+        return concat_s(type_format(self.inner as Type*), "?");
+    }
+
+    with (let sb = sb_create() => sb_free(sb)) {
+        sb_append(sb, "func(");
+        let params = self.params as VectorBase*;
+        for (let i = 0; i < vec_size(params); i = i + 1) {
+            if (i > 0) {
+                sb_append(sb, ", ");
+            }
+            sb_append(sb, type_format(*(vec_get(params, i) as Type**)));
+        }
+        sb_append(sb, ") -> ");
+        sb_append(sb, type_format(self.result as Type*));
+        return sb_to_string(sb);
+    }
+}
+
+func type_free(self: Type*) {
+    if (self.inner != null) {
+        type_free(self.inner as Type*);
+    }
+    if (self.params != null) {
+        type_param_vec_free(self.params);
+    }
+    if (self.result != null) {
+        type_free(self.result as Type*);
+    }
+    drop self;
+}

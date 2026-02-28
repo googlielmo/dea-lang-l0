@@ -1,0 +1,375 @@
+/*
+ * SPDX-License-Identifier: MIT OR Apache-2.0
+ * Copyright (c) 2026 gwz
+ */
+
+module name_resolver;
+
+import sys.rt;
+
+import std.hashmap;
+import std.hashset;
+import std.string;
+import std.text;
+import std.vector;
+import util.diag;
+import util.strings;
+
+import ast;
+import driver;
+import symbols;
+
+struct ModuleEnv {
+    module_name: string;
+    module_ptr: Module*;
+    locals: StringPtrMap*;           // string -> Symbol*
+    imported: StringPtrMap*;         // string -> Symbol* (non-owning)
+    all: StringPtrMap*;              // string -> Symbol* (non-owning for imported, owning via locals)
+    ambiguous_imports: StringSet*;
+    imported_modules: StringSet*;
+}
+
+struct NameResolution {
+    envs: VectorBase*;               // ModuleEnv*
+    by_name: StringPtrMap*;          // string -> ModuleEnv* (non-owning)
+}
+
+func nr_span_diag_error(diags: DiagCollector*, code: string, message: string, filename: string, span: Span) {
+    diag_error(diags, "NameResolver", code, message, filename, span.start_line, span.start_column, span.end_line,
+        span.end_column);
+}
+
+func nr_span_diag_warn(diags: DiagCollector*, code: string, message: string, filename: string, span: Span) {
+    diag_warn(diags, "NameResolver", code, message, filename, span.start_line, span.start_column, span.end_line,
+        span.end_column);
+}
+
+func nr_map_symbol_get(self: StringPtrMap*, name: string) -> Symbol*? {
+    let value = spm_get(self, name);
+    if (value == null) {
+        return null;
+    }
+    return value as Symbol*;
+}
+
+func nr_build_top_key(module_name: string, name: string) -> string {
+    return concat3_s(module_name, "::", name);
+}
+
+func nr_path_is_same_signature(left: TypeRef*?, right: TypeRef*?) -> bool {
+    if (left == null || right == null) {
+        return left == null && right == null;
+    }
+
+    let lt = left as TypeRef*;
+    let rt = right as TypeRef*;
+    if (!eq_s(lt.name, rt.name) || lt.pointer_depth != rt.pointer_depth || lt.is_nullable != rt.is_nullable) {
+        return false;
+    }
+
+    let left_modules = lt.module_path;
+    let right_modules = rt.module_path;
+    if ((left_modules == null) != (right_modules == null)) {
+        return false;
+    }
+    if (left_modules != null) {
+        let lv = left_modules as VectorString*;
+        let rv = right_modules as VectorString*;
+        if (vs_size(lv) != vs_size(rv)) {
+            return false;
+        }
+        for (let i = 0; i < vs_size(lv); i = i + 1) {
+            if (!eq_s(vs_get(lv, i), vs_get(rv, i))) {
+                return false;
+            }
+        }
+    }
+
+    let left_names = lt.name_qualifier;
+    let right_names = rt.name_qualifier;
+    if ((left_names == null) != (right_names == null)) {
+        return false;
+    }
+    if (left_names != null) {
+        let lv2 = left_names as VectorString*;
+        let rv2 = right_names as VectorString*;
+        if (vs_size(lv2) != vs_size(rv2)) {
+            return false;
+        }
+        for (let i = 0; i < vs_size(lv2); i = i + 1) {
+            if (!eq_s(vs_get(lv2, i), vs_get(rv2, i))) {
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
+func nr_extern_signatures_compatible(local_sym: Symbol*, imported_sym: Symbol*) -> bool {
+    if (ord(local_sym.kind) != ord(SYM_FUNC) || ord(imported_sym.kind) != ord(SYM_FUNC)) {
+        return false;
+    }
+
+    let local_decl = local_sym.decl_ptr as FuncDecl*;
+    let imported_decl = imported_sym.decl_ptr as FuncDecl*;
+    if (!local_decl.is_extern || !imported_decl.is_extern) {
+        return false;
+    }
+    if (vec_size(local_decl.params) != vec_size(imported_decl.params)) {
+        return false;
+    }
+    if (!nr_path_is_same_signature(local_decl.return_type, imported_decl.return_type)) {
+        return false;
+    }
+
+    for (let i = 0; i < vec_size(local_decl.params); i = i + 1) {
+        let lp = ptr_vec_get(local_decl.params, i) as Param*;
+        let rp = ptr_vec_get(imported_decl.params, i) as Param*;
+        if (!nr_path_is_same_signature(lp.type_ref, rp.type_ref)) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+func nr_symbol_free_map(self: StringPtrMap*) {
+    for (let i = 0; i < spm_capacity(self); i = i + 1) {
+        if (spm_slot_occupied(self, i)) {
+            symbol_free(spm_slot_value(self, i) as Symbol*);
+        }
+    }
+    spm_free(self);
+}
+
+func nr_module_env_free(self: ModuleEnv*) {
+    nr_symbol_free_map(self.locals);
+    spm_free(self.imported);
+    spm_free(self.all);
+    ss_free(self.ambiguous_imports);
+    ss_free(self.imported_modules);
+    drop self;
+}
+
+func nr_free(self: NameResolution*) {
+    for (let i = 0; i < vec_size(self.envs); i = i + 1) {
+        nr_module_env_free(ptr_vec_get(self.envs, i) as ModuleEnv*);
+    }
+    vec_free(self.envs);
+    spm_free(self.by_name);
+    drop self;
+}
+
+func nr_env_count(self: NameResolution*) -> int {
+    return vec_size(self.envs);
+}
+
+func nr_env_get(self: NameResolution*, index: int) -> ModuleEnv* {
+    return ptr_vec_get(self.envs, index) as ModuleEnv*;
+}
+
+func nr_env_find(self: NameResolution*, module_name: string) -> ModuleEnv*? {
+    let value = spm_get(self.by_name, module_name);
+    if (value == null) {
+        return null;
+    }
+    return value as ModuleEnv*;
+}
+
+func nr_module_env_local(self: ModuleEnv*, name: string) -> Symbol*? {
+    return nr_map_symbol_get(self.locals, name);
+}
+
+func nr_module_env_imported(self: ModuleEnv*, name: string) -> Symbol*? {
+    return nr_map_symbol_get(self.imported, name);
+}
+
+func nr_module_env_all(self: ModuleEnv*, name: string) -> Symbol*? {
+    return nr_map_symbol_get(self.all, name);
+}
+
+func nr_module_env_is_ambiguous(self: ModuleEnv*, name: string) -> bool {
+    return ss_has(self.ambiguous_imports, name);
+}
+
+func nr_module_env_imports_module(self: ModuleEnv*, module_name: string) -> bool {
+    return ss_has(self.imported_modules, module_name);
+}
+
+func nr_module_env_local_keys(self: ModuleEnv*) -> VectorString* {
+    return spm_keys(self.locals);
+}
+
+func nr_module_env_imported_keys(self: ModuleEnv*) -> VectorString* {
+    return spm_keys(self.imported);
+}
+
+func nr_module_env_all_keys(self: ModuleEnv*) -> VectorString* {
+    return spm_keys(self.all);
+}
+
+func nr_define_local(env: ModuleEnv*, diags: DiagCollector*, name: string, sym: Symbol*) {
+    if (spm_has(env.locals, name)) {
+        nr_span_diag_error(
+            diags,
+            "RES-0010",
+            concat4_s("duplicate top-level definition of '", name, "' in module '", env.module_name),
+            env.module_ptr.filename,
+            sym.span
+        );
+        symbol_free(sym);
+        return;
+    }
+
+    spm_put(env.locals, us_clone_s(name), sym as void*);
+    spm_put(env.all, us_clone_s(name), sym as void*);
+}
+
+func nr_collect_locals(env: ModuleEnv*, diags: DiagCollector*) {
+    let mod = env.module_ptr;
+    for (let i = 0; i < vec_size(mod.decls); i = i + 1) {
+        let top = ptr_vec_get(mod.decls, i) as TopLevelDecl*;
+        match (top.kind) {
+            TD_FUNC => {
+                let decl = top.data as FuncDecl*;
+                nr_define_local(env, diags, decl.name,
+                    symbol_create(decl.name, SYM_FUNC, env.module_name, "", decl as void*, decl.span));
+            }
+            TD_STRUCT => {
+                let decl = top.data as StructDecl*;
+                nr_define_local(env, diags, decl.name,
+                    symbol_create(decl.name, SYM_STRUCT, env.module_name, "", decl as void*, decl.span));
+            }
+            TD_ENUM => {
+                let decl = top.data as EnumDecl*;
+                nr_define_local(env, diags, decl.name,
+                    symbol_create(decl.name, SYM_ENUM, env.module_name, "", decl as void*, decl.span));
+                for (let j = 0; j < vec_size(decl.variants); j = j + 1) {
+                    let variant = ptr_vec_get(decl.variants, j) as EnumVariant*;
+                    nr_define_local(env, diags, variant.name,
+                        symbol_create(variant.name, SYM_ENUM_VARIANT, env.module_name, decl.name, variant as void*,
+                            decl.span));
+                }
+            }
+            TD_TYPE_ALIAS => {
+                let decl = top.data as TypeAliasDecl*;
+                nr_define_local(env, diags, decl.name,
+                    symbol_create(decl.name, SYM_TYPE_ALIAS, env.module_name, "", decl as void*, decl.span));
+            }
+            TD_LET => {
+                let decl = top.data as LetDecl*;
+                nr_define_local(env, diags, decl.name,
+                    symbol_create(decl.name, SYM_LET, env.module_name, "", decl as void*, decl.span));
+            }
+        }
+    }
+}
+
+func nr_open_imports_one(env: ModuleEnv*, imported_env: ModuleEnv*, diags: DiagCollector*, imp: Import*) {
+    for (let i = 0; i < spm_capacity(imported_env.locals); i = i + 1) {
+        if (spm_slot_occupied(imported_env.locals, i)) {
+            let name = spm_slot_key(imported_env.locals, i);
+            let sym = spm_slot_value(imported_env.locals, i) as Symbol*;
+
+            let local_sym = nr_module_env_local(env, name);
+            if (local_sym != null) {
+                let local = local_sym as Symbol*;
+                if (nr_extern_signatures_compatible(local, sym)) {
+                    nr_span_diag_warn(
+                        diags,
+                        "RES-0020",
+                        concat4_s("imported extern function '", nr_build_top_key(imported_env.module_name, name),
+                            "' will be shadowed by a compatible local extern declaration in module '", env.module_name),
+                        env.module_ptr.filename,
+                        local.span
+                    );
+                } else {
+                    nr_span_diag_warn(
+                        diags,
+                        "RES-0021",
+                        concat4_s("imported symbol '", nr_build_top_key(imported_env.module_name, name),
+                            "' will be shadowed by a local definition in module '", env.module_name),
+                        env.module_ptr.filename,
+                        local.span
+                    );
+                }
+            } else {
+                if (spm_has(env.imported, name)) {
+                    nr_span_diag_warn(
+                        diags,
+                        "RES-0022",
+                        concat4_s("symbol '", name, "' imported from multiple modules into '", env.module_name),
+                        env.module_ptr.filename,
+                        env.module_ptr.span
+                    );
+                    ss_add(env.ambiguous_imports, us_clone_s(name));
+                    spm_remove(env.all, name);
+                } else {
+                    spm_put(env.imported, us_clone_s(name), sym as void*);
+                    if (!ss_has(env.ambiguous_imports, name)) {
+                        spm_put(env.all, us_clone_s(name), sym as void*);
+                    }
+                }
+            }
+        }
+    }
+}
+
+func nr_open_imports(nr: NameResolution*, env: ModuleEnv*, diags: DiagCollector*) {
+    let mod = env.module_ptr;
+    for (let i = 0; i < vec_size(mod.imports); i = i + 1) {
+        let imp = ptr_vec_get(mod.imports, i) as Import*;
+        ss_add(env.imported_modules, us_clone_s(imp.name));
+        let imported_env = nr_env_find(nr, imp.name);
+        if (imported_env == null) {
+            nr_span_diag_error(
+                diags,
+                "RES-0029",
+                concat4_s("unknown imported module '", imp.name, "' in module '", env.module_name),
+                env.module_ptr.filename,
+                env.module_ptr.span
+            );
+            continue;
+        }
+        nr_open_imports_one(env, imported_env as ModuleEnv*, diags, imp);
+    }
+}
+
+func nr_make_env(module_ptr: Module*) -> ModuleEnv* {
+    return new ModuleEnv(
+        us_clone_s(module_ptr.name),
+        module_ptr,
+        spm_create(),
+        spm_create(),
+        spm_create(),
+        ss_create(),
+        ss_create()
+    );
+}
+
+func nr_resolve(driver_state: DriverState*, diags: DiagCollector*) -> NameResolution* {
+    let result = new NameResolution(ptr_vec_create(driver_unit_count(driver_state)), spm_create());
+
+    for (let i = 0; i < driver_unit_count(driver_state); i = i + 1) {
+        let unit = driver_unit_get(driver_state, i);
+        if (unit.parse_result.root_module == null) {
+            continue;
+        }
+
+        let module_ptr = unit.parse_result.root_module as Module*;
+        let env = nr_make_env(module_ptr);
+        ptr_vec_push(result.envs, env as void*);
+        spm_put(result.by_name, us_clone_s(env.module_name), env as void*);
+    }
+
+    for (let i = 0; i < vec_size(result.envs); i = i + 1) {
+        nr_collect_locals(ptr_vec_get(result.envs, i) as ModuleEnv*, diags);
+    }
+
+    for (let i = 0; i < vec_size(result.envs); i = i + 1) {
+        nr_open_imports(result, ptr_vec_get(result.envs, i) as ModuleEnv*, diags);
+    }
+
+    return result;
+}

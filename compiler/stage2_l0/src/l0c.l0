@@ -16,6 +16,7 @@ import util.diag;
 
 import util.strings;
 import source_paths;
+import analysis;
 import driver;
 import cli_args;
 import diag_print;
@@ -129,20 +130,20 @@ func l0c_cmd_check(opts: CliOptions*, cfg: LogConfig*) -> int {
         }
         let prep = prepared as PreparedInput*;
 
-        let result = driver_analyze_entry(prep.search_paths, prep.entry_module, cfg);
+        let result = analysis_analyze_entry(prep.search_paths, prep.entry_module, cfg);
         prepared_input_free(prep);
         prepared = null;
-        dp_print_collector_with_sources(result.diags, result.source_names, result.source_texts);
+        dp_print_collector_with_sources(result.diags, analysis_source_names(result), analysis_source_texts(result));
 
         let rc = 0;
-        if (driver_has_errors(result)) {
+        if (analysis_has_errors(result)) {
             rc = 1;
         }
 
-        log_info(cfg, concat4_s("Analysis complete: ", int_to_string(driver_diag_count(result)),
+        log_info(cfg, concat4_s("Analysis complete: ", int_to_string(analysis_diag_count(result)),
             " diagnostic(s), ", concat_s(int_to_string(result.diags.error_count), " error(s)")));
 
-        driver_state_free(result);
+        analysis_result_free(result);
         return rc;
     }
 }

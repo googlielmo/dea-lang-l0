@@ -1,6 +1,6 @@
 # L0 Project Status
 
-Version: 2026-02-22
+Version: 2026-02-28
 
 This document summarizes what is implemented in this repository today and what remains open.
 
@@ -139,14 +139,20 @@ Current implemented assets:
     - `src/lexer.l0`
     - `src/ast.l0`
     - `src/parser.l0`
+    - `src/types.l0`
+    - `src/symbols.l0`
+    - `src/analysis.l0`
+    - `src/name_resolver.l0`
+    - `src/signatures.l0`
+    - `src/locals.l0`
+    - `src/l0c.l0`
     - `src/main.l0`
 - Utility modules:
     - `src/util/array.l0`
     - `src/util/vector.l0` (includes `vi_sort` for int vectors and `vs_sort` for string vectors)
     - `src/util/linear_map.l0`
     - `src/util/text.l0`
-- Test suite under `compiler/stage2_l0/tests` and test runner `run_tests.sh`.
-- Current Stage 2 test runner status: `9/9` tests passing.
+- Test suite under `compiler/stage2_l0/tests` plus `run_tests.sh` and `run_trace_tests.sh`.
 
 Stage 2 parser status:
 
@@ -178,6 +184,20 @@ Stage 2 AST storage status:
 - Parser API returns `ParseResult` with arenas and module root.
 - `parse_result_free` deep cleanup is implemented for parser-owned allocations.
 
+Stage 2 semantic foundation status:
+
+- `AnalysisResult` owns `DriverState`, combined diagnostics, name-resolution environments,
+  signature tables, and local-scope environments.
+- Module-level name resolution is implemented with Stage 1-aligned `RES-*` behavior for
+  duplicate top-level definitions, import shadowing, ambiguous open imports, and unknown
+  imported modules during semantic opening.
+- Top-level signature resolution is implemented for functions, structs, enums, aliases, and
+  top-level lets, including narrow literal/constructor-based let inference and value-type
+  cycle detection.
+- Local scope construction is implemented for non-extern functions over the arena-backed AST,
+  including block, loop, `match`, `case`, and `with` scope boundaries.
+- Stage 2 `l0c --check` runs driver + semantic foundation passes and returns semantic errors.
+
 ## Known Limitations and Constraints
 
 These remain true in Stage 1:
@@ -190,8 +210,8 @@ These remain true in Stage 1:
 
 Current Stage 2 limitations:
 
-1. Semantic passes are not implemented yet (name resolution, signature resolution, local scopes, expression type
-   checking).
+1. Expression type checking is not implemented yet (`expr_types`, `var_ref_resolution`, and intrinsic target typing
+   remain Stage 1-only).
 2. Stage 2 backend/codegen pipeline is not implemented yet.
 3. Some language constraints intentionally remain staged in parser diagnostics (for example, array types and
    bitwise/shift operators).
@@ -201,6 +221,6 @@ Current Stage 2 limitations:
 Near-term project direction, consistent with current docs/code:
 
 1. Continue Stage 2 from parser baseline into semantic passes (name/signature/local-scope/type checking).
-2. Connect Stage 2 semantic outputs to backend/codegen milestones.
-3. Keep Stage 1 behavior deterministic and contract-documented while Stage 2 grows.
-4. Expand language features only once semantics and diagnostics are decision-complete.
+2. Add Stage 2 expression type checking on top of the semantic foundation passes.
+3. Connect Stage 2 semantic outputs to backend/codegen milestones.
+4. Keep Stage 1 behavior deterministic and contract-documented while Stage 2 grows.

@@ -298,16 +298,29 @@ func tv_len(self: TokenVector) -> int {
     return self.vec.length;
 }
 
-func tv_free(self: TokenVector) {
-    for (let i: int = 0; i < self.vec.length; i = i + 1) {
-        let tok_ptr = vec_get(self.vec, i) as Token*;
-        match (tok_ptr.token_type) {
-            TT_IDENT(t) => { rt_string_release(t); }
-            TT_INT(t, v) => { rt_string_release(t); }
-            TT_BYTE(t, v) => { rt_string_release(t); }
-            TT_STRING(t, v) => { rt_string_release(t); rt_string_release(v); }
-            _ => {}
+func token_release_payload(token: Token) {
+    match (token.token_type) {
+        TT_IDENT(text) => {
+            rt_string_release(text);
         }
+        TT_INT(text, value) => {
+            rt_string_release(text);
+        }
+        TT_BYTE(text, value) => {
+            rt_string_release(text);
+        }
+        TT_STRING(text, value) => {
+            rt_string_release(text);
+            rt_string_release(value);
+        }
+        _ => {
+        }
+    }
+}
+
+func tv_free(self: TokenVector) {
+    for (let i = 0; i < self.vec.length; i = i + 1) {
+        token_release_payload(*(vec_get(self.vec, i) as Token*));
     }
     vec_free(self.vec);
 }

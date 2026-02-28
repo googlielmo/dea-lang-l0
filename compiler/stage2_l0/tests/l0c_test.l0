@@ -15,6 +15,10 @@ func fixture_root() -> string {
     return "compiler/stage2_l0/tests/fixtures/driver";
 }
 
+func semantics_fixture_root() -> string {
+    return "compiler/stage2_l0/tests/fixtures/semantics";
+}
+
 func test_check_ok() {
     with (let argv = vs_create(8) => vs_free(argv)) {
         vs_push(argv, "--check");
@@ -36,6 +40,18 @@ func test_check_cycle_fails() {
 
         let rc = run_with_argv(argv);
         assert(rc == 1, "--check should fail for cycle_a");
+    }
+}
+
+func test_check_semantic_failure() {
+    with (let argv = vs_create(8) => vs_free(argv)) {
+        vs_push(argv, "--check");
+        vs_push(argv, "-P");
+        vs_push(argv, semantics_fixture_root());
+        vs_push(argv, "infer_fail_main");
+
+        let rc = run_with_argv(argv);
+        assert(rc == 1, "--check should fail for semantic errors");
     }
 }
 
@@ -75,6 +91,7 @@ func test_nyi_mode_exit_code() {
 func main() {
     test_check_ok();
     test_check_cycle_fails();
+    test_check_semantic_failure();
     test_tok_ok();
     test_parse_error_exit_code();
     test_nyi_mode_exit_code();

@@ -10,6 +10,10 @@ import std.string;
 import std.text;
 import std.vector;
 
+func us_clone_s(s: string) -> string {
+    return slice_s(s, 0, len_s(s));
+}
+
 func us_vs_clone(src: VectorString*) -> VectorString* {
     let out = vs_create(vs_size(src));
     for (let i = 0; i < vs_size(src); i = i + 1) {

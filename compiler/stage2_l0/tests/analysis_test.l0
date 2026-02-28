@@ -1,0 +1,69 @@
+/*
+ * SPDX-License-Identifier: MIT OR Apache-2.0
+ * Copyright (c) 2026 gwz
+ */
+
+module analysis_test;
+
+import std.io;
+import std.string;
+import std.assert;
+import std.vector;
+
+import analysis;
+import source_paths;
+import util.log;
+
+func fixture_root() -> string {
+    return "compiler/stage2_l0/tests/fixtures/semantics";
+}
+
+func make_paths() -> SourceSearchPaths* {
+    let sp = sp_create();
+    sp_add_project_root(sp, fixture_root());
+    return sp;
+}
+
+func has_diag_code(result: AnalysisResult*, code: string) -> bool {
+    for (let i = 0; i < analysis_diag_count(result); i = i + 1) {
+        let d = analysis_diag_get(result, i);
+        if (eq_s(d.code, code)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+func test_analysis_ok_main() {
+    let sp = make_paths();
+    with (let cfg = log_config_create(LL_SILENT, false) => drop cfg) {
+        let result = analysis_analyze_entry(sp, "ok_main", cfg);
+        assert(!analysis_has_errors(result), "expected no analysis errors for ok_main");
+        assert(analysis_name_resolution(result) != null, "expected name resolution data");
+        assert(analysis_signature_tables(result) != null, "expected signature tables");
+        assert(analysis_locals(result) != null, "expected locals data");
+        assert(vs_size(analysis_source_names(result)) == 3, "expected 3 cached sources");
+        analysis_result_free(result);
+    }
+    sp_free(sp);
+}
+
+func test_analysis_semantic_failure() {
+    let sp = make_paths();
+    with (let cfg = log_config_create(LL_SILENT, false) => drop cfg) {
+        let result = analysis_analyze_entry(sp, "infer_fail_main", cfg);
+        assert(analysis_has_errors(result), "expected semantic analysis errors");
+        assert(has_diag_code(result, "SIG-0030"), "expected SIG-0030 semantic diagnostic");
+        assert(analysis_name_resolution(result) != null, "expected names to still be produced");
+        assert(analysis_signature_tables(result) != null, "expected signature tables to still be produced");
+        assert(analysis_locals(result) != null, "expected locals pass to still run");
+        analysis_result_free(result);
+    }
+    sp_free(sp);
+}
+
+func main() {
+    test_analysis_ok_main();
+    test_analysis_semantic_failure();
+    printl_s("analysis_test: all tests passed");
+}
