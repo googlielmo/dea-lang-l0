@@ -1,6 +1,8 @@
 #  SPDX-License-Identifier: MIT OR Apache-2.0
 #  Copyright (c) 2026 gwz
 
+import re
+
 
 def test_codegen_trace_defines_emitted(analyze_single):
     result = analyze_single(
@@ -740,6 +742,55 @@ def test_codegen_concat3_nested_arg_temp_materialized(codegen_single, compile_an
     ok, stdout, stderr = compile_and_run(c_code, tmp_path)
     assert ok, stderr
     assert stdout.strip() == "one-two"
+
+
+def test_codegen_loop_continue_does_not_release_uninitialized_arc_local(codegen_single):
+    c_code, _ = codegen_single(
+        "main",
+        """
+        module main;
+
+        import std.string;
+
+        func mk_name(n: int) -> string {
+            if (n == 0) {
+                return concat_s("a", "0");
+            }
+            return concat_s("b", "1");
+        }
+
+        func main() -> int {
+            for (let i = 0; i < 2; i = i + 1) {
+                if (i == 0) {
+                    continue;
+                }
+
+                let name = mk_name(i);
+                if (len_s(name) == 0) {
+                    return 1;
+                }
+            }
+            return 0;
+        }
+        """,
+    )
+
+    if c_code is None:
+        return
+
+    main_start = c_code.find("l0_int l0_main_main(")
+    assert main_start != -1
+    main_body = c_code[main_start:]
+
+    bug_shape = re.search(
+        r"goto (__lcont_\d+);.*?l0_string name = .*?\1:;.*?rt_string_release\(name\);",
+        main_body,
+        re.DOTALL,
+    )
+    assert bug_shape is None, (
+        "continue path must not jump to a label that later unconditionally releases "
+        "an ARC local declared after the continue"
+    )
 
 
 def test_codegen_return_borrowed_param_retains(codegen_single, compile_and_run, tmp_path):

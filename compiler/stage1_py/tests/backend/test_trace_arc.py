@@ -598,6 +598,51 @@ def test_trace_arc_concat3_nested_argument_freed(
         )
 
 
+def test_trace_arc_loop_continue_skips_uninitialized_arc_cleanup(
+    analyze_single, compile_and_run, tmp_path
+):
+    """A continue path before ARC local initialization must not trigger invalid cleanup."""
+    ok, stdout, stderr, arc = _compile_with_trace_arc(
+        analyze_single,
+        compile_and_run,
+        tmp_path,
+        """
+        module main;
+        import std.io;
+        import std.string;
+
+        func mk_name(n: int) -> string {
+            if (n == 0) {
+                return concat_s("a", "0");
+            }
+            return concat_s("b", "1");
+        }
+
+        func main() -> int {
+            let total: int = 0;
+            for (let i = 0; i < 3; i = i + 1) {
+                if (i == 0) {
+                    continue;
+                }
+
+                let name = mk_name(i);
+                printl_s(name);
+                total = total + len_s(name);
+            }
+            return 0;
+        }
+        """,
+    )
+    assert ok, stderr
+    assert stdout.strip().splitlines() == ["b1", "b1"]
+
+    heap_rcs = _heap_rc_values(arc)
+    assert heap_rcs, f"expected heap ARC events, stderr={stderr}"
+    assert all(0 <= rc < 1000 for rc in heap_rcs), (
+        f"unexpected heap refcount values: {heap_rcs}"
+    )
+
+
 # ---------------------------------------------------------------------------
 # J – Return borrowed param retains
 # ---------------------------------------------------------------------------

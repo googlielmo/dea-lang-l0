@@ -70,8 +70,8 @@ class Backend:
     # Scope tracking for string cleanup
     _current_scope: Optional[ScopeContext] = None
 
-    # Stack of loop scopes (for break/continue)
-    _loop_scope_stack: List[ScopeContext] = field(default_factory=list)
+    # Stack of (continue_cleanup_scope, break_cleanup_scope) for loops
+    _loop_cleanup_scope_stack: List[Tuple[ScopeContext, ScopeContext]] = field(default_factory=list)
 
     # Nesting depth inside C switch statements (match/case)
     _switch_depth: int = 0
@@ -830,19 +830,20 @@ class Backend:
                     self._emit_value_cleanup(var_name, var_type)
             scope = scope.parent
 
-    def _emit_cleanup_for_loop_exit(self) -> None:
+    def _emit_cleanup_for_loop_exit(self, *, is_break: bool) -> None:
         """
         Emit cleanup for break/continue.
-        Walks from current scope up to and including the innermost loop body scope,
+        Walks from current scope up to and including the innermost loop cleanup target,
         executing any with-statement cleanup data along the way.
         The with-cleanup runs before owned-var cleanup (see
         ``_emit_cleanup_for_return`` for rationale).
         """
-        if not self._loop_scope_stack:
+        if not self._loop_cleanup_scope_stack:
             # Shouldn't happen if semantic analysis caught it
             self.ice("[ICE-1020] break/continue outside of loop")
 
-        loop_scope = self._loop_scope_stack[-1]  # Innermost loop
+        continue_scope, break_scope = self._loop_cleanup_scope_stack[-1]
+        target_scope = break_scope if is_break else continue_scope
 
         scope = self._current_scope
         while scope is not None:
@@ -859,8 +860,8 @@ class Backend:
                 if self.analysis.has_arc_data(var_type):
                     self._emit_value_cleanup(var_name, var_type)
 
-            if scope is loop_scope:
-                break  # Stop after cleaning the loop scope itself
+            if scope is target_scope:
+                break  # Stop after cleaning the selected loop scope itself
 
             scope = scope.parent
 
@@ -1002,7 +1003,7 @@ class Backend:
 
         elif isinstance(stmt, BreakStmt):
             # break;
-            self._emit_cleanup_for_loop_exit()
+            self._emit_cleanup_for_loop_exit(is_break=True)
             break_label, _ = self._loop_label_stack[-1]
             self.emitter.emit_goto(break_label)
             self._next_stmt_unreachable = True
@@ -1010,7 +1011,7 @@ class Backend:
 
         elif isinstance(stmt, ContinueStmt):
             # continue;
-            self._emit_cleanup_for_loop_exit()
+            self._emit_cleanup_for_loop_exit(is_break=False)
             _, continue_label = self._loop_label_stack[-1]
             self.emitter.emit_goto(continue_label)
             self._next_stmt_unreachable = True
@@ -1081,7 +1082,7 @@ class Backend:
         self.emitter.emit_block_start()
 
         loop_scope = self._push_scope()
-        self._loop_scope_stack.append(loop_scope)
+        self._loop_cleanup_scope_stack.append((loop_scope, loop_scope))
 
         self._emit_block_sequence(stmt.body, module_name)
 
@@ -1090,7 +1091,7 @@ class Backend:
 
         self.emitter.emit_label(continue_label)
 
-        self._loop_scope_stack.pop()
+        self._loop_cleanup_scope_stack.pop()
         self._pop_scope()
         self.emitter.emit_block_end()
 
@@ -1119,26 +1120,28 @@ class Backend:
         self.emitter.emit_while_header(c_cond)
 
         self.emitter.emit_block_start()
+        self.emitter.emit_block_start()
         loop_scope = self._push_scope()
-        self._loop_scope_stack.append(loop_scope)
+        self._loop_cleanup_scope_stack.append((loop_scope, outer_scope))
 
         self._emit_block_sequence(stmt.body, module_name)
-
-        self.emitter.emit_label(continue_label)
-
-        if stmt.update and not self._next_stmt_unreachable:
-            self._emit_stmt(stmt.update, module_name)
-
-        # Emit cleanup only if code is reachable
-        if not self._next_stmt_unreachable:
+        body_fallthrough_reachable = not self._next_stmt_unreachable
+        if body_fallthrough_reachable:
             self._emit_cleanup_at_scope_exit(loop_scope)
 
-        self._loop_scope_stack.pop()
+        self._loop_cleanup_scope_stack.pop()
         self._pop_scope()  # Pop loop_scope
         self.emitter.emit_block_end()
 
-        if not self._next_stmt_unreachable:
-            self._emit_cleanup_at_scope_exit(outer_scope)
+        self._next_stmt_unreachable = False
+        self.emitter.emit_label(continue_label)
+
+        if stmt.update:
+            self._emit_stmt(stmt.update, module_name)
+
+        self.emitter.emit_block_end()
+
+        self._emit_cleanup_at_scope_exit(outer_scope)
 
         self._pop_scope()  # Pop outer_scope
         self.emitter.emit_for_loop_end()
