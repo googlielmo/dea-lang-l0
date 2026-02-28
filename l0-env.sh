@@ -30,4 +30,9 @@ case ":${PATH}:" in
     *) export PATH="${PATH}:${SCRIPT_DIR}" ;;
 esac
 
+if [[ -f "${SCRIPT_DIR}/.venv/bin/activate" ]]; then
+    # shellcheck source=/dev/null
+    . "${SCRIPT_DIR}/.venv/bin/activate"
+fi
+
 export L0_CC="clang"

@@ -128,7 +128,8 @@ For interactive shells, source the helper script:
    source ./l0-env.sh
    ```
 
-This sets `L0_HOME` and adds the repository root to `PATH` for the current shell session (`bash` and `zsh`).
+This sets `L0_HOME`, adds the repository root to `PATH`, and sources `.venv/bin/activate` when a repository-local
+virtualenv is present for the current shell session (`bash` and `zsh`).
 
 If you prefer manual setup or want to override values, use:
 
