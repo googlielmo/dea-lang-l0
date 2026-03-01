@@ -1,5 +1,7 @@
 # L0 Ownership and Memory Management Reference
 
+Version: 2026-03-01
+
 This document describes how ownership works in L0 today, covering:
 
 - **`new` / `drop`** — heap object allocation and deallocation.
@@ -151,9 +153,11 @@ Value ownership:
 
 The compiler ensures that ARC-managed locals are only cleaned up if they were actually initialized on the current path.
 
-- **`continue` in loops:** Cleanup only runs for variables declared within the current iteration body. The update step and loop condition are evaluated after iteration-scope cleanup.
+- **`continue` in loops:** Cleanup only runs for variables declared within the current iteration body. The update step
+  and loop condition are evaluated after iteration-scope cleanup.
 - **Early `return`:** All scopes up to the function top-level are cleaned in reverse order.
-- **Move optimization:** Returning a local variable (`return x;`) skips its final `release` because ownership is transferred to the caller.
+- **Move optimization:** Returning a local variable (`return x;`) skips its final `release` because ownership is
+  transferred to the caller.
 
 ## 9. Stage 2 Lexer/Parser Ownership Patterns
 

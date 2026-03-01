@@ -16,27 +16,37 @@ Dea/L0 is a small, safe, C-family systems language compiling to C99.
 Detailed information lives in `docs/`. **Before answering questions about grammar, architecture, backend design, or
 implementation status, read the relevant doc file(s).**
 
-| Doc file                                 | Covers                                                        |
-|------------------------------------------|---------------------------------------------------------------|
-| `docs/reference/architecture.md`         | Compiler pipeline, passes, data flow, file layout             |
+| Doc file                                   | Covers                                                        |
+|--------------------------------------------|---------------------------------------------------------------|
+| `docs/reference/architecture.md`           | Compiler pipeline, passes, data flow, file layout             |
 | `docs/specs/compiler/diagnostic-format.md` | Normative diagnostic output format (header, snippet, gutter)  |
-| `docs/specs/compiler/stage1-contract.md` | Stage 1 compact contract, interfaces, guarantees, doc routing |
-| `docs/reference/c-backend-design.md`     | C backend architecture, emission strategy                     |
-| `docs/reference/design-decisions.md`     | Runtime, pointer model, integer model, I/O, rationale         |
-| `docs/reference/grammar/l0.md`           | Formal EBNF grammar                                           |
-| `docs/reference/project-status.md`       | Implementation status, known limitations, roadmap             |
-| `docs/reference/standard-library.md`     | stdlib module reference (`std.*`, `sys.*`)                    |
-| `docs/reference/ownership.md`            | Ownership rules for `new`/`drop`, ARC strings, and containers |
-| `docs/specs/runtime/trace.md`            | Trace flags, generated defines, runtime trace contract        |
+| `docs/specs/compiler/stage1-contract.md`   | Stage 1 compact contract, interfaces, guarantees, doc routing |
+| `docs/reference/c-backend-design.md`       | C backend architecture, emission strategy                     |
+| `docs/reference/design-decisions.md`       | Runtime, pointer model, integer model, I/O, rationale         |
+| `docs/reference/grammar/l0.md`             | Formal EBNF grammar                                           |
+| `docs/reference/project-status.md`         | Implementation status, known limitations, roadmap             |
+| `docs/reference/standard-library.md`       | stdlib module reference (`std.*`, `sys.*`)                    |
+| `docs/reference/ownership.md`              | Ownership rules for `new`/`drop`, ARC strings, and containers |
+| `docs/specs/runtime/trace.md`              | Trace flags, generated defines, runtime trace contract        |
 
 Documentation policy:
 
-- `docs/README.md` for docs placement, naming, and attic rules.
+- `docs/README.md` for docs placement, naming, metadata standards, and attic rules.
+- **Metadata:** Reference/Specs must have `Version: YYYY-MM-DD`. Plans (Bug Fix/Feature/Refactor) must use the standard
+  metadata block (Date, Status, Kind, etc.).
 - `docs/attic/README.md` for archived/obsolete document policy details.
 - **Maintenance:** If you change stdlib or ARC behavior, you MUST update the corresponding `.md` in `docs/` in the same
   PR.
 
 Also see: `CONTRIBUTING.md`, `SECURITY.md`.
+
+## Environment & Setup
+
+- **Virtual Environment:** Always check for a local `.venv` and/or `uv` availability. Use the local virtual environment
+  to execute `pytest` and `./l0c`.
+- **Environment Variables:** Source `source ./l0-env.sh` when needed to set up `L0_HOME`, `PATH`, and `L0_CC`.
+- **Auto-provisioning:** If no local virtual environment is available and sufficient permissions are granted, install one
+  using `uv sync` (preferred, uses `pyproject.toml`) or `python3 -m venv .venv && source .venv/bin/activate && pip install -e .`.
 
 ## Commands
 

@@ -26,6 +26,54 @@ This directory is organized by document intent first, then subsystem.
 - Avoid duplicating type in file names when path already encodes it.
 - Keep names concise and domain-focused.
 
+## Document Metadata & Templates
+
+All documentation should follow these metadata standards to ensure consistency and discoverability.
+
+### Reference and Specifications (`reference/`, `specs/`)
+
+Stable or normative documents must include a version line immediately following the main header.
+
+**Template:**
+```markdown
+# [Title]
+
+Version: YYYY-MM-DD
+
+[Introduction or summary of the document intent.]
+
+## Related Docs
+
+- [Link to related architecture/spec/reference doc]
+```
+
+### Plans (`plans/`)
+
+Plans for bug fixes, features, or refactors follow a more detailed metadata block.
+
+**Template:**
+```markdown
+# [Bug Fix | Feature | Refactor | Tool] Plan
+
+## [Short Title]
+
+- Date: YYYY-MM-DD
+- Status: [Draft | In Progress | Closed (fixed/implemented)]
+- Title: [Full descriptive title]
+- Kind: [Bug Fix | Feature | Refactor | Tooling]
+- Severity: [Low | Medium | High | Critical]
+- Stage: [1 | 2 | Shared]
+- Subsystem: [Subsystem name]
+- Modules:
+    - `path/to/module.l0`
+- Test modules:
+    - `path/to/test_module.l0`
+- Repro: [Reproduction command or path] (optional)
+
+## Summary
+...
+```
+
 ## Core References
 
 - [reference/architecture.md](reference/architecture.md): compiler pipeline and pass structure.

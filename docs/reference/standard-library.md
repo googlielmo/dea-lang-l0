@@ -1,5 +1,7 @@
 # The L0 Standard Library
 
+Version: 2026-03-01
+
 The standard library provides ergonomic L0 modules (`std.*`) and low-level runtime bindings (`sys.*`).
 
 For canonical ownership behavior around `new`/`drop`, ARC strings, and container-specific retain/release patterns, see
@@ -236,32 +238,32 @@ This module exposes runtime hash functions directly via `extern func` declaratio
 
 **Imports:** `sys.rt`, `std.assert`
 
-| Function        | Signature                                             | Description                                                             |
-|-----------------|-------------------------------------------------------|-------------------------------------------------------------------------|
-| `len_s`         | `(s: string) -> int`                                  | Returns string byte length.                                             |
-| `is_empty_s`    | `(s: string) -> bool`                                 | Returns whether string length is zero.                                  |
-| `char_at_s`     | `(s: string, index: int) -> byte`                     | Returns byte at index.                                                  |
-| `eq_s`          | `(a: string, b: string) -> bool`                      | Compares strings for equality.                                          |
-| `cmp_s`         | `(a: string, b: string) -> int`                       | Compares strings lexicographically (`<0`, `0`, `>0`).                   |
-| `concat_s`      | `(a: string, b: string) -> string`                    | Concatenates strings.                                                   |
-| `slice_s`       | `(s: string, start: int, end: int) -> string`         | Returns substring `[start, end)`.                                       |
-| `byte_to_s`     | `(b: byte) -> string`                                 | Creates one-character string from a byte value.                         |
-| `bytes_to_s`    | `(bytes: byte*, len: int) -> string`                  | Creates string from byte buffer.                                        |
-| `find_s`        | `(haystack: string, needle: string) -> int`           | Returns first match index or `-1`.                                      |
-| `find_last_s`   | `(haystack: string, needle: string) -> int`           | Returns last match index or `-1` (`len_s(haystack)` for empty needle).  |
-| `find_from_s`   | `(haystack: string, needle: string, pos: int) -> int` | Returns first match index at/after `pos`, or `-1`. Requires `pos >= 0`. |
-| `contains_s`    | `(haystack: string, needle: string) -> bool`          | Returns whether `needle` occurs in `haystack`.                          |
-| `starts_with_s` | `(s: string, prefix: string) -> bool`                 | Returns whether `s` starts with `prefix`.                               |
-| `ends_with_s`   | `(s: string, suffix: string) -> bool`                 | Returns whether `s` ends with `suffix`.                                 |
-| `is_space`      | `(c: byte) -> bool`                                   | Whitespace check (`' '`, `'\n'`, `'\t'`, `'\r'`).                       |
-| `is_digit`      | `(c: byte) -> bool`                                   | Decimal digit check (`'0'..'9'`).                                       |
-| `is_digit_base` | `(c: byte, base: int) -> bool`                        | Valid digit check for base `2..16`.                                     |
-| `is_alpha`      | `(c: byte) -> bool`                                   | ASCII alphabetic check.                                                 |
-| `is_alnum`      | `(c: byte) -> bool`                                   | ASCII alphanumeric check.                                               |
-| `to_digit`      | `(c: byte) -> int`                                    | Converts decimal ASCII digit byte to integer value.                     |
-| `to_digit_base` | `(c: byte, base: int) -> int?`                        | Converts base `2..16` digit byte to integer value or `null`.            |
-| `to_upper`      | `(c: byte) -> byte`                                   | Uppercases ASCII letter; returns input otherwise.                       |
-| `to_lower`      | `(c: byte) -> byte`                                   | Lowercases ASCII letter; returns input otherwise.                       |
+| Function        | Signature                                             | Description                                                              |
+|-----------------|-------------------------------------------------------|--------------------------------------------------------------------------|
+| `len_s`         | `(s: string) -> int`                                  | Returns string byte length.                                              |
+| `is_empty_s`    | `(s: string) -> bool`                                 | Returns whether string length is zero.                                   |
+| `char_at_s`     | `(s: string, index: int) -> byte`                     | Returns byte at index.                                                   |
+| `eq_s`          | `(a: string, b: string) -> bool`                      | Compares strings for equality.                                           |
+| `cmp_s`         | `(a: string, b: string) -> int`                       | Compares strings lexicographically (`<0`, `0`, `>0`).                    |
+| `concat_s`      | `(a: string, b: string) -> string`                    | Concatenates strings.                                                    |
+| `slice_s`       | `(s: string, start: int, end: int) -> string`         | Returns substring `[start, end)`.                                        |
+| `byte_to_s`     | `(b: byte) -> string`                                 | Creates one-character string from a byte value.                          |
+| `bytes_to_s`    | `(bytes: byte*, len: int) -> string`                  | Creates string from byte buffer.                                         |
+| `find_s`        | `(haystack: string, needle: string) -> int`           | Returns first match index or `-1`.                                       |
+| `find_last_s`   | `(haystack: string, needle: string) -> int`           | Returns last match index or `-1` (`len_s(haystack)` for empty needle).   |
+| `find_from_s`   | `(haystack: string, needle: string, pos: int) -> int` | Returns first match index at/after `pos`, or `-1`. Requires `pos >= 0`.  |
+| `contains_s`    | `(haystack: string, needle: string) -> bool`          | Returns whether `needle` occurs in `haystack`.                           |
+| `starts_with_s` | `(s: string, prefix: string) -> bool`                 | Returns whether `s` starts with `prefix`.                                |
+| `ends_with_s`   | `(s: string, suffix: string) -> bool`                 | Returns whether `s` ends with `suffix`.                                  |
+| `is_space`      | `(c: byte) -> bool`                                   | Whitespace check (`' '`, `'\n'`, `'\t'`, `'\r'`).                        |
+| `is_digit`      | `(c: byte) -> bool`                                   | Decimal digit check (`'0'..'9'`).                                        |
+| `is_digit_base` | `(c: byte, base: int) -> bool`                        | Valid digit check for base `2..16`.                                      |
+| `is_alpha`      | `(c: byte) -> bool`                                   | ASCII alphabetic check.                                                  |
+| `is_alnum`      | `(c: byte) -> bool`                                   | ASCII alphanumeric check.                                                |
+| `to_digit`      | `(c: byte) -> int`                                    | Converts decimal ASCII digit byte to integer value.                      |
+| `to_digit_base` | `(c: byte, base: int) -> int?`                        | Converts base `2..16` digit byte to integer value or `null`.             |
+| `to_upper`      | `(c: byte) -> byte`                                   | Uppercases ASCII letter; returns input otherwise.                        |
+| `to_lower`      | `(c: byte) -> byte`                                   | Lowercases ASCII letter; returns input otherwise.                        |
 | `trim_s`        | `(s: string) -> string`                               | Trims leading/trailing ASCII whitespace (`' '`, `'\n'`, `'\t'`, `'\r'`). |
 
 ### `std.text`
@@ -277,10 +279,10 @@ This module exposes runtime hash functions directly via `extern func` declaratio
 | `concat3_s/concat4_s`                               | string concat helpers                                                                               | Concatenate 3 or 4 strings efficiently.                                                                   |
 | `to_upper_s/to_lower_s`                             | case helpers                                                                                        | Convert full string case.                                                                                 |
 | `repeat_s/reverse_s`                                | string helpers                                                                                      | Repeat or reverse string content.                                                                         |
-| `split_s`                                           | `(s: string, sep: string) -> VectorString*`                                                         | Splits by non-empty separator and keeps empty tokens. Caller owns result (`vs_free`).                    |
-| `lines_s`                                           | `(s: string) -> VectorString*`                                                                      | Splits on `\n`, strips trailing `\r` per line. Caller owns result (`vs_free`).                           |
+| `split_s`                                           | `(s: string, sep: string) -> VectorString*`                                                         | Splits by non-empty separator and keeps empty tokens. Caller owns result (`vs_free`).                     |
+| `lines_s`                                           | `(s: string) -> VectorString*`                                                                      | Splits on `\n`, strips trailing `\r` per line. Caller owns result (`vs_free`).                            |
 | `join_s`                                            | `(parts: VectorString*, sep: string) -> string`                                                     | Joins vector elements with separator.                                                                     |
-| `replace_s`                                         | `(s: string, old: string, replacement: string) -> string`                                           | Replaces all non-overlapping matches of non-empty `old` with `replacement`.                              |
+| `replace_s`                                         | `(s: string, old: string, replacement: string) -> string`                                           | Replaces all non-overlapping matches of non-empty `old` with `replacement`.                               |
 | `int_to_string_base`                                | `(value: int, base: int) -> string`                                                                 | Base conversion for signed ints (`2..16`).                                                                |
 | `int_to_string/int_to_hex_string/int_to_bin_string` | format helpers                                                                                      | Decimal, hex, and binary formatting helpers.                                                              |
 | `bool_to_string/string_to_bool`                     | `(bool) -> string`, `(string) -> bool?`                                                             | Converts booleans to `"true"`/`"false"` and parses strict lowercase boolean text.                         |
@@ -306,20 +308,20 @@ This module exposes runtime hash functions directly via `extern func` declaratio
 
 **Imports:** `sys.rt`, `std.math`
 
-| Type/Function         | Signature                                                     | Description                                                   |
-|-----------------------|---------------------------------------------------------------|---------------------------------------------------------------|
-| `WallTime`            | `struct { sec: int; nsec: int; }`                            | Unix wall-clock snapshot with nanosecond fraction.            |
-| `MonotonicTime`       | `struct { sec: int; nsec: int; }`                            | Monotonic-clock snapshot with nanosecond fraction.            |
-| `Duration`            | `struct { sec: int; nsec: int; }`                            | Non-negative normalized duration (`0 <= nsec < 1e9`).         |
-| `DateTime`            | `struct`                                                     | Calendar breakdown (date/time, weekday, yearday, offset, DST). |
-| `wall_now`            | `() -> WallTime?`                                            | Captures current wall-clock time.                             |
-| `monotonic_supported` | `() -> bool`                                                 | Returns monotonic clock capability.                           |
-| `monotonic_now`       | `() -> MonotonicTime?`                                       | Captures current monotonic time when supported.               |
-| `monotonic_diff`      | `(start: MonotonicTime, end: MonotonicTime) -> Duration?`    | Returns `end - start` or `null` for invalid/reversed inputs.  |
-| `wall_to_utc_datetime`| `(t: WallTime) -> DateTime?`                                 | Converts wall time to UTC calendar representation.             |
-| `wall_to_local_datetime`| `(t: WallTime) -> DateTime?`                               | Converts wall time to local calendar representation.           |
-| `utc_now_datetime`    | `() -> DateTime?`                                            | Convenience wrapper for current UTC calendar time.             |
-| `local_now_datetime`  | `() -> DateTime?`                                            | Convenience wrapper for current local calendar time.           |
+| Type/Function            | Signature                                                 | Description                                                    |
+|--------------------------|-----------------------------------------------------------|----------------------------------------------------------------|
+| `WallTime`               | `struct { sec: int; nsec: int; }`                         | Unix wall-clock snapshot with nanosecond fraction.             |
+| `MonotonicTime`          | `struct { sec: int; nsec: int; }`                         | Monotonic-clock snapshot with nanosecond fraction.             |
+| `Duration`               | `struct { sec: int; nsec: int; }`                         | Non-negative normalized duration (`0 <= nsec < 1e9`).          |
+| `DateTime`               | `struct`                                                  | Calendar breakdown (date/time, weekday, yearday, offset, DST). |
+| `wall_now`               | `() -> WallTime?`                                         | Captures current wall-clock time.                              |
+| `monotonic_supported`    | `() -> bool`                                              | Returns monotonic clock capability.                            |
+| `monotonic_now`          | `() -> MonotonicTime?`                                    | Captures current monotonic time when supported.                |
+| `monotonic_diff`         | `(start: MonotonicTime, end: MonotonicTime) -> Duration?` | Returns `end - start` or `null` for invalid/reversed inputs.   |
+| `wall_to_utc_datetime`   | `(t: WallTime) -> DateTime?`                              | Converts wall time to UTC calendar representation.             |
+| `wall_to_local_datetime` | `(t: WallTime) -> DateTime?`                              | Converts wall time to local calendar representation.           |
+| `utc_now_datetime`       | `() -> DateTime?`                                         | Convenience wrapper for current UTC calendar time.             |
+| `local_now_datetime`     | `() -> DateTime?`                                         | Convenience wrapper for current local calendar time.           |
 
 ### `std.unit`
 
@@ -344,48 +346,48 @@ All `extern func` symbols exposed to L0 from stdlib modules are listed here.
 
 ### Declared in `sys.rt` (41)
 
-| Function                    | Signature                                     |
-|-----------------------------|-----------------------------------------------|
-| `rt_string_get`             | `(s: string, index: int) -> byte`             |
-| `rt_strlen`                 | `(str: string) -> int`                        |
-| `rt_string_equals`          | `(a: string, b: string) -> bool`              |
-| `rt_string_compare`         | `(a: string, b: string) -> int`               |
-| `rt_string_concat`          | `(a: string, b: string) -> string`            |
-| `rt_string_slice`           | `(s: string, start: int, end: int) -> string` |
-| `rt_string_from_byte_array` | `(bytes: byte*, len: int) -> string`          |
-| `rt_string_from_byte`       | `(b: byte) -> string`                         |
-| `rt_string_retain`          | `(s: string) -> void`                         |
-| `rt_string_release`         | `(s: string) -> void`                         |
-| `rt_read_file_all`          | `(path: string) -> string?`                   |
-| `rt_write_file_all`         | `(path: string, data: string) -> bool`        |
-| `rt_flush_stdout`           | `() -> void`                                  |
-| `rt_flush_stderr`           | `() -> void`                                  |
-| `rt_print`                  | `(s: string) -> void`                         |
-| `rt_print_stderr`           | `(s: string) -> void`                         |
-| `rt_println`                | `() -> void`                                  |
-| `rt_println_stderr`         | `() -> void`                                  |
-| `rt_print_int`              | `(x: int) -> void`                            |
-| `rt_print_int_stderr`       | `(x: int) -> void`                            |
-| `rt_print_bool`             | `(x: bool) -> void`                           |
-| `rt_print_bool_stderr`      | `(x: bool) -> void`                           |
-| `rt_read_line`              | `() -> string?`                               |
-| `rt_read_char`              | `() -> int`                                   |
-| `rt_abort`                  | `(message: string) -> void`                   |
-| `rt_exit`                   | `(code: int) -> void`                         |
-| `rt_srand`                  | `(seed: int) -> void`                         |
-| `rt_rand`                   | `(max: int) -> int`                           |
-| `rt_errno`                  | `() -> int`                                   |
-| `rt_get_env_var`            | `(name: string) -> string?`                   |
-| `rt_get_argc`               | `() -> int`                                   |
-| `rt_get_argv`               | `(i: int) -> string`                          |
-| `rt_time_unix`              | `(out: RtTimeParts*) -> bool`                 |
-| `rt_time_monotonic`         | `(out: RtTimeParts*) -> bool`                 |
-| `rt_time_monotonic_supported` | `() -> bool`                                |
-| `rt_time_local_offset_sec`  | `(unix_sec: int) -> int?`                     |
-| `rt_time_local_is_dst`      | `(unix_sec: int) -> bool?`                    |
-| `rt_system`                 | `(cmd: string) -> int`                        |
-| `rt_file_exists`            | `(path: string) -> bool`                      |
-| `rt_delete_file`            | `(path: string) -> bool`                      |
+| Function                      | Signature                                     |
+|-------------------------------|-----------------------------------------------|
+| `rt_string_get`               | `(s: string, index: int) -> byte`             |
+| `rt_strlen`                   | `(str: string) -> int`                        |
+| `rt_string_equals`            | `(a: string, b: string) -> bool`              |
+| `rt_string_compare`           | `(a: string, b: string) -> int`               |
+| `rt_string_concat`            | `(a: string, b: string) -> string`            |
+| `rt_string_slice`             | `(s: string, start: int, end: int) -> string` |
+| `rt_string_from_byte_array`   | `(bytes: byte*, len: int) -> string`          |
+| `rt_string_from_byte`         | `(b: byte) -> string`                         |
+| `rt_string_retain`            | `(s: string) -> void`                         |
+| `rt_string_release`           | `(s: string) -> void`                         |
+| `rt_read_file_all`            | `(path: string) -> string?`                   |
+| `rt_write_file_all`           | `(path: string, data: string) -> bool`        |
+| `rt_flush_stdout`             | `() -> void`                                  |
+| `rt_flush_stderr`             | `() -> void`                                  |
+| `rt_print`                    | `(s: string) -> void`                         |
+| `rt_print_stderr`             | `(s: string) -> void`                         |
+| `rt_println`                  | `() -> void`                                  |
+| `rt_println_stderr`           | `() -> void`                                  |
+| `rt_print_int`                | `(x: int) -> void`                            |
+| `rt_print_int_stderr`         | `(x: int) -> void`                            |
+| `rt_print_bool`               | `(x: bool) -> void`                           |
+| `rt_print_bool_stderr`        | `(x: bool) -> void`                           |
+| `rt_read_line`                | `() -> string?`                               |
+| `rt_read_char`                | `() -> int`                                   |
+| `rt_abort`                    | `(message: string) -> void`                   |
+| `rt_exit`                     | `(code: int) -> void`                         |
+| `rt_srand`                    | `(seed: int) -> void`                         |
+| `rt_rand`                     | `(max: int) -> int`                           |
+| `rt_errno`                    | `() -> int`                                   |
+| `rt_get_env_var`              | `(name: string) -> string?`                   |
+| `rt_get_argc`                 | `() -> int`                                   |
+| `rt_get_argv`                 | `(i: int) -> string`                          |
+| `rt_time_unix`                | `(out: RtTimeParts*) -> bool`                 |
+| `rt_time_monotonic`           | `(out: RtTimeParts*) -> bool`                 |
+| `rt_time_monotonic_supported` | `() -> bool`                                  |
+| `rt_time_local_offset_sec`    | `(unix_sec: int) -> int?`                     |
+| `rt_time_local_is_dst`        | `(unix_sec: int) -> bool?`                    |
+| `rt_system`                   | `(cmd: string) -> int`                        |
+| `rt_file_exists`              | `(path: string) -> bool`                      |
+| `rt_delete_file`              | `(path: string) -> bool`                      |
 
 ### Declared in `sys.unsafe` (8)
 

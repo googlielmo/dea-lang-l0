@@ -1,5 +1,7 @@
 # L0 Language and Runtime Design Decisions
 
+Version: 2026-03-01
+
 This document records rationale and policy decisions.
 
 Canonical ownership boundaries:

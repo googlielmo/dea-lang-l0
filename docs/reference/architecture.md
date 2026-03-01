@@ -1,5 +1,7 @@
 # L0 Compiler Architecture (Stage 1)
 
+Version: 2026-03-01
+
 This is the canonical architecture document for the Stage 1 compiler.
 
 Related canonical docs:
