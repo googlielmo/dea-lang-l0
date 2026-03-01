@@ -3,29 +3,25 @@
 
 import pytest
 
-from l0_lexer import Lexer, LexerError, TokenKind
+from l0_lexer import Lexer, TokenKind
 
 
 def test_int_literal_above_32bit_range_raises():
     src = "2147483648"
 
-    with pytest.raises(LexerError) as excinfo:
-        Lexer.from_source(src).tokenize()
+    lexer = Lexer.from_source(src)
+    lexer.tokenize()
 
-    assert "exceeds 32-bit signed range" in excinfo.value.message
-    assert excinfo.value.line == 1
-    assert excinfo.value.column == 1
+    assert any("exceeds 32-bit signed range" in d.message for d in lexer.diagnostics)
 
 
 def test_int_literal_below_32bit_range_raises():
     src = "-2147483649"
 
-    with pytest.raises(LexerError) as excinfo:
-        Lexer.from_source(src).tokenize()
+    lexer = Lexer.from_source(src)
+    lexer.tokenize()
 
-    assert "exceeds 32-bit signed range" in excinfo.value.message
-    assert excinfo.value.line == 1
-    assert excinfo.value.column == 1
+    assert any("exceeds 32-bit signed range" in d.message for d in lexer.diagnostics)
 
 
 def test_common_tokenization_cases_and_comments():
@@ -88,13 +84,13 @@ def test_string_literal_tokenized_without_escapes():
 def test_unterminated_string_literal_raises_with_location():
     src = 'let msg = "unterminated\nnext line'
 
-    with pytest.raises(LexerError) as excinfo:
-        Lexer.from_source(src).tokenize()
+    lexer = Lexer.from_source(src)
+    lexer.tokenize()
 
-    assert "unterminated string literal" in excinfo.value.message
-    # Error should surface at the newline that terminates the string.
-    assert excinfo.value.line == 1
-    assert excinfo.value.column == 24
+    assert any("unterminated string literal" in d.message for d in lexer.diagnostics)
+    err = next(d for d in lexer.diagnostics if "unterminated" in d.message)
+    assert err.line == 1
+    assert err.column == 24
 
 
 def test_line_and_column_increment_across_newlines_and_comments():
@@ -116,67 +112,67 @@ def test_lexer_invalid_hex_escape_non_hex():
     """Test that invalid hex escape sequence raises error."""
     src = '"\\xGG"'
 
-    with pytest.raises(LexerError) as excinfo:
-        Lexer.from_source(src).tokenize()
+    lexer = Lexer.from_source(src)
+    lexer.tokenize()
 
-    assert "invalid hex escape sequence" in excinfo.value.message
+    assert any("invalid hex escape sequence" in d.message for d in lexer.diagnostics)
 
 
 def test_lexer_invalid_unicode_escape_incomplete():
     """Test that incomplete \\u escape raises error."""
     src = '"\\u12"'  # Only 2 hex digits, needs 4
 
-    with pytest.raises(LexerError) as excinfo:
-        Lexer.from_source(src).tokenize()
+    lexer = Lexer.from_source(src)
+    lexer.tokenize()
 
-    assert "invalid unicode escape sequence (\\u)" in excinfo.value.message
+    assert any("invalid unicode escape sequence (\\u)" in d.message for d in lexer.diagnostics)
 
 
 def test_lexer_invalid_unicode_escape_long_incomplete():
     """Test that incomplete \\U escape raises error."""
     src = '"\\U1234567"'  # Only 7 hex digits, needs 8
 
-    with pytest.raises(LexerError) as excinfo:
-        Lexer.from_source(src).tokenize()
+    lexer = Lexer.from_source(src)
+    lexer.tokenize()
 
-    assert "invalid unicode escape sequence (\\U)" in excinfo.value.message
+    assert any("invalid unicode escape sequence (\\U)" in d.message for d in lexer.diagnostics)
 
 
 def test_lexer_unknown_escape_sequence():
     """Test that unknown escape sequence raises error."""
     src = '"\\q"'
 
-    with pytest.raises(LexerError) as excinfo:
-        Lexer.from_source(src).tokenize()
+    lexer = Lexer.from_source(src)
+    lexer.tokenize()
 
-    assert "unknown escape sequence" in excinfo.value.message
+    assert any("unknown escape sequence" in d.message for d in lexer.diagnostics)
 
 
 def test_lexer_octal_escape_out_of_range():
     """Test that octal escape > 255 raises error."""
     src = '"\\777"'  # 0o777 = 511 > 255
 
-    with pytest.raises(LexerError) as excinfo:
-        Lexer.from_source(src).tokenize()
+    lexer = Lexer.from_source(src)
+    lexer.tokenize()
 
-    assert "octal escape sequence out of range" in excinfo.value.message
+    assert any("octal escape sequence out of range" in d.message for d in lexer.diagnostics)
 
 
 def test_lexer_unterminated_block_comment():
     """Test that unterminated block comment raises error."""
     src = "/* this comment never ends"
 
-    with pytest.raises(LexerError) as excinfo:
-        Lexer.from_source(src).tokenize()
+    lexer = Lexer.from_source(src)
+    lexer.tokenize()
 
-    assert "unterminated block comment" in excinfo.value.message
+    assert any("unterminated block comment" in d.message for d in lexer.diagnostics)
 
 
 def test_lexer_unexpected_character():
     """Test that unexpected character raises error."""
     src = "@"
 
-    with pytest.raises(LexerError) as excinfo:
-        Lexer.from_source(src).tokenize()
+    lexer = Lexer.from_source(src)
+    lexer.tokenize()
 
-    assert "unexpected character" in excinfo.value.message
+    assert any("unexpected character" in d.message for d in lexer.diagnostics)

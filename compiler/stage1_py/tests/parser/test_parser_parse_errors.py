@@ -5,7 +5,7 @@ from textwrap import dedent
 
 import pytest
 
-from l0_parser import ParseError, Parser
+from l0_parser import Parser
 
 
 def test_parser_missing_semicolon_reports_error():
@@ -20,21 +20,17 @@ def test_parser_missing_semicolon_reports_error():
         """
     )
 
-    with pytest.raises(ParseError) as excinfo:
-        Parser.from_source(src).parse_module()
-
-    assert "expected ';'" in excinfo.value.message
-    assert excinfo.value.token is not None
+    parser = Parser.from_source(src)
+    parser.parse_module()
+    assert any("expected ';'" in d.message for d in parser.diagnostics)
 
 
 def test_parser_malformed_module_decl():
     src = "module broken\nfunc main() -> int { return 0; }"
 
-    with pytest.raises(ParseError) as excinfo:
-        Parser.from_source(src).parse_module()
-
-    assert "expected ';' after module name" in excinfo.value.message
-    assert excinfo.value.token is not None
+    parser = Parser.from_source(src)
+    parser.parse_module()
+    assert any("expected ';' after module name" in d.message for d in parser.diagnostics)
 
 
 def test_parser_unexpected_token():
@@ -50,11 +46,10 @@ def test_parser_unexpected_token():
         """
     )
 
-    with pytest.raises(ParseError) as excinfo:
-        Parser.from_source(src).parse_module()
+    parser = Parser.from_source(src)
+    parser.parse_module()
 
-    assert "unexpected token" in excinfo.value.message
-    assert excinfo.value.token is not None
+    assert any("unexpected ']'" in d.message for d in parser.diagnostics)
 
 
 # ============================================================================
@@ -79,10 +74,10 @@ def test_parser_match_duplicate_variant_pattern():
         """
     )
 
-    with pytest.raises(ParseError) as excinfo:
-        Parser.from_source(src).parse_module()
+    parser = Parser.from_source(src)
+    parser.parse_module()
 
-    assert "duplicate variant patterns" in excinfo.value.message
+    assert any("duplicate variant patterns" in d.message for d in parser.diagnostics)
 
 
 def test_parser_match_empty_arms():
@@ -100,10 +95,10 @@ def test_parser_match_empty_arms():
         """
     )
 
-    with pytest.raises(ParseError) as excinfo:
-        Parser.from_source(src).parse_module()
+    parser = Parser.from_source(src)
+    parser.parse_module()
 
-    assert "at least one arm" in excinfo.value.message
+    assert any("at least one arm" in d.message for d in parser.diagnostics)
 
 
 def test_parser_match_multiple_wildcards():
@@ -123,7 +118,7 @@ def test_parser_match_multiple_wildcards():
         """
     )
 
-    with pytest.raises(ParseError) as excinfo:
-        Parser.from_source(src).parse_module()
+    parser = Parser.from_source(src)
+    parser.parse_module()
 
-    assert "duplicate variant patterns" in excinfo.value.message
+    assert any("duplicate variant patterns" in d.message for d in parser.diagnostics)

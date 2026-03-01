@@ -19,7 +19,7 @@ from l0_ast import (
     Module, FuncDecl, CaseStmt, CaseElse,
     IntLiteral, ByteLiteral, StringLiteral, BoolLiteral, Block, )
 from l0_lexer import Lexer, TokenKind
-from l0_parser import Parser, ParseError
+from l0_parser import Parser
 
 
 # ============================================================================
@@ -29,6 +29,11 @@ from l0_parser import Parser, ParseError
 def parse_module(src: str) -> Module:
     parser = Parser.from_source(src)
     return parser.parse_module()
+
+def parse_module_with_parser(src: str):
+    parser = Parser.from_source(src)
+    mod = parser.parse_module()
+    return mod, parser
 
 
 def get_func_body_stmt(src: str, func_name: str = "main", stmt_index: int = 0):
@@ -230,8 +235,8 @@ def test_parse_case_missing_lparen():
         }
     }
     """
-    with pytest.raises(ParseError, match="PAR-0231"):
-        parse_module(src)
+    mod, parser = parse_module_with_parser(src)
+    assert any("PAR-0231" in d.message for d in parser.diagnostics)
 
 
 def test_parse_case_missing_rparen():
@@ -242,8 +247,8 @@ def test_parse_case_missing_rparen():
         }
     }
     """
-    with pytest.raises(ParseError, match="PAR-0232"):
-        parse_module(src)
+    mod, parser = parse_module_with_parser(src)
+    assert any("PAR-0232" in d.message for d in parser.diagnostics)
 
 
 def test_parse_case_missing_lbrace():
@@ -253,8 +258,8 @@ def test_parse_case_missing_lbrace():
         case (42) 1 => { return; }
     }
     """
-    with pytest.raises(ParseError, match="PAR-0233"):
-        parse_module(src)
+    mod, parser = parse_module_with_parser(src)
+    assert any("PAR-0233" in d.message for d in parser.diagnostics)
 
 
 def test_parse_case_is_after_else():
@@ -267,8 +272,8 @@ def test_parse_case_is_after_else():
         }
     }
     """
-    with pytest.raises(ParseError, match="PAR-0234"):
-        parse_module(src)
+    mod, parser = parse_module_with_parser(src)
+    assert any("PAR-0234" in d.message for d in parser.diagnostics)
 
 
 def test_parse_case_missing_arrow_in_arm():
@@ -280,8 +285,8 @@ def test_parse_case_missing_arrow_in_arm():
         }
     }
     """
-    with pytest.raises(ParseError, match="PAR-0235"):
-        parse_module(src)
+    mod, parser = parse_module_with_parser(src)
+    assert any("PAR-0235" in d.message for d in parser.diagnostics)
 
 
 def test_parse_case_duplicate_else():
@@ -294,8 +299,8 @@ def test_parse_case_duplicate_else():
         }
     }
     """
-    with pytest.raises(ParseError, match="PAR-0236"):
-        parse_module(src)
+    mod, parser = parse_module_with_parser(src)
+    assert any("PAR-0236" in d.message for d in parser.diagnostics)
 
 
 def test_parse_case_arrow_in_else():
@@ -307,8 +312,8 @@ def test_parse_case_arrow_in_else():
         }
     }
     """
-    with pytest.raises(ParseError, match="PAR-0237"):
-        parse_module(src)
+    mod, parser = parse_module_with_parser(src)
+    assert any("PAR-0237" in d.message for d in parser.diagnostics)
 
 
 def test_parse_case_unexpected_token():
@@ -320,8 +325,8 @@ def test_parse_case_unexpected_token():
         }
     }
     """
-    with pytest.raises(ParseError, match="PAR-0235"):
-        parse_module(src)
+    mod, parser = parse_module_with_parser(src)
+    assert any("PAR-0235" in d.message for d in parser.diagnostics)
 
 
 def test_parse_case_missing_rbrace():
@@ -332,8 +337,8 @@ def test_parse_case_missing_rbrace():
             1 => { return; }
     }
     """
-    with pytest.raises(ParseError):
-        parse_module(src)
+    mod, parser = parse_module_with_parser(src)
+    assert any(d.kind == "error" for d in parser.diagnostics)
 
 
 def test_parse_case_empty_body():
@@ -344,8 +349,8 @@ def test_parse_case_empty_body():
         }
     }
     """
-    with pytest.raises(ParseError, match="PAR-0240"):
-        parse_module(src)
+    mod, parser = parse_module_with_parser(src)
+    assert any("PAR-0240" in d.message for d in parser.diagnostics)
 
 
 def test_parse_case_invalid_literal():
@@ -357,8 +362,8 @@ def test_parse_case_invalid_literal():
         }
     }
     """
-    with pytest.raises(ParseError, match="PAR-0241"):
-        parse_module(src)
+    mod, parser = parse_module_with_parser(src)
+    assert any("PAR-0241" in d.message for d in parser.diagnostics)
 
 
 # ============================================================================

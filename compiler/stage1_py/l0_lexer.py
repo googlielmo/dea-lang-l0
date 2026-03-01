@@ -3,7 +3,8 @@
 
 from dataclasses import dataclass
 from enum import Enum, auto
-from typing import List
+from typing import List, Optional
+from l0_diagnostics import Diagnostic
 
 
 # ==========================
@@ -145,14 +146,6 @@ class Token:
         return f"{self.text!r}" if self.kind != TokenKind.EOF else "end-of-file"
 
 
-@dataclass
-class LexerError(Exception):
-    message: str
-    filename: str
-    line: int
-    column: int
-
-
 def is_reserved_keyword(word: str) -> bool:
     return word in KEYWORDS
 
@@ -176,7 +169,7 @@ HEX_CHARS = "0123456789abcdefABCDEF"
 
 
 class Lexer:
-    def __init__(self, source: str, filename: str = "<input>") -> None:
+    def __init__(self, source: str, filename: str = "<input>", diagnostics: Optional[List[Diagnostic]] = None) -> None:
         self.source = source
         self.filename = filename
         self.length = len(source)
@@ -184,12 +177,16 @@ class Lexer:
         self.line = 1
         self.column = 1
         self._prev_kind: TokenKind | None = None
+        self.diagnostics = diagnostics if diagnostics is not None else []
 
     @classmethod
     def from_source(cls, source: str) -> "Lexer":
         return cls(source)
 
     # --- low-level char utilities ---
+
+    def _error(self, message: str, line: int, column: int) -> None:
+        self.diagnostics.append(Diagnostic(kind="error", message=message, filename=self.filename, line=line, column=column))
 
     def _at_end(self) -> bool:
         return self.index >= self.length
@@ -225,6 +222,7 @@ class Lexer:
             self._prev_kind = tok.kind
             if tok.kind is TokenKind.EOF:
                 break
+
         return tokens
 
     def _next_token(self) -> Token:
@@ -360,15 +358,16 @@ class Lexer:
         if c == "%":
             return Token(TokenKind.MODULO, c, start_line, start_col)
 
-        raise LexerError(f"[LEX-0040] unexpected character {c!r} at {start_line}:{start_col}", self.filename, start_line,
-                         start_col)
+        self._error(f"[LEX-0040] unexpected character {c!r} at {start_line}:{start_col}", start_line, start_col)
+        return self._next_token()
 
     def _read_byte_literal(self, start_col: int, start_line: int) -> str:
         chars: List[str] = []
         ch = self._peek()
 
         if ch == "\0" or ch == "\n":
-            raise LexerError("[LEX-0020] unterminated char literal", self.filename, self.line, self.column)
+            self._error("[LEX-0020] unterminated char literal", self.line, self.column)
+            return "\0"
 
         if ch == "\\":
             chars.append(self._read_valid_char_escape())
@@ -376,9 +375,9 @@ class Lexer:
             chars.append(self._advance())
 
         if self._peek() != "'":
-            raise LexerError("[LEX-0021] invalid char literal, expected closing single quote", self.filename, self.line, self.column)
-
-        self._advance()  # consume closing '
+            self._error("[LEX-0021] invalid char literal, expected closing single quote", self.line, self.column)
+        else:
+            self._advance()  # consume closing '
 
         text = "".join(chars)
 
@@ -389,9 +388,9 @@ class Lexer:
             value = int(hex_digits, 16)
 
             if value > 255:
-                raise LexerError(
+                self._error(
                     f"[LEX-0031] character literal hex escape out of range (0-255): '\\x{hex_digits}' = {value}",
-                    self.filename, start_line, start_col
+                    start_line, start_col
                 )
         elif text.startswith("\\") and len(text) > 1 and text[1] in OCT_CHARS:
             # octal escape (range was checked during escape parsing)
@@ -399,7 +398,7 @@ class Lexer:
         else:
             utf8string = text.encode("utf-8").decode("unicode_escape").encode("utf-8")
             if len(utf8string) != 1:
-                raise LexerError("[LEX-0030] character literal must represent a single byte", self.filename, start_line,
+                self._error("[LEX-0030] character literal must represent a single byte", start_line,
                                  start_col)
 
             # if text is a \u or \U escape, convert it to the \xXX form to be C99-compatible
@@ -414,7 +413,8 @@ class Lexer:
             ch = self._peek()
 
             if ch == "\0" or ch == "\n":
-                raise LexerError("[LEX-0010] unterminated string literal", self.filename, self.line, self.column)
+                self._error("[LEX-0010] unterminated string literal", self.line, self.column)
+                break
             if ch == "\\":
                 chars.append(self._read_valid_char_escape())
                 continue
@@ -439,7 +439,8 @@ class Lexer:
             if next_ch in HEX_CHARS:
                 chars.append(self._advance())
             else:
-                raise LexerError(f"[LEX-0050] invalid hex escape sequence", self.filename, self.line, self.column)
+                self._error(f"[LEX-0050] invalid hex escape sequence", self.line, self.column)
+                return "".join(chars)
             while True:  # consume additional hex digits
                 next_ch = self._peek()
                 if next_ch in HEX_CHARS:
@@ -454,7 +455,8 @@ class Lexer:
                 if next_ch in HEX_CHARS:
                     chars.append(self._advance())
                 else:
-                    raise LexerError(f"[LEX-0051] invalid unicode escape sequence (\\u)", self.filename, self.line, self.column)
+                    self._error(f"[LEX-0051] invalid unicode escape sequence (\\u)", self.line, self.column)
+                    return "".join(chars)
 
         elif esc == "U":  # unicode escape of the form \UXXXXXXXX
             chars.append(self._advance())  # append 'U'
@@ -463,11 +465,12 @@ class Lexer:
                 if next_ch in HEX_CHARS:
                     chars.append(self._advance())
                 else:
-                    raise LexerError(f"[LEX-0052] invalid unicode escape sequence (\\U)", self.filename, self.line, self.column)
+                    self._error(f"[LEX-0052] invalid unicode escape sequence (\\U)", self.line, self.column)
+                    return "".join(chars)
             value = int("".join(chars[2:]), 16)
             if value > 0x10FFFF:
-                raise LexerError("[LEX-0054] Unicode code point out of range (must be <= 0x10FFFF)",
-                                 self.filename, self.line, self.column)
+                self._error("[LEX-0054] Unicode code point out of range (must be <= 0x10FFFF)",
+                                 self.line, self.column)
 
         elif esc in OCT_CHARS:  # octal escape
             chars.append(self._advance())  # append the first octal digit
@@ -480,9 +483,9 @@ class Lexer:
             # check that the octal value is in range 0-255
             oct_value = int("".join(chars[1:]), 8)
             if oct_value > 255:
-                raise LexerError(f"[LEX-0053] octal escape sequence out of range 0..255", self.filename, self.line, self.column)
+                self._error(f"[LEX-0053] octal escape sequence out of range 0..255", self.line, self.column)
         else:
-            raise LexerError(f"[LEX-0059] unknown escape sequence \\{esc}", self.filename, self.line, self.column)
+            self._error(f"[LEX-0059] unknown escape sequence \\{esc}", self.line, self.column)
 
         return "".join(chars)
 
@@ -494,12 +497,12 @@ class Lexer:
         if is_negative:
             text = "-" + text
         if self._peek().isalpha() or self._peek() == "_":
-            raise LexerError(f"[LEX-0061] invalid character '{self._peek()}' after integer literal",
-                             self.filename, self.line, self.column)
+            self._error(f"[LEX-0061] invalid character '{self._peek()}' after integer literal",
+                             self.line, self.column)
         value = int(text)
         if value > 2 ** 31 - 1 or value < -2 ** 31:
-            raise LexerError(f"[LEX-0060] integer literal '{value}' exceeds 32-bit signed range",
-                             self.filename, start_line, start_col)
+            self._error(f"[LEX-0060] integer literal '{value}' exceeds 32-bit signed range",
+                             start_line, start_col)
         return text
 
     def _skip_ws_and_comments(self) -> None:
@@ -521,7 +524,8 @@ class Lexer:
                 self._advance()  # '*'
                 while True:
                     if self._at_end():
-                        raise LexerError("[LEX-0070] unterminated block comment", self.filename, self.line, self.column)
+                        self._error("[LEX-0070] unterminated block comment", self.line, self.column)
+                        break
                     if self._peek() == "*" and self._peek_next() == "/":
                         self._advance()  # '*'
                         self._advance()  # '/'

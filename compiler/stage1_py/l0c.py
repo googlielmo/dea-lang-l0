@@ -45,9 +45,13 @@ def _load_file_lines(path: str, cache: Dict[str, List[str]]) -> List[str]:
 
 
 def print_diagnostics(result: AnalysisResult, context: CompilationContext) -> None:
+    print_diagnostic_list(result.diagnostics, context)
+
+
+def print_diagnostic_list(diagnostics: List[Diagnostic], context: CompilationContext) -> None:
     file_cache: Dict[str, List[str]] = {}
 
-    for diag in result.diagnostics:
+    for diag in diagnostics:
         print_diagnostic_with_snippet(diag, file_cache, context)
 
 
@@ -518,7 +522,10 @@ def cmd_ast(args: argparse.Namespace) -> int:
     try:
         cu = driver.build_compilation_unit(args.entry)
     except Exception as e:
-        log_error(context, f"error: [L0C-0020] {e}")
+        if driver.diagnostics:
+            print_diagnostic_list(driver.diagnostics, context)
+        else:
+            log_error(context, f"error: [L0C-0020] {e}")
         return 1
 
     if args.all_modules:
@@ -548,7 +555,14 @@ def _dump_tokens_for_file(path: Path, include_eof: bool, context=None) -> int:
         return 1
 
     lexer = Lexer(text, filename=str(path))
-    tokens = lexer.tokenize()
+    try:
+        tokens = lexer.tokenize()
+    except Exception as e:
+        if lexer.diagnostics:
+            print_diagnostic_list(lexer.diagnostics, context)
+        else:
+            log_error(context, f"error: [L0C-0042] {e}")
+        return 1
 
     for tok in tokens:
         if not include_eof and tok.kind is TokenKind.EOF:
@@ -579,7 +593,10 @@ def cmd_tok(args: argparse.Namespace) -> int:
         try:
             cu = driver.build_compilation_unit(args.entry)
         except Exception as e:
-            log_error(context, f"error: [L0C-0050] {e}")
+            if driver.diagnostics:
+                print_diagnostic_list(driver.diagnostics, context)
+            else:
+                log_error(context, f"error: [L0C-0050] {e}")
             return 1
 
         exit_code = 0

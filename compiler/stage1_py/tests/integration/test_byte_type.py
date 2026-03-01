@@ -15,7 +15,7 @@ from conftest import _find_cc, compile_and_run
 from l0_ast import ByteLiteral, FuncDecl, LetStmt, ReturnStmt
 from l0_backend import Backend
 from l0_driver import L0Driver
-from l0_lexer import Lexer, LexerError, TokenKind
+from l0_lexer import Lexer, TokenKind
 from l0_parser import Parser
 from l0_types import BuiltinType
 
@@ -122,21 +122,20 @@ def test_lexer_byte_literal_unterminated_raises():
     """Test that unterminated byte literal raises error."""
     src = "'a"
 
-    with pytest.raises(LexerError) as excinfo:
-        Lexer.from_source(src).tokenize()
+    lexer = Lexer.from_source(src)
+    lexer.tokenize()
 
-    assert "LEX-0021" in excinfo.value.message
+    assert any("LEX-0021" in d.message for d in lexer.diagnostics)
 
 
 def test_lexer_byte_literal_empty_raises():
     """Test that empty byte literal raises error."""
     src = "''"
 
-    with pytest.raises(LexerError) as excinfo:
-        Lexer.from_source(src).tokenize()
+    lexer = Lexer.from_source(src)
+    lexer.tokenize()
 
-    # Either unterminated or invalid, depending on implementation
-    assert excinfo.value.message is not None
+    assert any(d.kind == "error" for d in lexer.diagnostics)
 
 
 def test_lexer_byte_literal_multi_byte_raises():
@@ -144,10 +143,10 @@ def test_lexer_byte_literal_multi_byte_raises():
     # A multi-byte UTF-8 character
     src = "'\u00e9'"  # é (2 bytes in UTF-8)
 
-    with pytest.raises(LexerError) as excinfo:
-        Lexer.from_source(src).tokenize()
+    lexer = Lexer.from_source(src)
+    lexer.tokenize()
 
-    assert "single byte" in excinfo.value.message
+    assert any("single byte" in d.message for d in lexer.diagnostics)
 
 
 def test_lexer_byte_literal_location():

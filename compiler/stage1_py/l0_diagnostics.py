@@ -6,7 +6,10 @@ from dataclasses import dataclass
 from typing import Optional
 
 from l0_ast import Node
-from l0_lexer import Token
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from l0_lexer import Token
 
 DIAGNOSTIC_CODE_FAMILIES = {
     "LEX": [
@@ -262,7 +265,7 @@ def diag_from_token(
         *,
         module_name: Optional[str],
         filename: Optional[str],
-        token: Optional[Token],
+        token: Optional["Token"],
 ) -> Diagnostic:
     line = column = end_line = end_column = None
     if token is not None:

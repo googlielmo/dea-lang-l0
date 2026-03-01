@@ -4,7 +4,7 @@
 from conftest import has_error_code
 
 
-def test_parser_recovery_stops_at_first_error(analyze_single):
+def test_parser_recovery_from_missing_semicolon(analyze_single):
     src = """
     module main;
 
@@ -21,12 +21,14 @@ def test_parser_recovery_stops_at_first_error(analyze_single):
     result = analyze_single("main", src)
 
     assert result.has_errors()
-    assert result.cu is None
-    assert len(result.diagnostics) == 1
+    assert result.cu is not None
+    # We recovered from the missing semicolon on line 5, 
+    # but bailed on line 6 (missing expression).
+    assert len(result.diagnostics) >= 1
     assert has_error_code(result.diagnostics, "PAR-0100")
 
 
-def test_parser_recovery_import_error_blocks_later_decls(analyze_single):
+def test_parser_recovery_from_missing_import_semicolon(analyze_single):
     src = """
     module main;
 
@@ -44,6 +46,6 @@ def test_parser_recovery_import_error_blocks_later_decls(analyze_single):
     result = analyze_single("main", src)
 
     assert result.has_errors()
-    assert result.cu is None
-    assert len(result.diagnostics) == 1
+    assert result.cu is not None
+    assert len(result.diagnostics) >= 1
     assert has_error_code(result.diagnostics, "PAR-0321")

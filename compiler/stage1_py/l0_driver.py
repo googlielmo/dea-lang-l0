@@ -2,7 +2,7 @@
 #  Copyright (c) 2025-2026 gwz
 
 from pathlib import Path
-from typing import Dict, Set
+from typing import Dict, Set, List
 
 from l0_analysis import AnalysisResult
 from l0_ast import Module
@@ -10,11 +10,11 @@ from l0_compilation import CompilationUnit
 from l0_context import CompilationContext
 from l0_diagnostics import Diagnostic, diag_from_token
 from l0_expr_types import ExpressionTypeChecker
-from l0_lexer import LexerError, Lexer
+from l0_lexer import Lexer
 from l0_locals import LocalScopeResolver
 from l0_logger import log_info, log_debug, log_stage
 from l0_name_resolver import NameResolver
-from l0_parser import Parser, ParseError
+from l0_parser import Parser
 from l0_paths import SourceSearchPaths
 from l0_signatures import SignatureResolver
 
@@ -74,6 +74,7 @@ class L0Driver:
     ):
         self.search_paths = search_paths or SourceSearchPaths()
         self.context = context or CompilationContext.default()
+        self.diagnostics: List[Diagnostic] = []
         # Modules successfully loaded (by module name).
         self.module_cache: Dict[str, Module] = {}
         # Modules currently being loaded (for cycle detection).
@@ -100,53 +101,27 @@ class L0Driver:
         log_stage(self.context, "Building compilation unit", entry_module_name)
         try:
             cu = self.build_compilation_unit(entry_module_name)
-        except FileNotFoundError as e:
-            result.diagnostics.append(
-                Diagnostic(kind="error", message=f"file: [DRV-0010] {str(e)}")
-            )
-            return result
-        except ValueError as e:
-            # module name mismatch or similar
-            result.diagnostics.append(
-                Diagnostic(kind="error", message=f"input: [DRV-0020] {str(e)}")
-            )
-            return result
-        except ImportCycleError as e:
-            result.diagnostics.append(
-                Diagnostic(kind="error", message=f"import: [DRV-0030] {str(e)}")
-            )
-            return result
-        except LexerError as e:
-            # syntax error during lexing
-            result.diagnostics.append(
-                Diagnostic(
-                    kind="error",
-                    message=f"syntax: {e.message}",
-                    filename=e.filename,
-                    line=e.line,
-                    column=e.column,
-                )
-            )
-            return result
-        except ParseError as e:
-            # syntax error during parsing
-            result.diagnostics.append(
-                diag_from_token(
-                    kind="error",
-                    message=e.message,
-                    token=e.token,
-                    module_name=None, # TODO: fill in module name (may need to pass it through ParseError)
-                    filename=e.filename
-                )
-            )
-            return result
-        except SourceEncodingError as e:
-            result.diagnostics.append(
-                Diagnostic(kind="error", message=f"input: [DRV-0040] {e}")
-            )
+        except (FileNotFoundError, ValueError, ImportCycleError, SourceEncodingError) as e:
+            # Transfer all collected lexer/parser diagnostics
+            result.diagnostics.extend(self.diagnostics)
+            # If no specific diagnostic was collected but we have an exception, add it
+            if not result.diagnostics:
+                if isinstance(e, FileNotFoundError):
+                    result.diagnostics.append(Diagnostic(kind="error", message=f"file: [DRV-0010] {str(e)}"))
+                elif isinstance(e, ValueError):
+                    result.diagnostics.append(Diagnostic(kind="error", message=f"input: [DRV-0020] {str(e)}"))
+                elif isinstance(e, ImportCycleError):
+                    result.diagnostics.append(Diagnostic(kind="error", message=f"import: [DRV-0030] {str(e)}"))
+                elif isinstance(e, SourceEncodingError):
+                    result.diagnostics.append(Diagnostic(kind="error", message=f"input: [DRV-0040] {e}"))
             return result
 
         result.cu = cu
+        result.diagnostics.extend(self.diagnostics)
+
+        if result.has_errors():
+            return result
+
         log_debug(self.context, f"Compilation unit contains {len(cu.modules)} module(s): {', '.join(sorted(cu.modules.keys()))}")
 
         # 2. Module-level name resolution
@@ -271,12 +246,12 @@ class L0Driver:
 
     def _parse_source(self, text: str, file_path: str) -> Module:
         log_debug(self.context, f"Lexing {file_path}")
-        lexer = Lexer(text, filename=file_path)
+        lexer = Lexer(text, filename=file_path, diagnostics=self.diagnostics)
         tokens = lexer.tokenize()
         log_debug(self.context, f"Lexed {len(tokens)} token(s) from {file_path}")
 
         log_debug(self.context, f"Parsing {file_path}")
-        parser = Parser(tokens)
+        parser = Parser(tokens, diagnostics=self.diagnostics)
         module = parser.parse_module(filename=file_path)
         log_debug(self.context, f"Parsed module '{module.name}' from {file_path}")
 

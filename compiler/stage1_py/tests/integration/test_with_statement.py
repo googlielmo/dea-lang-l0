@@ -18,7 +18,7 @@ from l0_ast import (
     Module, FuncDecl, WithStmt, LetStmt, ExprStmt, AssignStmt,
 )
 from l0_lexer import Lexer, TokenKind
-from l0_parser import Parser, ParseError
+from l0_parser import Parser
 
 
 # ============================================================================
@@ -28,6 +28,11 @@ from l0_parser import Parser, ParseError
 def parse_module(src: str) -> Module:
     parser = Parser.from_source(src)
     return parser.parse_module()
+
+def parse_module_with_parser(src: str):
+    parser = Parser.from_source(src)
+    mod = parser.parse_module()
+    return mod, parser
 
 
 def get_func_body_stmt(src: str, func_name: str = "main", stmt_index: int = 0):
@@ -228,8 +233,8 @@ def test_parse_with_mixed_arrows_error():
         }
     }
     """
-    with pytest.raises(ParseError, match="PAR-0503"):
-        parse_module(src)
+    mod, parser = parse_module_with_parser(src)
+    assert any("PAR-0503" in d.message for d in parser.diagnostics)
 
 
 def test_parse_with_arrows_and_cleanup_block_error():
@@ -246,8 +251,8 @@ def test_parse_with_arrows_and_cleanup_block_error():
         }
     }
     """
-    with pytest.raises(ParseError, match="PAR-0504"):
-        parse_module(src)
+    mod, parser = parse_module_with_parser(src)
+    assert any("PAR-0504" in d.message for d in parser.diagnostics)
 
 
 def test_parse_with_no_arrows_no_cleanup_error():
@@ -261,8 +266,8 @@ def test_parse_with_no_arrows_no_cleanup_error():
         }
     }
     """
-    with pytest.raises(ParseError, match="PAR-0505"):
-        parse_module(src)
+    mod, parser = parse_module_with_parser(src)
+    assert any("PAR-0505" in d.message for d in parser.diagnostics)
 
 
 # ============================================================================

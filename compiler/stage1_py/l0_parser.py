@@ -3,6 +3,7 @@
 
 from dataclasses import dataclass
 from typing import List, Optional
+from l0_diagnostics import Diagnostic
 
 from l0_ast import (
     Span, TypeRef, Import, TopLevelDecl, Param, FuncDecl, FieldDecl, StructDecl, EnumVariant, EnumDecl,
@@ -19,17 +20,25 @@ from l0_lexer import TokenKind, Token, Lexer, is_reserved_keyword
 # ==========================
 
 @dataclass
-class ParseError(Exception):
-    message: str
-    token: Optional[Token] = None
-    filename: Optional[str] = None
+class _ParseSyncException(Exception):
+    pass
+
+
+def token_len(tok: Token) -> int:
+    if tok.kind in (TokenKind.STRING, TokenKind.BYTE):
+        # Account for the quotes around string and byte literals
+        return len(tok.text) + 2
+    else:
+        return len(tok.text)
 
 
 class Parser:
-    def __init__(self, tokens: List[Token], filename: Optional[str] = None) -> None:
+    def __init__(self, tokens: List[Token], filename: Optional[str] = None,
+                 diagnostics: Optional[List[Diagnostic]] = None) -> None:
         self.tokens = tokens
         self.index = 0
         self.filename = filename
+        self.diagnostics = diagnostics if diagnostics is not None else []
 
     @classmethod
     def from_source(cls, source: str) -> "Parser":
@@ -38,6 +47,23 @@ class Parser:
         return cls(tokens)
 
     # --- token utilities ---
+
+    def _error(self, message: str, token: Optional[Token] = None) -> None:
+        tok = token if token is not None else self._peek()
+        line = tok.line if tok else 0
+        column = tok.column if tok else 0
+        self.diagnostics.append(
+            Diagnostic(kind="error", message=message, filename=self.filename, line=line, column=column))
+
+    def _error_bail(self, message: str, token: Optional[Token] = None) -> None:
+        self._error(message, token)
+        raise _ParseSyncException()
+
+    def _error_unexpected(self, error_code: str, tok: Token, context: str) -> None:
+        if tok.kind is TokenKind.EOF:
+            self._error_bail(f"{error_code} unexpected end of file in {context}", tok)
+
+        self._error_bail(f"{error_code} unexpected '{tok.text}' in {context}", tok)
 
     def _peek(self) -> Token:
         return self.tokens[self.index]
@@ -65,24 +91,29 @@ class Parser:
 
     def _expect(self, kind: TokenKind, msg: str) -> Token:
         if not self._check(kind):
-            raise ParseError(f"{msg}, got {self._peek()} instead", self._peek(), self.filename)
+            self._error_bail(f"{msg}, got {self._peek()} instead")
         return self._advance()
+
+    def _expect_semicolon(self, msg: Optional[str] = None) -> None:
+        if not self._match(TokenKind.SEMI):
+            prev = self._last()
+            if prev is not None:
+                tok = Token(TokenKind.SEMI, ";", prev.line, prev.column + token_len(prev))
+                error_msg = f"{msg}" if msg else f"[PAR-0101] expected ';' after '{prev.text}'"
+                self._error(error_msg, tok)
+            else:
+                current = self._peek()
+                tok = Token(TokenKind.SEMI, ";", current.line, current.column + token_len(current))
+                error_msg = f"{msg}" if msg else "[PAR-0102] expected ';'"
+                self._error(error_msg, tok)
 
     def _expect_variable_name(self, msg: str) -> Token:
         tok = self._peek()
         if tok.kind == TokenKind.FUTURE_EXTENSION:
-            raise ParseError(
-                f"[PAR-0010] invalid variable name '{tok.text}': reserved keyword",
-                tok,
-                self.filename,
-            )
+            self._error_bail(f"[PAR-0010] invalid variable name '{tok.text}': reserved keyword", tok)
         tok = self._expect(TokenKind.IDENT, msg)
         if is_reserved_keyword(tok.text):
-            raise ParseError(
-                f"[PAR-0011] invalid variable name '{tok.text}': reserved identifier",
-                tok,
-                self.filename,
-            )
+            self._error_bail(f"[PAR-0011] invalid variable name '{tok.text}': reserved identifier", tok)
         return tok
 
     def _span_start(self) -> Span:
@@ -137,28 +168,46 @@ class Parser:
             self.filename = filename
 
         start = self._span_start()
-        self._expect(TokenKind.MODULE, "[PAR-0310] expected 'module'")
+        
+        try:
+            self._expect(TokenKind.MODULE, "[PAR-0310] expected 'module'")
 
-        first_mod = self._expect(TokenKind.IDENT, "[PAR-0311] expected module name")
-        mod_parts = self._get_dotted_module_name(first_mod)
+            first_mod = self._expect(TokenKind.IDENT, "[PAR-0311] expected module name")
+            mod_parts = self._get_dotted_module_name(first_mod)
 
-        self._expect(TokenKind.SEMI, "[PAR-0312] expected ';' after module name")
-        module_name = ".".join(mod_parts)
+            self._expect_semicolon("[PAR-0312] expected ';' after module name")
+            module_name = ".".join(mod_parts)
 
-        imports: List[Import] = []
-        # import <Ident ( "." Ident )*> ;
-        while self._match(TokenKind.IMPORT):
-            first = self._expect(TokenKind.IDENT, "[PAR-0320] expected imported module name")
-            parts = self._get_dotted_module_name(first)
+            imports: List[Import] = []
+            # import <Ident ( "." Ident )*> ;
+            while self._match(TokenKind.IMPORT):
+                first = self._expect(TokenKind.IDENT, "[PAR-0320] expected imported module name")
+                parts = self._get_dotted_module_name(first)
 
-            self._expect(TokenKind.SEMI, "[PAR-0321] expected ';' after import")
-            imports.append(Import(".".join(parts)))
+                self._expect_semicolon("[PAR-0321] expected ';' after import")
+                imports.append(Import(".".join(parts)))
+        except _ParseSyncException:
+            # Failed to parse module header. Return an empty module to allow driver to collect errors.
+            return Module("unknown", [], [], span=self._extend_span(start), filename=filename)
 
         decls: List[TopLevelDecl] = []
         while not self._at_end():
-            decls.append(self._parse_top_level_decl())
+            try:
+                decl = self._parse_top_level_decl()
+                if decl is not None:
+                    decls.append(decl)
+            except _ParseSyncException:
+                self._sync_top_level()
 
         return Module(module_name, imports, decls, span=self._extend_span(start), filename=filename)
+
+    def _sync_top_level(self) -> None:
+        """Skip tokens until we find the start of a new top-level declaration or EOF."""
+        while not self._at_end():
+            kind = self._peek().kind
+            if kind in (TokenKind.FUNC, TokenKind.STRUCT, TokenKind.ENUM, TokenKind.TYPE, TokenKind.EXTERN, TokenKind.LET):
+                break
+            self._advance()
 
     # --- top-level declarations ---
 
@@ -175,7 +224,7 @@ class Parser:
             return self._parse_type_alias()
         if self._check(TokenKind.LET):
             return self._parse_top_level_let()
-        raise ParseError(f"[PAR-0020] unexpected token in top level: {self._peek()}", self._peek(), self.filename)
+        self._error_unexpected("[PAR-0020]", self._peek(), "top level declaration");
 
     def _parse_extern_func(self) -> FuncDecl:
         self._expect(TokenKind.EXTERN, "[PAR-0030] expected 'extern'")
@@ -205,7 +254,7 @@ class Parser:
             ret_type = self._parse_type()
 
         if is_extern:
-            self._expect(TokenKind.SEMI, "[PAR-0046] expected ';' after extern function decl")
+            self._expect_semicolon("[PAR-0046] expected ';' after extern function decl")
             return FuncDecl(name_tok.text, params, ret_type, body=Block([]), is_extern=True,
                             span=self._extend_span(start))
 
@@ -222,7 +271,7 @@ class Parser:
             field_name = self._expect(TokenKind.IDENT, "[PAR-0053] expected field name")
             self._expect(TokenKind.COLON, "[PAR-0054] expected ':' after field name")
             field_type = self._parse_type()
-            self._expect(TokenKind.SEMI, "[PAR-0055] expected ';' after field declaration")
+            self._expect_semicolon("[PAR-0055] expected ';' after field declaration")
             fields.append(FieldDecl(field_name.text, field_type))
         self._expect(TokenKind.RBRACE, "[PAR-0056] expected '}' after struct body")
         return StructDecl(name_tok.text, fields, span=self._extend_span(start))
@@ -246,7 +295,7 @@ class Parser:
                         if not self._match(TokenKind.COMMA):
                             break
                 self._expect(TokenKind.RPAREN, "[PAR-0066] expected ')' after variant payload")
-            self._expect(TokenKind.SEMI, "[PAR-0067] expected ';' after variant")
+            self._expect_semicolon("[PAR-0067] expected ';' after variant")
             variants.append(EnumVariant(var_name_tok.text, fields))
         self._expect(TokenKind.RBRACE, "[PAR-0068] expected '}' after enum body")
         return EnumDecl(name_tok.text, variants, span=self._extend_span(start))
@@ -257,7 +306,7 @@ class Parser:
         name_tok = self._expect(TokenKind.IDENT, "[PAR-0071] expected type alias name")
         self._expect(TokenKind.EQ, "[PAR-0072] expected '=' in type alias")
         target = self._parse_type()
-        self._expect(TokenKind.SEMI, "[PAR-0073] expected ';' after type alias")
+        self._expect_semicolon("[PAR-0073] expected ';' after type alias")
         return TypeAliasDecl(name_tok.text, target, span=self._extend_span(start))
 
     def _parse_top_level_let(self) -> LetDecl:
@@ -271,7 +320,7 @@ class Parser:
 
         self._expect(TokenKind.EQ, "[PAR-0082] expected '=' in let binding")
         value = self._parse_expr()
-        self._expect(TokenKind.SEMI, "[PAR-0083] expected ';' after let declaration")
+        self._expect_semicolon("[PAR-0083] expected ';' after let declaration")
         return LetDecl(name_tok.text, type_ref, value, span=self._extend_span(start))
 
     # --- types ---
@@ -293,8 +342,8 @@ class Parser:
         if self._match(TokenKind.QUESTION):
             is_nullable = True
         if self._peek().kind is TokenKind.LBRACKET:
-            raise ParseError("[PAR-9401] array types not yet supported: use pointers and [] indexing in expressions",
-                             self._peek(), self.filename)
+            self._error_bail("[PAR-9401] array types not yet supported: use pointers and [] indexing in expressions",
+                             self._peek())
         return TypeRef(name_tok.text, pointer_depth, is_nullable, module_path=module_path,
                        name_qualifier=name_qualifier, span=self._extend_span(start))
 
@@ -304,10 +353,33 @@ class Parser:
         start = self._span_start()
         self._expect(TokenKind.LBRACE, "[PAR-0090] expected '{' to start block")
         stmts: List[Stmt] = []
-        while not self._check(TokenKind.RBRACE):
-            stmts.append(self._parse_stmt())
+        while not self._check(TokenKind.RBRACE) and not self._at_end():
+            try:
+                stmt = self._parse_stmt()
+                if stmt is not None:
+                    stmts.append(stmt)
+            except _ParseSyncException:
+                self._sync_stmt()
         self._expect(TokenKind.RBRACE, "[PAR-0091] expected '}' after block")
         return Block(stmts, span=self._extend_span(start))
+
+    def _sync_stmt(self) -> None:
+        """Skip tokens until we reach a statement boundary or end of block."""
+        while not self._at_end():
+            kind = self._peek().kind
+            # If we hit a semicolon, consume it and we are synced for the next statement.
+            if kind == TokenKind.SEMI:
+                self._advance()
+                return
+            # If we hit the end of a block or a new top-level declaration, stop.
+            if kind in (TokenKind.RBRACE, TokenKind.FUNC, TokenKind.STRUCT, TokenKind.ENUM, TokenKind.TYPE, TokenKind.EXTERN):
+                return
+            # If we hit a statement-starting keyword, we are synced.
+            if kind in (TokenKind.LET, TokenKind.IF, TokenKind.WHILE, TokenKind.FOR, TokenKind.RETURN, 
+                        TokenKind.BREAK, TokenKind.CONTINUE, TokenKind.DROP, TokenKind.MATCH, 
+                        TokenKind.CASE, TokenKind.WITH):
+                return
+            self._advance()
 
     def _parse_stmt(self) -> Stmt:
         if self._check(TokenKind.LBRACE):
@@ -327,7 +399,7 @@ class Parser:
 
         simple_stmt = self._parse_simple_stmt()
 
-        self._expect(TokenKind.SEMI, "[PAR-0100] expected ';' after statement")
+        self._expect_semicolon("[PAR-0100] expected ';' after statement")
 
         return simple_stmt
 
@@ -401,14 +473,14 @@ class Parser:
             init = None
         else:
             init = self._parse_simple_stmt()
-            self._expect(TokenKind.SEMI, "[PAR-0142] expected ';' after for loop initialization")
+            self._expect_semicolon("[PAR-0142] expected ';' after for loop initialization")
         # Condition
         if self._check(TokenKind.SEMI):
             self._advance()  # consume the ';'
             cond = None
         else:
             cond = self._parse_expr()
-            self._expect(TokenKind.SEMI, "[PAR-0143] expected ';' after for loop condition")
+            self._expect_semicolon("[PAR-0143] expected ';' after for loop condition")
         # Post-iteration
         if self._check(TokenKind.RPAREN):
             post = None
@@ -457,10 +529,10 @@ class Parser:
                                 if isinstance(arm.pattern, VariantPattern))
                                     .union("_" for arm in arms
                                            if isinstance(arm.pattern, WildcardPattern))):
-            raise ParseError("[PAR-0176] duplicate variant patterns in match statement", self._peek(), self.filename)
+            self._error_bail("[PAR-0176] duplicate variant patterns in match statement", self._peek())
 
         if len(arms) == 0:
-            raise ParseError("[PAR-0177] match statement must have at least one arm", self._peek(), self.filename)
+            self._error_bail("[PAR-0177] match statement must have at least one arm", self._peek())
 
         return MatchStmt(expr, arms, span=self._extend_span(start))
 
@@ -490,12 +562,11 @@ class Parser:
         has_arrows = any(it.cleanup is not None for it in items)
         has_bare = any(it.cleanup is None for it in items)
         if has_arrows and has_bare:
-            raise ParseError("[PAR-0503] 'with': all items must use '=>' or none", self._peek(), self.filename)
+            self._error_bail("[PAR-0503] 'with': all items must use '=>' or none", self._peek())
         if has_arrows and cleanup_body is not None:
-            raise ParseError("[PAR-0504] 'with': cannot have both '=>' and cleanup block", self._peek(), self.filename)
+            self._error_bail("[PAR-0504] 'with': cannot have both '=>' and cleanup block", self._peek())
         if not has_arrows and cleanup_body is None:
-            raise ParseError("[PAR-0505] 'with': cleanup block required when '=>' is not used", self._peek(),
-                             self.filename)
+            self._error_bail("[PAR-0505] 'with': cleanup block required when '=>' is not used", self._peek())
         return WithStmt(items, body, cleanup_body, span=self._extend_span(start))
 
     def _parse_case_stmt(self) -> CaseStmt:
@@ -512,18 +583,18 @@ class Parser:
         while not self._check(TokenKind.RBRACE):
             if self._match(TokenKind.ELSE):
                 if seen_else:
-                    raise ParseError("[PAR-0236] duplicate 'else' arm in 'case' statement", self._peek(), self.filename)
+                    self._error_bail("[PAR-0236] duplicate 'else' arm in 'case' statement", self._peek())
                 else_start = self._span_start()
                 if self._match(TokenKind.ARROW_MATCH):
-                    raise ParseError("[PAR-0237] '=>' not allowed in 'else' arm", self._peek(), self.filename)
+                    self._error_bail("[PAR-0237] '=>' not allowed in 'else' arm", self._peek())
                 body = self._parse_stmt()
                 else_arm = CaseElse(body, span=self._extend_span(else_start))
                 seen_else = True
                 continue
             else:
                 if seen_else:
-                    raise ParseError("[PAR-0234] value arm cannot appear after 'else' in 'case' statement",
-                                     self._peek(), self.filename)
+                    self._error_bail("[PAR-0234] value arm cannot appear after 'else' in 'case' statement",
+                                     self._peek())
                 arm_start = self._span_start()
                 literal = self._parse_case_literal()
                 self._expect(TokenKind.ARROW_MATCH, "[PAR-0235] expected '=>' in 'case' arm")
@@ -534,7 +605,7 @@ class Parser:
         self._expect(TokenKind.RBRACE, "[PAR-0239] expected '}' after 'case' statement")
 
         if len(arms) == 0 and else_arm is None:
-            raise ParseError("[PAR-0240] 'case' statement must have at least one arm", self._peek(), self.filename)
+            self._error_bail("[PAR-0240] 'case' statement must have at least one arm", self._peek())
 
         return CaseStmt(expr, arms, else_arm, span=self._extend_span(start))
 
@@ -551,7 +622,7 @@ class Parser:
             return BoolLiteral(True, span=self._extend_span(start))
         if self._match(TokenKind.FALSE):
             return BoolLiteral(False, span=self._extend_span(start))
-        raise ParseError("[PAR-0241] expected literal in 'case' arm", tok, self.filename)
+        self._error_bail("[PAR-0241] expected literal in 'case' arm", tok)
 
     def _parse_pattern(self) -> Pattern:
         start = self._span_start()
@@ -579,7 +650,7 @@ class Parser:
                 self._expect(TokenKind.RPAREN, "[PAR-0181] expected ')' in pattern")
             return VariantPattern(name_tok.text, vars, module_path=module_path,
                                   name_qualifier=name_qualifier, span=self._extend_span(start))
-        raise ParseError(f"[PAR-0182] unexpected token in pattern: {self._peek()}", self._peek(), self.filename)
+        self._error_unexpected("[PAR-0182]", self._peek(), "pattern")
 
     def _parse_break_stmt(self) -> Stmt:
         start = self._span_start()
@@ -609,11 +680,7 @@ class Parser:
         tok = self._peek()
         desc = self._RESERVED_BINARY_OPS.get(tok.kind)
         if desc is not None:
-            raise ParseError(
-                f"[PAR-0226] {desc} operator is not yet supported",
-                tok,
-                self.filename,
-            )
+            self._error_bail(f"[PAR-0226] {desc} operator is not yet supported", tok)
 
     def _parse_or_expr(self) -> Expr:
         start = self._span_start()
@@ -683,11 +750,7 @@ class Parser:
         # reserved prefix operator: ~ (bitwise NOT)
         if self._check(TokenKind.TILDE):
             tok = self._peek()
-            raise ParseError(
-                "[PAR-0226] '~' (bitwise NOT) operator is not yet supported",
-                tok,
-                self.filename,
-            )
+            self._error_bail("[PAR-0226] '~' (bitwise NOT) operator is not yet supported", tok)
         return self._parse_cast_expr()
 
     def _parse_cast_expr(self) -> Expr:
@@ -845,4 +908,4 @@ class Parser:
             self._expect(TokenKind.RPAREN, "[PAR-0224] expected ')' after expression")
             return ParenExpr(inner, span=self._extend_span(start))
 
-        raise ParseError(f"[PAR-0225] unexpected token in expression: {tok.kind}:'{tok.text}'", tok, self.filename)
+        self._error_unexpected("[PAR-0225]", tok, "expression")
