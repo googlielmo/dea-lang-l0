@@ -129,8 +129,8 @@ Key points:
 - `return expr;` is an ownership-creating site. Returning a place expression retains before scope cleanup runs.
 - Direct `return local_var;` for owned locals is lowered as a move: cleanup skips that binding instead of retaining.
 - Scope exit cleanup runs in reverse declaration order.
-- Early exits (`return`, `break`, `continue`, `try` early return) run pending `with` cleanup first, then owned var
-  cleanup, including `try` short-circuits that happen while evaluating `with` headers.
+- Early exits (`return`, `break`, `continue`, `try` early return) run pending `with` cleanup first, then owned var cleanup.
+- Loop cleanup is path-sensitive: `continue` cleans only the current iteration body scope before jumping to the update step, while `break` and `return` clean all nested scopes up to the relevant exit boundary. This ensures that ARC locals declared after a `continue` are not released if the `continue` path is taken before their initialization.
 - For `with` cleanup-block form, nullable header lets are predeclared to `null` before initializer evaluation so
   header-failure cleanup can safely reference them.
 - Enum/struct-by-value cleanup recursively cleans owned fields of active values.

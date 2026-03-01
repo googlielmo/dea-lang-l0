@@ -36,6 +36,8 @@ These systems are deliberately separate:
 | Byte-copy move (`rt_memcpy`) of string-bearing data                         | Ownership moves with the bytes        | Do **not** release the moved-from slot again — the destination is now the sole owner.                              |
 | Bulk zero (`rt_memset`, `arr_zap`) on string-bearing storage                | Zeroing bypasses ARC                  | Release owned strings **first**, then zero.                                                                        |
 | `string` returned by value from a container helper                          | Caller receives a managed value       | Follow normal ARC lifetime. Avoid compensating manual releases unless you are crossing a raw-memory boundary.      |
+| `return local_var` (where `local_var` is owned)                             | Ownership moves to caller             | The compiler skips local cleanup for the returned variable (move optimization).                                    |
+| `return expr` (non-local or non-owned)                                      | Caller receives a managed reference   | The compiler retains the result before scope cleanup runs.                                                         |
 
 ## 3. `new` / `drop` Semantics
 
@@ -145,7 +147,15 @@ Value ownership:
 1. You perform ordinary L0 assignment on ARC-managed fields or slots.
 2. You use ARC-aware stdlib helpers that already handle ownership (`vs_*`, `lmss_*`, `lmis_*`, map/set key APIs).
 
-## 8. Stage 2 Lexer/Parser Ownership Patterns
+## 8. Control Flow and ARC Cleanup
+
+The compiler ensures that ARC-managed locals are only cleaned up if they were actually initialized on the current path.
+
+- **`continue` in loops:** Cleanup only runs for variables declared within the current iteration body. The update step and loop condition are evaluated after iteration-scope cleanup.
+- **Early `return`:** All scopes up to the function top-level are cleaned in reverse order.
+- **Move optimization:** Returning a local variable (`return x;`) skips its final `release` because ownership is transferred to the caller.
+
+## 9. Stage 2 Lexer/Parser Ownership Patterns
 
 Recommended pattern for temporary allocations:
 
@@ -161,7 +171,7 @@ Common examples:
 - Token/vector cleanup helpers that release payload strings.
 - AST free helpers that release nested containers before dropping nodes.
 
-## 9. Bug Reporting and Trace Validation
+## 10. Bug Reporting and Trace Validation
 
 If you observe behavior that contradicts this reference:
 
@@ -193,7 +203,7 @@ Pass criteria:
 - `leaked_string_ptrs=0`.
 - No definite trace or runtime errors.
 
-## 10. Ground-Truth References
+## 11. Ground-Truth References
 
 Primary source files:
 
