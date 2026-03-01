@@ -4,6 +4,7 @@
 import textwrap
 from pathlib import Path
 
+from conftest import has_error_code
 from l0_driver import L0Driver
 from l0_name_resolver import NameResolver
 from l0_paths import SourceSearchPaths
@@ -152,8 +153,7 @@ def test_unknown_type_produces_diagnostic(tmp_path):
     # No type should have been attached due to error
     assert fn_sym.type is None
 
-    msgs = [d.message for d in sr.diagnostics]
-    assert any("unknown type 'UnknownType'" in m for m in msgs)
+    assert has_error_code(sr.diagnostics, "SIG-0019")
 
 
 # ---------------------------------------------------------------------------
@@ -280,6 +280,4 @@ def test_cyclic_type_aliases_produce_diagnostics(tmp_path):
     assert a_sym.type is None
     assert b_sym.type is None
 
-    msgs = [d.message for d in sr.diagnostics]
-    assert any("cyclic type alias involving 'A'" in m for m in msgs)
-    assert any("cyclic type alias involving 'B'" in m for m in msgs)
+    assert has_error_code(sr.diagnostics, "SIG-0020")

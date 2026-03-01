@@ -54,7 +54,7 @@ def test_null_assignment_to_non_nullable_fails(analyze_single):
 
     result = analyze_single("main", src)
     assert result.has_errors()
-    assert any("type mismatch" in d.message for d in result.diagnostics)
+    assert has_error_code(result.diagnostics, "TYP-0310")
 
 
 def test_try_operator_rejected_on_non_nullable(analyze_single):
@@ -97,7 +97,7 @@ def test_assign_nullable_into_non_nullable_requires_unwrap(analyze_single):
 
     result = analyze_single("main", src)
     assert result.has_errors()
-    assert any("type mismatch" in d.message for d in result.diagnostics)
+    assert has_error_code(result.diagnostics, "TYP-0310")
 
 
 def test_rt_string_release_rejects_optional_string(analyze_single):
@@ -112,4 +112,4 @@ def test_rt_string_release_rejects_optional_string(analyze_single):
 
     result = analyze_single("main", src)
     assert result.has_errors()
-    assert any("expected 'string', got 'string?'" in d.message for d in result.diagnostics)
+    assert has_error_code(result.diagnostics, "TYP-0312")

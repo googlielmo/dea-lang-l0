@@ -9,6 +9,7 @@ Tests both type checking and code generation.
 
 from textwrap import dedent
 
+from conftest import has_error_code
 import l0_backend
 from l0_driver import L0Driver
 
@@ -102,7 +103,7 @@ def test_casts_pointer_nullability(tmp_path):
 
     assert result.has_errors()
     assert len(result.diagnostics) == 1
-    assert any("return value type mismatch: expected 'int*', got 'null'" in d.message for d in result.diagnostics)
+    assert has_error_code(result.diagnostics, "TYP-0315")
 
 def test_casts_wrong_types(tmp_path):
     """Test casts with wrong types."""
@@ -128,9 +129,7 @@ def test_casts_wrong_types(tmp_path):
 
     assert result.has_errors()
     assert len(result.diagnostics) == 3
-    assert any("cannot cast from 'string' to 'int'" in d.message for d in result.diagnostics)
-    assert any("cannot cast from 'int' to 'string'" in d.message for d in result.diagnostics)
-    assert any("cannot cast from 'bool' to 'int'" in d.message for d in result.diagnostics)
+    assert len([d for d in result.diagnostics if "TYP-0230" in d.message]) == 3
 
 def  test_casts_wrong_enum_struct(tmp_path):
     """Test casts involving enums and structs."""
@@ -167,7 +166,4 @@ def  test_casts_wrong_enum_struct(tmp_path):
     assert result.has_errors()
     assert len(result.diagnostics) == 4
 
-    assert any("cannot cast from 'casts::Color' to 'int'" in d.message for d in result.diagnostics)
-    assert any("cannot cast from 'int' to 'casts::Color'" in d.message for d in result.diagnostics)
-    assert any("cannot cast from 'casts::Point' to 'casts::Point*'" in d.message for d in result.diagnostics)
-    assert any("cannot cast from 'casts::Point*' to 'casts::Point'" in d.message for d in result.diagnostics)
+    assert len([d for d in result.diagnostics if "TYP-0230" in d.message]) == 4

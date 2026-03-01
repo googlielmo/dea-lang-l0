@@ -1,6 +1,8 @@
 #  SPDX-License-Identifier: MIT OR Apache-2.0
 #  Copyright (c) 2026 gwz
 
+from conftest import has_error_code
+
 from l0_driver import L0Driver
 from l0_paths import SourceSearchPaths
 
@@ -37,4 +39,4 @@ def test_analyze_missing_module(temp_project):
 
     assert result.cu is None
     assert result.diagnostics
-    assert any("not found" in d.message for d in result.diagnostics)
+    assert has_error_code(result.diagnostics, "DRV-0010")

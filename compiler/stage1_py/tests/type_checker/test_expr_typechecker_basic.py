@@ -68,4 +68,4 @@ def test_return_wrong_type(analyze_single):
     )
 
     assert result.has_errors()
-    assert any("type mismatch" in d.message for d in result.diagnostics)
+    assert has_error_code(result.diagnostics, "TYP-0315")

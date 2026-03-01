@@ -176,7 +176,7 @@ def test_bare_payload_variant_error(analyze_single):
     )
 
     assert result.has_errors()
-    assert any("requires arguments" in d.message for d in result.diagnostics)
+    assert has_error_code(result.diagnostics, "TYP-0152")
 
 
 def test_call_syntax_still_works(analyze_single):

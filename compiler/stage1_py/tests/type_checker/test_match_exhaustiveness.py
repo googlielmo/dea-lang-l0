@@ -3,6 +3,7 @@
 
 from textwrap import dedent
 
+from conftest import has_error_code
 from l0_driver import L0Driver
 
 
@@ -49,8 +50,7 @@ def test_unknown_variant_name_reports_error(tmp_path):
 
     result = _analyze_single(tmp_path, "main", src)
     assert result.has_errors()
-    msgs = "\n".join(d.message for d in result.diagnostics)
-    assert "unknown variant" in msgs
+    assert has_error_code(result.diagnostics, "TYP-0102")
 
 
 def test_match_on_non_enum_type_rejected(tmp_path):

@@ -40,4 +40,4 @@ def test_call_argument_type_mismatch(analyze_single):
 
     result = analyze_single("main", src)
     assert result.has_errors()
-    assert any("type mismatch" in d.message for d in result.diagnostics)
+    assert has_error_code(result.diagnostics, "TYP-0312")

@@ -11,7 +11,7 @@ from textwrap import dedent
 
 import pytest
 
-from conftest import _find_cc, compile_and_run
+from conftest import _find_cc, compile_and_run, has_error_code
 from l0_ast import ByteLiteral, FuncDecl, LetStmt, ReturnStmt
 from l0_backend import Backend
 from l0_driver import L0Driver
@@ -125,7 +125,7 @@ def test_lexer_byte_literal_unterminated_raises():
     lexer = Lexer.from_source(src)
     lexer.tokenize()
 
-    assert any("LEX-0021" in d.message for d in lexer.diagnostics)
+    assert has_error_code(lexer.diagnostics, "LEX-0021")
 
 
 def test_lexer_byte_literal_empty_raises():
@@ -146,7 +146,7 @@ def test_lexer_byte_literal_multi_byte_raises():
     lexer = Lexer.from_source(src)
     lexer.tokenize()
 
-    assert any("single byte" in d.message for d in lexer.diagnostics)
+    assert has_error_code(lexer.diagnostics, "LEX-0030")
 
 
 def test_lexer_byte_literal_location():
@@ -329,7 +329,7 @@ def test_typechecker_int_to_byte_requires_cast(tmp_path):
     )
 
     assert result.has_errors()
-    assert any("type" in d.message.lower() for d in result.diagnostics)
+    assert has_error_code(result.diagnostics, "TYP-0310")
 
 
 def test_typechecker_int_to_byte_cast(tmp_path):

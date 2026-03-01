@@ -1,6 +1,7 @@
 #  SPDX-License-Identifier: MIT OR Apache-2.0
 #  Copyright (c) 2026 gwz
 
+from conftest import has_error_code
 from l0_driver import L0Driver
 
 
@@ -104,4 +105,4 @@ def test_driver_reports_non_utf8_source(write_l0_file, temp_project, stage1_root
     result = driver.analyze("badenc.main")
 
     assert result.has_errors()
-    assert any("[DRV-0040]" in d.message for d in result.diagnostics)
+    assert has_error_code(result.diagnostics, "DRV-0040")

@@ -21,6 +21,7 @@ At the following conversion sites:
 
 import pytest
 
+from conftest import has_error_code
 from l0_ast import FuncDecl, ReturnStmt
 from l0_backend import Backend
 from l0_driver import L0Driver
@@ -46,13 +47,13 @@ def analyze_and_check_no_errors(tmp_path, write_l0_file, search_paths, name: str
     return result
 
 
-def analyze_and_expect_error(tmp_path, write_l0_file, search_paths, name: str, src: str, error_substring: str):
-    """Analyze and assert an error containing the given substring."""
+def analyze_and_expect_error(tmp_path, write_l0_file, search_paths, name: str, src: str, error_code: str):
+    """Analyze and assert an error containing the given error code."""
     result = analyze(tmp_path, write_l0_file, search_paths, name, src)
     errors = [d for d in result.diagnostics if d.kind == "error"]
-    assert errors, f"Expected an error containing '{error_substring}', but no errors occurred"
-    assert any(error_substring in d.message for d in errors), \
-        f"Expected error containing '{error_substring}', got: {[d.message for d in errors]}"
+    assert errors, f"Expected an error containing '{error_code}', but no errors occurred"
+    assert has_error_code(errors, error_code), \
+        f"Expected error containing '{error_code}', got: {[d.message for d in errors]}"
     return result
 
 
@@ -626,7 +627,7 @@ class TestConversionRejection:
                 let x: int? = 42;
                 let y: int = x;
             }
-        """, "type mismatch")
+        """, "TYP-0310")
 
     def test_int_to_byte_rejected(self):
         """int cannot implicitly narrow to byte."""
@@ -638,7 +639,7 @@ class TestConversionRejection:
                 let x: int = 42;
                 let y: byte = x;
             }
-        """, "type mismatch")
+        """, "TYP-0310")
 
     def test_string_to_int_optional_rejected(self):
         """string cannot convert to int?."""
@@ -649,7 +650,7 @@ class TestConversionRejection:
             func f() -> void {
                 let x: int? = "hello";
             }
-        """, "type mismatch")
+        """, "TYP-0310")
 
     def test_wrong_optional_type_rejected(self):
         """int cannot convert to string?."""
@@ -660,7 +661,7 @@ class TestConversionRejection:
             func f() -> void {
                 let x: string? = 42;
             }
-        """, "type mismatch")
+        """, "TYP-0310")
 
 
 # ============================================================================

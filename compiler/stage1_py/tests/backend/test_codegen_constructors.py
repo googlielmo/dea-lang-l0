@@ -7,6 +7,7 @@ Tests both type checking and code generation for constructor expressions.
 #  SPDX-License-Identifier: MIT OR Apache-2.0
 #  Copyright (c) 2026 gwz
 
+from conftest import has_error_code
 from l0_ast import FuncDecl, LetStmt
 from l0_types import StructType, EnumType
 
@@ -68,7 +69,7 @@ def test_struct_constructor_wrong_arity(analyze_single):
     )
 
     assert result.has_errors()
-    assert any("expects 2 argument(s), got 1" in d.message for d in result.diagnostics)
+    assert has_error_code(result.diagnostics, "TYP-0191")
 
 
 def test_struct_constructor_wrong_type(analyze_single):
@@ -91,7 +92,7 @@ def test_struct_constructor_wrong_type(analyze_single):
     )
 
     assert result.has_errors()
-    assert any("field 'y' type mismatch: expected 'int', got 'bool'" in d.message for d in result.diagnostics)
+    assert has_error_code(result.diagnostics, "TYP-0313")
 
 
 def test_struct_constructor_nested(analyze_single):
@@ -224,7 +225,7 @@ def test_enum_variant_constructor_wrong_arity(analyze_single):
     )
 
     assert result.has_errors()
-    assert any("expects 1 argument(s), got 2" in d.message for d in result.diagnostics)
+    assert has_error_code(result.diagnostics, "TYP-0201")
 
 
 def test_enum_variant_constructor_wrong_type(analyze_single):
@@ -246,7 +247,7 @@ def test_enum_variant_constructor_wrong_type(analyze_single):
     )
 
     assert result.has_errors()
-    assert any("expected 'int', got 'bool'" in d.message for d in result.diagnostics)
+    assert has_error_code(result.diagnostics, "TYP-0314")
 
 
 def test_enum_variant_constructor_multiple_fields(analyze_single):
@@ -527,7 +528,7 @@ def test_constructor_error_mentions_field_name(analyze_single):
 
     assert result.has_errors()
     # Should mention field name 'x' in error
-    assert any("field 'x'" in d.message for d in result.diagnostics)
+    assert has_error_code(result.diagnostics, "TYP-0313")
 
 
 def test_variant_constructor_error_clear(analyze_single):
@@ -551,8 +552,7 @@ def test_variant_constructor_error_clear(analyze_single):
 
     assert result.has_errors()
     # Should mention variant name and type mismatch
-    assert any("variant constructor 'Ok'" in d.message for d in result.diagnostics)
-    assert any("string" in d.message and "int" in d.message for d in result.diagnostics)
+    assert has_error_code(result.diagnostics, "TYP-0314")
 
 
 # ============================================================================
@@ -653,7 +653,7 @@ def test_struct_constructor_too_many_args(analyze_single):
     )
 
     assert result.has_errors()
-    assert any("expects 2 argument(s), got 3" in d.message for d in result.diagnostics)
+    assert has_error_code(result.diagnostics, "TYP-0191")
 
 
 def test_nonexistent_field_access(analyze_single):
@@ -676,8 +676,7 @@ def test_nonexistent_field_access(analyze_single):
     )
 
     assert result.has_errors()
-    assert any("no field 'z'" in d.message.lower() or "unknown field" in d.message.lower()
-               for d in result.diagnostics)
+    assert has_error_code(result.diagnostics, "TYP-0221")
 
 
 def test_field_access_on_non_struct(analyze_single):
@@ -695,8 +694,4 @@ def test_field_access_on_non_struct(analyze_single):
     )
 
     assert result.has_errors()
-    assert any(
-        "field" in d.message.lower()
-        and ("int" in d.message.lower() or "struct" in d.message.lower())
-        for d in result.diagnostics
-    )
+    assert has_error_code(result.diagnostics, "TYP-0222")

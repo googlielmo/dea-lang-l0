@@ -6,6 +6,7 @@ from textwrap import dedent
 import pytest
 
 from l0_parser import Parser
+from tests.conftest import has_error_code
 
 
 def test_parser_missing_semicolon_reports_error():
@@ -22,7 +23,7 @@ def test_parser_missing_semicolon_reports_error():
 
     parser = Parser.from_source(src)
     parser.parse_module()
-    assert any("expected ';'" in d.message for d in parser.diagnostics)
+    assert has_error_code(parser.diagnostics, "PAR-0100")
 
 
 def test_parser_malformed_module_decl():
@@ -30,7 +31,7 @@ def test_parser_malformed_module_decl():
 
     parser = Parser.from_source(src)
     parser.parse_module()
-    assert any("expected ';' after module name" in d.message for d in parser.diagnostics)
+    assert has_error_code(parser.diagnostics, "PAR-0312")
 
 
 def test_parser_unexpected_token():
@@ -49,7 +50,7 @@ def test_parser_unexpected_token():
     parser = Parser.from_source(src)
     parser.parse_module()
 
-    assert any("unexpected ']'" in d.message for d in parser.diagnostics)
+    assert has_error_code(parser.diagnostics, "PAR-0225")
 
 
 # ============================================================================
@@ -77,7 +78,7 @@ def test_parser_match_duplicate_variant_pattern():
     parser = Parser.from_source(src)
     parser.parse_module()
 
-    assert any("duplicate variant patterns" in d.message for d in parser.diagnostics)
+    assert has_error_code(parser.diagnostics, "PAR-0176")
 
 
 def test_parser_match_empty_arms():
@@ -98,7 +99,7 @@ def test_parser_match_empty_arms():
     parser = Parser.from_source(src)
     parser.parse_module()
 
-    assert any("at least one arm" in d.message for d in parser.diagnostics)
+    assert has_error_code(parser.diagnostics, "PAR-0177")
 
 
 def test_parser_match_multiple_wildcards():
@@ -121,4 +122,4 @@ def test_parser_match_multiple_wildcards():
     parser = Parser.from_source(src)
     parser.parse_module()
 
-    assert any("duplicate variant patterns" in d.message for d in parser.diagnostics)
+    assert has_error_code(parser.diagnostics, "PAR-0176")

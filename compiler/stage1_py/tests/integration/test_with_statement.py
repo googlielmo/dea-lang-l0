@@ -14,6 +14,7 @@ Covers:
 
 import pytest
 
+from conftest import has_error_code
 from l0_ast import (
     Module, FuncDecl, WithStmt, LetStmt, ExprStmt, AssignStmt,
 )
@@ -234,7 +235,7 @@ def test_parse_with_mixed_arrows_error():
     }
     """
     mod, parser = parse_module_with_parser(src)
-    assert any("PAR-0503" in d.message for d in parser.diagnostics)
+    assert has_error_code(parser.diagnostics, "PAR-0503")
 
 
 def test_parse_with_arrows_and_cleanup_block_error():
@@ -252,7 +253,7 @@ def test_parse_with_arrows_and_cleanup_block_error():
     }
     """
     mod, parser = parse_module_with_parser(src)
-    assert any("PAR-0504" in d.message for d in parser.diagnostics)
+    assert has_error_code(parser.diagnostics, "PAR-0504")
 
 
 def test_parse_with_no_arrows_no_cleanup_error():
@@ -267,7 +268,7 @@ def test_parse_with_no_arrows_no_cleanup_error():
     }
     """
     mod, parser = parse_module_with_parser(src)
-    assert any("PAR-0505" in d.message for d in parser.diagnostics)
+    assert has_error_code(parser.diagnostics, "PAR-0505")
 
 
 # ============================================================================
@@ -987,7 +988,7 @@ def test_typecheck_with_drop_in_cleanup_use_after_drop_rejected(analyze_single):
         }
     """)
     errors = [d for d in result.diagnostics if d.kind == "error"]
-    assert any("TYP-0150" in d.message for d in errors), [d.message for d in errors]
+    assert has_error_code(errors, "TYP-0150"), [d.message for d in errors]
 
 
 def test_typecheck_with_cleanup_block_header_try_failure_nonnullable_ref_rejected(analyze_single):
@@ -1009,7 +1010,7 @@ def test_typecheck_with_cleanup_block_header_try_failure_nonnullable_ref_rejecte
         func main() -> int { return 0; }
     """)
     errors = [d for d in result.diagnostics if d.kind == "error"]
-    assert any("TYP-0156" in d.message for d in errors), [d.message for d in errors]
+    assert has_error_code(errors, "TYP-0156"), [d.message for d in errors]
 
 
 def test_typecheck_with_cleanup_block_header_try_failure_nonnullable_not_referenced_passes(analyze_single):
