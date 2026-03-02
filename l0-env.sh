@@ -6,7 +6,10 @@
 
 script_src="${BASH_SOURCE[0]-}"
 if [[ -z "${script_src}" && -n "${ZSH_VERSION-}" ]]; then
-    script_src="${(%):-%N}"
+    script_src="${(%):-%x}"
+    if [[ -z "${script_src}" ]]; then
+        script_src="${(%):-%N}"
+    fi
 fi
 
 sourced=0
@@ -25,14 +28,16 @@ fi
 SCRIPT_DIR="$(cd -- "$(dirname -- "${script_src}")" && pwd -P)"
 export L0_HOME="${SCRIPT_DIR}/compiler"
 
-case ":${PATH}:" in
-    *":${SCRIPT_DIR}:"*) ;;
-    *) export PATH="${PATH}:${SCRIPT_DIR}" ;;
-esac
-
 if [[ -f "${SCRIPT_DIR}/.venv/bin/activate" ]]; then
     # shellcheck source=/dev/null
     . "${SCRIPT_DIR}/.venv/bin/activate"
 fi
+
+case ":${PATH}:" in
+    *":${SCRIPT_DIR}:"*) ;;
+    *) export PATH="${PATH:+${PATH}:}${SCRIPT_DIR}" ;;
+esac
+
+hash -r 2>/dev/null || true
 
 export L0_CC="clang"
