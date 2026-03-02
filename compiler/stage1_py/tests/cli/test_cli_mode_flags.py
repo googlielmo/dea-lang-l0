@@ -81,29 +81,24 @@ def test_explicit_run_rejects_implicit_program_args(monkeypatch, capsys):
     assert "use '--' before runtime program arguments" in capsys.readouterr().err
 
 
-def test_legacy_run_command_preserves_old_program_arg_style(monkeypatch):
+def test_old_style_run_command_is_not_supported(monkeypatch, capsys):
     calls = _patch_handlers(monkeypatch)
 
-    rc = _run_main(["run", "app.main", "alpha", "--beta"])
+    rc = _run_main(["run", "app.main", "alpha"])
 
-    assert rc == 0
-    assert len(calls) == 1
-    name, args = calls[0]
-    assert name == "run"
-    assert args.entry == "app.main"
-    assert args.args == ["alpha", "--beta"]
+    assert rc == 2
+    assert calls == []
+    assert "multiple targets are not supported yet" in capsys.readouterr().err
 
 
-def test_legacy_codegen_alias_maps_to_gen_mode(monkeypatch):
+def test_old_style_codegen_command_is_not_supported(monkeypatch, capsys):
     calls = _patch_handlers(monkeypatch)
 
     rc = _run_main(["codegen", "app.main"])
 
-    assert rc == 0
-    assert len(calls) == 1
-    name, args = calls[0]
-    assert name == "gen"
-    assert args.entry == "app.main"
+    assert rc == 2
+    assert calls == []
+    assert "multiple targets are not supported yet" in capsys.readouterr().err
 
 
 def test_short_gen_alias_maps_to_gen_mode(monkeypatch):
@@ -203,10 +198,10 @@ def test_output_is_allowed_in_run_mode(monkeypatch):
     assert args.output == "x"
 
 
-def test_explicit_mode_flags_disable_legacy_rewrite(monkeypatch):
+def test_default_build_allows_target_named_run(monkeypatch):
     calls = _patch_handlers(monkeypatch)
 
-    rc = _run_main(["--build", "run"])
+    rc = _run_main(["run"])
 
     assert rc == 0
     assert len(calls) == 1

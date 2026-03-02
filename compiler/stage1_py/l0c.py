@@ -27,7 +27,15 @@ from l0_types import (
 )
 
 
+### L0 Compiler (l0c) - Stage 1: Analysis and C Code Generation
+### This is the main entry point for the L0 compiler's stage 1, which includes:
+### - Command-line interface parsing
+### - Environment variable handling for defaults
+### - Building the compilation context and search paths
+
+
 def _init_env_defaults() -> None:
+    """Initialize environment variables for system root and runtime include paths based on L0_HOME."""
     l0_home = os.getenv("L0_HOME")
     if not l0_home:
         return
@@ -38,6 +46,7 @@ def _init_env_defaults() -> None:
 
 
 def _load_file_lines(path: str, cache: Dict[str, List[str]]) -> List[str]:
+    """Load lines of a source file, using a cache to avoid redundant reads."""
     if path not in cache:
         text = load_source_utf8(path)
         cache[path] = text.splitlines()
@@ -45,10 +54,12 @@ def _load_file_lines(path: str, cache: Dict[str, List[str]]) -> List[str]:
 
 
 def print_diagnostics(result: AnalysisResult, context: CompilationContext) -> None:
+    """Print diagnostics from the analysis result, including source snippets if possible."""
     print_diagnostic_list(result.diagnostics, context)
 
 
 def print_diagnostic_list(diagnostics: List[Diagnostic], context: CompilationContext) -> None:
+    """Print a list of diagnostics, using a file cache to optimize source snippet retrieval."""
     file_cache: Dict[str, List[str]] = {}
 
     for diag in diagnostics:
@@ -57,6 +68,7 @@ def print_diagnostic_list(diagnostics: List[Diagnostic], context: CompilationCon
 
 def print_diagnostic_with_snippet(diag: Diagnostic, file_cache: Dict[str, List[str]],
                                   context: CompilationContext = None) -> None:
+    """Print a single diagnostic, including the source line and a caret pointing to the error location if available."""
     # First line: header
     log_error(context, diag.format())
 
@@ -102,6 +114,7 @@ def print_diagnostic_with_snippet(diag: Diagnostic, file_cache: Dict[str, List[s
 
 
 def _is_valid_module_name(module_name: str) -> bool:
+    """Check if a module name is valid (dot-separated identifiers)."""
     if not module_name:
         return False
     parts = module_name.split(".")
@@ -111,6 +124,7 @@ def _is_valid_module_name(module_name: str) -> bool:
 
 
 def build_search_paths(context: CompilationContext, args: argparse.Namespace) -> Optional[SourceSearchPaths]:
+    """Build source search paths from command-line arguments, handling entry path parsing and defaults."""
     # if args.entry is a path, split into dir and module name
     entry_path = Path(args.entry)
     if entry_path.suffix == ".l0" or entry_path.is_absolute() or entry_path.parent != Path('.'):
@@ -189,7 +203,7 @@ def _run_analysis(args):
 
 
 def _get_module_names(args, cu) -> List[str]:
-    """Get list of module names based on --all-modules flag."""
+    """Get the list of module names based on the `--all-modules` flag."""
     if getattr(args, 'all_modules', False):
         return sorted(cu.modules.keys())
     return [args.entry]
@@ -224,10 +238,10 @@ def _find_cc() -> Optional[str]:
 
 def _compiler_flag_family(compiler):
     """
-    Simple heuristic to determine compiler family for flag selection.
-    Uses pattern matching to handle cases like "gcc-10" or "clang-14" on Unix and "gcc.exe" or "clang.exe" on Windows.
-    :param compiler: the name of the compiler executable
-    :return: a string indicating the compiler family ("tcc", "gcc", "clang", "cc", "msvc", or "unknown")
+    Determine the compiler family for flag selection using a simple heuristic.
+
+    Uses pattern matching to handle cases like "gcc-10" or "clang-14" on Unix
+    and "gcc.exe" or "clang.exe" on Windows.
     """
     if compiler.endswith("tcc") or search(r"tcc(\.exe)?$", compiler):
         return "tcc"
@@ -243,6 +257,7 @@ def _compiler_flag_family(compiler):
 
 
 def _check_entry_main_for_build(result: AnalysisResult, entry_name: str, context: CompilationContext) -> bool:
+    """Check that the entry module defines a valid 'main' function for build/run modes."""
     entry_env = result.module_envs.get(entry_name)
     if entry_env is None:
         log_error(context, f"error: [L0C-0012] entry module '{entry_name}' not found in analysis result")
@@ -275,6 +290,7 @@ def _check_entry_main_for_build(result: AnalysisResult, entry_name: str, context
 
 
 def _validate_runtime_library_path(runtime_lib_path: str, context: CompilationContext) -> bool:
+    """Validate that the provided runtime library path exists and contains expected L0 runtime library files."""
     runtime_dir = Path(runtime_lib_path)
     if not runtime_dir.is_dir():
         log_error(
@@ -293,6 +309,32 @@ def _validate_runtime_library_path(runtime_lib_path: str, context: CompilationCo
         return False
 
     return True
+
+
+def _get_optimize_flag(flag_family, extra_opts) -> Optional[str]:
+    """Determine the appropriate optimization flag for the detected compiler family.
+    Returns the optimization flag string (e.g. '-O2') or None if no suitable flag is found.
+    """
+    # if any opt starts with -O or /O, assume user is explicitly controlling optimization and do not add a default optimize flag
+    if extra_opts and any(opt.startswith("-O") or opt.startswith("/O") for opt in extra_opts):
+        return None
+
+    # if debug options are present, use the minimal optimization level that still allows debugging (e.g. -Og for gcc/clang, -O0 for tcc)
+    if extra_opts and any(opt in extra_opts for opt in ["-g", "/Zi", "/Z7"]):
+        if flag_family == "tcc":
+            return "-O0"
+        elif flag_family == "gcc":
+            return "-Og"
+        elif flag_family == "msvc":
+            return "/Od"
+
+    # Default quick optimization level for non-debug builds (can be overridden with --c-options/-C if needed)
+    if flag_family in {"gcc", "tcc"}:
+        return "-O1"
+    elif flag_family == "msvc":
+        return "/O1"
+    else:
+        return None
 
 
 def cmd_build(args: argparse.Namespace) -> int:
@@ -334,6 +376,7 @@ def cmd_build(args: argparse.Namespace) -> int:
         else:
             c_path = exe_path.with_suffix(".c")
     else:
+        # noinspection PyDeprecation
         c_path = Path(tempfile.mktemp(suffix=".c"))
 
     try:
@@ -344,7 +387,7 @@ def cmd_build(args: argparse.Namespace) -> int:
         compiler = args.c_compiler or _find_cc()
         if compiler is None:
             log_error(context,
-                      "error: [L0C-0009] no C compiler found: use --c-compiler to specify one or set the CC environment variable")
+                      "error: [L0C-0009] no C compiler found: use '--c-compiler' to specify one or set the L0_CC environment variable")
             return 1
 
         log_info(context, f"Using C compiler: {compiler}")
@@ -373,6 +416,13 @@ def cmd_build(args: argparse.Namespace) -> int:
         else:
             log_warning(context,
                         f"Unsupported compiler '{compiler}' (flag family '{flag_family}'): not adding standard flags")
+
+        # Optimization flags for non-debug builds
+        optimize_flag = _get_optimize_flag(flag_family, extra_opts)
+
+        if optimize_flag:
+            log_info(context, f"Adding optimization flag: {optimize_flag}")
+            cmd.append(optimize_flag)
 
         # Add runtime include path
         if args.runtime_include:
@@ -432,7 +482,7 @@ def cmd_run(args: argparse.Namespace) -> int:
         if output_arg and not keep_c:
             log_error(
                 context,
-                "warning: [L0C-0017] '--output/-o' is ignored in --run mode unless '--keep-c' is set; "
+                "warning: [L0C-0017] '--output' is ignored in '--run' mode unless '--keep-c' is set; "
                 "the executable path remains temporary",
             )
         c_output_path = None
@@ -502,6 +552,7 @@ def cmd_codegen(args: argparse.Namespace) -> int:
 
 
 def cmd_check(args: argparse.Namespace) -> int:
+    """Run analysis and type checking without code generation."""
     _, _, exit_code = _run_analysis(args)
     return exit_code
 
@@ -545,6 +596,7 @@ def cmd_ast(args: argparse.Namespace) -> int:
 
 
 def _dump_tokens_for_file(path: Path, include_eof: bool, context=None) -> int:
+    """Dump lexer tokens for a single file, including line and column information."""
     try:
         text = load_source_utf8(path)
     except OSError as e:
@@ -629,7 +681,7 @@ def cmd_sym(args: argparse.Namespace) -> int:
     """
     Dump module-level symbol tables.
 
-    By default dumps symbols only for the entry module.
+    By default, dumps symbols only for the entry module.
     With --all-modules, dumps symbols for all modules in the compilation unit.
     """
     result, _, _ = _run_analysis(args)
@@ -791,7 +843,7 @@ def _add_all_modules_arg(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--all-modules", "-a",
         action="store_true",
-        help="Process all modules in the compilation unit (valid in: --tok, --ast, --sym, --type)",
+        help="Process all modules in the compilation unit (valid in: '--tok', '--ast', '--sym', '--type')",
     )
 
 
@@ -802,20 +854,20 @@ def _add_runtime_args(parser: argparse.ArgumentParser) -> None:
         help=(
             "C compiler to use (default: $L0_CC has highest precedence if set;"
             " then tcc, gcc, clang, cc from PATH, or $CC, in that order;"
-            " valid in: --build, --run)"
+            " valid in: '--build', '--run')"
         ),
     )
     parser.add_argument(
         "--c-options", "-C",
-        help='Extra options to pass to the C compiler (e.g. -C="-O2 -DDEBUG"; valid in: --build, --run)',
+        help="Extra options to pass to the C compiler (e.g. -C=\"-Og -DDEBUG\"; valid in: '--build', '--run')",
     )
     parser.add_argument(
         "--runtime-include", "-I",
-        help="Path to L0 runtime headers (default: $L0_RUNTIME_INCLUDE; valid in: --build, --run)",
+        help="Path to L0 runtime headers (default: $L0_RUNTIME_INCLUDE; valid in: '--build', '--run')",
     )
     parser.add_argument(
         "--runtime-lib", "-L",
-        help="Path to L0 runtime library (default: $L0_RUNTIME_LIB; valid in: --build, --run)",
+        help="Path to L0 runtime library (default: $L0_RUNTIME_LIB; valid in: '--build', '--run')",
     )
 
 
@@ -824,53 +876,19 @@ def _add_codegen_arg(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--no-line-directives", "-NLD",
         action="store_true",
-        help="Disable #line directives in generated C code (valid in: --build, --run, --gen)",
+        help="Disable #line directives in generated C code (valid in: '--build', '--run', '--gen')",
     )
     parser.add_argument(
         "--trace-arc",
         action="store_true",
-        help="Enable ARC runtime tracing in generated C code (emits L0_TRACE_ARC; valid in: --build, --run, --gen)",
+        help="Enable ARC runtime tracing in generated C code (emits L0_TRACE_ARC; valid in: '--build', '--run', '--gen')",
     )
     parser.add_argument(
         "--trace-memory",
         action="store_true",
-        help="Enable memory runtime tracing in generated C code (emits L0_TRACE_MEMORY; valid in: --build, --run, --gen)",
+        help="Enable memory runtime tracing in generated C code (emits L0_TRACE_MEMORY; valid in: '--build', '--run', '--gen')",
     )
 
-
-_LEGACY_COMMAND_TO_MODE = {
-    "run": "run",
-    "build": "build",
-    "gen": "gen",
-    "codegen": "gen",
-    "check": "check",
-    "analyze": "check",
-    "tok": "tok",
-    "tokens": "tok",
-    "ast": "ast",
-    "sym": "sym",
-    "symbols": "sym",
-    "type": "type",
-    "types": "type",
-}
-
-_MODE_FLAGS = {
-    "-r",
-    "-g",
-    "--run",
-    "--build",
-    "--gen",
-    "--codegen",
-    "--check",
-    "--analyze",
-    "--tok",
-    "--tokens",
-    "--ast",
-    "--sym",
-    "--symbols",
-    "--type",
-    "--types",
-}
 
 _OPTIONS_REQUIRING_VALUE = {
     "-P", "--project-root",
@@ -884,6 +902,7 @@ _OPTIONS_REQUIRING_VALUE = {
 
 
 def _split_cli_and_program_args(argv: Sequence[str]) -> Tuple[List[str], List[str]]:
+    """Split compiler CLI arguments from program arguments passed after `--`."""
     argv_list = list(argv)
     if "--" not in argv_list:
         return argv_list, []
@@ -891,114 +910,8 @@ def _split_cli_and_program_args(argv: Sequence[str]) -> Tuple[List[str], List[st
     return argv_list[:idx], argv_list[idx + 1:]
 
 
-def _contains_mode_flag(argv: Sequence[str]) -> bool:
-    for token in argv:
-        if token == "--":
-            break
-        if token in _MODE_FLAGS:
-            return True
-    return False
-
-
-def _find_legacy_command_index(argv: Sequence[str]) -> Optional[int]:
-    i = 0
-    while i < len(argv):
-        token = argv[i]
-        if token == "--":
-            return None
-
-        if token in _LEGACY_COMMAND_TO_MODE:
-            # Do not rewrite single trailing words like `./l0c run` to keep
-            # default-build behavior for a target named `run`.
-            if i + 1 < len(argv):
-                return i
-            return None
-
-        if token.startswith("--"):
-            if "=" in token:
-                i += 1
-                continue
-            if token in _OPTIONS_REQUIRING_VALUE:
-                i += 2
-                continue
-            i += 1
-            continue
-
-        if token.startswith("-") and token != "-":
-            if fullmatch(r"-v+", token):
-                i += 1
-                continue
-            if token in _OPTIONS_REQUIRING_VALUE:
-                i += 2
-                continue
-            i += 1
-            continue
-
-        i += 1
-
-    return None
-
-
-def _rewrite_legacy_command_argv(argv: Sequence[str]) -> Tuple[List[str], Optional[str]]:
-    rewritten = list(argv)
-    if _contains_mode_flag(rewritten):
-        return rewritten, None
-
-    cmd_idx = _find_legacy_command_index(rewritten)
-    if cmd_idx is None:
-        return rewritten, None
-
-    legacy_command = rewritten[cmd_idx]
-    rewritten[cmd_idx] = f"--{_LEGACY_COMMAND_TO_MODE[legacy_command]}"
-    if legacy_command == "run":
-        rewritten = _rewrite_legacy_run_argv(rewritten, cmd_idx)
-    return rewritten, legacy_command
-
-
-def _rewrite_legacy_run_argv(argv: Sequence[str], command_index: int) -> List[str]:
-    rewritten = list(argv)
-    tail = rewritten[command_index + 1:]
-    if not tail or "--" in tail:
-        return rewritten
-
-    i = 0
-    while i < len(tail):
-        token = tail[i]
-        if token.startswith("--"):
-            if "=" in token:
-                i += 1
-                continue
-            if token in _OPTIONS_REQUIRING_VALUE:
-                i += 2
-                continue
-            i += 1
-            continue
-
-        if token.startswith("-") and token != "-":
-            if fullmatch(r"-v+", token):
-                i += 1
-                continue
-            if token in _OPTIONS_REQUIRING_VALUE:
-                i += 2
-                continue
-            i += 1
-            continue
-
-        # First non-option token in legacy run syntax is the entry target.
-        target_index = i
-        if target_index + 1 >= len(tail):
-            return rewritten
-        return (
-                rewritten[:command_index + 1]
-                + tail[:target_index + 1]
-                + ["--"]
-                + tail[target_index + 1:]
-        )
-
-    return rewritten
-
-
 def _validate_mode_scoped_flags(parser: argparse.ArgumentParser, args: argparse.Namespace) -> None:
+    """Reject flags that were provided for a mode where they are not valid."""
     mode = args.mode
 
     scoped_flags = [
@@ -1027,14 +940,14 @@ def _validate_mode_scoped_flags(parser: argparse.ArgumentParser, args: argparse.
 
 
 def main(argv=None) -> None:
+    """Parse CLI arguments, dispatch the selected mode, and exit with its status."""
     _init_env_defaults()
     parser = argparse.ArgumentParser(
         prog="l0c",
         description="L0 compiler (Stage 1)",
         epilog=(
             "Modes are selected with flags (default: --build). "
-            "Use '--' to pass program arguments for --run. "
-            "Legacy command words like 'run' and 'gen' are accepted as a compatibility shim."
+            "Use '--' to pass program arguments for --run."
         ),
     )
 
@@ -1082,8 +995,7 @@ def main(argv=None) -> None:
         "--output",
         "-o",
         help=(
-            "Output path (valid in: --build, --gen, --run; run uses it only for kept C filename with --keep-c "
-            "and warns otherwise)"
+            "Output path (valid in: '--build', '--gen', '--run')"
         ),
     )
     _add_runtime_args(parser)
@@ -1091,27 +1003,22 @@ def main(argv=None) -> None:
     parser.add_argument(
         "--keep-c",
         action="store_true",
-        help="Keep generated C file (valid in: --build, --run; run writes ./a.c by default, or <output>.c with -o)",
+        help="Keep generated C file (valid in: '--build', '--run'; use with '--output' to specify C file path"
     )
     _add_all_modules_arg(parser)
     parser.add_argument("--include-eof", action="store_true",
-                        help="Include the EOF token in tok output (valid in: --tok)")
+                        help="Include the EOF token in output (valid in: '--tok')")
     _add_target_args(parser)
 
     raw_argv = list(argv) if argv is not None else sys.argv[1:]
-    rewritten_argv, legacy_command = _rewrite_legacy_command_argv(raw_argv)
-    cli_argv, program_args = _split_cli_and_program_args(rewritten_argv)
+    cli_argv, program_args = _split_cli_and_program_args(raw_argv)
     args = parser.parse_args(cli_argv)
 
     if args.mode == "run":
-        if legacy_command == "run":
-            args.entry = args.targets[0]
-            args.args = args.targets[1:] + program_args
-        else:
-            if len(args.targets) > 1:
-                parser.error("mode '--run' accepts exactly one target; use '--' before runtime program arguments")
-            args.entry = args.targets[0]
-            args.args = program_args
+        if len(args.targets) > 1:
+            parser.error("mode '--run' accepts exactly one target; use '--' before runtime program arguments")
+        args.entry = args.targets[0]
+        args.args = program_args
     else:
         if program_args:
             parser.error("arguments after '--' are valid only with '--run'")

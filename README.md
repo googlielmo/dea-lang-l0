@@ -333,39 +333,36 @@ options:
   --ast                 Pretty-print the AST
   --sym, --symbols      Dump module-level symbols
   --type, --types       Dump resolved types
-  --output, -o OUTPUT   Output path (valid in: --build, --gen, --run; run uses
-                        it only for kept C filename with --keep-c and warns
-                        otherwise)
+  --output, -o OUTPUT   Output path (valid in: '--build', '--gen', '--run')
   --c-compiler, -c C_COMPILER
                         C compiler to use (default: $L0_CC has highest
                         precedence if set; then tcc, gcc, clang, cc from PATH,
-                        or $CC, in that order; valid in: --build, --run)
+                        or $CC, in that order; valid in: '--build', '--run')
   --c-options, -C C_OPTIONS
-                        Extra options to pass to the C compiler (e.g. -C="-O2
-                        -DDEBUG"; valid in: --build, --run)
+                        Extra options to pass to the C compiler (e.g. -C="-Og
+                        -DDEBUG"; valid in: '--build', '--run')
   --runtime-include, -I RUNTIME_INCLUDE
                         Path to L0 runtime headers (default:
-                        $L0_RUNTIME_INCLUDE; valid in: --build, --run)
+                        $L0_RUNTIME_INCLUDE; valid in: '--build', '--run')
   --runtime-lib, -L RUNTIME_LIB
                         Path to L0 runtime library (default: $L0_RUNTIME_LIB;
-                        valid in: --build, --run)
+                        valid in: '--build', '--run')
   --no-line-directives, -NLD
                         Disable #line directives in generated C code (valid
-                        in: --build, --run, --gen)
+                        in: '--build', '--run', '--gen')
   --trace-arc           Enable ARC runtime tracing in generated C code (emits
-                        L0_TRACE_ARC; valid in: --build, --run, --gen)
+                        L0_TRACE_ARC; valid in: '--build', '--run', '--gen')
   --trace-memory        Enable memory runtime tracing in generated C code
-                        (emits L0_TRACE_MEMORY; valid in: --build, --run,
-                        --gen)
-  --keep-c              Keep generated C file (valid in: --build, --run; run
-                        writes ./a.c by default, or <output>.c with -o)
+                        (emits L0_TRACE_MEMORY; valid in: '--build', '--run',
+                        '--gen')
+  --keep-c              Keep generated C file (valid in: '--build', '--run';
+                        use with '--output' to specify C file path
   --all-modules, -a     Process all modules in the compilation unit (valid in:
-                        --tok, --ast, --sym, --type)
-  --include-eof         Include the EOF token in tok output (valid in: --tok)
+                        '--tok', '--ast', '--sym', '--type')
+  --include-eof         Include the EOF token in output (valid in: '--tok')
 
 Modes are selected with flags (default: --build). Use '--' to pass program
-arguments for --run. Legacy command words like 'run' and 'gen' are accepted as
-a compatibility shim.
+arguments for --run.
 ```
 
 For `--run`, pass program arguments after `--`:

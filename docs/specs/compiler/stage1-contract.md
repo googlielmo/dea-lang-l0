@@ -1,6 +1,6 @@
 # L0 Stage 1 Compiler Contract
 
-Version: 2026-02-19
+Version: 2026-03-02
 
 This document is the compact Stage 1 contract and navigation index.
 
@@ -45,10 +45,10 @@ Primary mode flags:
 - `--sym` (alias flag: `--symbols`)
 - `--type` (alias flag: `--types`)
 
-Compatibility shim:
+Mode selection uses flags only:
 
-- Legacy command words (`run`, `build`, `gen`, `check`, `tok`, `ast`, `sym`, `type` and aliases) are accepted.
-- New `--run` form expects runtime program arguments after `--`.
+- Legacy command words such as `run`, `build`, `gen`, `check`, `tok`, `ast`, `sym`, and `type` are not accepted.
+- `--run` expects runtime program arguments after `--`.
 
 Global options:
 
