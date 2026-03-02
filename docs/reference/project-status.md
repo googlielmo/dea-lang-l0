@@ -1,6 +1,6 @@
 # L0 Project Status
 
-Version: 2026-02-28
+Version: 2026-03-01
 
 This document summarizes what is implemented in this repository today and what remains open.
 
@@ -142,9 +142,12 @@ Current implemented assets:
     - `src/types.l0`
     - `src/symbols.l0`
     - `src/analysis.l0`
+    - `src/sem_context.l0`
     - `src/name_resolver.l0`
     - `src/signatures.l0`
+    - `src/type_resolve.l0`
     - `src/locals.l0`
+    - `src/expr_types.l0`
     - `src/l0c.l0`
     - `src/main.l0`
 - Utility modules:
@@ -184,19 +187,17 @@ Stage 2 AST storage status:
 - Parser API returns `ParseResult` with arenas and module root.
 - `parse_result_free` deep cleanup is implemented for parser-owned allocations.
 
-Stage 2 semantic foundation status:
+Stage 2 semantic status:
 
 - `AnalysisResult` owns `DriverState`, combined diagnostics, name-resolution environments,
-  signature tables, and local-scope environments.
-- Module-level name resolution is implemented with Stage 1-aligned `RES-*` behavior for
-  duplicate top-level definitions, import shadowing, ambiguous open imports, and unknown
-  imported modules during semantic opening.
+  signature tables, local-scope environments, and expression typing results.
+- Module-level name resolution is implemented with Stage 1-aligned `RES-*` behavior.
 - Top-level signature resolution is implemented for functions, structs, enums, aliases, and
-  top-level lets, including narrow literal/constructor-based let inference and value-type
-  cycle detection.
-- Local scope construction is implemented for non-extern functions over the arena-backed AST,
-  including block, loop, `match`, `case`, and `with` scope boundaries.
-- Stage 2 `l0c --check` runs driver + semantic foundation passes and returns semantic errors.
+  top-level lets.
+- Local scope construction is implemented for non-extern functions over the arena-backed AST.
+- Expression and statement type checking is implemented with feature parity with Stage 1,
+  including control-flow checks, assignment compatibility, and pattern variable typing.
+- Stage 2 `l0c --check`, `--type`, and `--sym` are implemented with Stage 1-aligned output.
 
 ## Known Limitations and Constraints
 
@@ -210,17 +211,15 @@ These remain true in Stage 1:
 
 Current Stage 2 limitations:
 
-1. Expression type checking is not implemented yet (`expr_types`, `var_ref_resolution`, and intrinsic target typing
-   remain Stage 1-only).
-2. Stage 2 backend/codegen pipeline is not implemented yet.
-3. Some language constraints intentionally remain staged in parser diagnostics (for example, array types and
+1. Stage 2 backend/codegen pipeline is not implemented yet.
+2. Some language constraints intentionally remain staged in parser diagnostics (for example, array types and
    bitwise/shift operators).
 
 ## Short Roadmap
 
 Near-term project direction, consistent with current docs/code:
 
-1. Continue Stage 2 from parser baseline into semantic passes (name/signature/local-scope/type checking).
-2. Add Stage 2 expression type checking on top of the semantic foundation passes.
-3. Connect Stage 2 semantic outputs to backend/codegen milestones.
+1. Connect Stage 2 semantic outputs to backend/codegen milestones.
+2. Implement Stage 2 lowering passes.
+3. Add Stage 2 C emission and driver `--build`/`--run` support.
 4. Keep Stage 1 behavior deterministic and contract-documented while Stage 2 grows.

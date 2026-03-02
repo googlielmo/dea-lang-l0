@@ -1,0 +1,38 @@
+/*
+ * SPDX-License-Identifier: MIT OR Apache-2.0
+ * Copyright (c) 2026 gwz
+ */
+
+module typing_err;
+
+func err_binary_mismatch() {
+    let x: int = 1 + true; // TYP-0310
+}
+
+func err_assign_mismatch() {
+    let x: int = "hello"; // TYP-0311
+}
+
+func err_unknown_id() {
+    let x = unknown_var; // TYP-0189
+}
+
+struct Point { x: int; y: int; }
+
+func err_struct_field() {
+    let p = Point(1, 2);
+    let z = p.z; // TYP-0340
+}
+
+func err_call_args() {
+    let p = Point(1); // TYP-0330
+}
+
+func err_return_type() -> int {
+    return "not an int"; // TYP-0315
+}
+
+func err_if_cond() {
+    if (123) { // TYP-0313
+    }
+}

@@ -11,7 +11,8 @@ This document describes how ownership works in L0 today, covering:
 
 ## Scope and Status
 
-- The ground truth is the **current implementation**: Stage 1 backend lowering and Stage 2 lexer/parser + stdlib.
+- The ground truth is the **current implementation**: Stage 1 backend lowering and Stage 2 frontend
+  (lexer/parser/semantics) + stdlib.
 - If runtime or codegen behavior differs from this document, treat it as a bug and report it.
 
 ## 1. Ownership Model at a Glance

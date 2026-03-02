@@ -1,0 +1,741 @@
+/*
+ * SPDX-License-Identifier: MIT OR Apache-2.0
+ * Copyright (c) 2026 gwz
+ */
+
+module expr_types;
+
+import std.hashmap;
+import std.hashset;
+import std.io;
+import std.string;
+import std.text;
+import std.vector;
+import util.diag;
+import util.strings;
+
+import ast;
+import driver;
+import locals;
+import name_resolver;
+import sem_context;
+import signatures;
+import symbols;
+import type_resolve;
+import types;
+
+struct ExpressionTypeChecker {
+    result: AnalysisResult*;
+    current_module: string;
+    current_unit: DriverUnit*?;
+    current_env: ModuleEnv*?;
+    current_func: FunctionEnv*?;
+    current_ret_type: Type*?;
+    current_scope: Scope*?;
+}
+
+func etc_diag_error(self: ExpressionTypeChecker*, code: string, message: string, filename: string, span: Span) {
+    diag_error(self.result.diags, "TypeChecker", code, message, filename, span.start_line, span.start_column,
+        span.end_line, span.end_column);
+}
+
+func etc_diag_warn(self: ExpressionTypeChecker*, code: string, message: string, filename: string, span: Span) {
+    diag_warn(self.result.diags, "TypeChecker", code, message, filename, span.start_line, span.start_column,
+        span.end_line, span.end_column);
+}
+
+func etc_key(module_name: string, id: int) -> string {
+    let id_s = int_to_string(id);
+    let res = concat3_s(module_name, "::", id_s);
+    // drop id_s; // string is ARC, no drop
+    return res;
+}
+
+func etc_set_expr_type(self: ExpressionTypeChecker*, expr_id: ExprId, ty: Type*) {
+    let key = etc_key(self.current_module, expr_id);
+    spm_put(self.result.expr_types, key, type_clone(ty) as void*);
+}
+
+func etc_set_var_type(self: ExpressionTypeChecker*, name: string, ty: Type*) {
+    let key = concat3_s(self.current_module, "::var::", name);
+    spm_put(self.result.expr_types, key, type_clone(ty) as void*);
+}
+
+func etc_get_var_type(self: ExpressionTypeChecker*, name: string) -> Type*? {
+    let key = concat3_s(self.current_module, "::var::", name);
+    let val = spm_get(self.result.expr_types, key);
+    if (val == null) return null;
+    return type_clone(val as Type*);
+}
+
+func etc_set_var_res(self: ExpressionTypeChecker*, expr_id: ExprId, res: VarRefResolution) {
+    let key = etc_key(self.current_module, expr_id);
+    sim_put(self.result.var_ref_resolution, key, ord(res));
+}
+
+func etc_set_intrinsic_target(self: ExpressionTypeChecker*, expr_id: ExprId, ty: Type*) {
+    let key = etc_key(self.current_module, expr_id);
+    spm_put(self.result.intrinsic_targets, key, type_clone(ty) as void*);
+}
+
+func etc_lookup_local(self: ExpressionTypeChecker*, name: string) -> Type*? {
+    if (self.current_scope == null) {
+        return null;
+    }
+    let local = lc_scope_lookup(self.current_scope, name);
+    if (local == null) {
+        return null;
+    }
+    let l = local as LocalSymbol*;
+    match (l.kind) {
+        LK_PARAM => {
+            let p = l.decl_ptr as Param*;
+            with (let seen = ss_create() => ss_free(seen)) {
+                return tr_resolve_type_ref(self.result.signatures as SignatureTables*, self.result.names as NameResolution*,
+                    self.current_env as ModuleEnv*, p.type_ref, self.result.diags, seen);
+            }
+        }
+        LK_LOCAL => {
+            let s = l.decl_ptr as StmtNode*;
+            if (s.type_ref != null) {
+                with (let seen2 = ss_create() => ss_free(seen2)) {
+                    return tr_resolve_type_ref(self.result.signatures as SignatureTables*, self.result.names as NameResolution*,
+                        self.current_env as ModuleEnv*, s.type_ref as TypeRef*, self.result.diags, seen2);
+                }
+            }
+            let key = etc_key(self.current_module, s.expr_a);
+            let val_ty = spm_get(self.result.expr_types, key);
+            if (val_ty != null) {
+                return type_clone(val_ty as Type*);
+            }
+        }
+        LK_PATTERN_VAR => {
+            return etc_get_var_type(self, name);
+        }
+    }
+    return null;
+}
+
+func etc_lookup_symbol(self: ExpressionTypeChecker*, name: string, module_path: VectorString*?,
+                        name_qualifier: VectorString*?) -> Symbol*? {
+    return tr_symbol_lookup(self.result.names as NameResolution*, self.current_env as ModuleEnv*, name, module_path,
+        name_qualifier);
+}
+
+func etc_bind_pattern_types(self: ExpressionTypeChecker*, match_ty: Type*, pattern_id: PatternId) {
+    let unit = self.current_unit as DriverUnit*;
+    let pattern = pattern_arena_get(unit.parse_result.pattern_arena, pattern_id);
+    if (ord(pattern.kind) != ord(PT_VARIANT)) return;
+    
+    if (ord(match_ty.kind) != ord(TY_ENUM)) return;
+    
+    let info = sig_lookup_enum_info(self.result.signatures as SignatureTables*, match_ty.module_name, match_ty.name);
+    if (info == null) return;
+    
+    let variants = (info as EnumInfo*).variants;
+    for (let i = 0; i < vec_size(variants); i = i + 1) {
+        let v_info = ptr_vec_get(variants, i) as EnumVariantInfo*;
+        if (eq_s(v_info.name, pattern.name)) {
+            if (pattern.vars != null) {
+                let vars = pattern.vars as VectorString*;
+                for (let j = 0; j < vs_size(vars); j = j + 1) {
+                    if (j < vec_size(v_info.field_types)) {
+                        etc_set_var_type(self, vs_get(vars, j), ptr_vec_get(v_info.field_types, j) as Type*);
+                    }
+                }
+            }
+            break;
+        }
+    }
+}
+
+func etc_check_stmt(self: ExpressionTypeChecker*, stmt_id: StmtId) {
+    if (stmt_id < 0) {
+        return;
+    }
+    let unit = self.current_unit as DriverUnit*;
+    let stmt = stmt_arena_get(unit.parse_result.stmt_arena, stmt_id);
+    
+    let old_scope = self.current_scope;
+    if (self.current_func != null) {
+        let scope = lc_func_env_get_block_scope(self.current_func as FunctionEnv*, stmt_id);
+        if (scope != null) {
+            self.current_scope = scope;
+        }
+    }
+
+    match (stmt.kind) {
+        ST_BLOCK => {
+            if (stmt.ids != null) {
+                let ids = stmt.ids as VectorBase*;
+                for (let i = 0; i < vec_size(ids); i = i + 1) {
+                    etc_check_stmt(self, id_vec_get(ids, i));
+                }
+            }
+        }
+        ST_LET => {
+            let val_ty = etc_infer_expr(self, stmt.expr_a);
+            if (stmt.type_ref != null) {
+                with (let seen = ss_create() => ss_free(seen)) {
+                    let ann_ty = tr_resolve_type_ref(self.result.signatures as SignatureTables*,
+                        self.result.names as NameResolution*, self.current_env as ModuleEnv*,
+                        stmt.type_ref as TypeRef*, self.result.diags, seen);
+                    if (ann_ty != null && val_ty != null) {
+                        if (!etc_can_assign(self, ann_ty as Type*, val_ty as Type*)) {
+                            etc_diag_error(self, "TYP-0311", concat4_s("initializer for '", stmt.name, "' type mismatch: ",
+                                concat3_s(type_format(ann_ty as Type*), " and ", type_format(val_ty as Type*))),
+                                unit.path, stmt.span);
+                        }
+                    }
+                    if (ann_ty != null) type_free(ann_ty as Type*);
+                }
+            }
+            if (val_ty != null) {
+                type_free(val_ty as Type*);
+            }
+        }
+        ST_ASSIGN => {
+            let left_ty = etc_infer_expr(self, stmt.expr_a);
+            let right_ty = etc_infer_expr(self, stmt.expr_b);
+            if (left_ty != null && right_ty != null) {
+                if (!etc_can_assign(self, left_ty as Type*, right_ty as Type*)) {
+                    etc_diag_error(self, "TYP-0312", concat_s("assignment type mismatch", ""), unit.path, stmt.span);
+                }
+            }
+            if (left_ty != null) type_free(left_ty as Type*);
+            if (right_ty != null) type_free(right_ty as Type*);
+        }
+        ST_IF => {
+            let cond_ty = etc_infer_expr(self, stmt.expr_a);
+            if (cond_ty != null) {
+                if (!etc_is_bool(cond_ty as Type*)) {
+                    etc_diag_error(self, "TYP-0313", "if condition must be bool", unit.path, stmt.span);
+                }
+                type_free(cond_ty as Type*);
+            }
+            etc_check_stmt(self, stmt.stmt_a);
+            etc_check_stmt(self, stmt.stmt_b);
+        }
+        ST_WHILE => {
+            let cond_ty2 = etc_infer_expr(self, stmt.expr_a);
+            if (cond_ty2 != null) {
+                if (!etc_is_bool(cond_ty2 as Type*)) {
+                    etc_diag_error(self, "TYP-0314", "while condition must be bool", unit.path, stmt.span);
+                }
+                type_free(cond_ty2 as Type*);
+            }
+            etc_check_stmt(self, stmt.stmt_a);
+        }
+        ST_FOR => {
+            etc_check_stmt(self, stmt.stmt_a);
+            let cond_ty3 = etc_infer_expr(self, stmt.expr_a);
+            if (cond_ty3 != null) {
+                if (!etc_is_bool(cond_ty3 as Type*)) {
+                    etc_diag_error(self, "TYP-0314", "for condition must be bool", unit.path, stmt.span);
+                }
+                type_free(cond_ty3 as Type*);
+            }
+            etc_check_stmt(self, stmt.stmt_b);
+            etc_check_stmt(self, stmt.stmt_c);
+        }
+        ST_MATCH => {
+            let val_ty2 = etc_infer_expr(self, stmt.expr_a);
+            if (val_ty2 != null) {
+                if (stmt.match_arms != null) {
+                    let arms = stmt.match_arms as VectorBase*;
+                    for (let i = 0; i < vec_size(arms); i = i + 1) {
+                        let arm = ptr_vec_get(arms, i) as MatchArm*;
+                        etc_bind_pattern_types(self, val_ty2 as Type*, arm.pattern);
+                        etc_check_stmt(self, arm.body);
+                    }
+                }
+                type_free(val_ty2 as Type*);
+            }
+        }
+        ST_CASE => {
+            let val_ty3 = etc_infer_expr(self, stmt.expr_a);
+            if (val_ty3 != null) {
+                if (stmt.case_arms != null) {
+                    let arms2 = stmt.case_arms as VectorBase*;
+                    for (let i = 0; i < vec_size(arms2); i = i + 1) {
+                        let arm2 = ptr_vec_get(arms2, i) as CaseArm*;
+                        etc_check_stmt(self, arm2.body);
+                    }
+                }
+                if (stmt.case_else != null) {
+                    etc_check_stmt(self, (stmt.case_else as CaseElse*).body);
+                }
+                type_free(val_ty3 as Type*);
+            }
+        }
+        ST_WITH => {
+            if (stmt.with_items != null) {
+                let items = stmt.with_items as VectorBase*;
+                for (let i = 0; i < vec_size(items); i = i + 1) {
+                    let item = ptr_vec_get(items, i) as WithItem*;
+                    etc_check_stmt(self, item.init);
+                }
+            }
+            etc_check_stmt(self, stmt.stmt_a);
+            etc_check_stmt(self, stmt.stmt_b);
+        }
+        ST_RETURN => {
+            let ret_ty = etc_infer_expr(self, stmt.expr_a);
+            if (self.current_ret_type != null) {
+                let expected = self.current_ret_type as Type*;
+                if (ret_ty != null) {
+                    if (!etc_can_assign(self, expected, ret_ty as Type*)) {
+                        etc_diag_error(self, "TYP-0315", concat4_s("return type mismatch: expected ",
+                            type_format(expected), ", got ", type_format(ret_ty as Type*)), unit.path, stmt.span);
+                    }
+                } else {
+                    if (!type_is_builtin(expected, "void")) {
+                        etc_diag_error(self, "TYP-0315", concat_s("return type mismatch: expected ",
+                            type_format(expected)), unit.path, stmt.span);
+                    }
+                }
+            }
+            if (ret_ty != null) type_free(ret_ty as Type*);
+        }
+        ST_DROP => {
+            let drop_ty = etc_infer_expr(self, stmt.expr_a);
+            if (drop_ty != null) {
+                type_free(drop_ty as Type*);
+            }
+        }
+        ST_EXPR => {
+            let ty = etc_infer_expr(self, stmt.expr_a);
+            if (ty != null) {
+                type_free(ty as Type*);
+            }
+        }
+        ST_BREAK => {}
+        ST_CONTINUE => {}
+    }
+    
+    self.current_scope = old_scope;
+}
+
+func etc_is_int(ty: Type*?) -> bool {
+    if (ty == null) return false;
+    return type_is_builtin(ty as Type*, "int") || type_is_builtin(ty as Type*, "byte");
+}
+
+func etc_is_bool(ty: Type*?) -> bool {
+    if (ty == null) return false;
+    return type_is_builtin(ty as Type*, "bool");
+}
+
+func etc_is_string(ty: Type*?) -> bool {
+    if (ty == null) return false;
+    return type_is_builtin(ty as Type*, "string");
+}
+
+func etc_types_equal(a: Type*?, b: Type*?) -> bool {
+    return type_equals(a, b);
+}
+
+func etc_can_assign(self: ExpressionTypeChecker*, dst: Type*, src: Type*) -> bool {
+    if (type_equals(dst, src)) return true;
+    
+    if (ord(dst.kind) == ord(TY_NULLABLE)) {
+        if (ord(src.kind) == ord(TY_NULL)) return true;
+        return etc_can_assign(self, dst.inner as Type*, src);
+    }
+    
+    if (type_is_builtin(dst, "int") && type_is_builtin(src, "byte")) return true;
+    
+    return false;
+}
+
+func etc_infer_unary(self: ExpressionTypeChecker*, expr_id: ExprId, expr: ExprNode*) -> Type*? {
+    let sub_ty = etc_infer_expr(self, expr.expr_a);
+    if (sub_ty == null) return null;
+    let s_ty = sub_ty as Type*;
+
+    if (eq_s(expr.text_value, "-")) {
+        if (!etc_is_int(s_ty)) {
+            etc_diag_error(self, "TYP-0310", concat_s("unary '-' expects int, got ", type_format(s_ty)),
+                (self.current_unit as DriverUnit*).path, expr.span);
+        }
+        return s_ty;
+    } else if (eq_s(expr.text_value, "!")) {
+        if (!etc_is_bool(s_ty)) {
+            etc_diag_error(self, "TYP-0310", concat_s("unary '!' expects bool, got ", type_format(s_ty)),
+                (self.current_unit as DriverUnit*).path, expr.span);
+        }
+        return s_ty;
+    } else if (eq_s(expr.text_value, "*")) {
+        if (ord(s_ty.kind) != ord(TY_POINTER)) {
+            etc_diag_error(self, "TYP-0310", concat_s("dereference '*' expects pointer, got ", type_format(s_ty)),
+                (self.current_unit as DriverUnit*).path, expr.span);
+            return s_ty;
+        }
+        let res = type_clone(s_ty.inner as Type*);
+        type_free(s_ty);
+        return res;
+    } else if (eq_s(expr.text_value, "&")) {
+        let res2 = type_new_pointer(type_clone(s_ty));
+        type_free(s_ty);
+        return res2;
+    }
+
+    type_free(s_ty);
+    return null;
+}
+
+func etc_infer_binary(self: ExpressionTypeChecker*, expr_id: ExprId, expr: ExprNode*) -> Type*? {
+    let left_ty = etc_infer_expr(self, expr.expr_a);
+    let right_ty = etc_infer_expr(self, expr.expr_b);
+    if (left_ty == null || right_ty == null) {
+        if (left_ty != null) type_free(left_ty as Type*);
+        if (right_ty != null) type_free(right_ty as Type*);
+        return null;
+    }
+    let l_ty = left_ty as Type*;
+    let r_ty = right_ty as Type*;
+
+    let op = expr.text_value;
+    if (eq_s(op, "+") || eq_s(op, "-") || eq_s(op, "*") || eq_s(op, "/") || eq_s(op, "%") ||
+        eq_s(op, "&") || eq_s(op, "|") || eq_s(op, "^") || eq_s(op, "<<") || eq_s(op, ">>")) {
+        if (!etc_is_int(l_ty) || !etc_is_int(r_ty)) {
+            etc_diag_error(self, "TYP-0310", concat4_s("binary '", op, "' expects int, got ", type_format(l_ty)),
+                (self.current_unit as DriverUnit*).path, expr.span);
+        }
+        type_free(r_ty);
+        return l_ty;
+    } else if (eq_s(op, "==") || eq_s(op, "!=")) {
+        if (!etc_types_equal(l_ty, r_ty)) {
+            let ok = false;
+            if (ord(l_ty.kind) == ord(TY_NULL) && (ord(r_ty.kind) == ord(TY_POINTER) || ord(r_ty.kind) == ord(TY_NULLABLE))) ok = true;
+            if (ord(r_ty.kind) == ord(TY_NULL) && (ord(l_ty.kind) == ord(TY_POINTER) || ord(l_ty.kind) == ord(TY_NULLABLE))) ok = true;
+            
+            if (!ok) {
+                etc_diag_error(self, "TYP-0310", concat_s(concat4_s("binary '", op, "' type mismatch: ", type_format(l_ty)),
+                    concat_s(" and ", type_format(r_ty))), (self.current_unit as DriverUnit*).path, expr.span);
+            }
+        }
+        type_free(l_ty);
+        type_free(r_ty);
+        return type_builtin_bool();
+    } else if (eq_s(op, "<") || eq_s(op, "<=") || eq_s(op, ">") || eq_s(op, ">=")) {
+        if (!etc_is_int(l_ty) || !etc_is_int(r_ty)) {
+            etc_diag_error(self, "TYP-0310", concat4_s("binary '", op, "' expects int, got ", type_format(l_ty)),
+                (self.current_unit as DriverUnit*).path, expr.span);
+        }
+        type_free(l_ty);
+        type_free(r_ty);
+        return type_builtin_bool();
+    } else if (eq_s(op, "&&") || eq_s(op, "||")) {
+        if (!etc_is_bool(l_ty) || !etc_is_bool(r_ty)) {
+            etc_diag_error(self, "TYP-0310", concat4_s("binary '", op, "' expects bool, got ", type_format(l_ty)),
+                (self.current_unit as DriverUnit*).path, expr.span);
+        }
+        type_free(r_ty);
+        return l_ty;
+    }
+
+    type_free(l_ty);
+    type_free(r_ty);
+    return null;
+}
+
+func etc_infer_call(self: ExpressionTypeChecker*, expr_id: ExprId, expr: ExprNode*) -> Type*? {
+    let callee_ty = etc_infer_expr(self, expr.expr_a);
+    if (callee_ty == null) return null;
+    let c_ty = callee_ty as Type*;
+
+    if (ord(c_ty.kind) == ord(TY_FUNC)) {
+        let params = c_ty.params as VectorBase*;
+        let args = expr.ids as VectorBase*;
+        let arg_count = 0;
+        if (args != null) arg_count = vec_size(args);
+        
+        if (arg_count != vec_size(params)) {
+            etc_diag_error(self, "TYP-0320", concat_s("function call argument count mismatch", ""),
+                (self.current_unit as DriverUnit*).path, expr.span);
+        } else {
+            for (let i = 0; i < arg_count; i = i + 1) {
+                let arg_id = id_vec_get(args as VectorBase*, i);
+                let arg_ty = etc_infer_expr(self, arg_id);
+                if (arg_ty != null) {
+                    let p_ty = *(vec_get(params, i) as Type**);
+                    if (!etc_can_assign(self, p_ty, arg_ty as Type*)) {
+                        etc_diag_error(self, "TYP-0321", concat_s("function call argument type mismatch", ""),
+                            (self.current_unit as DriverUnit*).path, expr.span);
+                    }
+                    type_free(arg_ty as Type*);
+                }
+            }
+        }
+        let res = type_clone(c_ty.result as Type*);
+        type_free(c_ty);
+        return res;
+    }
+
+    if (ord(c_ty.kind) == ord(TY_STRUCT)) {
+        let info = sig_lookup_struct_info(self.result.signatures as SignatureTables*, c_ty.module_name, c_ty.name);
+        if (info != null) {
+            let fields = (info as StructInfo*).fields;
+            let args2 = expr.ids as VectorBase*;
+            let arg_count2 = 0;
+            if (args2 != null) arg_count2 = vec_size(args2);
+            
+            if (arg_count2 != vec_size(fields)) {
+                etc_diag_error(self, "TYP-0330", concat_s("struct constructor field count mismatch", ""),
+                    (self.current_unit as DriverUnit*).path, expr.span);
+            } else {
+                for (let i = 0; i < arg_count2; i = i + 1) {
+                    let arg_id2 = id_vec_get(args2 as VectorBase*, i);
+                    let arg_ty2 = etc_infer_expr(self, arg_id2);
+                    if (arg_ty2 != null) {
+                        let f_info = ptr_vec_get(fields, i) as StructFieldInfo*;
+                        if (!etc_can_assign(self, f_info.field_type, arg_ty2 as Type*)) {
+                            etc_diag_error(self, "TYP-0331", concat_s("struct constructor field type mismatch", ""),
+                                (self.current_unit as DriverUnit*).path, expr.span);
+                        }
+                        type_free(arg_ty2 as Type*);
+                    }
+                }
+            }
+        }
+        return c_ty;
+    }
+
+    if (ord(c_ty.kind) == ord(TY_ENUM)) {
+        let callee = expr_arena_get((self.current_unit as DriverUnit*).parse_result.expr_arena, expr.expr_a);
+        if (ord(callee.kind) == ord(EX_VAR_REF)) {
+            let sym = etc_lookup_symbol(self, callee.text_value, callee.module_path, callee.name_qualifier);
+            if (sym != null && ord((sym as Symbol*).kind) == ord(SYM_ENUM_VARIANT)) {
+                let s = sym as Symbol*;
+                let info2 = sig_lookup_enum_info(self.result.signatures as SignatureTables*, s.module_name, s.owner_name);
+                if (info2 != null) {
+                    let variants = (info2 as EnumInfo*).variants;
+                    for (let i = 0; i < vec_size(variants); i = i + 1) {
+                        let v_info = ptr_vec_get(variants, i) as EnumVariantInfo*;
+                        if (eq_s(v_info.name, s.name)) {
+                            let fields2 = v_info.field_types;
+                            let args3 = expr.ids as VectorBase*;
+                            let arg_count3 = 0;
+                            if (args3 != null) arg_count3 = vec_size(args3);
+                            
+                            if (arg_count3 != vec_size(fields2)) {
+                                etc_diag_error(self, "TYP-0332", concat_s("enum variant constructor field count mismatch", ""),
+                                    (self.current_unit as DriverUnit*).path, expr.span);
+                            } else {
+                                for (let j = 0; j < arg_count3; j = j + 1) {
+                                    let arg_id3 = id_vec_get(args3 as VectorBase*, j);
+                                    let arg_ty3 = etc_infer_expr(self, arg_id3);
+                                    if (arg_ty3 != null) {
+                                        let f_ty = ptr_vec_get(fields2, j) as Type*;
+                                        if (!etc_can_assign(self, f_ty, arg_ty3 as Type*)) {
+                                            etc_diag_error(self, "TYP-0333", concat_s("enum variant constructor field type mismatch", ""),
+                                                (self.current_unit as DriverUnit*).path, expr.span);
+                                        }
+                                        type_free(arg_ty3 as Type*);
+                                    }
+                                }
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        return c_ty;
+    }
+
+    type_free(c_ty);
+    return null;
+}
+
+func etc_infer_field(self: ExpressionTypeChecker*, expr_id: ExprId, expr: ExprNode*) -> Type*? {
+    let left_ty = etc_infer_expr(self, expr.expr_a);
+    if (left_ty == null) return null;
+    let l_ty = left_ty as Type*;
+
+    let base_ty = l_ty;
+    if (ord(l_ty.kind) == ord(TY_POINTER)) {
+        base_ty = l_ty.inner as Type*;
+    }
+
+    if (ord(base_ty.kind) == ord(TY_STRUCT)) {
+        let info = sig_lookup_struct_info(self.result.signatures as SignatureTables*, base_ty.module_name, base_ty.name);
+        if (info != null) {
+            let fields = (info as StructInfo*).fields;
+            for (let i = 0; i < vec_size(fields); i = i + 1) {
+                let f_info = ptr_vec_get(fields, i) as StructFieldInfo*;
+                if (eq_s(f_info.name, expr.text_value)) {
+                    type_free(l_ty);
+                    return type_clone(f_info.field_type);
+                }
+            }
+        }
+    }
+
+    etc_diag_error(self, "TYP-0340", concat4_s("type ", type_format(l_ty), " has no field '", expr.text_value),
+        (self.current_unit as DriverUnit*).path, expr.span);
+    type_free(l_ty);
+    return null;
+}
+
+func etc_infer_index(self: ExpressionTypeChecker*, expr_id: ExprId, expr: ExprNode*) -> Type*? {
+    let left_ty = etc_infer_expr(self, expr.expr_a);
+    let index_ty = etc_infer_expr(self, expr.expr_b);
+    if (left_ty == null) {
+        if (index_ty != null) type_free(index_ty as Type*);
+        return null;
+    }
+    let l_ty = left_ty as Type*;
+
+    if (ord(l_ty.kind) != ord(TY_POINTER)) {
+        etc_diag_error(self, "TYP-0350", concat_s("indexing expects pointer, got ", type_format(l_ty)),
+            (self.current_unit as DriverUnit*).path, expr.span);
+    }
+    
+    if (index_ty != null) {
+        if (!etc_is_int(index_ty as Type*)) {
+            etc_diag_error(self, "TYP-0351", concat_s("index expects int, got ", type_format(index_ty as Type*)),
+                (self.current_unit as DriverUnit*).path, expr.span);
+        }
+        type_free(index_ty as Type*);
+    }
+
+    if (ord(l_ty.kind) == ord(TY_POINTER)) {
+        let res = type_clone(l_ty.inner as Type*);
+        type_free(l_ty);
+        return res;
+    }
+    
+    type_free(l_ty);
+    return null;
+}
+
+func etc_infer_expr(self: ExpressionTypeChecker*, expr_id: ExprId) -> Type*? {
+    if (expr_id < 0) {
+        return null;
+    }
+    let unit = self.current_unit as DriverUnit*;
+    let expr = expr_arena_get(unit.parse_result.expr_arena, expr_id);
+    let ty: Type*? = null;
+
+    match (expr.kind) {
+        EX_INT => { ty = type_builtin_int(); }
+        EX_BYTE => { ty = type_builtin_byte(); }
+        EX_BOOL => { ty = type_builtin_bool(); }
+        EX_STRING => { ty = type_builtin_string(); }
+        EX_NULL => { ty = type_new_null(); }
+        EX_VAR_REF => {
+            let local_ty = etc_lookup_local(self, expr.text_value);
+            if (local_ty != null) {
+                etc_set_var_res(self, expr_id, VAR_RES_LOCAL);
+                ty = local_ty;
+            } else {
+                let sym = etc_lookup_symbol(self, expr.text_value, expr.module_path, expr.name_qualifier);
+                if (sym != null) {
+                    let s = sym as Symbol*;
+                    etc_set_var_res(self, expr_id, VAR_RES_MODULE);
+                    if (s.resolved_type != null) {
+                        ty = type_clone(s.resolved_type as Type*);
+                    } else if (ord(s.kind) == ord(SYM_FUNC)) {
+                        let ft = sig_lookup_func_type(self.result.signatures as SignatureTables*, s.module_name, s.name);
+                        if (ft != null) ty = type_clone(ft as Type*);
+                    } else if (ord(s.kind) == ord(SYM_LET)) {
+                        let lt = sig_lookup_let_type(self.result.signatures as SignatureTables*, s.module_name, s.name);
+                        if (lt != null) ty = type_clone(lt as Type*);
+                    } else if (ord(s.kind) == ord(SYM_ENUM_VARIANT)) {
+                        ty = type_new_enum(s.module_name, s.owner_name);
+                    }
+                } else {
+                    etc_diag_error(self, "TYP-0189", concat3_s("unknown identifier '", expr.text_value, "'"),
+                        unit.path, expr.span);
+                }
+            }
+        }
+        EX_UNARY => { ty = etc_infer_unary(self, expr_id, expr); }
+        EX_BINARY => { ty = etc_infer_binary(self, expr_id, expr); }
+        EX_CALL => { ty = etc_infer_call(self, expr_id, expr); }
+        EX_FIELD => { ty = etc_infer_field(self, expr_id, expr); }
+        EX_INDEX => { ty = etc_infer_index(self, expr_id, expr); }
+        EX_CAST => {
+            if (expr.type_ref != null) {
+                with (let seen = ss_create() => ss_free(seen)) {
+                    ty = tr_resolve_type_ref(self.result.signatures as SignatureTables*,
+                        self.result.names as NameResolution*, self.current_env as ModuleEnv*,
+                        expr.type_ref as TypeRef*, self.result.diags, seen);
+                }
+            }
+            let sub_ty2 = etc_infer_expr(self, expr.expr_a);
+            if (sub_ty2 != null) type_free(sub_ty2 as Type*);
+        }
+        EX_NEW => {
+            if (expr.type_ref != null) {
+                with (let seen2 = ss_create() => ss_free(seen2)) {
+                    let base_ty = tr_resolve_type_ref(self.result.signatures as SignatureTables*,
+                        self.result.names as NameResolution*, self.current_env as ModuleEnv*,
+                        expr.type_ref as TypeRef*, self.result.diags, seen2);
+                    if (base_ty != null) {
+                        ty = type_new_pointer(base_ty as Type*);
+                    }
+                }
+            }
+        }
+        EX_PAREN => {
+            ty = etc_infer_expr(self, expr.expr_a);
+        }
+        EX_TRY => {
+            ty = etc_infer_expr(self, expr.expr_a);
+        }
+        EX_TYPE => {
+            if (expr.type_ref != null) {
+                with (let seen3 = ss_create() => ss_free(seen3)) {
+                    ty = tr_resolve_type_ref(self.result.signatures as SignatureTables*,
+                        self.result.names as NameResolution*, self.current_env as ModuleEnv*,
+                        expr.type_ref as TypeRef*, self.result.diags, seen3);
+                }
+            }
+        }
+    }
+
+    if (ty != null) {
+        etc_set_expr_type(self, expr_id, ty as Type*);
+    }
+    return ty;
+}
+
+func etc_check_function(self: ExpressionTypeChecker*, env: FunctionEnv*) {
+    self.current_func = env;
+    self.current_scope = env.root_scope;
+    let func_type = sig_lookup_func_type(self.result.signatures as SignatureTables*, env.module_name, env.func_name);
+    if (func_type == null) {
+        return;
+    }
+    self.current_ret_type = (func_type as Type*).result;
+    etc_check_stmt(self, env.func_decl.body);
+    self.current_func = null;
+    self.current_ret_type = null;
+    self.current_scope = null;
+}
+
+func expr_types_check(result: AnalysisResult*) {
+    let checker = new ExpressionTypeChecker(result, "", null, null, null, null, null);
+    
+    for (let i = 0; i < driver_unit_count(result.driver_state); i = i + 1) {
+        let unit = driver_unit_get(result.driver_state, i);
+        if (unit.parse_result.root_module == null) continue;
+        
+        checker.current_unit = unit;
+        checker.current_module = (unit.parse_result.root_module as Module*).name;
+        checker.current_env = nr_env_find(result.names as NameResolution*, checker.current_module) as ModuleEnv*;
+        
+        let locals = result.locals_result as LocalsResult*;
+        for (let j = 0; j < locals_env_count(locals); j = j + 1) {
+            let env = locals_env_get(locals, j);
+            if (eq_s(env.module_name, checker.current_module)) {
+                etc_check_function(checker, env);
+            }
+        }
+    }
+    
+    drop checker;
+}

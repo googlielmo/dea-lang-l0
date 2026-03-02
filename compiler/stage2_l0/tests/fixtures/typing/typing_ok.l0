@@ -1,0 +1,55 @@
+/*
+ * SPDX-License-Identifier: MIT OR Apache-2.0
+ * Copyright (c) 2026 gwz
+ */
+
+module typing_ok;
+
+func test_literals() {
+    let a: int = 123;
+    let b: byte = 'A';
+    let c: bool = true;
+    let d: string = "hello";
+}
+
+func test_binary(x: int, y: int) -> int {
+    let sum = x + y;
+    let diff = x - y;
+    let prod = x * y;
+    let ok: bool = (x == y) && (sum > 0);
+    return sum;
+}
+
+struct Point {
+    x: int;
+    y: int;
+}
+
+func test_struct() -> int {
+    let p = Point(1, 2);
+    let px = p.x;
+    let py = p.y;
+    return px + py;
+}
+
+enum Status {
+    Idle;
+    Active(code: int);
+}
+
+func test_enum(s: Status) -> int {
+    match (s) {
+        Idle => { return 0; }
+        Active(c) => { return c; }
+    }
+}
+
+func test_ptr(p: int*) -> int {
+    let val = *p;
+    return val;
+}
+
+func test_widening(b: byte) -> int {
+    let i: int = b;
+    return i;
+}

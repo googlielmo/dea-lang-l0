@@ -11,6 +11,7 @@ import std.assert;
 import std.vector;
 
 import analysis;
+import sem_context;
 import ast;
 import signatures;
 import source_paths;

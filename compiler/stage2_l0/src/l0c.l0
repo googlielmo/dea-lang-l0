@@ -7,6 +7,7 @@ module l0c;
 
 import sys.rt;
 
+import std.hashmap;
 import std.io;
 import std.system;
 import std.string;
@@ -14,15 +15,21 @@ import std.text;
 import std.vector;
 import util.diag;
 
+import ast;
 import util.strings;
 import source_paths;
 import analysis;
+import sem_context;
 import driver;
 import cli_args;
 import diag_print;
 import lexer;
 import tokens;
 import util.log;
+import name_resolver;
+import types;
+import symbols;
+import signatures;
 
 struct PreparedInput {
     entry_module: string;
@@ -219,6 +226,232 @@ func l0c_cmd_tok(opts: CliOptions*, cfg: LogConfig*) -> int {
     }
 }
 
+func l0c_cmd_sym(opts: CliOptions*, cfg: LogConfig*) -> int {
+    with (let diags = diag_create() => diag_free(diags)) {
+        let prepared = l0c_prepare_input(opts, diags);
+        if (prepared == null) {
+            dp_print_collector(diags);
+            return 1;
+        }
+        let prep = prepared as PreparedInput*;
+        let result = analysis_analyze_entry(prep.search_paths, prep.entry_module, cfg);
+        prepared_input_free(prep);
+        prepared = null;
+
+        if (analysis_has_errors(result)) {
+            dp_print_collector_with_sources(result.diags, analysis_source_names(result), analysis_source_texts(result));
+            analysis_result_free(result);
+            return 1;
+        }
+
+        with (let module_names = driver_module_names_sorted(result.driver_state) => vs_free(module_names)) {
+            for (let i = 0; i < vs_size(module_names); i = i + 1) {
+                let mod_name = vs_get(module_names, i);
+                let entry_unit = driver_find_unit(result.driver_state, result.driver_state.entry_module) as DriverUnit*;
+                if (!opts.all_modules && !eq_s(mod_name, entry_unit.module_name)) {
+                    continue;
+                }
+
+                let env_opt = nr_env_find(result.names as NameResolution*, mod_name);
+                if (env_opt == null) {
+                    printl_s(concat3_s("=== module ", mod_name, " (no symbol env) ==="));
+                    continue;
+                }
+                let env = env_opt as ModuleEnv*;
+
+                printl_s(concat3_s("=== module ", mod_name, " ==="));
+
+                printl_s("  locals:");
+                with (let keys = spm_keys(env.locals) => vs_free(keys)) {
+                    vs_sort(keys);
+                    if (vs_size(keys) > 0) {
+                        for (let j = 0; j < vs_size(keys); j = j + 1) {
+                            let sym = spm_get(env.locals, vs_get(keys, j)) as Symbol*;
+                            with (let sb = sb_create() => sb_free(sb)) {
+                                sb_append(sb, "    ");
+                                sb_append(sb, symbol_kind_name(sym.kind));
+                                while (sb_size(sb) < 17) { sb_append(sb, " "); }
+                                sb_append(sb, sym.name);
+                                if (sym.resolved_type != null) {
+                                    sb_append(sb, ": ");
+                                    sb_append(sb, type_format(sym.resolved_type as Type*));
+                                }
+                                printl_s(sb_to_string(sb));
+                            }
+                        }
+                    } else {
+                        printl_s("    <none>");
+                    }
+                }
+
+                printl_s("  imported:");
+                with (let keys2 = spm_keys(env.imported) => vs_free(keys2)) {
+                    vs_sort(keys2);
+                    if (vs_size(keys2) > 0) {
+                        for (let j = 0; j < vs_size(keys2); j = j + 1) {
+                            let sym2 = spm_get(env.imported, vs_get(keys2, j)) as Symbol*;
+                            with (let sb2 = sb_create() => sb_free(sb2)) {
+                                sb_append(sb2, "    ");
+                                sb_append(sb2, symbol_kind_name(sym2.kind));
+                                while (sb_size(sb2) < 17) { sb_append(sb2, " "); }
+                                sb_append(sb2, sym2.name);
+                                sb_append(sb2, " (from ");
+                                sb_append(sb2, sym2.module_name);
+                                sb_append(sb2, ")");
+                                if (sym2.resolved_type != null) {
+                                    sb_append(sb2, ": ");
+                                    sb_append(sb2, type_format(sym2.resolved_type as Type*));
+                                }
+                                printl_s(sb_to_string(sb2));
+                            }
+                        }
+                    } else {
+                        printl_s("    <none>");
+                    }
+                }
+
+                printl_s("  all:");
+                with (let keys3 = spm_keys(env.all) => vs_free(keys3)) {
+                    vs_sort(keys3);
+                    if (vs_size(keys3) > 0) {
+                        for (let j = 0; j < vs_size(keys3); j = j + 1) {
+                            let name = vs_get(keys3, j);
+                            let sym3 = spm_get(env.all, name) as Symbol*;
+                            let origin = "unknown";
+                            if (spm_has(env.locals, name)) { origin = "local"; }
+                            else if (spm_has(env.imported, name)) { origin = "imported"; }
+
+                            with (let sb3 = sb_create() => sb_free(sb3)) {
+                                sb_append(sb3, "    ");
+                                sb_append(sb3, symbol_kind_name(sym3.kind));
+                                while (sb_size(sb3) < 17) { sb_append(sb3, " "); }
+                                sb_append(sb3, sym3.name);
+                                sb_append(sb3, " [");
+                                sb_append(sb3, origin);
+                                sb_append(sb3, "]");
+                                if (sym3.resolved_type != null) {
+                                    sb_append(sb3, ": ");
+                                    sb_append(sb3, type_format(sym3.resolved_type as Type*));
+                                }
+                                printl_s(sb_to_string(sb3));
+                            }
+                        }
+                    } else {
+                        printl_s("    <none>");
+                    }
+                }
+                printl_s("");
+            }
+        }
+
+        analysis_result_free(result);
+        return 0;
+    }
+}
+
+func l0c_cmd_type(opts: CliOptions*, cfg: LogConfig*) -> int {
+    with (let diags = diag_create() => diag_free(diags)) {
+        let prepared = l0c_prepare_input(opts, diags);
+        if (prepared == null) {
+            dp_print_collector(diags);
+            return 1;
+        }
+        let prep = prepared as PreparedInput*;
+        let result = analysis_analyze_entry(prep.search_paths, prep.entry_module, cfg);
+        prepared_input_free(prep);
+        prepared = null;
+
+        if (analysis_has_errors(result)) {
+            dp_print_collector_with_sources(result.diags, analysis_source_names(result), analysis_source_texts(result));
+            analysis_result_free(result);
+            return 1;
+        }
+
+        let tables = result.signatures as SignatureTables*;
+        with (let module_names = driver_module_names_sorted(result.driver_state) => vs_free(module_names)) {
+            for (let i = 0; i < vs_size(module_names); i = i + 1) {
+                let mod_name = vs_get(module_names, i);
+                let entry_unit = driver_find_unit(result.driver_state, result.driver_state.entry_module) as DriverUnit*;
+                if (!opts.all_modules && !eq_s(mod_name, entry_unit.module_name)) {
+                    continue;
+                }
+
+                printl_s(concat3_s("=== module ", mod_name, " ==="));
+
+                printl_s("  functions:");
+                let any_funcs = false;
+                with (let f_keys = spm_keys(tables.func_types) => vs_free(f_keys)) {
+                    vs_sort(f_keys);
+                    for (let j = 0; j < vs_size(f_keys); j = j + 1) {
+                        let key = vs_get(f_keys, j);
+                        if (starts_with_s(key, concat_s(mod_name, "::"))) {
+                            any_funcs = true;
+                            let fname = slice_s(key, len_s(mod_name) + 2, len_s(key));
+                            printl_s(concat4_s("    ", fname, ": ", type_format(spm_get(tables.func_types, key) as Type*)));
+                        }
+                    }
+                }
+                if (!any_funcs) { printl_s("    <none>"); }
+
+                printl_s("  structs:");
+                let any_structs = false;
+                with (let s_keys = spm_keys(tables.struct_infos) => vs_free(s_keys)) {
+                    vs_sort(s_keys);
+                    for (let j = 0; j < vs_size(s_keys); j = j + 1) {
+                        let key2 = vs_get(s_keys, j);
+                        if (starts_with_s(key2, concat_s(mod_name, "::"))) {
+                            any_structs = true;
+                            let s_info = spm_get(tables.struct_infos, key2) as StructInfo*;
+                            printl_s(concat3_s("    ", s_info.name, ":"));
+                            for (let k = 0; k < vec_size(s_info.fields); k = k + 1) {
+                                let f_info = ptr_vec_get(s_info.fields, k) as StructFieldInfo*;
+                                printl_s(concat4_s("      ", f_info.name, ": ", type_format(f_info.field_type)));
+                            }
+                        }
+                    }
+                }
+                if (!any_structs) { printl_s("    <none>"); }
+
+                printl_s("  enums:");
+                let any_enums = false;
+                with (let e_keys = spm_keys(tables.enum_infos) => vs_free(e_keys)) {
+                    vs_sort(e_keys);
+                    for (let j = 0; j < vs_size(e_keys); j = j + 1) {
+                        let key3 = vs_get(e_keys, j);
+                        if (starts_with_s(key3, concat_s(mod_name, "::"))) {
+                            any_enums = true;
+                            let e_info = spm_get(tables.enum_infos, key3) as EnumInfo*;
+                            printl_s(concat3_s("    ", e_info.name, ":"));
+                            for (let k = 0; k < vec_size(e_info.variants); k = k + 1) {
+                                let v_info = ptr_vec_get(e_info.variants, k) as EnumVariantInfo*;
+                                with (let sb = sb_create() => sb_free(sb)) {
+                                    sb_append(sb, "      ");
+                                    sb_append(sb, v_info.name);
+                                    if (vec_size(v_info.field_types) > 0) {
+                                        sb_append(sb, "(");
+                                        for (let l = 0; l < vec_size(v_info.field_types); l = l + 1) {
+                                            if (l > 0) { sb_append(sb, ", "); }
+                                            sb_append(sb, type_format(ptr_vec_get(v_info.field_types, l) as Type*));
+                                        }
+                                        sb_append(sb, ")");
+                                    }
+                                    printl_s(sb_to_string(sb));
+                                }
+                            }
+                        }
+                    }
+                }
+                if (!any_enums) { printl_s("    <none>"); }
+
+                printl_s("");
+            }
+        }
+
+        analysis_result_free(result);
+        return 0;
+    }
+}
+
 func l0c_cmd_nyi(mode: CliMode, cfg: LogConfig*) -> int {
     with (let diags = diag_create() => diag_free(diags)) {
         diag_error(
@@ -270,10 +503,10 @@ func run_with_argv(argv: VectorString*) -> int {
                 rc = l0c_cmd_nyi(opts.mode, cfg);
             }
             CM_SYM => {
-                rc = l0c_cmd_nyi(opts.mode, cfg);
+                rc = l0c_cmd_sym(opts, cfg);
             }
             CM_TYPE => {
-                rc = l0c_cmd_nyi(opts.mode, cfg);
+                rc = l0c_cmd_type(opts, cfg);
             }
         }
 

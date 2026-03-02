@@ -1,0 +1,222 @@
+/*
+ * SPDX-License-Identifier: MIT OR Apache-2.0
+ * Copyright (c) 2026 gwz
+ */
+
+module type_resolve;
+
+import std.hashset;
+import std.string;
+import std.text;
+import std.vector;
+import util.diag;
+
+import ast;
+import driver;
+import name_resolver;
+import symbols;
+import types;
+
+func tr_key(module_name: string, name: string) -> string {
+    return concat3_s(module_name, "::", name);
+}
+
+func tr_module_from_path(path: VectorString*) -> string {
+    with (let sb = sb_create() => sb_free(sb)) {
+        for (let i = 0; i < vs_size(path); i = i + 1) {
+            if (i > 0) {
+                sb_append(sb, ".");
+            }
+            sb_append(sb, vs_get(path, i));
+        }
+        return sb_to_string(sb);
+    }
+}
+
+func tr_diag_error(diags: DiagCollector*, code: string, message: string, filename: string, span: Span) {
+    diag_error(diags, "TypeResolver", code, message, filename, span.start_line, span.start_column, span.end_line,
+        span.end_column);
+}
+
+func tr_symbol_lookup(nr: NameResolution*, env: ModuleEnv*, name: string, module_path: VectorString*?,
+                       name_qualifier: VectorString*?) -> Symbol*? {
+    if (module_path == null) {
+        if (name_qualifier == null) {
+            if (nr_module_env_is_ambiguous(env, name)) {
+                return null;
+            }
+            return nr_module_env_all(env, name);
+        }
+
+        if (vs_size(name_qualifier as VectorString*) != 1) {
+            return null;
+        }
+
+        let sym = nr_module_env_all(env, name);
+        if (sym == null) {
+            return null;
+        }
+        let s = sym as Symbol*;
+        if (ord(s.kind) != ord(SYM_ENUM_VARIANT)) {
+            return null;
+        }
+        if (!eq_s(s.owner_name, vs_get(name_qualifier as VectorString*, 0))) {
+            return null;
+        }
+        return s;
+    }
+
+    let target_module = tr_module_from_path(module_path as VectorString*);
+    if (!eq_s(target_module, env.module_name) && !nr_module_env_imports_module(env, target_module)) {
+        return null;
+    }
+    let target_env = nr_env_find(nr, target_module);
+    if (target_env == null) {
+        return null;
+    }
+
+    if (name_qualifier == null) {
+        return nr_module_env_local(target_env as ModuleEnv*, name);
+    }
+
+    if (vs_size(name_qualifier as VectorString*) != 1) {
+        return null;
+    }
+
+    let sym2 = nr_module_env_local(target_env as ModuleEnv*, name);
+    if (sym2 == null) {
+        return null;
+    }
+    let s2 = sym2 as Symbol*;
+    if (ord(s2.kind) != ord(SYM_ENUM_VARIANT)) {
+        return null;
+    }
+    if (!eq_s(s2.owner_name, vs_get(name_qualifier as VectorString*, 0))) {
+        return null;
+    }
+    return s2;
+}
+
+func tr_resolve_alias(tables: SignatureTables*, nr: NameResolution*, env: ModuleEnv*, sym: Symbol*, diags: DiagCollector*,
+                       seen: StringSet*) -> Type*? {
+    if (sym.resolved_type != null) {
+        return type_clone(sym.resolved_type as Type*);
+    }
+
+    let key = tr_key(sym.module_name, sym.name);
+    if (ss_has(seen, key)) {
+        tr_diag_error(
+            diags,
+            "SIG-0020",
+            concat4_s("cyclic type alias involving '", sym.name, "' in module '", sym.module_name),
+            env.module_ptr.filename,
+            sym.span
+        );
+        return null;
+    }
+
+    ss_add(seen, key);
+    let decl = sym.decl_ptr as TypeAliasDecl*;
+    let resolved = tr_resolve_type_ref(tables, nr, nr_env_find(nr, sym.module_name) as ModuleEnv*, decl.target, diags, seen);
+    ss_remove(seen, key);
+    if (resolved != null) {
+        symbol_set_type_clone(sym, resolved as Type*);
+    }
+    return resolved;
+}
+
+func tr_apply_suffix(base: Type*, tref: TypeRef*, diags: DiagCollector*, filename: string) -> Type*? {
+    let current = base;
+    for (let i = 0; i < tref.pointer_depth; i = i + 1) {
+        current = type_new_pointer(current);
+    }
+
+    if (!tref.is_nullable) {
+        return current;
+    }
+
+    if (ord(current.kind) == ord(TY_BUILTIN) && eq_s(current.name, "void")) {
+        type_free(current);
+        tr_diag_error(diags, "SIG-0011", "type 'void' cannot be nullable", filename, tref.span);
+        return null;
+    }
+
+    return type_new_nullable(current);
+}
+
+func tr_resolve_type_ref(tables: SignatureTables*, nr: NameResolution*, env: ModuleEnv*, tref: TypeRef*,
+                          diags: DiagCollector*, seen: StringSet*) -> Type*? {
+    if (tref.name_qualifier != null) {
+        let full = tref.name;
+        tr_diag_error(
+            diags,
+            "SIG-0018",
+            concat3_s("qualified symbol paths are not supported in type position: ", full, ""),
+            env.module_ptr.filename,
+            tref.span
+        );
+        return null;
+    }
+
+    let base: Type*? = null;
+    if (tref.module_path == null && type_is_builtin_name(tref.name)) {
+        if (eq_s(tref.name, "bool")) {
+            base = type_builtin_bool();
+        } else if (eq_s(tref.name, "byte")) {
+            base = type_builtin_byte();
+        } else if (eq_s(tref.name, "int")) {
+            base = type_builtin_int();
+        } else if (eq_s(tref.name, "string")) {
+            base = type_builtin_string();
+        } else {
+            base = type_builtin_void();
+        }
+        return tr_apply_suffix(base as Type*, tref, diags, env.module_ptr.filename);
+    }
+
+    if (tref.module_path == null && nr_module_env_is_ambiguous(env, tref.name)) {
+        tr_diag_error(
+            diags,
+            "SIG-0019",
+            concat4_s("ambiguous type '", tref.name, "' in module '", env.module_name),
+            env.module_ptr.filename,
+            tref.span
+        );
+        return null;
+    }
+
+    let sym = tr_symbol_lookup(nr, env, tref.name, tref.module_path, null);
+    if (sym == null) {
+        tr_diag_error(
+            diags,
+            "SIG-0019",
+            concat4_s("unknown type '", tref.name, "' in module '", env.module_name),
+            env.module_ptr.filename,
+            tref.span
+        );
+        return null;
+    }
+
+    let s = sym as Symbol*;
+    if (ord(s.kind) == ord(SYM_STRUCT)) {
+        base = type_new_struct(s.module_name, s.name);
+    } else if (ord(s.kind) == ord(SYM_ENUM)) {
+        base = type_new_enum(s.module_name, s.name);
+    } else if (ord(s.kind) == ord(SYM_TYPE_ALIAS)) {
+        base = tr_resolve_alias(tables, nr, env, s, diags, seen);
+    } else {
+        tr_diag_error(
+            diags,
+            "SIG-0010",
+            concat4_s("symbol '", s.name, "' in module '", env.module_name),
+            env.module_ptr.filename,
+            tref.span
+        );
+        return null;
+    }
+
+    if (base == null) {
+        return null;
+    }
+    return tr_apply_suffix(base as Type*, tref, diags, env.module_ptr.filename);
+}

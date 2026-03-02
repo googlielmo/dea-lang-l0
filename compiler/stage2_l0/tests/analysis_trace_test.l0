@@ -9,6 +9,7 @@ import std.io;
 import std.assert;
 
 import analysis;
+import sem_context;
 import source_paths;
 import util.log;
 

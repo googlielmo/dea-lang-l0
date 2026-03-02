@@ -1,0 +1,71 @@
+/*
+ * SPDX-License-Identifier: MIT OR Apache-2.0
+ * Copyright (c) 2026 gwz
+ */
+
+module expr_types_test;
+
+import std.io;
+import std.string;
+import std.assert;
+import std.vector;
+
+import analysis;
+import sem_context;
+import source_paths;
+import util.log;
+
+func fixture_root() -> string {
+    return "compiler/stage2_l0/tests/fixtures/typing";
+}
+
+func make_paths() -> SourceSearchPaths* {
+    let sp = sp_create();
+    sp_add_project_root(sp, fixture_root());
+    return sp;
+}
+
+func has_diag_code(result: AnalysisResult*, code: string) -> bool {
+    for (let i = 0; i < analysis_diag_count(result); i = i + 1) {
+        let d = analysis_diag_get(result, i);
+        if (eq_s(d.code, code)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+func test_typing_ok() {
+    let sp = make_paths();
+    with (let cfg = log_config_create(LL_SILENT, false) => drop cfg) {
+        let result = analysis_analyze_entry(sp, "typing_ok", cfg);
+        assert(!analysis_has_errors(result), "expected no typing errors for typing_ok");
+        analysis_result_free(result);
+    }
+    sp_free(sp);
+}
+
+func test_typing_err() {
+    let sp = make_paths();
+    with (let cfg = log_config_create(LL_SILENT, false) => drop cfg) {
+        let result = analysis_analyze_entry(sp, "typing_err", cfg);
+        assert(analysis_has_errors(result), "expected typing errors for typing_err");
+        
+        assert(has_diag_code(result, "TYP-0310"), "expected binary mismatch error");
+        assert(has_diag_code(result, "TYP-0311"), "expected assign mismatch error");
+        assert(has_diag_code(result, "TYP-0189"), "expected unknown identifier error");
+        assert(has_diag_code(result, "TYP-0340"), "expected struct field error");
+        assert(has_diag_code(result, "TYP-0330"), "expected call args count error");
+        assert(has_diag_code(result, "TYP-0315"), "expected return type mismatch error");
+        assert(has_diag_code(result, "TYP-0313"), "expected if condition error");
+        
+        analysis_result_free(result);
+    }
+    sp_free(sp);
+}
+
+func main() {
+    test_typing_ok();
+    test_typing_err();
+    printl_s("expr_types_test: all tests passed");
+}

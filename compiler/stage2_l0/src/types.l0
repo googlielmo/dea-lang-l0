@@ -5,9 +5,12 @@
 
 module types;
 
+import std.hashmap;
 import std.string;
 import std.text;
 import std.vector;
+
+import ast;
 
 enum TypeKind {
     TY_BUILTIN;
@@ -26,6 +29,43 @@ struct Type {
     inner: Type*?;
     params: VectorBase*?; // Type*
     result: Type*?;
+}
+
+struct StructFieldInfo {
+    name: string;
+    field_type: Type*;
+}
+
+struct StructInfo {
+    key: string;
+    module_name: string;
+    name: string;
+    filename: string;
+    span: Span;
+    struct_type: Type*;
+    fields: VectorBase*; // StructFieldInfo*
+}
+
+struct EnumVariantInfo {
+    name: string;
+    field_types: VectorBase*; // Type*
+}
+
+struct EnumInfo {
+    key: string;
+    module_name: string;
+    name: string;
+    filename: string;
+    span: Span;
+    enum_type: Type*;
+    variants: VectorBase*; // EnumVariantInfo*
+}
+
+struct SignatureTables {
+    func_types: StringPtrMap*;   // key -> Type*
+    struct_infos: StringPtrMap*; // key -> StructInfo*
+    enum_infos: StringPtrMap*;   // key -> EnumInfo*
+    let_types: StringPtrMap*;    // key -> Type*
 }
 
 func type_param_vec_free(items: VectorBase*?) {
@@ -211,3 +251,58 @@ func type_free(self: Type*) {
     }
     drop self;
 }
+
+func struct_info_free(self: StructInfo*) {
+    type_free(self.struct_type);
+    for (let i = 0; i < vec_size(self.fields); i = i + 1) {
+        let field = ptr_vec_get(self.fields, i) as StructFieldInfo*;
+        type_free(field.field_type);
+        drop field;
+    }
+    vec_free(self.fields);
+    drop self;
+}
+
+func enum_info_free(self: EnumInfo*) {
+    type_free(self.enum_type);
+    for (let i = 0; i < vec_size(self.variants); i = i + 1) {
+        let variant = ptr_vec_get(self.variants, i) as EnumVariantInfo*;
+        let field_types = variant.field_types as VectorBase*;
+        for (let j = 0; j < vec_size(field_types); j = j + 1) {
+            type_free(ptr_vec_get(field_types, j) as Type*);
+        }
+        vec_free(field_types);
+        drop variant;
+    }
+    vec_free(self.variants);
+    drop self;
+}
+
+func sig_tables_free(self: SignatureTables*) {
+    for (let i = 0; i < spm_capacity(self.func_types); i = i + 1) {
+        if (spm_slot_occupied(self.func_types, i)) {
+            type_free(spm_slot_value(self.func_types, i) as Type*);
+        }
+    }
+    for (let i = 0; i < spm_capacity(self.struct_infos); i = i + 1) {
+        if (spm_slot_occupied(self.struct_infos, i)) {
+            struct_info_free(spm_slot_value(self.struct_infos, i) as StructInfo*);
+        }
+    }
+    for (let i = 0; i < spm_capacity(self.enum_infos); i = i + 1) {
+        if (spm_slot_occupied(self.enum_infos, i)) {
+            enum_info_free(spm_slot_value(self.enum_infos, i) as EnumInfo*);
+        }
+    }
+    for (let i = 0; i < spm_capacity(self.let_types); i = i + 1) {
+        if (spm_slot_occupied(self.let_types, i)) {
+            type_free(spm_slot_value(self.let_types, i) as Type*);
+        }
+    }
+    spm_free(self.func_types);
+    spm_free(self.struct_infos);
+    spm_free(self.enum_infos);
+    spm_free(self.let_types);
+    drop self;
+}
+

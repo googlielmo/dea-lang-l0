@@ -3,7 +3,7 @@
 ## Stage 2 Expression Type Checking Milestone
 
 - Date: 2026-03-01
-- Status: Proposed (2026-03-01)
+- Status: Implemented (2026-03-01)
 - Title: Stage 2 expression type checking milestone
 - Kind: Feature
 - Severity: Medium
@@ -39,7 +39,7 @@ Implement the Stage 2 expression type checking milestone to achieve feature pari
 
 ## Non-Goals
 
-1. Backend/codegen, MIR, or C emission.
+1. Backend/codegen, IR, or C emission.
 2. Stage 2 `--build`, `--run`, or `--gen` support.
 3. New language features, diagnostics, or type system rules not already present in Stage 1.
 

@@ -16,59 +16,11 @@ import ast;
 import driver;
 import name_resolver;
 import symbols;
+import type_resolve;
 import types;
-
-struct StructFieldInfo {
-    name: string;
-    field_type: Type*;
-}
-
-struct StructInfo {
-    key: string;
-    module_name: string;
-    name: string;
-    filename: string;
-    span: Span;
-    struct_type: Type*;
-    fields: VectorBase*; // StructFieldInfo*
-}
-
-struct EnumVariantInfo {
-    name: string;
-    field_types: VectorBase*; // Type*
-}
-
-struct EnumInfo {
-    key: string;
-    module_name: string;
-    name: string;
-    filename: string;
-    span: Span;
-    enum_type: Type*;
-    variants: VectorBase*; // EnumVariantInfo*
-}
-
-struct SignatureTables {
-    func_types: StringPtrMap*;   // key -> Type*
-    struct_infos: StringPtrMap*; // key -> StructInfo*
-    enum_infos: StringPtrMap*;   // key -> EnumInfo*
-    let_types: StringPtrMap*;    // key -> Type*
-}
 
 func sig_key(module_name: string, name: string) -> string {
     return concat3_s(module_name, "::", name);
-}
-
-func sig_module_from_path(path: VectorString*) -> string {
-    with (let sb = sb_create() => sb_free(sb)) {
-        for (let i = 0; i < vs_size(path); i = i + 1) {
-            if (i > 0) {
-                sb_append(sb, ".");
-            }
-            sb_append(sb, vs_get(path, i));
-        }
-        return sb_to_string(sb);
-    }
 }
 
 func sig_diag_error(diags: DiagCollector*, code: string, message: string, filename: string, span: Span) {
@@ -125,56 +77,6 @@ func sig_enum_variant_vec_temp_free(items: VectorBase*?) {
     vec_free(vec);
 }
 
-func sig_struct_info_free(self: StructInfo*) {
-    type_free(self.struct_type);
-    for (let i = 0; i < vec_size(self.fields); i = i + 1) {
-        let field = ptr_vec_get(self.fields, i) as StructFieldInfo*;
-        type_free(field.field_type);
-        drop field;
-    }
-    vec_free(self.fields);
-    drop self;
-}
-
-func sig_enum_info_free(self: EnumInfo*) {
-    type_free(self.enum_type);
-    for (let i = 0; i < vec_size(self.variants); i = i + 1) {
-        let variant = ptr_vec_get(self.variants, i) as EnumVariantInfo*;
-        sig_type_vec_free(variant.field_types);
-        drop variant;
-    }
-    vec_free(self.variants);
-    drop self;
-}
-
-func sig_tables_free(self: SignatureTables*) {
-    for (let i = 0; i < spm_capacity(self.func_types); i = i + 1) {
-        if (spm_slot_occupied(self.func_types, i)) {
-            type_free(spm_slot_value(self.func_types, i) as Type*);
-        }
-    }
-    for (let i = 0; i < spm_capacity(self.struct_infos); i = i + 1) {
-        if (spm_slot_occupied(self.struct_infos, i)) {
-            sig_struct_info_free(spm_slot_value(self.struct_infos, i) as StructInfo*);
-        }
-    }
-    for (let i = 0; i < spm_capacity(self.enum_infos); i = i + 1) {
-        if (spm_slot_occupied(self.enum_infos, i)) {
-            sig_enum_info_free(spm_slot_value(self.enum_infos, i) as EnumInfo*);
-        }
-    }
-    for (let i = 0; i < spm_capacity(self.let_types); i = i + 1) {
-        if (spm_slot_occupied(self.let_types, i)) {
-            type_free(spm_slot_value(self.let_types, i) as Type*);
-        }
-    }
-    spm_free(self.func_types);
-    spm_free(self.struct_infos);
-    spm_free(self.enum_infos);
-    spm_free(self.let_types);
-    drop self;
-}
-
 func sig_lookup_func_type(self: SignatureTables*, module_name: string, name: string) -> Type*? {
     let value = spm_get(self.func_types, sig_key(module_name, name));
     if (value == null) {
@@ -211,189 +113,6 @@ func sig_make_tables() -> SignatureTables* {
     return new SignatureTables(spm_create(), spm_create(), spm_create(), spm_create());
 }
 
-func sig_symbol_lookup(nr: NameResolution*, env: ModuleEnv*, name: string, module_path: VectorString*?,
-                       name_qualifier: VectorString*?) -> Symbol*? {
-    if (module_path == null) {
-        if (name_qualifier == null) {
-            if (nr_module_env_is_ambiguous(env, name)) {
-                return null;
-            }
-            return nr_module_env_all(env, name);
-        }
-
-        if (vs_size(name_qualifier as VectorString*) != 1) {
-            return null;
-        }
-
-        let sym = nr_module_env_all(env, name);
-        if (sym == null) {
-            return null;
-        }
-        let s = sym as Symbol*;
-        if (ord(s.kind) != ord(SYM_ENUM_VARIANT)) {
-            return null;
-        }
-        if (!eq_s(s.owner_name, vs_get(name_qualifier as VectorString*, 0))) {
-            return null;
-        }
-        return s;
-    }
-
-    let target_module = sig_module_from_path(module_path as VectorString*);
-    if (!eq_s(target_module, env.module_name) && !nr_module_env_imports_module(env, target_module)) {
-        return null;
-    }
-    let target_env = nr_env_find(nr, target_module);
-    if (target_env == null) {
-        return null;
-    }
-
-    if (name_qualifier == null) {
-        return nr_module_env_local(target_env as ModuleEnv*, name);
-    }
-
-    if (vs_size(name_qualifier as VectorString*) != 1) {
-        return null;
-    }
-
-    let sym2 = nr_module_env_local(target_env as ModuleEnv*, name);
-    if (sym2 == null) {
-        return null;
-    }
-    let s2 = sym2 as Symbol*;
-    if (ord(s2.kind) != ord(SYM_ENUM_VARIANT)) {
-        return null;
-    }
-    if (!eq_s(s2.owner_name, vs_get(name_qualifier as VectorString*, 0))) {
-        return null;
-    }
-    return s2;
-}
-
-func sig_resolve_alias(tables: SignatureTables*, nr: NameResolution*, env: ModuleEnv*, sym: Symbol*, diags: DiagCollector*,
-                       seen: StringSet*) -> Type*? {
-    if (sym.resolved_type != null) {
-        return type_clone(sym.resolved_type as Type*);
-    }
-
-    let key = sig_key(sym.module_name, sym.name);
-    if (ss_has(seen, key)) {
-        sig_diag_error(
-            diags,
-            "SIG-0020",
-            concat4_s("cyclic type alias involving '", sym.name, "' in module '", sym.module_name),
-            env.module_ptr.filename,
-            sym.span
-        );
-        return null;
-    }
-
-    ss_add(seen, key);
-    let decl = sym.decl_ptr as TypeAliasDecl*;
-    let resolved = sig_resolve_type_ref(tables, nr, nr_env_find(nr, sym.module_name) as ModuleEnv*, decl.target, diags, seen);
-    ss_remove(seen, key);
-    if (resolved != null) {
-        symbol_set_type_clone(sym, resolved as Type*);
-    }
-    return resolved;
-}
-
-func sig_apply_suffix(base: Type*, tref: TypeRef*, diags: DiagCollector*, filename: string) -> Type*? {
-    let current = base;
-    for (let i = 0; i < tref.pointer_depth; i = i + 1) {
-        current = type_new_pointer(current);
-    }
-
-    if (!tref.is_nullable) {
-        return current;
-    }
-
-    if (ord(current.kind) == ord(TY_BUILTIN) && eq_s(current.name, "void")) {
-        type_free(current);
-        sig_diag_error(diags, "SIG-0011", "type 'void' cannot be nullable", filename, tref.span);
-        return null;
-    }
-
-    return type_new_nullable(current);
-}
-
-func sig_resolve_type_ref(tables: SignatureTables*, nr: NameResolution*, env: ModuleEnv*, tref: TypeRef*,
-                          diags: DiagCollector*, seen: StringSet*) -> Type*? {
-    if (tref.name_qualifier != null) {
-        let full = tref.name;
-        sig_diag_error(
-            diags,
-            "SIG-0018",
-            concat3_s("qualified symbol paths are not supported in type position: ", full, ""),
-            env.module_ptr.filename,
-            tref.span
-        );
-        return null;
-    }
-
-    let base: Type*? = null;
-    if (tref.module_path == null && type_is_builtin_name(tref.name)) {
-        if (eq_s(tref.name, "bool")) {
-            base = type_builtin_bool();
-        } else if (eq_s(tref.name, "byte")) {
-            base = type_builtin_byte();
-        } else if (eq_s(tref.name, "int")) {
-            base = type_builtin_int();
-        } else if (eq_s(tref.name, "string")) {
-            base = type_builtin_string();
-        } else {
-            base = type_builtin_void();
-        }
-        return sig_apply_suffix(base as Type*, tref, diags, env.module_ptr.filename);
-    }
-
-    if (tref.module_path == null && nr_module_env_is_ambiguous(env, tref.name)) {
-        sig_diag_error(
-            diags,
-            "SIG-0019",
-            concat4_s("ambiguous type '", tref.name, "' in module '", env.module_name),
-            env.module_ptr.filename,
-            tref.span
-        );
-        return null;
-    }
-
-    let sym = sig_symbol_lookup(nr, env, tref.name, tref.module_path, null);
-    if (sym == null) {
-        sig_diag_error(
-            diags,
-            "SIG-0019",
-            concat4_s("unknown type '", tref.name, "' in module '", env.module_name),
-            env.module_ptr.filename,
-            tref.span
-        );
-        return null;
-    }
-
-    let s = sym as Symbol*;
-    if (ord(s.kind) == ord(SYM_STRUCT)) {
-        base = type_new_struct(s.module_name, s.name);
-    } else if (ord(s.kind) == ord(SYM_ENUM)) {
-        base = type_new_enum(s.module_name, s.name);
-    } else if (ord(s.kind) == ord(SYM_TYPE_ALIAS)) {
-        base = sig_resolve_alias(tables, nr, env, s, diags, seen);
-    } else {
-        sig_diag_error(
-            diags,
-            "SIG-0010",
-            concat4_s("symbol '", s.name, "' in module '", env.module_name),
-            env.module_ptr.filename,
-            tref.span
-        );
-        return null;
-    }
-
-    if (base == null) {
-        return null;
-    }
-    return sig_apply_suffix(base as Type*, tref, diags, env.module_ptr.filename);
-}
-
 func sig_resolve_struct(tables: SignatureTables*, nr: NameResolution*, env: ModuleEnv*, decl: StructDecl*,
                         diags: DiagCollector*) {
     with (let fields: VectorBase*? = ptr_vec_create(vec_size(decl.fields)) => sig_struct_field_vec_temp_free(fields),
@@ -401,7 +120,7 @@ func sig_resolve_struct(tables: SignatureTables*, nr: NameResolution*, env: Modu
         let ok = true;
         for (let i = 0; i < vec_size(decl.fields); i = i + 1) {
             let field_decl = ptr_vec_get(decl.fields, i) as FieldDecl*;
-            let field_type = sig_resolve_type_ref(tables, nr, env, field_decl.type_ref, diags, seen as StringSet*);
+            let field_type = tr_resolve_type_ref(tables, nr, env, field_decl.type_ref, diags, seen as StringSet*);
             if (field_type == null) {
                 ok = false;
                 continue;
@@ -444,7 +163,7 @@ func sig_resolve_enum(tables: SignatureTables*, nr: NameResolution*, env: Module
             let field_types = ptr_vec_create(vec_size(variant_decl.fields));
             for (let j = 0; j < vec_size(variant_decl.fields); j = j + 1) {
                 let field_decl = ptr_vec_get(variant_decl.fields, j) as FieldDecl*;
-                let field_type = sig_resolve_type_ref(tables, nr, env, field_decl.type_ref, diags, seen as StringSet*);
+                let field_type = tr_resolve_type_ref(tables, nr, env, field_decl.type_ref, diags, seen as StringSet*);
                 if (field_type == null) {
                     ok = false;
                     continue;
@@ -486,7 +205,7 @@ func sig_resolve_func(tables: SignatureTables*, nr: NameResolution*, env: Module
         let ok = true;
         for (let i = 0; i < vec_size(decl.params); i = i + 1) {
             let param = ptr_vec_get(decl.params, i) as Param*;
-            let param_type = sig_resolve_type_ref(tables, nr, env, param.type_ref, diags, seen as StringSet*);
+            let param_type = tr_resolve_type_ref(tables, nr, env, param.type_ref, diags, seen as StringSet*);
             if (param_type == null) {
                 ok = false;
                 continue;
@@ -494,7 +213,7 @@ func sig_resolve_func(tables: SignatureTables*, nr: NameResolution*, env: Module
             ptr_vec_push(params as VectorBase*, param_type as void*);
         }
 
-        let ret_type = sig_resolve_type_ref(tables, nr, env, decl.return_type, diags, seen as StringSet*);
+        let ret_type = tr_resolve_type_ref(tables, nr, env, decl.return_type, diags, seen as StringSet*);
         if (ret_type == null) {
             ok = false;
         }
@@ -552,7 +271,7 @@ func sig_infer_literal_type(tables: SignatureTables*, nr: NameResolution*, env: 
         return null;
     }
 
-    let sym = sig_symbol_lookup(nr, env, callee.text_value, callee.module_path, callee.name_qualifier);
+    let sym = tr_symbol_lookup(nr, env, callee.text_value, callee.module_path, callee.name_qualifier);
     if (sym == null) {
         return null;
     }
@@ -578,7 +297,7 @@ func sig_resolve_let(tables: SignatureTables*, nr: NameResolution*, env: ModuleE
     let let_type: Type*? = null;
     if (decl.type_ref != null) {
         with (let seen = ss_create() => ss_free(seen)) {
-            let_type = sig_resolve_type_ref(tables, nr, env, decl.type_ref as TypeRef*, diags, seen);
+            let_type = tr_resolve_type_ref(tables, nr, env, decl.type_ref as TypeRef*, diags, seen);
         }
     } else {
         let_type = sig_infer_literal_type(tables, nr, env, driver_state, decl.value);
@@ -734,7 +453,7 @@ func sig_resolve(driver_state: DriverState*, nr: NameResolution*, diags: DiagCol
                     let sym = nr_module_env_local(env, (top.data as TypeAliasDecl*).name);
                     if (sym != null) {
                         with (let seen = ss_create() => ss_free(seen)) {
-                            let resolved_alias = sig_resolve_alias(tables, nr, env, sym as Symbol*, diags, seen);
+                            let resolved_alias = tr_resolve_alias(tables, nr, env, sym as Symbol*, diags, seen);
                             if (resolved_alias != null) {
                                 type_free(resolved_alias as Type*);
                             }

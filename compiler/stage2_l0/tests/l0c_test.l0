@@ -88,6 +88,30 @@ func test_nyi_mode_exit_code() {
     }
 }
 
+func test_type_ok() {
+    with (let argv = vs_create(8) => vs_free(argv)) {
+        vs_push(argv, "--type");
+        vs_push(argv, "-P");
+        vs_push(argv, semantics_fixture_root());
+        vs_push(argv, "ok_main");
+
+        let rc = run_with_argv(argv);
+        assert(rc == 0, "--type should succeed for ok_main");
+    }
+}
+
+func test_sym_ok() {
+    with (let argv = vs_create(8) => vs_free(argv)) {
+        vs_push(argv, "--sym");
+        vs_push(argv, "-P");
+        vs_push(argv, semantics_fixture_root());
+        vs_push(argv, "ok_main");
+
+        let rc = run_with_argv(argv);
+        assert(rc == 0, "--sym should succeed for ok_main");
+    }
+}
+
 func main() {
     test_check_ok();
     test_check_cycle_fails();
@@ -95,5 +119,7 @@ func main() {
     test_tok_ok();
     test_parse_error_exit_code();
     test_nyi_mode_exit_code();
+    test_type_ok();
+    test_sym_ok();
     printl_s("l0c_test: all tests passed");
 }

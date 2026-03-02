@@ -1,0 +1,96 @@
+/*
+ * SPDX-License-Identifier: MIT OR Apache-2.0
+ * Copyright (c) 2026 gwz
+ */
+
+module sem_context;
+
+import std.hashmap;
+import std.vector;
+import util.diag;
+
+import driver;
+import locals;
+import name_resolver;
+import signatures;
+import types;
+
+enum VarRefResolution {
+    VAR_RES_LOCAL;
+    VAR_RES_MODULE;
+}
+
+struct AnalysisResult {
+    driver_state: DriverState*;
+    diags: DiagCollector*;
+    names: NameResolution*?;
+    signatures: SignatureTables*?;
+    locals_result: LocalsResult*?;
+    expr_types: StringPtrMap*;         // key (module::expr_id) -> Type*
+    var_ref_resolution: StringIntMap*; // key (module::expr_id) -> VarRefResolution
+    intrinsic_targets: StringPtrMap*;  // key (module::expr_id) -> Type*
+}
+
+func analysis_result_free(self: AnalysisResult*) {
+    if (self.locals_result != null) {
+        locals_free(self.locals_result as LocalsResult*);
+    }
+    if (self.signatures != null) {
+        sig_tables_free(self.signatures as SignatureTables*);
+    }
+    if (self.names != null) {
+        nr_free(self.names as NameResolution*);
+    }
+
+    for (let i = 0; i < spm_capacity(self.expr_types); i = i + 1) {
+        if (spm_slot_occupied(self.expr_types, i)) {
+            type_free(spm_slot_value(self.expr_types, i) as Type*);
+        }
+    }
+    spm_free(self.expr_types);
+
+    sim_free(self.var_ref_resolution);
+
+    for (let i = 0; i < spm_capacity(self.intrinsic_targets); i = i + 1) {
+        if (spm_slot_occupied(self.intrinsic_targets, i)) {
+            type_free(spm_slot_value(self.intrinsic_targets, i) as Type*);
+        }
+    }
+    spm_free(self.intrinsic_targets);
+
+    diag_free(self.diags);
+    driver_state_free(self.driver_state);
+    drop self;
+}
+
+func analysis_has_errors(self: AnalysisResult*) -> bool {
+    return diag_has_errors(self.diags);
+}
+
+func analysis_diag_count(self: AnalysisResult*) -> int {
+    return diag_count(self.diags);
+}
+
+func analysis_diag_get(self: AnalysisResult*, index: int) -> Diagnostic* {
+    return diag_get(self.diags, index);
+}
+
+func analysis_source_names(self: AnalysisResult*) -> VectorString* {
+    return self.driver_state.source_names;
+}
+
+func analysis_source_texts(self: AnalysisResult*) -> VectorString* {
+    return self.driver_state.source_texts;
+}
+
+func analysis_name_resolution(self: AnalysisResult*) -> NameResolution*? {
+    return self.names;
+}
+
+func analysis_signature_tables(self: AnalysisResult*) -> SignatureTables*? {
+    return self.signatures;
+}
+
+func analysis_locals(self: AnalysisResult*) -> LocalsResult*? {
+    return self.locals_result;
+}
