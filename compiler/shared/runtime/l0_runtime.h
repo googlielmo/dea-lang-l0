@@ -6,7 +6,8 @@
  * Copyright (c) 2025-2026 gwz
  */
 
-/*
+/**
+ * @file l0_runtime.h
  * L0 Runtime Library (K0 - Kernel Layer)
  *
  * Header-only C99 runtime providing:
@@ -41,9 +42,9 @@
 
 #include "l0_siphash.h"
 
-/* ============================================================================
+/* =========================================================================
  * Compiler-specific builtins and attributes
- * ============================================================================ */
+ * ========================================================================= */
 
 #if defined(__TINYC__) && __TINYC__ >= 928
 /* __builtin_unreachable added in mob branch post-0.9.27 */
@@ -54,17 +55,23 @@
 #   define L0_UNREACHABLE(_s) rt_panic(_s)
 #endif
 
-/* ============================================================================
+/* =========================================================================
  * Optional tracing support (compile-time toggles)
- * ============================================================================ */
+ * ========================================================================= */
 
 #ifdef L0_TRACE_ARC
+/**
+ * Trace reference counting operations to stderr.
+ */
 #define _RT_TRACE_ARC(...) \
     do { \
         fprintf(stderr, "[l0][arc] "); \
         fprintf(stderr, __VA_ARGS__); \
         fprintf(stderr, "\n"); \
     } while (0)
+/**
+ * Trace reference counting operations with location info.
+ */
 #define _RT_TRACE_ARC_LOC(loc_file, loc_line, ...) \
     do { \
         fprintf(stderr, "[l0][arc] "); \
@@ -78,12 +85,18 @@
 #endif
 
 #ifdef L0_TRACE_MEMORY
+/**
+ * Trace memory allocation operations to stderr.
+ */
 #define _RT_TRACE_MEM(...) \
     do { \
         fprintf(stderr, "[l0][mem] "); \
         fprintf(stderr, __VA_ARGS__); \
         fprintf(stderr, "\n"); \
     } while (0)
+/**
+ * Trace memory allocation operations with location info.
+ */
 #define _RT_TRACE_MEM_LOC(loc_file, loc_line, ...) \
     do { \
         fprintf(stderr, "[l0][mem] "); \
@@ -96,13 +109,13 @@
 #define _RT_TRACE_MEM_LOC(loc_file, loc_line, ...) ((void)0)
 #endif
 
-/* ============================================================================
+/* =========================================================================
  * Core type definitions
- * ============================================================================ */
+ * ========================================================================= */
 
 typedef uint8_t  l0_bool;
 
-typedef int8_t   l0_tiny; /* future use */
+typedef int8_t   l0_tiny; /**< future use */
 typedef int16_t  l0_short;
 typedef int32_t  l0_int;
 typedef int64_t  l0_long;
@@ -115,8 +128,11 @@ typedef uint64_t l0_ulong;
 typedef float    l0_float;
 typedef double   l0_double;
 
-/* L0 string: length-tracked, reference counted, immutable character sequence.
- *
+/**
+ * @struct _l0_h_string
+ * Heap-allocated L0 string header.
+ * 
+ * L0 string: length-tracked, reference counted, immutable character sequence.
  * Strings are always length-tracked to prevent out-of-bounds access.
  * An l0_string with len=0 represents an empty string.
  * Data should be NULL for empty strings to maintain consistency, but non-NULL is tolerated.
@@ -127,27 +143,33 @@ typedef double   l0_double;
  * Strings with refcount == _RT_MEM_SENTINEL have already been freed (double-free detected).
  * Data is null-terminated for C interoperability, but length is authoritative.
  */
+typedef struct {
+    l0_int refcount;    /**< Reference count for memory management, or INT32_MAX if not reference counted */
+    l0_int len;         /**< Length in bytes (must be >= 0) */
+    char bytes[];       /**< Mutable character data, 0-terminated for C interoperability */
+} _l0_h_string;
 
 #define L0_STRING_K_STATIC  0
 #define L0_STRING_K_HEAP    1
 
-static const l0_int _RT_MEM_SENTINEL = 0xF00DB10C; /* sentinel value for memory checks */
+/**
+ * Sentinel value for memory checks.
+ */
+static const l0_int _RT_MEM_SENTINEL = 0xF00DB10C;
 
+/**
+ * @struct l0_string
+ * Unified L0 string type (static or heap-allocated).
+ */
 typedef struct {
-    l0_int refcount;    /* Reference count for memory management, or INT32_MAX if not reference counted */
-    l0_int len;         /* Length in bytes (must be >= 0) */
-    char bytes[];       /* Mutable character data, 0-terminated for C interoperability */
-} _l0_h_string;
-
-typedef struct {
-    unsigned int kind : 1;      /* Kind of string: either L0_STRING_K_STATIC (0) or L0_STRING_K_HEAP (1) */
-    unsigned int : 0;           /* Align to next unsigned int boundary */
+    unsigned int kind : 1;      /**< Kind of string: either L0_STRING_K_STATIC (0) or L0_STRING_K_HEAP (1) */
+    unsigned int : 0;           /**< Align to next unsigned int boundary */
     union {
         struct {
-            l0_int len;         /* Length in bytes (for constant inline strings) */
-            const char* bytes;  /* Pointer to character data (may be NULL for empty string) */
-        } s_str;                /* Static string structure for constant inline strings */
-        _l0_h_string *h_str;    /* Heap-allocated string structure for dynamic strings */
+            l0_int len;         /**< Length in bytes (for constant inline strings) */
+            const char* bytes;  /**< Pointer to character data (may be NULL for empty string) */
+        } s_str;                /**< Static string structure for constant inline strings */
+        _l0_h_string *h_str;    /**< Heap-allocated string structure for dynamic strings */
     } data;
 } l0_string;
 
@@ -157,41 +179,50 @@ typedef struct {
 static l0_string L0_STRING_EMPTY = { 0, { .s_str = { 0, NULL } } };
 
 /**
- * String literal construction macro
+ * String literal construction macro.
  */
 #define L0_STRING_CONST(str_data, str_len) { .kind = L0_STRING_K_STATIC, .data.s_str = { .len = (str_len), .bytes = (str_data) } }
 
-/* ============================================================================
+/* =========================================================================
  * Optional type wrappers (T? as {has_value, value})
- * ============================================================================ */
+ * ========================================================================= */
 
 #ifndef L0_OPT_BOOL_DEFINED
 #define L0_OPT_BOOL_DEFINED
+/** @struct l0_opt_bool Optional boolean wrapper. */
 typedef struct { l0_bool has_value; l0_bool value; } l0_opt_bool;
 #endif /* L0_OPT_BOOL_DEFINED */
 
 #ifndef L0_OPT_BYTE_DEFINED
 #define L0_OPT_BYTE_DEFINED
+/** @struct l0_opt_byte Optional byte wrapper. */
 typedef struct { l0_bool has_value; l0_byte value; } l0_opt_byte;
 #endif /* L0_OPT_BYTE_DEFINED */
 
 #ifndef L0_OPT_INT_DEFINED
 #define L0_OPT_INT_DEFINED
+/** @struct l0_opt_int Optional integer wrapper. */
 typedef struct { l0_bool has_value; l0_int value; } l0_opt_int;
 #endif /* L0_OPT_INT_DEFINED */
 
 #ifndef L0_OPT_STRING_DEFINED
 #define L0_OPT_STRING_DEFINED
+/** @struct l0_opt_string Optional string wrapper. */
 typedef struct { l0_bool has_value; l0_string value; } l0_opt_string;
 #endif /* L0_OPT_STRING_DEFINED */
 
+/** @struct _l0_base_opt Base structure for optional types to access has_value. */
 typedef struct { l0_bool has_value; } _l0_base_opt;
 
-/* Static instances for common optional strings */
+/** Static instance for null optional string. */
 static l0_opt_string L0_OPT_STRING_NULL = { .has_value = 0, .value = { 0 } };
+/** Static instance for empty optional string. */
 static l0_opt_string L0_OPT_STRING_EMPTY = { .has_value = 1, .value = { 0 } };
 
-/* Definition for `sys.rt::RtTimeParts` */
+/**
+ * @struct l0_sys_rt_RtTimeParts
+ * Definition for `sys.rt::RtTimeParts`.
+ */
 #ifndef L0_DEFINED_l0_sys_rt_RtTimeParts
 #define L0_DEFINED_l0_sys_rt_RtTimeParts
 struct l0_sys_rt_RtTimeParts {
@@ -200,22 +231,33 @@ struct l0_sys_rt_RtTimeParts {
 };
 #endif
 
-/* ============================================================================
+/* =========================================================================
  * Argument handling
- * ============================================================================ */
+ * ========================================================================= */
 
 static int _rt_argc = 0;
 static char** _rt_argv = NULL;
 
+/**
+ * Initialize command-line arguments.
+ * 
+ * @param argc Number of arguments.
+ * @param argv Argument vector.
+ */
 void _rt_init_args(int argc, char** argv) {
     _rt_argc = argc;
     _rt_argv = argv;
 }
 
-/* ============================================================================
+/* =========================================================================
  * Panic mechanism
- * ============================================================================ */
+ * ========================================================================= */
 
+/**
+ * Abort the program with a message.
+ * 
+ * @param message The panic message.
+ */
 static void _rt_panic(const char* message) {
     if (message == NULL) {
         message = "Guru Meditation";
@@ -226,6 +268,11 @@ static void _rt_panic(const char* message) {
     abort();
 }
 
+/**
+ * Abort the program with a formatted message.
+ * 
+ * @param fmt Format string.
+ */
 static void _rt_panic_fmt(const char* fmt, ...) {
     va_list args;
     fflush(stdout);
@@ -238,10 +285,17 @@ static void _rt_panic_fmt(const char* fmt, ...) {
     abort();
 }
 
-/* ============================================================================
+/* =========================================================================
  * UB-free integer helpers
- * ============================================================================ */
+ * ========================================================================= */
 
+/**
+ * Safe integer division.
+ * 
+ * @param a Dividend.
+ * @param b Divisor.
+ * @return Quotient.
+ */
 static l0_int _rt_idiv(l0_int a, l0_int b) {
     if (b == 0) {
         _rt_panic("division by zero");
@@ -252,6 +306,13 @@ static l0_int _rt_idiv(l0_int a, l0_int b) {
     return a / b;
 }
 
+/**
+ * Safe integer modulo.
+ * 
+ * @param a Dividend.
+ * @param b Divisor.
+ * @return Remainder.
+ */
 static l0_int _rt_imod(l0_int a, l0_int b) {
     if (b == 0) {
         _rt_panic("modulo by zero");
@@ -262,6 +323,13 @@ static l0_int _rt_imod(l0_int a, l0_int b) {
     return a % b;
 }
 
+/**
+ * Safe integer addition with overflow check.
+ * 
+ * @param a First operand.
+ * @param b Second operand.
+ * @return Sum.
+ */
 static l0_int _rt_iadd(l0_int a, l0_int b) {
     if ((b > 0 && a > INT32_MAX - b) || (b < 0 && a < INT32_MIN - b)) {
         _rt_panic("integer addition overflow");
@@ -269,6 +337,13 @@ static l0_int _rt_iadd(l0_int a, l0_int b) {
     return a + b;
 }
 
+/**
+ * Safe integer subtraction with overflow check.
+ * 
+ * @param a First operand.
+ * @param b Second operand.
+ * @return Difference.
+ */
 static l0_int _rt_isub(l0_int a, l0_int b) {
     if ((b < 0 && a > INT32_MAX + b) || (b > 0 && a < INT32_MIN + b)) {
         _rt_panic("integer subtraction overflow");
@@ -276,6 +351,13 @@ static l0_int _rt_isub(l0_int a, l0_int b) {
     return a - b;
 }
 
+/**
+ * Safe integer multiplication with overflow check.
+ * 
+ * @param a First operand.
+ * @param b Second operand.
+ * @return Product.
+ */
 static l0_int _rt_imul(l0_int a, l0_int b) {
     /* Zero multiplication always succeeds */
     if (a == 0 || b == 0) {
@@ -322,6 +404,12 @@ static l0_int _rt_imul(l0_int a, l0_int b) {
     return a * b;
 }
 
+/**
+ * Narrow l0_int to l0_byte with range check.
+ * 
+ * @param value Integer value.
+ * @return Byte value.
+ */
 l0_byte _rt_narrow_l0_byte(l0_int value) {
     if (value < 0 || value > 255) {
         _rt_panic("int to byte cast overflow");
@@ -329,10 +417,17 @@ l0_byte _rt_narrow_l0_byte(l0_int value) {
     return (l0_byte)value;
 }
 
-/* ============================================================================
+/* =========================================================================
  * UB-free optional type helpers
- * ============================================================================ */
+ * ========================================================================= */
 
+/**
+ * Unwrap a pointer, panicking if NULL.
+ * 
+ * @param opt Pointer to unwrap.
+ * @param type_name Name of the type for error reporting.
+ * @return Unwrapped pointer.
+ */
 static inline void *_unwrap_ptr(void *opt, const char *type_name) {
     if (opt == NULL) {
         _rt_panic_fmt("unwrap of empty optional: '%s'", type_name);
@@ -340,6 +435,13 @@ static inline void *_unwrap_ptr(void *opt, const char *type_name) {
     return opt;
 }
 
+/**
+ * Unwrap an optional type structure, panicking if it has no value.
+ * 
+ * @param opt_ptr Pointer to the optional structure.
+ * @param type_name Name of the type for error reporting.
+ * @return Pointer to the optional structure.
+ */
 static inline void *_unwrap_opt(void *opt_ptr, const char *type_name) {
     _l0_base_opt *base = (_l0_base_opt*)opt_ptr;
     if (!base->has_value) {
@@ -348,9 +450,9 @@ static inline void *_unwrap_opt(void *opt_ptr, const char *type_name) {
     return opt_ptr;
 }
 
-/* ============================================================================
+/* =========================================================================
  * String construction and operations
- * ============================================================================ */
+ * ========================================================================= */
 
 /**
  * Create an L0 string from a constant C string.
@@ -358,6 +460,9 @@ static inline void *_unwrap_opt(void *opt_ptr, const char *type_name) {
  *
  * Note: Does NOT allocate or copy - just wraps the existing C string.
  * Use only for string literals or static const data.
+ * 
+ * @param c_str Constant C string.
+ * @return L0 string.
  */
 static l0_string _rt_l0_string_from_const_literal(const char *c_str) {
     l0_string s;
@@ -383,6 +488,10 @@ static l0_string _rt_l0_string_from_const_literal(const char *c_str) {
  *
  * The returned string is of kind L0_STRING_K_HEAP and
  * its data is null-terminated in advance.
+ * 
+ * @param mem Allocated memory block.
+ * @param s_len Length of the string.
+ * @return Initialized L0 string.
  */
 static l0_string _rt_init_heap_string(void *mem, l0_int s_len) {
     l0_string s;
@@ -404,6 +513,9 @@ static l0_string _rt_init_heap_string(void *mem, l0_int s_len) {
  *
  * The returned string is of kind L0_STRING_K_HEAP and
  * its data is null-terminated in advance.
+ * 
+ * @param len Length of the string.
+ * @return Allocated L0 string.
  */
 #ifdef L0_TRACE_MEMORY
 static l0_string _rt_alloc_string_impl(l0_int len, const char *_loc_file, int _loc_line) {
@@ -437,6 +549,8 @@ static l0_string _rt_alloc_string(l0_int len) {
 /**
  * Free a string's allocated data, if applicable.
  * If reference counted, decrements reference count and frees when it reaches zero.
+ * 
+ * @param str L0 string to free.
  */
 #if defined(L0_TRACE_ARC) || defined(L0_TRACE_MEMORY)
 static void _rt_free_string_impl(l0_string str, const char *_loc_file, int _loc_line) {
@@ -562,6 +676,13 @@ static void _rt_free_string(l0_string str) {
 }
 #endif
 
+/**
+ * Reallocate a heap string to a new length.
+ * 
+ * @param s Current L0 string.
+ * @param new_len New length.
+ * @return Updated L0 string.
+ */
 static l0_string _rt_realloc_string(l0_string s, l0_int new_len) {
     if (new_len < 0) {
         _rt_panic("_rt_realloc_string: negative length");
@@ -600,8 +721,11 @@ static l0_string _rt_realloc_string(l0_string s, l0_int new_len) {
 }
 
 /**
- * Create a new reference counted L0_string from a null-terminated C string:
+ * Create a new reference counted L0_string from a null-terminated C string.
  * Allocates new memory and copies data.
+ * 
+ * @param c_str Null-terminated C string.
+ * @return L0 string.
  */
 static l0_string _rt_new_l0_string(const char *c_str) {
     if (c_str == NULL) {
@@ -619,11 +743,14 @@ static l0_string _rt_new_l0_string(const char *c_str) {
 }
 
 /**
- * Gets the null-terminated C string underlying an L0 string,
+ * Gets the null-terminated C string underlying an L0 string.
  * or NULL if not available, e.g. for static empty strings.
  * Useful when interfacing with C APIs that require null-terminated strings.
  *
  * Note: This is an internal helper, not exposed to L0 code.
+ * 
+ * @param s L0 string.
+ * @return Pointer to character data.
  */
 static char *_rt_string_bytes(l0_string s) {
     switch (s.kind) {
@@ -640,14 +767,17 @@ static char *_rt_string_bytes(l0_string s) {
     }
 }
 
-/* ============================================================================
+/* =========================================================================
  * User string operations
- * ============================================================================ */
+ * ========================================================================= */
 
 /**
  * Get the length of a string.
+ * 
+ * @param str L0 string.
+ * @return Length in bytes.
  *
- * L0 signature: extern func rt_strlen(str: string) -> int;
+ * L0 signature: `extern func rt_strlen(str: string) -> int;` 
  */
 static l0_int rt_strlen(l0_string str) {
     switch(str.kind) {
@@ -668,8 +798,12 @@ static l0_int rt_strlen(l0_string str) {
 /**
  * Bounds-checked character access.
  * Returns the character at the given index, or panics if out of bounds.
+ * 
+ * @param a L0 string.
+ * @param index Index.
+ * @return Byte value.
  *
- * L0 signature: extern func rt_string_get(s: string, index: int) -> byte;
+ * L0 signature: `extern func rt_string_get(s: string, index: int) -> byte;` 
  */
 static l0_byte rt_string_get(l0_string a, l0_int index) {
     l0_int a_len = rt_strlen(a);
@@ -686,8 +820,12 @@ static l0_byte rt_string_get(l0_string a, l0_int index) {
 
 /**
  * Check if two strings are equal.
+ * 
+ * @param a First string.
+ * @param b Second string.
+ * @return 1 if equal, 0 otherwise.
  *
- * L0 signature: extern func rt_string_equals(a: string, b: string) -> bool;
+ * L0 signature: `extern func rt_string_equals(a: string, b: string) -> bool;` 
  */
 static l0_bool rt_string_equals(l0_string a, l0_string b) {
     l0_int a_len = rt_strlen(a);
@@ -710,8 +848,12 @@ static l0_bool rt_string_equals(l0_string a, l0_string b) {
 /**
  * Compare two strings lexicographically.
  * Returns 0 if equal, <0 if a < b, >0 if a > b.
+ * 
+ * @param a First string.
+ * @param b Second string.
+ * @return Comparison result.
  *
- * L0 signature: extern func rt_string_compare(a: string, b: string) -> int;
+ * L0 signature: `extern func rt_string_compare(a: string, b: string) -> int;` 
  */
 static l0_int rt_string_compare(l0_string a, l0_string b) {
     l0_int a_len = rt_strlen(a);
@@ -750,8 +892,12 @@ static l0_int rt_string_compare(l0_string a, l0_string b) {
 /**
  * Concatenate two strings (allocates new memory).
  * Returns a heap-allocated string containing a + b.
+ * 
+ * @param a First string.
+ * @param b Second string.
+ * @return Concatenated string.
  *
- * L0 signature: extern func rt_string_concat(a: string, b: string) -> string;
+ * L0 signature: `extern func rt_string_concat(a: string, b: string) -> string;` 
  */
 #ifdef L0_TRACE_MEMORY
 static l0_string _rt_string_concat_impl(l0_string a, l0_string b, const char *_loc_file, int _loc_line) {
@@ -823,8 +969,13 @@ static l0_string rt_string_concat(l0_string a, l0_string b) {
 /**
  * Create a substring (allocates new memory).
  * Panics if start/end are out of bounds or start > end.
+ * 
+ * @param s Source string.
+ * @param start Start index.
+ * @param end End index.
+ * @return Slice string.
  *
- * L0 signature: extern func rt_string_slice(s: string, start: int, end: int) -> string;
+ * L0 signature: `extern func rt_string_slice(s: string, start: int, end: int) -> string;` 
  */
 static l0_string rt_string_slice(l0_string s, l0_int start, l0_int end) {
     l0_int s_len = rt_strlen(s);
@@ -856,8 +1007,11 @@ static l0_string rt_string_slice(l0_string s, l0_int start, l0_int end) {
  * Create an L0 string from a single character (byte).
  * Allocates a new heap string of length 1.
  * Note: Caller must free the returned string using _rt_free_string.
+ * 
+ * @param b Character.
+ * @return L0 string.
  *
- * L0 signature: extern func rt_string_from_byte(b: byte) -> string;
+ * L0 signature: `extern func rt_string_from_byte(b: byte) -> string;` 
  */
 static l0_string rt_string_from_byte(l0_byte b) {
     l0_string s = _rt_alloc_string(1);
@@ -873,8 +1027,12 @@ static l0_string rt_string_from_byte(l0_byte b) {
  * The array does not need to be a null-terminated C string: all bytes are copied and a null
  * terminator is added for C interoperability.
  * Panics if len is negative.
+ * 
+ * @param bytes Pointer to bytes.
+ * @param len Length.
+ * @return L0 string.
  *
- * L0 signature: extern func rt_string_from_byte_array(bytes: byte*, len: int) -> string;
+ * L0 signature: `extern func rt_string_from_byte_array(bytes: byte*, len: int) -> string;` 
  */
 static l0_string rt_string_from_byte_array(l0_byte* bytes, l0_int len) {
     if (len < 0) {
@@ -889,8 +1047,10 @@ static l0_string rt_string_from_byte_array(l0_byte* bytes, l0_int len) {
 /**
  * Increment reference count for heap strings (no-op for static).
  * Panics if the string is heap-allocated but has an invalid refcount state (e.g. double free detected).
+ * 
+ * @param s L0 string.
  *
- * L0 signature: extern func rt_string_retain(s: string) -> void;
+ * L0 signature: `extern func rt_string_retain(s: string) -> void;` 
  */
 #ifdef L0_TRACE_ARC
 static void _rt_string_retain_impl(l0_string s, const char *_loc_file, int _loc_line) {
@@ -987,8 +1147,10 @@ static void rt_string_retain(l0_string s) {
 
 /**
  * Decrement reference count, freeing if zero.
+ * 
+ * @param s L0 string.
  *
- * L0 signature: extern func rt_string_release(s: string) -> void;
+ * L0 signature: `extern func rt_string_release(s: string) -> void;` 
  */
 #ifdef L0_TRACE_ARC
 static void _rt_string_release_impl(l0_string s, const char *_loc_file, int _loc_line) {
@@ -1001,15 +1163,18 @@ static void rt_string_release(l0_string s) {
 }
 #endif
 
-/* ============================================================================
+/* =========================================================================
  * System interaction and environment
- * ============================================================================ */
+ * ========================================================================= */
 
 /**
  * Execute a system command and return its exit code.
  * Returns the exit code of the command, or a negative value on error.
+ * 
+ * @param cmd Command string.
+ * @return Exit code.
  *
- * L0 signature: extern func rt_system(cmd: string) -> int;
+ * L0 signature: `extern func rt_system(cmd: string) -> int;` 
  */
 static l0_int rt_system(l0_string cmd) {
     char *c = _rt_string_bytes(cmd);
@@ -1017,11 +1182,14 @@ static l0_int rt_system(l0_string cmd) {
 }
 
 /**
-* Get an environment variable as an L0 optional string.
-* Returns null (empty optional) if the variable is not set.
-*
-* L0 signature: extern func rt_get_env_var(name: string) -> string?;
-*/
+ * Get an environment variable as an L0 optional string.
+ * Returns null (empty optional) if the variable is not set.
+ * 
+ * @param name Variable name.
+ * @return Optional string value.
+ *
+ * L0 signature: `extern func rt_get_env_var(name: string) -> string?;` 
+ */
 static l0_opt_string rt_get_env_var(l0_string name) {
     if (rt_strlen(name) == 0) {
         return L0_OPT_STRING_NULL;
@@ -1047,8 +1215,10 @@ static l0_opt_string rt_get_env_var(l0_string name) {
 
 /**
  * Get the number of command-line arguments.
+ * 
+ * @return Argument count.
  *
- * L0 signature: extern func rt_get_argc() -> int;
+ * L0 signature: `extern func rt_get_argc() -> int;` 
  */
 static l0_int rt_get_argc(void) {
     return (l0_int)_rt_argc;
@@ -1057,8 +1227,11 @@ static l0_int rt_get_argc(void) {
 /**
  * Get the command-line argument at the given index.
  * Panics if index is out of bounds.
+ * 
+ * @param i Index.
+ * @return Argument string.
  *
- * L0 signature: extern func rt_get_argv(i: int) -> string;
+ * L0 signature: `extern func rt_get_argv(i: int) -> string;` 
  */
 static l0_string rt_get_argv(l0_int i) {
     if (i < 0 || i >= _rt_argc) {
@@ -1067,10 +1240,13 @@ static l0_string rt_get_argv(l0_int i) {
     return _rt_l0_string_from_const_literal(_rt_argv[i]);
 }
 
-/* ============================================================================
+/* =========================================================================
  * Time APIs
- * ============================================================================ */
+ * ========================================================================= */
 
+/**
+ * Internal helper to convert time_t to l0_int seconds.
+ */
 static l0_bool _rt_time_to_l0_int_sec(time_t value, l0_int *out) {
     long long sec = (long long)value;
     if (sec < INT32_MIN || sec > INT32_MAX) {
@@ -1080,6 +1256,9 @@ static l0_bool _rt_time_to_l0_int_sec(time_t value, l0_int *out) {
     return 1;
 }
 
+/**
+ * Internal helper to convert long to l0_int nanoseconds.
+ */
 static l0_bool _rt_time_to_l0_int_nsec(long value, l0_int *out) {
     long long nsec = (long long)value;
     if (nsec < 0 || nsec > 999999999LL) {
@@ -1089,6 +1268,9 @@ static l0_bool _rt_time_to_l0_int_nsec(long value, l0_int *out) {
     return 1;
 }
 
+/**
+ * Internal helper to write time parts to struct.
+ */
 static l0_bool _rt_time_write_parts(struct l0_sys_rt_RtTimeParts *out, l0_int sec, l0_int nsec) {
     if (out == NULL) {
         _rt_panic("_rt_time_write_parts: out-parameter is null");
@@ -1100,8 +1282,11 @@ static l0_bool _rt_time_write_parts(struct l0_sys_rt_RtTimeParts *out, l0_int se
 
 /**
  * Capture current unix wall clock into `out`.
+ * 
+ * @param out Pointer to RtTimeParts.
+ * @return 1 on success, 0 on failure.
  *
- * L0 signature: extern func rt_time_unix(out: RtTimeParts*) -> bool;
+ * L0 signature: `extern func rt_time_unix(out: RtTimeParts*) -> bool;` 
  */
 static l0_bool rt_time_unix(struct l0_sys_rt_RtTimeParts *out) {
     if (out == NULL) {
@@ -1137,8 +1322,11 @@ static l0_bool rt_time_unix(struct l0_sys_rt_RtTimeParts *out) {
 
 /**
  * Capture current monotonic clock into `out`.
+ * 
+ * @param out Pointer to RtTimeParts.
+ * @return 1 on success, 0 on failure.
  *
- * L0 signature: extern func rt_time_monotonic(out: RtTimeParts*) -> bool;
+ * L0 signature: `extern func rt_time_monotonic(out: RtTimeParts*) -> bool;` 
  */
 static l0_bool rt_time_monotonic(struct l0_sys_rt_RtTimeParts *out) {
     if (out == NULL) {
@@ -1168,8 +1356,10 @@ static l0_bool rt_time_monotonic(struct l0_sys_rt_RtTimeParts *out) {
 
 /**
  * Returns whether a monotonic clock source is available.
+ * 
+ * @return 1 if supported, 0 otherwise.
  *
- * L0 signature: extern func rt_time_monotonic_supported() -> bool;
+ * L0 signature: `extern func rt_time_monotonic_supported() -> bool;` 
  */
 static l0_bool rt_time_monotonic_supported(void) {
 #if defined(CLOCK_MONOTONIC)
@@ -1181,8 +1371,11 @@ static l0_bool rt_time_monotonic_supported(void) {
 
 /**
  * Returns local UTC offset in seconds for `unix_sec`.
+ * 
+ * @param unix_sec Unix timestamp.
+ * @return Optional integer offset.
  *
- * L0 signature: extern func rt_time_local_offset_sec(unix_sec: int) -> int?;
+ * L0 signature: `extern func rt_time_local_offset_sec(unix_sec: int) -> int?;` 
  */
 static l0_opt_int rt_time_local_offset_sec(l0_int unix_sec) {
     time_t t = (time_t)unix_sec;
@@ -1214,8 +1407,11 @@ static l0_opt_int rt_time_local_offset_sec(l0_int unix_sec) {
 
 /**
  * Returns whether local time is daylight-saving time for `unix_sec`.
+ * 
+ * @param unix_sec Unix timestamp.
+ * @return Optional boolean.
  *
- * L0 signature: extern func rt_time_local_is_dst(unix_sec: int) -> bool?;
+ * L0 signature: `extern func rt_time_local_is_dst(unix_sec: int) -> bool?;` 
  */
 static l0_opt_bool rt_time_local_is_dst(l0_int unix_sec) {
     time_t t = (time_t)unix_sec;
@@ -1234,15 +1430,18 @@ static l0_opt_bool rt_time_local_is_dst(l0_int unix_sec) {
     return (l0_opt_bool){ .has_value = 1, .value = local_ptr->tm_isdst > 0 ? 1 : 0 };
 }
 
-/* ============================================================================
+/* =========================================================================
  * I/O operations (whole-file)
- * ============================================================================ */
+ * ========================================================================= */
 
 /**
  * Read entire file contents into a string.
  * Returns empty string on error (file not found, read error, allocation failure).
+ * 
+ * @param path File path.
+ * @return Optional string containing file contents.
  *
- * L0 signature: extern func rt_read_file_all(path: string) -> string?;
+ * L0 signature: `extern func rt_read_file_all(path: string) -> string?;` 
  */
 static l0_opt_string rt_read_file_all(l0_string path) {
 
@@ -1302,8 +1501,12 @@ static l0_opt_string rt_read_file_all(l0_string path) {
 /**
  * Write string data to a file.
  * Returns 1 (true) on success, 0 (false) on error.
+ * 
+ * @param path File path.
+ * @param data Data string.
+ * @return 1 on success, 0 on failure.
  *
- * L0 signature: extern func rt_write_file_all(path: string, data: string) -> bool;
+ * L0 signature: `extern func rt_write_file_all(path: string, data: string) -> bool;` 
  */
 static l0_bool rt_write_file_all(l0_string path, l0_string data) {
     l0_int path_len = rt_strlen(path);
@@ -1336,8 +1539,11 @@ static l0_bool rt_write_file_all(l0_string path, l0_string data) {
 
 /**
  * Check if a file exists at the given path.
+ * 
+ * @param path File path.
+ * @return 1 if exists, 0 otherwise.
  *
- * L0 signature: extern func rt_file_exists(path: string) -> bool;
+ * L0 signature: `extern func rt_file_exists(path: string) -> bool;` 
  */
 static l0_bool rt_file_exists(l0_string path) {
     char *c = _rt_string_bytes(path);
@@ -1352,8 +1558,11 @@ static l0_bool rt_file_exists(l0_string path) {
 /**
  * Delete the file at the given path.
  * Returns 1 (true) on success, 0 (false) on error.
+ * 
+ * @param path File path.
+ * @return 1 on success, 0 on failure.
  *
- * L0 signature: extern func rt_delete_file(path: string) -> bool;
+ * L0 signature: `extern func rt_delete_file(path: string) -> bool;` 
  */
 static l0_bool rt_delete_file(l0_string path) {
     char *c = _rt_string_bytes(path);
@@ -1361,15 +1570,12 @@ static l0_bool rt_delete_file(l0_string path) {
     return result == 0;
 }
 
-/* ============================================================================
+/* =========================================================================
  * Printing to stdout/stderr
- * ============================================================================ */
+ * ========================================================================= */
 
 /**
-  * Flush stdout.
-  *
-  * L0 signature: extern func rt_flush_stdout() -> void;
-  */
+ * Flush stdout. */
 static void rt_flush_stdout(void) {
     fflush(stdout);
 }
@@ -1377,7 +1583,10 @@ static void rt_flush_stdout(void) {
 /**
  * Flush stderr.
  *
- * L0 signature: extern func rt_flush_stderr() -> void;
+
+ * L0 signature: `extern func rt_flush_stdout() -> void;`
+ *
+ * L0 signature: `extern func rt_flush_stderr() -> void;` 
  */
 static void rt_flush_stderr(void) {
     fflush(stderr);
@@ -1385,6 +1594,9 @@ static void rt_flush_stderr(void) {
 
 /**
  * Internal helper to print an l0_string to a given stream.
+ * 
+ * @param s String to print.
+ * @param stream Target stream.
  */
 void _rt_print(l0_string s, FILE *stream){
     l0_int s_len = rt_strlen(s);
@@ -1396,8 +1608,10 @@ void _rt_print(l0_string s, FILE *stream){
 
 /**
  * Print a string to stdout.
+ * 
+ * @param s String to print.
  *
- * L0 signature: extern func rt_print(s: string) -> void;
+ * L0 signature: `extern func rt_print(s: string) -> void;` 
  */
 static void rt_print(l0_string s) {
     _rt_print(s, stdout);
@@ -1405,18 +1619,17 @@ static void rt_print(l0_string s) {
 
 /**
  * Print a string to stderr.
+ * 
+ * @param s String to print.
  *
- * L0 signature: extern func rt_print_stderr(s: string) -> void;
+ * L0 signature: `extern func rt_print_stderr(s: string) -> void;` 
  */
 static void rt_print_stderr(l0_string s) {
     _rt_print(s, stderr);
 }
 
 /**
- * Print a newline to stdout.
- *
- * L0 signature: extern func rt_println() -> void;
- */
+ * Print a newline to stdout. */
 static void rt_println(void) {
     fputc('\n', stdout);
 }
@@ -1424,7 +1637,10 @@ static void rt_println(void) {
 /**
  * Print a newline to stderr.
  *
- * L0 signature: extern func rt_println_stderr() -> void;
+
+ * L0 signature: `extern func rt_println() -> void;`
+ *
+ * L0 signature: `extern func rt_println_stderr() -> void;` 
  */
 static void rt_println_stderr(void) {
     fputc('\n', stderr);
@@ -1432,16 +1648,21 @@ static void rt_println_stderr(void) {
 
 /**
  * Print an integer to stdout.
+ * 
+ * @param x Integer value.
  *
- * L0 signature: extern func rt_print_int(x: int) -> void;
+ * L0 signature: `extern func rt_print_int(x: int) -> void;` 
  */
 static void rt_print_int(l0_int x) {
     printf("%d", (int)x);
 }
 
-/** Print an integer to stderr.
+/**
+ * Print an integer to stderr.
+ * 
+ * @param x Integer value.
  *
- * L0 signature: extern func rt_print_int_stderr(x: int) -> void;
+ * L0 signature: `extern func rt_print_int_stderr(x: int) -> void;` 
  */
 static void rt_print_int_stderr(l0_int x) {
     fprintf(stderr, "%d", (int)x);
@@ -1449,8 +1670,10 @@ static void rt_print_int_stderr(l0_int x) {
 
 /**
  * Print a bool to stdout.
+ * 
+ * @param x Boolean value.
  *
- * L0 signature: extern func rt_print_bool(x: bool) -> void;
+ * L0 signature: `extern func rt_print_bool(x: bool) -> void;` 
  */
 static void rt_print_bool(l0_bool x) {
     printf("%s", x ? "true" : "false");
@@ -1458,25 +1681,29 @@ static void rt_print_bool(l0_bool x) {
 
 /**
  * Print a bool to stderr.
+ * 
+ * @param x Boolean value.
  *
- * L0 signature: extern func rt_print_bool_stderr(x: bool) -> void;
+ * L0 signature: `extern func rt_print_bool_stderr(x: bool) -> void;` 
  */
 static void rt_print_bool_stderr(l0_bool x) {
     fprintf(stderr, "%s", x ? "true" : "false");
 }
 
-/* ===========================================================================
+/* =========================================================================
  * Reading from stdin
- * ============================================================================ */
+ * ========================================================================= */
 
 /**
  * Read a line from stdin into a dynamically allocated buffer.
  * Returns None on EOF (no characters read).
- *
- * L0 signature: extern func rt_read_line() -> string?;
- *
+ * *
  * Ownership: on Some(s), s.data is heap-allocated and must be freed by calling
  * rt_string_release(s) (directly or indirectly via stdlib).
+ * 
+ * @return Optional string containing the line.
+ *
+ * L0 signature: `extern func rt_read_line() -> string?;` 
  */
 static l0_opt_string rt_read_line(void) {
     size_t capacity = 128;
@@ -1524,8 +1751,10 @@ static l0_opt_string rt_read_line(void) {
 /**
  * Read one character from stdin.
  * Returns -1 on EOF or error.
+ * 
+ * @return Character value or -1.
  *
- * L0 signature: extern func rt_read_char() -> int;
+ * L0 signature: `extern func rt_read_char() -> int;` 
  */
 static l0_int rt_read_char(void) {
     int c = fgetc(stdin);
@@ -1535,14 +1764,16 @@ static l0_int rt_read_char(void) {
     return (l0_int)c;
 }
 
-/* ============================================================================
+/* =========================================================================
  * Other runtime utilities
- * ============================================================================ */
+ * ========================================================================= */
 
 /**
  * Abort the program with a panic message.
+ * 
+ * @param message Panic message.
  *
- * L0 signature: extern func rt_abort(message: string) -> void;
+ * L0 signature: `extern func rt_abort(message: string) -> void;` 
  */
 static void rt_abort(l0_string message) {
     if (rt_strlen(message) == 0) {
@@ -1555,22 +1786,26 @@ static void rt_abort(l0_string message) {
 
 /**
  * Exit the program with the given exit code.
+ * 
+ * @param code Exit code.
  *
- * L0 signature: extern func rt_exit(code: int) -> void;
+ * L0 signature: `extern func rt_exit(code: int) -> void;` 
  */
 static void rt_exit(l0_int code) {
     exit((int)code);
 }
 
-/* ============================================================================
+/* =========================================================================
  * Random number generation
- * ============================================================================ */
+ * ========================================================================= */
 
 /**
  * Seed the random number generator.
  * Uses current time if seed is 0.
+ * 
+ * @param seed Seed value.
  *
- * L0 signature: extern func rt_srand(seed: int) -> void;
+ * L0 signature: `extern func rt_srand(seed: int) -> void;` 
  */
 static void rt_srand(l0_int seed) {
     if (seed == 0) {
@@ -1583,8 +1818,11 @@ static void rt_srand(l0_int seed) {
 /**
  * Generate a random integer in the range [0, max).
  * Returns 0 if max <= 0.
+ * 
+ * @param max Upper bound (exclusive).
+ * @return Random value.
  *
- * L0 signature: extern func rt_rand(max: int) -> int;
+ * L0 signature: `extern func rt_rand(max: int) -> int;` 
  */
 static l0_int rt_rand(l0_int max) {
     if (max <= 0) {
@@ -1595,14 +1833,16 @@ static l0_int rt_rand(l0_int max) {
 
 /**
  * Get the current errno value.
+ * 
+ * @return errno value.
  *
- * L0 signature: extern func rt_errno() -> int;
+ * L0 signature: `extern func rt_errno() -> int;` 
  */
 static l0_int rt_errno(void) {
     return (l0_int)errno;
 }
 
-/* ============================================================================
+/* =========================================================================
  * UNSAFE ZONE: HERE BE DRAGONS
  * ----------------------------------------------------------------------------
  * This section contains functions that directly manipulate memory.
@@ -1611,18 +1851,21 @@ static l0_int rt_errno(void) {
  * They are intended for low-level operations where performance is critical.
  * Misuse can lead to undefined behavior, memory corruption, or security
  * vulnerabilities.
- * ============================================================================ */
+ * ========================================================================= */
 
-/* ============================================================================
+/* =========================================================================
  * Memory allocation and manipulation functions.
- * ============================================================================ */
+ * ========================================================================= */
 
 /**
  * Allocate memory of the given size in bytes.
  * Returns NULL on allocation failure or if bytes is zero.
  * Panics if bytes is negative, or too large to fit in size_t (platform-dependent).
+ * 
+ * @param bytes Size in bytes.
+ * @return Pointer to allocated memory or NULL.
  *
- * L0 signature: extern func rt_alloc(bytes: int) -> void*?;
+ * L0 signature: `extern func rt_alloc(bytes: int) -> void*?;` 
  */
 #ifdef L0_TRACE_MEMORY
 static void *_rt_alloc_impl(l0_int bytes, const char *_loc_file, int _loc_line) {
@@ -1680,8 +1923,12 @@ static void *rt_alloc(l0_int bytes) {
  * Returns NULL on failure.
  * Panics if new_bytes is negative or too large to fit in size_t (platform-dependent).
  * If ptr is NULL, behaves like rt_alloc.
+ * 
+ * @param ptr Pointer to memory.
+ * @param new_bytes New size.
+ * @return Pointer to reallocated memory or NULL.
  *
- * L0 signature: extern func rt_realloc(ptr: void*, new_bytes: int) -> void*?;
+ * L0 signature: `extern func rt_realloc(ptr: void*, new_bytes: int) -> void*?;` 
  */
 #ifdef L0_TRACE_MEMORY
 static void *_rt_realloc_impl(void *ptr, l0_int new_bytes, const char *_loc_file, int _loc_line) {
@@ -1736,8 +1983,10 @@ static void *rt_realloc(void *ptr, l0_int new_bytes) {
 
 /**
  * Free previously allocated memory.
+ * 
+ * @param ptr Pointer to free.
  *
- * L0 signature: extern func rt_free(ptr: void*?) -> void;
+ * L0 signature: `extern func rt_free(ptr: void*?) -> void;` 
  */
 #ifdef L0_TRACE_MEMORY
 static void _rt_free_impl(void *ptr, const char *_loc_file, int _loc_line) {
@@ -1757,8 +2006,12 @@ static void rt_free(void *ptr) {
 /**
  * Allocate zeroed memory for an array of elements.
  * Returns NULL on allocation failure or if count/elem_size is negative.
+ * 
+ * @param count Number of elements.
+ * @param elem_size Element size.
+ * @return Pointer to zeroed memory or NULL.
  *
- * L0 signature: extern func rt_calloc(count: int, elem_size: int) -> void*?;
+ * L0 signature: `extern func rt_calloc(count: int, elem_size: int) -> void*?;` 
  */
 #ifdef L0_TRACE_MEMORY
 static void *_rt_calloc_impl(l0_int count, l0_int elem_size, const char *_loc_file, int _loc_line) {
@@ -1810,8 +2063,13 @@ static void *rt_calloc(l0_int count, l0_int elem_size) {
 /**
  * Set memory to a specific byte value.
  * Returns destination pointer.
+ * 
+ * @param dest Destination pointer.
+ * @param value Byte value.
+ * @param bytes Number of bytes.
+ * @return dest.
  *
- * L0 signature: extern func rt_memset(dest: void*, value: int, bytes: int) -> void*;
+ * L0 signature: `extern func rt_memset(dest: void*, value: int, bytes: int) -> void*;` 
  */
 static void *rt_memset(void *dest, l0_int value, l0_int bytes) {
     if (bytes < 0) {
@@ -1830,8 +2088,13 @@ static void *rt_memset(void *dest, l0_int value, l0_int bytes) {
 /**
  * Copy memory from source to destination.
  * Returns destination pointer.
+ * 
+ * @param dest Destination.
+ * @param src Source.
+ * @param bytes Number of bytes.
+ * @return dest.
  *
- * L0 signature: extern func rt_memcpy(dest: void*, src: void*, bytes: int) -> void*;
+ * L0 signature: `extern func rt_memcpy(dest: void*, src: void*, bytes: int) -> void*;` 
  */
 static void *rt_memcpy(void *dest, void *src, l0_int bytes) {
     if (bytes < 0) {
@@ -1846,12 +2109,16 @@ static void *rt_memcpy(void *dest, void *src, l0_int bytes) {
     return memcpy(dest, src, n);
 }
 
-// rt_memcmp
 /**
  * Compare two memory regions.
  * Returns 0 if equal, <0 if a < b, >0 if a > b.
+ * 
+ * @param a First region.
+ * @param b Second region.
+ * @param bytes Number of bytes.
+ * @return Comparison result.
  *
- * L0 signature: extern func rt_memcmp(a: void*, b: void*, bytes: int) -> int;
+ * L0 signature: `extern func rt_memcmp(a: void*, b: void*, bytes: int) -> int;` 
  */
 static l0_int rt_memcmp(void *a, void *b, l0_int bytes) {
     if (bytes < 0) {
@@ -1876,8 +2143,13 @@ static l0_int rt_memcmp(void *a, void *b, l0_int bytes) {
 /**
  * Get a pointer to an element in an array.
  * Panics if array_data is NULL, element_size is non-positive, or index is negative.
+ * 
+ * @param array_data Pointer to array data.
+ * @param element_size Size of one element.
+ * @param index Element index.
+ * @return Pointer to the element.
  *
- * L0 signature: extern func rt_array_element(array_data: void*, element_size: int, index: int) -> void*;
+ * L0 signature: `extern func rt_array_element(array_data: void*, element_size: int, index: int) -> void*;` 
  */
 static void *rt_array_element(void *array_data, l0_int element_size, l0_int index) {
     if (array_data == NULL) {
@@ -1900,15 +2172,16 @@ static void *rt_array_element(void *array_data, l0_int element_size, l0_int inde
     return (void *)((uintptr_t)array_data + offset);
 }
 
-/* ============================================================================
+/* =========================================================================
  * End of UNSAFE ZONE
- * ============================================================================ */
+ * ========================================================================= */
 
-/* ============================================================================
+/* =========================================================================
  * Runtime support for `new` & `drop`
- * ============================================================================ */
+ * ========================================================================= */
 
 /**
+ * @struct _rt_alloc_node
  * Internal allocation tracker for `new` / `drop`.
  *
  * The goal is to make misuse of `drop` (double-free / invalid pointer) a defined
@@ -1924,6 +2197,9 @@ static _rt_alloc_node *_rt_alloc_list = NULL;
 /**
  * Allocate a single zero-initialized object for L0 `new`.
  * Panics on failure, and registers the returned pointer for `_rt_drop`.
+ * 
+ * @param bytes Allocation size.
+ * @return Pointer to allocated object.
  */
 #ifdef L0_TRACE_MEMORY
 static void *_rt_alloc_obj_impl(l0_int bytes, const char *_loc_file, int _loc_line) {
@@ -1981,6 +2257,8 @@ static void *_rt_alloc_obj(l0_int bytes) {
  * Frees the memory and unregisters it from the allocation tracker.
  * A NULL pointer is a no-op.
  * Panics on invalid pointers (not previously allocated by `new`).
+ * 
+ * @param ptr Pointer to drop.
  */
 #ifdef L0_TRACE_MEMORY
 static void _rt_drop_impl(void *ptr, const char *_loc_file, int _loc_line) {
@@ -2033,11 +2311,16 @@ static void _rt_drop(void *ptr) {
 }
 #endif
 
-/* ============================================================================
+/* =========================================================================
  * Runtime support for hashing (using SipHash-1-3)
- * ============================================================================ */
+ * ========================================================================= */
 
-/* Final mixing function for 32-bit hashes (MurmurHash3 fmix32) */
+/**
+ * Final mixing function for 32-bit hashes (MurmurHash3 fmix32).
+ * 
+ * @param x Current hash.
+ * @return Mixed hash.
+ */
 static inline uint32_t _rt_fmix32(uint32_t x) {
     x ^= x >> 16;
     x *= 0x85ebca6bu;
@@ -2047,13 +2330,17 @@ static inline uint32_t _rt_fmix32(uint32_t x) {
     return x;
 }
 
-/* Fold a 64-bit hash into a 32-bit hash with final mixing. */
+/**
+ * Fold a 64-bit hash into a 32-bit hash with final mixing.
+ * 
+ * @param h 64-bit hash.
+ * @return 32-bit hash.
+ */
 static inline uint32_t _rt_fold_u64_to_u32_fmix(uint64_t h) {
     uint32_t x = (uint32_t)(h ^ (h >> 32));
     return _rt_fmix32(x);
 }
 
-/* Type definitions for SipHash keys and tags */
 typedef uint8_t _rt_siphash_key_t[16];
 typedef uint8_t _rt_siphash_tag8_t[8];
 
@@ -2070,14 +2357,25 @@ static const _rt_siphash_tag8_t _l0_sh_tag_data   = { 0, 'd', 'a', 't', 'a' };
 #define _L0_TAG_ENUM 0x20   /* enum */
 #define _L0_TAG_STRUCT 0x10 /* struct */
 
-/* Default (debug) SipHash key for L0 runtime.
-   In production, it will be randomized at runtime to prevent hash-flooding attacks. */
+/**
+ * Default (debug) SipHash key for L0 runtime.
+ * In production, it will be randomized at runtime to prevent hash-flooding attacks.
+ */
 static _rt_siphash_key_t _rt_sh_key = {
     0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
     0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F
 };
 
-/* Internal helper to hash data with a given 8-byte tag and flags */
+/**
+ * Internal helper to hash data with a given 8-byte tag and flags.
+ * 
+ * @param tag8 8-byte tag.
+ * @param flags Flags.
+ * @param data Pointer to data.
+ * @param len Data length.
+ * @param key SipHash key.
+ * @return 32-bit hash.
+ */
 static l0_int _rt_hash_tag8(const _rt_siphash_tag8_t tag8,
                             const uint8_t flags,
                             const void *data, size_t len,
@@ -2111,13 +2409,17 @@ static l0_int _rt_hash_data(void *data, l0_int size, const uint8_t flags) {
     return _rt_hash_tag8(_l0_sh_tag_data, flags, data, (size_t)size, _rt_sh_key);
 }
 
-/* ============================================================================
+/* =========================================================================
  * User-exposed hash functions
- * ============================================================================ */
+ * ========================================================================= */
 
 /**
  * Hash a boolean value.
- * L0 signature: extern func rt_hash_bool(value: bool) -> int;
+ * 
+ * @param value Boolean value.
+ * @return 32-bit hash.
+ *
+ * L0 signature: `extern func rt_hash_bool(value: bool) -> int;` 
  */
 static l0_int rt_hash_bool(l0_bool value) {
     return _rt_hash_bool(value, 0);
@@ -2125,7 +2427,11 @@ static l0_int rt_hash_bool(l0_bool value) {
 
 /**
  * Hash a byte value.
- * L0 signature: extern func rt_hash_byte(value: byte) -> int;
+ * 
+ * @param value Byte value.
+ * @return 32-bit hash.
+ *
+ * L0 signature: `extern func rt_hash_byte(value: byte) -> int;` 
  */
 static l0_int rt_hash_byte(l0_byte value) {
     return _rt_hash_byte(value, 0);
@@ -2133,7 +2439,11 @@ static l0_int rt_hash_byte(l0_byte value) {
 
 /**
  * Hash an integer value.
- * L0 signature: extern func rt_hash_int(value: int) -> int;
+ * 
+ * @param value Integer value.
+ * @return 32-bit hash.
+ *
+ * L0 signature: `extern func rt_hash_int(value: int) -> int;` 
  */
 static l0_int rt_hash_int(l0_int value) {
     return _rt_hash_int(value, 0);
@@ -2141,7 +2451,11 @@ static l0_int rt_hash_int(l0_int value) {
 
 /**
  * Hash a string value.
- * L0 signature: extern func rt_hash_string(value: string) -> int;
+ * 
+ * @param value L0 string.
+ * @return 32-bit hash.
+ *
+ * L0 signature: `extern func rt_hash_string(value: string) -> int;` 
  */
 static l0_int rt_hash_string(l0_string value) {
     return _rt_hash_string(value, 0);
@@ -2150,8 +2464,12 @@ static l0_int rt_hash_string(l0_string value) {
 /**
  * Hash raw data.
  * Panics if data is null or size is negative.
+ * 
+ * @param data Pointer to data.
+ * @param size Data size.
+ * @return 32-bit hash.
  *
- * L0 signature: extern func rt_hash_data(data: void*, size: int) -> int;
+ * L0 signature: `extern func rt_hash_data(data: void*, size: int) -> int;` 
  */
 static l0_int rt_hash_data(void *data, l0_int size) {
     if (size < 0) {
@@ -2165,8 +2483,11 @@ static l0_int rt_hash_data(void *data, l0_int size) {
 
 /**
  * Hash an optional boolean value.
+ * 
+ * @param opt Optional bool.
+ * @return 32-bit hash.
  *
- * L0 signature: extern func rt_hash_opt_bool(opt: bool?) -> int;
+ * L0 signature: `extern func rt_hash_opt_bool(opt: bool?) -> int;` 
  */
 static l0_int rt_hash_opt_bool(l0_opt_bool opt) {
     uint8_t flags = _L0_TAG_OPT;
@@ -2175,8 +2496,11 @@ static l0_int rt_hash_opt_bool(l0_opt_bool opt) {
 
 /**
  * Hash an optional byte value.
+ * 
+ * @param opt Optional byte.
+ * @return 32-bit hash.
  *
- * L0 signature: extern func rt_hash_opt_byte(opt: byte?) -> int;
+ * L0 signature: `extern func rt_hash_opt_byte(opt: byte?) -> int;` 
  */
 static l0_int rt_hash_opt_byte(l0_opt_byte opt) {
     uint8_t flags = _L0_TAG_OPT;
@@ -2185,8 +2509,11 @@ static l0_int rt_hash_opt_byte(l0_opt_byte opt) {
 
 /**
  * Hash an optional integer value.
+ * 
+ * @param opt Optional int.
+ * @return 32-bit hash.
  *
- * L0 signature: extern func rt_hash_opt_int(opt: int?) -> int;
+ * L0 signature: `extern func rt_hash_opt_int(opt: int?) -> int;` 
  */
 static l0_int rt_hash_opt_int(l0_opt_int opt) {
     uint8_t flags = _L0_TAG_OPT;
@@ -2196,8 +2523,11 @@ static l0_int rt_hash_opt_int(l0_opt_int opt) {
 /**
  * Hash an optional string value.
  * If opt is empty, hashes as an empty string with the optional flag.
+ * 
+ * @param opt Optional string.
+ * @return 32-bit hash.
  *
- * L0 signature: extern func rt_hash_opt_string(opt: string?) -> int;
+ * L0 signature: `extern func rt_hash_opt_string(opt: string?) -> int;` 
  */
 static l0_int rt_hash_opt_string(l0_opt_string opt) {
     uint8_t flags = _L0_TAG_OPT;
@@ -2212,8 +2542,11 @@ static l0_int rt_hash_opt_string(l0_opt_string opt) {
  * Hash a pointer value.
  * Note: this hashes the pointer value (address), not the data it points to.
  * Panics if ptr is null.
+ * 
+ * @param ptr Pointer.
+ * @return 32-bit hash.
  *
- * L0 signature: extern func rt_hash_ptr(ptr: void*) -> int;
+ * L0 signature: `extern func rt_hash_ptr(ptr: void*) -> int;` 
  */
 static l0_int rt_hash_ptr(void *ptr) {
     if (ptr == NULL) {
@@ -2227,8 +2560,11 @@ static l0_int rt_hash_ptr(void *ptr) {
  * Hash an optional pointer value.
  * Note: this hashes the pointer value (address), not the data it points to.
  * Panics if opt is empty (null pointer).
+ * 
+ * @param opt Pointer.
+ * @return 32-bit hash.
  *
- * L0 signature: extern func rt_hash_opt_ptr(opt: void*?) -> int;
+ * L0 signature: `extern func rt_hash_opt_ptr(opt: void*?) -> int;` 
  */
 static l0_int rt_hash_opt_ptr(void *opt) {
     if (opt == NULL) {
@@ -2238,8 +2574,8 @@ static l0_int rt_hash_opt_ptr(void *opt) {
     return _rt_hash_data(&opt, sizeof(void*), flags);
 }
 
-/* ============================================================================
+/* =========================================================================
  * End of L0 Runtime
- * ============================================================================ */
+ * ========================================================================= */
 
 #endif /* L0_RUNTIME_H */

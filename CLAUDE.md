@@ -45,8 +45,9 @@ Also see: `CONTRIBUTING.md`, `SECURITY.md`.
 - **Virtual Environment:** Always check for a local `.venv` and/or `uv` availability. Use the local virtual environment
   to execute `pytest` and `./l0c`.
 - **Environment Variables:** Source `source ./l0-env.sh` when needed to set up `L0_HOME`, `PATH`, and `L0_CC`.
-- **Auto-provisioning:** If no local virtual environment is available and sufficient permissions are granted, install one
-  using `uv sync` (preferred, uses `pyproject.toml`) or `python3 -m venv .venv && source .venv/bin/activate && pip install -e .`.
+- **Auto-provisioning:** If no local virtual environment is available and sufficient permissions are granted, install
+  one using `uv sync` (preferred, uses `pyproject.toml`) or
+  `python3 -m venv .venv && source .venv/bin/activate && pip install -e .`.
 
 ## Commands
 
@@ -138,6 +139,11 @@ grep -r 'XXX-NNNN' --include='*.py' compiler/stage1_py/
 - Before committing, verify this file's accuracy (file references current, new modules listed, deleted ones removed).
 
 ## Quality Standards
+
+### Documentation Standards
+
+- **Python:** Use Google Style docstrings (Args, Returns, Raises).
+- **C (.h/.c) & L0 (.l0):** Use Doxygen Style (Javadoc format: `/** ... */` with `@param`, `@return`; omit `@brief`).
 
 ### Definition of Done
 

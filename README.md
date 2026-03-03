@@ -89,9 +89,10 @@ func process_config(path: string) -> int {
 4. [Grammar](#grammar)
 5. [Compiler implementation architecture](#compiler-implementation-architecture)
 6. [CLI](#cli)
-7. [Project status](#project-status)
-8. [License](#license)
-9. [Author](#author)
+7. [Coding conventions](#coding-conventions)
+8. [Project status](#project-status)
+9. [License](#license)
+10. [Author](#author)
 
 ## Getting Started
 
@@ -414,6 +415,20 @@ How many acres do you wish to buy?
 ```
 
 Enjoy the game! Type your inputs as prompted and see how well you can govern ancient Sumeria.
+
+## Coding conventions
+
+When writing or modifying C/C++ and Dea/L0 code in this repository, please adhere to the following styling and documentation conventions:
+
+- **Documentation Blocks:** Use Javadoc-style Doxygen comments (`/** ... */`) for functions, types, and files. Omit the `@brief` tag; rely on the first sentence for the brief description.
+- **License Headers:** Use standard C block comments (`/* ... */`) for `SPDX-License-Identifier` and copyright information to separate them from API documentation.
+- **Section Banners:** Keep separator banners within a **79-character maximum line width**. A standard section banner uses exactly 73 equals signs (`=`):
+  ```c
+  /* =========================================================================
+   * Section name
+   * ========================================================================= */
+  ```
+For more details, including Python standards, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Project status
 

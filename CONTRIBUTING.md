@@ -74,6 +74,31 @@ Use verbose flags to see compilation stages:
 - Error handling: return structured diagnostics (`Diagnostic` objects); avoid silent failures.
 - See `docs/design_decisions.md` for rationale behind key language and compiler choices.
 
+### Documentation and styling standards
+
+- **Python:** Use Google Style docstrings (include `Args`, `Returns`, `Raises` sections).
+- **C (.h/.c) & L0 (.l0):**
+    - **Doxygen:** Use Javadoc format (`/** ... */` with `@param`, `@return` tags). Omit the `@brief` tag; rely on the
+      first sentence for the brief description.
+    - **License Headers:** Keep `SPDX-License-Identifier` and copyright headers in standard C block comments
+      (`/* ... */`) at the top of the file, distinct from Doxygen blocks.
+    - **Section Separators:**
+        - **C/C++:** Banners must fit within a **79-character maximum line width**. For standard block comment
+          separators, use exactly 73 equals signs (`=`):
+          ```c
+          /* =========================================================================
+           * Section name
+           * ========================================================================= */
+          ```
+        - **L0:** Use a shorter format to fit within a 40-character line width, with exactly 33 equals (`=`) or
+          hyphen ( `-`) signs. The title should stay within 33 characters (introduce a newline if longer).
+          ```
+          /* =================================
+             Section Name
+             ================================= */
+          ```
+          Notice the closing line has exactly 3 leading spaces and 33 signs before the `*/`.
+
 ### Commit messages
 
 - Use sentence case with a period at the end (e.g., "Add `byte` type support.").
