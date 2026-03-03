@@ -1,6 +1,12 @@
 #  SPDX-License-Identifier: MIT OR Apache-2.0
 #  Copyright (c) 2025-2026 gwz
 
+"""Module-level name resolution for the L0 compiler.
+
+This module provides the NameResolver class which builds module environments,
+collects top-level symbols, and handles import semantics.
+"""
+
 from typing import Dict
 
 from l0_ast import Node, StructDecl, EnumVariant, EnumDecl, TypeAliasDecl, LetDecl
@@ -11,26 +17,35 @@ from l0_symbols import SymbolKind, Symbol, ModuleEnv
 
 
 class NameResolver:
-    """
-    Stage-1 name resolver (module-level only, open import semantics).
+    """Stage-1 name resolver for module-level symbols.
 
-    - Builds ModuleEnv for each module in a CompilationUnit.
-    - Collects top-level symbols (funcs, structs, enums, variants, type aliases).
-    - Opens imports by injecting imported modules' local symbols into importers.
-    - Detects:
-        * duplicate local definitions
-        * conflicts between local and imported definitions
-        * conflicts between multiple imports exporting the same name
+    This resolver:
+    - Builds a ModuleEnv for each module in a CompilationUnit.
+    - Collects top-level symbols (functions, structs, enums, variants, aliases).
+    - Processes imports by injecting imported symbols into the importer's scope.
+    - Detects duplicate definitions and import conflicts.
+
+    Attributes:
+        cu: The compilation unit to resolve.
+        module_envs: Mapping of module names to their built environments.
+        diagnostics: List of collected diagnostics.
     """
 
     def __init__(self, cu: CompilationUnit):
+        """Initialize the name resolver.
+
+        Args:
+            cu: The compilation unit to process.
+        """
         self.cu = cu
         self.module_envs: Dict[str, ModuleEnv] = {}
         self.diagnostics: list[Diagnostic] = []
 
     def resolve(self) -> Dict[str, ModuleEnv]:
-        """
-        Main entry point: build environments for all modules and return the mapping.
+        """Resolve names for all modules in the compilation unit.
+
+        Returns:
+            A mapping from module names to their populated ModuleEnv objects.
         """
         # 1. Create envs
         for module in self.cu.modules.values():
@@ -41,7 +56,7 @@ class NameResolver:
         for env in self.module_envs.values():
             self._collect_locals(env)
 
-        # 3. Open imports (Option B semantics)
+        # 3. Open imports
         for env in self.module_envs.values():
             self._open_imports(env)
 
@@ -54,9 +69,10 @@ class NameResolver:
     # --- internal helpers ---
 
     def _collect_locals(self, env: ModuleEnv) -> None:
-        """
-        Populate env.locals and env.all from the module's own declarations.
-        Detect duplicate top-level names inside the same module.
+        """Collect local symbols from module declarations.
+
+        Args:
+            env: The module environment to populate.
         """
         m = env.module
 
@@ -110,10 +126,12 @@ class NameResolver:
                 continue
 
     def _define_local(self, env: ModuleEnv, name: str, sym: Symbol) -> None:
-        """
-        Define a local symbol in a module, reporting duplicates.
+        """Define a local symbol, checking for duplicates.
 
-        If a local with the same name already exists, keep the first and emit an error.
+        Args:
+            env: The environment to define the symbol in.
+            name: The name of the symbol.
+            sym: The Symbol object.
         """
         if name in env.locals:
             env.diagnostics.append(
@@ -125,20 +143,25 @@ class NameResolver:
                     node=(sym.node if isinstance(sym.node, Node) else None),
                 )
             )
-            # Keep existing symbol; ignore new one.
+            # Keep the previously defined local symbol
             return
 
         env.locals[name] = sym
         env.all[name] = sym
 
     def _open_imports(self, env: ModuleEnv) -> None:
-        """
-        Apply the following import semantics:
+        """Process imports for a module environment.
 
-        - For each imported module, add its locals into env.imported/env.all.
-        - If a name collides with a local, keep the local and report an error.
-        - If a name is imported from multiple modules, mark it ambiguous and
-          remove it from env.all; later resolution will see no binding.
+        Args:
+            env: The module environment whose imports should be opened.
+
+        Note:
+            Apply the following rules when opening imports:
+
+            - For each imported module, add its locals into `env.imported` and `env.all`.
+            - If a name collides with a local, keep the local and issue a warning.
+            - If a name is imported from multiple modules, mark it ambiguous, remove
+              it from `env.all` and issue a warning; later resolution will see no binding.
         """
         m = env.module
 
@@ -147,8 +170,7 @@ class NameResolver:
 
             imported_env = self.module_envs.get(imported_mod_name)
             if imported_env is None:
-                # In a well-formed CompilationUnit this shouldn't happen,
-                # since the driver should have already loaded all imports.
+                # Defensive check: the driver should have already loaded all modules
                 env.diagnostics.append(
                     diag_from_node(
                         kind="error",
@@ -235,7 +257,7 @@ class NameResolver:
                     env.all[name] = sym
 
     def _extern_signatures_compatible(self, local: Symbol, imported: Symbol) -> bool:
-        # Only functions
+        """Check if two extern function signatures are compatible."""
         if local.kind is not SymbolKind.FUNC or imported.kind is not SymbolKind.FUNC:
             return False
 

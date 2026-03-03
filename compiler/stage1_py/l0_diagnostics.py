@@ -1,12 +1,17 @@
 #  SPDX-License-Identifier: MIT OR Apache-2.0
 #  Copyright (c) 2025-2026 gwz
 
+"""Diagnostic reporting for the L0 compiler.
+
+This module defines the Diagnostic dataclass and helper functions for
+creating diagnostics from AST nodes and tokens.
+"""
+
 import os
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 
 from l0_ast import Node
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from l0_lexer import Token
@@ -204,10 +209,22 @@ DIAGNOSTIC_CODE_FAMILIES = {
 
 @dataclass
 class Diagnostic:
-    kind: str  # "error" or "warning"
+    """Represents a compiler diagnostic (error or warning).
+
+    Attributes:
+        kind: The kind of diagnostic ("error" or "warning").
+        message: The diagnostic message.
+        module_name: Optional name of the module where the diagnostic occurred.
+        filename: Optional file path where the diagnostic occurred.
+        line: 1-based line number of the start of the diagnostic.
+        column: 1-based column number of the start of the diagnostic.
+        end_line: 1-based line number of the end of the diagnostic.
+        end_column: 1-based column number of the end of the diagnostic.
+    """
+    kind: str
     message: str
-    module_name: Optional[str] = None  # module name
-    filename: Optional[str] = None  # file path
+    module_name: Optional[str] = None
+    filename: Optional[str] = None
 
     # Primary location (start of the span)
     line: Optional[int] = None
@@ -217,8 +234,12 @@ class Diagnostic:
     end_line: Optional[int] = None
     end_column: Optional[int] = None
 
-    # Return the one-line header; snippets will be printed at the call site
     def format(self) -> str:
+        """Format the diagnostic as a one-line string header.
+
+        Returns:
+            A formatted string containing location, kind, and message.
+        """
         loc = ""
         if self.filename is not None:
             loc += f"{os.path.abspath(str(self.filename))}"
@@ -241,6 +262,18 @@ def diag_from_node(
         filename: Optional[str],
         node: Optional[Node],
 ) -> Diagnostic:
+    """Create a Diagnostic from an AST node.
+
+    Args:
+        kind: The kind of diagnostic ("error" or "warning").
+        message: The diagnostic message.
+        module_name: Optional module name.
+        filename: Optional filename.
+        node: Optional AST node providing span information.
+
+    Returns:
+        A new Diagnostic instance.
+    """
     line = column = end_line = end_column = None
     if node is not None and node.span is not None:
         s = node.span
@@ -267,6 +300,18 @@ def diag_from_token(
         filename: Optional[str],
         token: Optional["Token"],
 ) -> Diagnostic:
+    """Create a Diagnostic from a lexer token.
+
+    Args:
+        kind: The kind of diagnostic ("error" or "warning").
+        message: The diagnostic message.
+        module_name: Optional module name.
+        filename: Optional filename.
+        token: Optional lexer token providing location information.
+
+    Returns:
+        A new Diagnostic instance.
+    """
     line = column = end_line = end_column = None
     if token is not None:
         line = token.line

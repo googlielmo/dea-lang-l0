@@ -1,11 +1,12 @@
-"""
-Scope Context
-
-Tracks variables and their lifetimes for cleanup management.
-"""
-
 #  SPDX-License-Identifier: MIT OR Apache-2.0
 #  Copyright (c) 2025-2026 gwz
+
+"""Scope tracking for resource management in the L0 compiler.
+
+This module provides the ScopeContext class, used during code generation to
+track variable lifetimes and schedule mandatory cleanups (ARC releases and
+'with' statement logic).
+"""
 
 from dataclasses import dataclass, field
 from typing import List, Optional, Tuple
@@ -16,26 +17,52 @@ from l0_ast import Block, Stmt
 
 @dataclass
 class ScopeContext:
-    """Track variables that need cleanup in current scope."""
-    owned_vars: List[Tuple[str, Type]] = field(default_factory=list)  # Variables needing cleanup
-    declared_vars: List[Tuple[str, Type]] = field(default_factory=list)  # All variables (for type lookup)
+    """Tracks variables and cleanup requirements for a single lexical scope.
+
+    Attributes:
+        owned_vars: Variables that must be cleaned up when the scope is exited.
+        declared_vars: All variables visible in this scope, used for type lookups.
+        parent: The enclosing scope context, if any.
+        with_cleanup_inline: List of cleanup statements for inline 'with' items.
+        with_cleanup_block: Optional block for 'with ... cleanup { ... }'.
+        with_cleanup_in_progress: Reentrancy guard for with-cleanup emission.
+    """
+    owned_vars: List[Tuple[str, Type]] = field(default_factory=list)
+    declared_vars: List[Tuple[str, Type]] = field(default_factory=list)
     parent: Optional['ScopeContext'] = None
-    # with-statement cleanup data, set by _emit_with for early-exit handling.
     with_cleanup_inline: Optional[List[Stmt]] = None
     with_cleanup_block: Optional[Block] = None
     with_cleanup_in_progress: bool = False
 
     def add_owned(self, var_name: str, var_type: Type) -> None:
-        """Mark a variable as owned (needs cleanup) and declared."""
+        """Mark a variable as owned (requiring cleanup) and declared.
+
+        Args:
+            var_name: The (mangled) name of the variable.
+            var_type: The L0 Type of the variable.
+        """
         if var_type is not None:
             self.owned_vars.append((var_name, var_type))
             self.declared_vars.append((var_name, var_type))
 
     def add_declared(self, var_name: str, var_type: Type) -> None:
-        """Mark a variable as declared (for type lookup only, no cleanup)."""
+        """Mark a variable as declared for type lookup only.
+
+        Used for function parameters and pattern variables, which are
+        managed by the caller or scrutinee and do not require cleanup
+        within the current scope.
+
+        Args:
+            var_name: The (mangled) name of the variable.
+            var_type: The L0 Type of the variable.
+        """
         if var_type is not None:
             self.declared_vars.append((var_name, var_type))
 
     def remove_owned(self, var_name: str) -> None:
-        """Remove from owned list (e.g., when returning the variable)."""
+        """Remove a variable from the owned set.
+
+        Args:
+            var_name: The (mangled) name of the variable to stop tracking.
+        """
         self.owned_vars = [(name, ty) for name, ty in self.owned_vars if name != var_name]

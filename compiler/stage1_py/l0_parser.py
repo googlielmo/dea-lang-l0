@@ -1,9 +1,14 @@
 #  SPDX-License-Identifier: MIT OR Apache-2.0
 #  Copyright (c) 2025-2026 gwz
 
+"""Parser implementation for the L0 compiler.
+
+This module provides the Parser class for recursive descent parsing of L0 tokens
+into an abstract syntax tree (AST).
+"""
+
 from dataclasses import dataclass
-from typing import List, Optional
-from l0_diagnostics import Diagnostic
+from typing import List, Optional, NoReturn
 
 from l0_ast import (
     Span, TypeRef, Import, TopLevelDecl, Param, FuncDecl, FieldDecl, StructDecl, EnumVariant, EnumDecl,
@@ -12,6 +17,7 @@ from l0_ast import (
     ByteLiteral, StringLiteral, BoolLiteral, NullLiteral, VarRef, UnaryOp, BinaryOp, CallExpr, IndexExpr,
     FieldAccessExpr, ParenExpr, CastExpr, TryExpr, TypeExpr, NewExpr, BreakStmt, ContinueStmt, ForStmt,
     WithItem, WithStmt)
+from l0_diagnostics import Diagnostic
 from l0_lexer import TokenKind, Token, Lexer, is_reserved_keyword
 
 
@@ -21,10 +27,19 @@ from l0_lexer import TokenKind, Token, Lexer, is_reserved_keyword
 
 @dataclass
 class _ParseSyncException(Exception):
+    """Internal exception used for error recovery during parsing."""
     pass
 
 
 def token_len(tok: Token) -> int:
+    """Calculate the display length of a token.
+
+    Args:
+        tok: The token to measure.
+
+    Returns:
+        The length of the token's text, accounting for literal quotes.
+    """
     if tok.kind in (TokenKind.STRING, TokenKind.BYTE):
         # Account for the quotes around string and byte literals
         return len(tok.text) + 2
@@ -33,8 +48,27 @@ def token_len(tok: Token) -> int:
 
 
 class Parser:
+    """Recursive descent parser for L0.
+
+    Converts a flat list of tokens into a hierarchical AST. Implements
+    error recovery via synchronization points.
+
+    Attributes:
+        tokens: The list of tokens to parse.
+        index: Current position in the token list.
+        filename: Name of the file being parsed (for diagnostics).
+        diagnostics: Collected list of parse errors and warnings.
+    """
+
     def __init__(self, tokens: List[Token], filename: Optional[str] = None,
                  diagnostics: Optional[List[Diagnostic]] = None) -> None:
+        """Initialize the parser.
+
+        Args:
+            tokens: The tokens to parse.
+            filename: Optional source filename.
+            diagnostics: Optional list to collect diagnostics into.
+        """
         self.tokens = tokens
         self.index = 0
         self.filename = filename
@@ -42,6 +76,14 @@ class Parser:
 
     @classmethod
     def from_source(cls, source: str) -> "Parser":
+        """Create a parser from a source string.
+
+        Args:
+            source: The source code text.
+
+        Returns:
+            A new Parser instance populated with tokens.
+        """
         lexer = Lexer.from_source(source)
         tokens = lexer.tokenize()
         return cls(tokens)
@@ -49,52 +91,90 @@ class Parser:
     # --- token utilities ---
 
     def _error(self, message: str, token: Optional[Token] = None) -> None:
+        """Add an error diagnostic.
+
+        Args:
+            message: The error message.
+            token: Optional token where the error occurred. Defaults to peek().
+        """
         tok = token if token is not None else self._peek()
         line = tok.line if tok else 0
         column = tok.column if tok else 0
         self.diagnostics.append(
             Diagnostic(kind="error", message=message, filename=self.filename, line=line, column=column))
 
-    def _error_bail(self, message: str, token: Optional[Token] = None) -> None:
+    def _error_bail(self, message: str, token: Optional[Token] = None) -> NoReturn:
+        """Report an error and raise a synchronization exception.
+
+        Args:
+            message: The error message.
+            token: Optional token where the error occurred.
+
+        Raises:
+            _ParseSyncException: Always raised to trigger recovery.
+        """
         self._error(message, token)
         raise _ParseSyncException()
 
-    def _error_unexpected(self, error_code: str, tok: Token, context: str) -> None:
+    def _error_unexpected(self, error_code: str, tok: Token, context: str) -> NoReturn:
+        """Report an unexpected token error and raise a synchronization exception.
+
+        Args:
+            error_code: The diagnostic code (e.g., "[PAR-nnnn]").
+            tok: The unexpected token.
+            context: Description of what was being parsed.
+        """
         if tok.kind is TokenKind.EOF:
             self._error_bail(f"{error_code} unexpected end of file in {context}", tok)
 
         self._error_bail(f"{error_code} unexpected '{tok.text}' in {context}", tok)
 
     def _peek(self) -> Token:
+        """Return the current token without advancing."""
         return self.tokens[self.index]
 
     def _last(self) -> Token:
+        """Return the previously advanced token."""
         return self.tokens[self.index - 1 if self.index > 0 else 0]
 
     def _at_end(self) -> bool:
+        """Check if at the end of the token stream."""
         return self._peek().kind is TokenKind.EOF
 
     def _advance(self) -> Token:
+        """Advance the current index and return the token."""
         tok = self._peek()
         if not self._at_end():
             self.index += 1
         return tok
 
     def _check(self, kind: TokenKind) -> bool:
+        """Check if the current token is of the specified kind."""
         return self._peek().kind is kind
 
     def _match(self, *kinds: TokenKind) -> bool:
+        """Advance and return True if the current token matches any of the kinds."""
         if self._peek().kind in kinds:
             self._advance()
             return True
         return False
 
     def _expect(self, kind: TokenKind, msg: str) -> Token:
+        """Advance if the current token matches kind, otherwise bail.
+
+        Args:
+            kind: The expected TokenKind.
+            msg: The error message if expectation fails.
+
+        Returns:
+            The matched token.
+        """
         if not self._check(kind):
             self._error_bail(f"{msg}, got {self._peek()} instead")
         return self._advance()
 
     def _expect_semicolon(self, msg: Optional[str] = None) -> None:
+        """Expect and consume a semicolon, reporting an error if missing."""
         if not self._match(TokenKind.SEMI):
             prev = self._last()
             if prev is not None:
@@ -108,6 +188,7 @@ class Parser:
                 self._error(error_msg, tok)
 
     def _expect_variable_name(self, msg: str) -> Token:
+        """Expect and consume a valid variable name (non-reserved identifier)."""
         tok = self._peek()
         if tok.kind == TokenKind.FUTURE_EXTENSION:
             self._error_bail(f"[PAR-0010] invalid variable name '{tok.text}': reserved keyword", tok)
@@ -117,10 +198,12 @@ class Parser:
         return tok
 
     def _span_start(self) -> Span:
+        """Create a zero-length span starting at the current token."""
         here = self._peek()
         return Span(here.line, here.column, here.line, here.column)
 
     def _extend_span(self, start: Span) -> Span:
+        """Create a new span extending from start to the end of the last token."""
         here = self._last()
         return Span(
             start.start_line,
@@ -130,6 +213,7 @@ class Parser:
         )
 
     def _get_dotted_module_name(self, first: Token) -> list[str]:
+        """Parse a dotted module name (e.g., a.b.c)."""
         parts = [first.text]
 
         while self._match(TokenKind.DOT):
@@ -138,6 +222,11 @@ class Parser:
         return parts
 
     def _try_parse_qualified_name(self) -> Optional[tuple[list[str], Optional[list[str]], Token]]:
+        """Try to parse a qualified name (e.g., mod::name).
+
+        Returns:
+            A tuple (module_path, qualifier, name_token) if successful, else None.
+        """
         if not self._check(TokenKind.IDENT):
             return None
         saved = self.index
@@ -162,8 +251,14 @@ class Parser:
     # --- entry point ---
 
     def parse_module(self, filename: Optional[str] = None) -> Module:
-        # module <Ident ( "." Ident )*> ;
+        """Parse a complete L0 module.
 
+        Args:
+            filename: Optional source filename for diagnostics.
+
+        Returns:
+            A Module AST node.
+        """
         if filename is not None:
             self.filename = filename
 
@@ -179,7 +274,6 @@ class Parser:
             module_name = ".".join(mod_parts)
 
             imports: List[Import] = []
-            # import <Ident ( "." Ident )*> ;
             while self._match(TokenKind.IMPORT):
                 first = self._expect(TokenKind.IDENT, "[PAR-0320] expected imported module name")
                 parts = self._get_dotted_module_name(first)
@@ -212,6 +306,7 @@ class Parser:
     # --- top-level declarations ---
 
     def _parse_top_level_decl(self) -> TopLevelDecl:
+        """Parse a single top-level declaration."""
         if self._check(TokenKind.EXTERN):
             return self._parse_extern_func()
         if self._check(TokenKind.FUNC):
@@ -227,10 +322,12 @@ class Parser:
         self._error_unexpected("[PAR-0020]", self._peek(), "top level declaration");
 
     def _parse_extern_func(self) -> FuncDecl:
+        """Parse an 'extern' function declaration."""
         self._expect(TokenKind.EXTERN, "[PAR-0030] expected 'extern'")
         return self._parse_function(is_extern=True)
 
     def _parse_function(self, is_extern: bool) -> FuncDecl:
+        """Parse a function declaration or definition."""
         start = self._span_start()
         self._expect(TokenKind.FUNC, "[PAR-0040] expected 'func'")
         name_tok = self._expect(TokenKind.IDENT, "[PAR-0041] expected function name")
@@ -246,10 +343,8 @@ class Parser:
                     break
         self._expect(TokenKind.RPAREN, "[PAR-0045] expected ')' after parameters")
 
-        # no -> means void return type
         if not self._match(TokenKind.ARROW_FUNC):
             ret_type = TypeRef("void", 0, False, span=self._extend_span(start))
-
         else:
             ret_type = self._parse_type()
 
@@ -262,6 +357,7 @@ class Parser:
         return FuncDecl(name_tok.text, params, ret_type, body=body, is_extern=False, span=self._extend_span(start))
 
     def _parse_struct(self) -> StructDecl:
+        """Parse a struct definition."""
         start = self._span_start()
         self._expect(TokenKind.STRUCT, "[PAR-0050] expected 'struct'")
         name_tok = self._expect(TokenKind.IDENT, "[PAR-0051] expected struct name")
@@ -277,6 +373,7 @@ class Parser:
         return StructDecl(name_tok.text, fields, span=self._extend_span(start))
 
     def _parse_enum(self) -> EnumDecl:
+        """Parse an enum definition."""
         start = self._span_start()
         self._expect(TokenKind.ENUM, "[PAR-0060] expected 'enum'")
         name_tok = self._expect(TokenKind.IDENT, "[PAR-0061] expected enum name")
@@ -301,6 +398,7 @@ class Parser:
         return EnumDecl(name_tok.text, variants, span=self._extend_span(start))
 
     def _parse_type_alias(self) -> TypeAliasDecl:
+        """Parse a type alias declaration."""
         start = self._span_start()
         self._expect(TokenKind.TYPE, "[PAR-0070] expected type name")
         name_tok = self._expect(TokenKind.IDENT, "[PAR-0071] expected type alias name")
@@ -310,6 +408,7 @@ class Parser:
         return TypeAliasDecl(name_tok.text, target, span=self._extend_span(start))
 
     def _parse_top_level_let(self) -> LetDecl:
+        """Parse a top-level 'let' binding."""
         start = self._span_start()
         self._expect(TokenKind.LET, "[PAR-0080] expected 'let'")
         name_tok = self._expect_variable_name("[PAR-0081] expected variable name")
@@ -326,6 +425,7 @@ class Parser:
     # --- types ---
 
     def _parse_type(self) -> TypeRef:
+        """Parse a type reference including pointer and nullability suffixes."""
         start = self._span_start()
         module_path = None
         name_qualifier = None
@@ -350,6 +450,7 @@ class Parser:
     # --- blocks and statements ---
 
     def _parse_block(self) -> Block:
+        """Parse a block of statements enclosed in braces."""
         start = self._span_start()
         self._expect(TokenKind.LBRACE, "[PAR-0090] expected '{' to start block")
         stmts: List[Stmt] = []
@@ -375,15 +476,16 @@ class Parser:
             if kind in (TokenKind.RBRACE, TokenKind.FUNC, TokenKind.STRUCT, TokenKind.ENUM, TokenKind.TYPE, TokenKind.EXTERN):
                 return
             # If we hit a statement-starting keyword, we are synced.
-            if kind in (TokenKind.LET, TokenKind.IF, TokenKind.WHILE, TokenKind.FOR, TokenKind.RETURN, 
+            if kind in (TokenKind.LET, TokenKind.IF, TokenKind.WHILE, TokenKind.FOR, TokenKind.RETURN,
                         TokenKind.BREAK, TokenKind.CONTINUE, TokenKind.DROP, TokenKind.MATCH, 
                         TokenKind.CASE, TokenKind.WITH):
                 return
             self._advance()
 
     def _parse_stmt(self) -> Stmt:
+        """Parse a single statement."""
         if self._check(TokenKind.LBRACE):
-            return self._parse_block()  # nested block as statement
+            return self._parse_block()
         elif self._check(TokenKind.IF):
             return self._parse_if_stmt()
         elif self._check(TokenKind.MATCH):
@@ -404,6 +506,7 @@ class Parser:
         return simple_stmt
 
     def _parse_simple_stmt(self) -> Stmt:
+        """Parse a simple statement (let, break, return, assign, or expr)."""
         start = self._span_start()
 
         if self._check(TokenKind.LET):
@@ -428,6 +531,7 @@ class Parser:
         return simple_stmt
 
     def _parse_let_stmt(self) -> LetStmt:
+        """Parse a local 'let' statement."""
         start = self._span_start()
         self._expect(TokenKind.LET, "[PAR-0110] expected 'let'")
         name_tok = self._expect_variable_name("[PAR-0111] expected variable name")
@@ -441,6 +545,7 @@ class Parser:
         return LetStmt(name_tok.text, type_ref, value, span=self._extend_span(start))
 
     def _parse_if_stmt(self) -> IfStmt:
+        """Parse an 'if' statement."""
         start = self._span_start()
         self._expect(TokenKind.IF, "[PAR-0120] expected 'if'")
         self._expect(TokenKind.LPAREN, "[PAR-0121] expected '(' after 'if'")
@@ -453,6 +558,7 @@ class Parser:
         return IfStmt(cond, then_stmt, else_stmt, span=self._extend_span(start))
 
     def _parse_while_stmt(self) -> WhileStmt:
+        """Parse a 'while' loop statement."""
         start = self._span_start()
         self._expect(TokenKind.WHILE, "[PAR-0130] expected 'while'")
         self._expect(TokenKind.LPAREN, "[PAR-0131] expected '('")
@@ -464,19 +570,20 @@ class Parser:
         return WhileStmt(cond, body, span=self._extend_span(start))
 
     def _parse_for_stmt(self) -> Stmt:
+        """Parse a 'for' loop statement."""
         start = self._span_start()
         self._expect(TokenKind.FOR, "[PAR-0140] expected 'for'")
         self._expect(TokenKind.LPAREN, "[PAR-0141] expected '(' after 'for'")
         # Initialization
         if self._check(TokenKind.SEMI):
-            self._advance()  # consume the ';'
+            self._advance()
             init = None
         else:
             init = self._parse_simple_stmt()
             self._expect_semicolon("[PAR-0142] expected ';' after for loop initialization")
         # Condition
         if self._check(TokenKind.SEMI):
-            self._advance()  # consume the ';'
+            self._advance()
             cond = None
         else:
             cond = self._parse_expr()
@@ -494,6 +601,7 @@ class Parser:
         return ForStmt(init, cond, post, body, span=self._extend_span(start))
 
     def _parse_return_stmt(self) -> ReturnStmt:
+        """Parse a 'return' statement."""
         start = self._span_start()
         self._expect(TokenKind.RETURN, "[PAR-0150] expected 'return'")
         if self._check(TokenKind.SEMI):
@@ -502,12 +610,14 @@ class Parser:
         return ReturnStmt(value, span=self._extend_span(start))
 
     def _parse_drop_stmt(self) -> DropStmt:
+        """Parse a 'drop' statement."""
         start = self._span_start()
         self._expect(TokenKind.DROP, "[PAR-0160] expected 'drop'")
         name_tok = self._expect_variable_name("[PAR-0161] expected variable name after 'drop'")
         return DropStmt(name_tok.text, span=self._extend_span(start))
 
     def _parse_match_stmt(self) -> MatchStmt:
+        """Parse a 'match' statement."""
         start = self._span_start()
         self._expect(TokenKind.MATCH, "[PAR-0170] expected 'match'")
         self._expect(TokenKind.LPAREN, "[PAR-0171] expected '('")
@@ -524,7 +634,7 @@ class Parser:
             arms.append(MatchArm(pattern, body, span=self._extend_span(arm_start)))
         self._expect(TokenKind.RBRACE, "[PAR-0175] expected '}' after match")
 
-        # Check for duplicate patterns/variant names or no arms
+        # Check for duplicate patterns or no arms
         if len(arms) != len(set(arm.pattern.name for arm in arms
                                 if isinstance(arm.pattern, VariantPattern))
                                     .union("_" for arm in arms
@@ -537,6 +647,7 @@ class Parser:
         return MatchStmt(expr, arms, span=self._extend_span(start))
 
     def _parse_with_item(self) -> WithItem:
+        """Parse a single item in a 'with' statement."""
         start = self._span_start()
         init = self._parse_simple_stmt()
         cleanup = None
@@ -545,6 +656,7 @@ class Parser:
         return WithItem(init, cleanup, span=self._extend_span(start))
 
     def _parse_with_stmt(self) -> WithStmt:
+        """Parse a 'with' statement for resource management."""
         start = self._span_start()
         self._expect(TokenKind.WITH, "[PAR-0500] expected 'with'")
         self._expect(TokenKind.LPAREN, "[PAR-0501] expected '(' after 'with'")
@@ -570,6 +682,7 @@ class Parser:
         return WithStmt(items, body, cleanup_body, span=self._extend_span(start))
 
     def _parse_case_stmt(self) -> CaseStmt:
+        """Parse a 'case' statement (multi-way constant branch)."""
         start = self._span_start()
         self._expect(TokenKind.CASE, "[PAR-0230] expected 'case'")
         self._expect(TokenKind.LPAREN, "[PAR-0231] expected '('")
@@ -610,6 +723,7 @@ class Parser:
         return CaseStmt(expr, arms, else_arm, span=self._extend_span(start))
 
     def _parse_case_literal(self) -> Expr:
+        """Parse a literal value for a 'case' arm."""
         start = self._span_start()
         tok = self._peek()
         if self._match(TokenKind.INT):
@@ -625,6 +739,7 @@ class Parser:
         self._error_bail("[PAR-0241] expected literal in 'case' arm", tok)
 
     def _parse_pattern(self) -> Pattern:
+        """Parse a pattern for 'match' arms."""
         start = self._span_start()
         # Wildcard '_'
         if self._match(TokenKind.UNDERSCORE):
@@ -653,11 +768,13 @@ class Parser:
         self._error_unexpected("[PAR-0182]", self._peek(), "pattern")
 
     def _parse_break_stmt(self) -> Stmt:
+        """Parse a 'break' statement."""
         start = self._span_start()
         self._expect(TokenKind.BREAK, "[PAR-0190] expected 'break'")
         return BreakStmt(span=self._extend_span(start))
 
-    def _parse_continue_stmt(self):
+    def _parse_continue_stmt(self) -> Stmt:
+        """Parse a 'continue' statement."""
         start = self._span_start()
         self._expect(TokenKind.CONTINUE, "[PAR-0200] expected 'continue'")
         return ContinueStmt(span=self._extend_span(start))
@@ -665,6 +782,7 @@ class Parser:
     # --- expressions with precedence ---
 
     def _parse_expr(self) -> Expr:
+        """Parse an expression (entry point for expression parsing)."""
         return self._parse_or_expr()
 
     _RESERVED_BINARY_OPS = {
@@ -683,6 +801,7 @@ class Parser:
             self._error_bail(f"[PAR-0226] {desc} operator is not yet supported", tok)
 
     def _parse_or_expr(self) -> Expr:
+        """Parse a logical OR expression."""
         start = self._span_start()
         expr = self._parse_and_expr()
         self._check_reserved_binary_op()
@@ -694,6 +813,7 @@ class Parser:
         return expr
 
     def _parse_and_expr(self) -> Expr:
+        """Parse a logical AND expression."""
         start = self._span_start()
         expr = self._parse_equality_expr()
         self._check_reserved_binary_op()
@@ -705,6 +825,7 @@ class Parser:
         return expr
 
     def _parse_equality_expr(self) -> Expr:
+        """Parse an equality expression."""
         start = self._span_start()
         expr = self._parse_rel_expr()
         while self._match(TokenKind.EQEQ, TokenKind.NE):
@@ -714,6 +835,7 @@ class Parser:
         return expr
 
     def _parse_rel_expr(self) -> Expr:
+        """Parse a relational expression."""
         start = self._span_start()
         expr = self._parse_add_expr()
         while self._match(TokenKind.LT, TokenKind.GT, TokenKind.LE, TokenKind.GE):
@@ -723,6 +845,7 @@ class Parser:
         return expr
 
     def _parse_add_expr(self) -> Expr:
+        """Parse an addition/subtraction expression."""
         start = self._span_start()
         expr = self._parse_mul_expr()
         while self._match(TokenKind.PLUS, TokenKind.MINUS):
@@ -732,6 +855,7 @@ class Parser:
         return expr
 
     def _parse_mul_expr(self) -> Expr:
+        """Parse a multiplication/division/modulo expression."""
         start = self._span_start()
         expr = self._parse_unary_expr()
         while self._match(TokenKind.STAR, TokenKind.SLASH, TokenKind.MODULO):
@@ -741,6 +865,7 @@ class Parser:
         return expr
 
     def _parse_unary_expr(self) -> Expr:
+        """Parse a unary expression."""
         start = self._span_start()
         # prefix unary operators: !, -, *
         if self._match(TokenKind.BANG, TokenKind.MINUS, TokenKind.STAR):
@@ -754,6 +879,7 @@ class Parser:
         return self._parse_cast_expr()
 
     def _parse_cast_expr(self) -> Expr:
+        """Parse a type cast expression."""
         start = self._span_start()
         expr = self._parse_postfix_expr()
         if self._match(TokenKind.AS):
@@ -762,11 +888,11 @@ class Parser:
         return expr
 
     def _parse_postfix_expr(self) -> Expr:
+        """Parse a postfix expression (calls, indexing, field access, try)."""
         start = self._span_start()
         expr = self._parse_primary_expr()
         while True:
             if self._match(TokenKind.LPAREN):
-                # call
                 args: List[Expr] = []
                 if not self._check(TokenKind.RPAREN):
                     while True:
@@ -791,15 +917,16 @@ class Parser:
             break
         return expr
 
-    # NEW: Parse call argument - tries type first in unambiguous cases
     def _parse_call_argument(self) -> Expr:
-        """
-        Parse a function call argument.
+        """Parse a function call argument, attempting to parse as TypeExpr first.
 
-        In argument position, we can have either expressions or type expressions.
-        We parse as TypeExpr only when syntactically unambiguous:
-          - Builtin type name: int, byte, bool, string, void
-          - Any name followed by * or ?: Point*, int?, Foo*?
+        Note:
+            In argument position, we can have either expressions or type expressions.
+
+            We parse as TypeExpr only when syntactically unambiguous:
+
+              - Builtin type name: int, byte, bool, string, void
+              - Any name followed by * or ?: Point*, int?, Foo*?
         """
         start = self._span_start()
 
@@ -816,58 +943,58 @@ class Parser:
         return self._peek().text in ("int", "byte", "bool", "string", "void")
 
     def _lookahead_is_type_suffix(self) -> bool:
-        """Check if there's a * or ? immediately after current identifier (for type disambiguation)."""
+        """Check if there's a '*' or '?' immediately after the current token."""
         saved = self.index
-        self._advance()  # skip the identifier
+        self._advance()
         result = self._check(TokenKind.STAR) or self._check(TokenKind.QUESTION)
         self.index = saved
         return result
 
     def _is_unambiguous_type_start(self) -> bool:
-        """
-        In call argument position, check if this is unambiguously a type.
+        """Check if the current position unambiguously starts a type reference.
 
-        Unambiguous type cases:
-          - Builtin type name (int, byte, bool, string, void)
-          - Ident followed by * or ? suffixes, ending at argument boundary (, or ))
+        Note:
 
-        Examples:
-          sizeof(int*)     → int is builtin → type
-          sizeof(Point*)   → Point* followed by ) → type
-          sizeof(a * b)    → a* followed by b, not boundary → expression
-          sizeof(Point)    → Point with no suffix → ambiguous, defaults to expr
+            **Unambiguous type cases:**
+
+                - Builtin type name (`int`, `byte`, `bool`, `string`, `void`)
+                - Ident followed by '*' or '?' suffixes, ending at argument boundary: ',' or ')'
+
+            **Examples:**
+
+                - sizeof(int*)     → int is builtin → type
+                - sizeof(Point*)   → Point* followed by ')' → type
+                - sizeof(a * b)    → '*' followed by 'b', not boundary → expression
+                - sizeof(Point)    → Point with no suffix → ambiguous, defaults to expr
         """
-        # Builtin type names are always types in argument position
         if self._is_builtin_type_name():
             return True
 
         if not self._check(TokenKind.IDENT):
             return False
 
-        # Look ahead: Ident, then any * or ?, then check for argument boundary
         saved = self.index
-        self._advance()  # skip identifier
+        self._advance()
 
         has_suffix = False
         while self._check(TokenKind.STAR) or self._check(TokenKind.QUESTION):
             has_suffix = True
             self._advance()
 
-        # At argument boundary?
         at_boundary = self._check(TokenKind.RPAREN) or self._check(TokenKind.COMMA)
 
         self.index = saved
 
-        # Type only if: has suffix AND at argument boundary
         return has_suffix and at_boundary
 
     def _parse_primary_expr(self) -> Expr:
+        """Parse a primary expression (literals, identifiers, parenthesized expressions)."""
         start = self._span_start()
         tok = self._peek()
 
         # 'new' constructor
         if self._match(TokenKind.NEW):
-            type_ref = self._parse_type()  # Full type, not just identifier
+            type_ref = self._parse_type()
             args: List[Expr] = []
             if self._match(TokenKind.LPAREN):
                 if not self._check(TokenKind.RPAREN):

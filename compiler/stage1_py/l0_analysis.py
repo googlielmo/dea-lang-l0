@@ -15,23 +15,28 @@ from l0_types import Type, FuncType, BuiltinType, StructType, EnumType, Nullable
 
 
 class VarRefResolution(Enum):
+    """Enumeration of variable reference resolution targets."""
     LOCAL = "local"
     MODULE = "module"
 
 
 @dataclass
 class AnalysisResult:
-    """
-    Full front-end analysis result for an entry module.
+    """Full front-end analysis result for an entry module.
 
-    Contains:
-      - compilation unit
-      - compilation context (cross-cutting compiler options)
-      - module-level symbol envs
-      - top-level type information (functions, structs, enums)
-      - local scope information (functions + nested scopes)
-      - expression types
-      - diagnostics accumulated from all passes
+    Attributes:
+        cu: The compilation unit containing all modules.
+        context: Cross-cutting compiler options and configuration.
+        module_envs: Module-level symbol environments keyed by module name.
+        func_types: Function signatures keyed by (module_name, decl_name).
+        struct_infos: Struct definitions keyed by (module_name, decl_name).
+        enum_infos: Enum definitions keyed by (module_name, decl_name).
+        func_envs: Function scope information keyed by (module_name, decl_name).
+        let_types: Types of top-level 'let' declarations keyed by (module_name, decl_name).
+        expr_types: Resolved types of expressions keyed by id(expr_node).
+        var_ref_resolution: Resolution targets for VarRef nodes keyed by id(expr_node).
+        intrinsic_targets: Target types for intrinsic operations keyed by id(expr_node).
+        diagnostics: List of all diagnostics accumulated during analysis.
     """
     cu: Optional[CompilationUnit] = None
     context: CompilationContext = field(default_factory=CompilationContext.default)
@@ -57,17 +62,47 @@ class AnalysisResult:
     diagnostics: List[Diagnostic] = field(default_factory=list)
 
     def has_errors(self) -> bool:
+        """Check if any 'error' diagnostics were reported.
+
+        Returns:
+            True if at least one error exists, False otherwise.
+        """
         return any(d.kind == "error" for d in self.diagnostics)
 
     def has_warnings(self) -> bool:
+        """Check if any 'warning' diagnostics were reported.
+
+        Returns:
+            True if at least one warning exists, False otherwise.
+        """
         return any(d.kind == "warning" for d in self.diagnostics)
 
     def is_arc_type(self, ty: Type) -> bool:
-        """Check if type needs ARC (reference counting). Currently only string."""
+        """Check if a type requires Automatic Reference Counting (ARC).
+
+        Currently, only the 'string' builtin type requires ARC.
+
+        Args:
+            ty: The type to check.
+
+        Returns:
+            True if the type is managed by ARC, False otherwise.
+        """
         return isinstance(ty, BuiltinType) and ty.name == "string"
 
     def has_arc_data(self, typ: Type) -> bool:
-        """Check whether `typ` transitively contains ARC-managed data, requiring retain/release orchestration."""
+        """Check if a type transitively contains ARC-managed data.
+
+        This is used to determine if a value of this type requires retain/release
+        orchestration during assignment or when going out of scope.
+
+        Args:
+            typ: The type to check.
+
+        Returns:
+            True if the type or any of its components are managed by ARC,
+            False otherwise.
+        """
         if self.is_arc_type(typ):
             return True
 

@@ -1,6 +1,12 @@
 #  SPDX-License-Identifier: MIT OR Apache-2.0
 #  Copyright (c) 2025-2026 gwz
 
+"""Lexer implementation for the L0 compiler.
+
+This module provides the Lexer class for tokenizing L0 source code,
+along with Token definitions and related utilities.
+"""
+
 from dataclasses import dataclass
 from enum import Enum, auto
 from typing import List, Optional
@@ -12,14 +18,85 @@ from l0_diagnostics import Diagnostic
 # ==========================
 
 class TokenKind(Enum):
+    """Enumeration of all supported token types in L0.
+
+    Attributes:
+        EOF: End of file marker.
+        IDENT: Identifier (e.g., variable or function name).
+        UNDERSCORE: Wildcard identifier ('_').
+        INT: Integer literal.
+        BYTE: Byte/character literal.
+        STRING: String literal.
+        MODULE: 'module' keyword.
+        IMPORT: 'import' keyword.
+        FUNC: 'func' keyword.
+        STRUCT: 'struct' keyword.
+        ENUM: 'enum' keyword.
+        TYPE: 'type' keyword.
+        EXTERN: 'extern' keyword.
+        LET: 'let' keyword.
+        RETURN: 'return' keyword.
+        MATCH: 'match' keyword.
+        CASE: 'case' keyword.
+        IF: 'if' keyword.
+        ELSE: 'else' keyword.
+        WHILE: 'while' keyword.
+        FOR: 'for' keyword.
+        BREAK: 'break' keyword.
+        CONTINUE: 'continue' keyword.
+        TRUE: 'true' keyword.
+        FALSE: 'false' keyword.
+        NULL: 'null' keyword.
+        AS: 'as' keyword.
+        NEW: 'new' keyword.
+        DROP: 'drop' keyword.
+        WITH: 'with' keyword.
+        CLEANUP: 'cleanup' keyword.
+        LBRACE: '{'
+        RBRACE: '}'
+        LPAREN: '('
+        RPAREN: ')'
+        LBRACKET: '['
+        RBRACKET: ']'
+        COMMA: ','
+        SEMI: ';'
+        COLON: ':'
+        DOUBLE_COLON: '::'
+        ARROW_FUNC: '->'
+        ARROW_MATCH: '=>'
+        EQ: '='
+        PLUS: '+'
+        MINUS: '-'
+        STAR: '*'
+        SLASH: '/'
+        MODULO: '%'
+        LT: '<'
+        GT: '>'
+        LE: '<='
+        GE: '>='
+        EQEQ: '=='
+        NE: '!='
+        ANDAND: '&&'
+        OROR: '||'
+        BANG: '!'
+        QUESTION: '?'
+        DOT: '.'
+        AMP: '&' (reserved)
+        PIPE: '|' (reserved)
+        CARET: '^' (reserved)
+        TILDE: '~' (reserved)
+        LSHIFT: '<<' (reserved)
+        RSHIFT: '>>' (reserved)
+        FUTURE_EXTENSION: Placeholder for future tokens.
+    """
     # Special
     EOF = auto()
 
-    IDENT = auto()  # identifier, e.g. i, name, etc.
-    UNDERSCORE = auto()  # "_"
-    INT = auto()  # integer literal, e.g. 42, -7, etc.
-    BYTE = auto()  # octet literal, e.g. 'a', '\n', etc.
-    STRING = auto()  # string literal, e.g. "hello world", etc.
+    IDENT = auto()
+    UNDERSCORE = auto()
+    INT = auto()
+    BYTE = auto()
+    STRING = auto()
 
     # Keywords
     MODULE = auto()
@@ -50,45 +127,45 @@ class TokenKind(Enum):
     CLEANUP = auto()
 
     # Punctuation / operators
-    LBRACE = auto()  # {
-    RBRACE = auto()  # }
-    LPAREN = auto()  # (
-    RPAREN = auto()  # )
-    LBRACKET = auto()  # [
-    RBRACKET = auto()  # ]
-    COMMA = auto()  # ,
-    SEMI = auto()  # ;
-    COLON = auto()  # :
-    DOUBLE_COLON = auto()  # ::
-    ARROW_FUNC = auto()  # ->
-    ARROW_MATCH = auto()  # =>
-    EQ = auto()  # =
+    LBRACE = auto()
+    RBRACE = auto()
+    LPAREN = auto()
+    RPAREN = auto()
+    LBRACKET = auto()
+    RBRACKET = auto()
+    COMMA = auto()
+    SEMI = auto()
+    COLON = auto()
+    DOUBLE_COLON = auto()
+    ARROW_FUNC = auto()
+    ARROW_MATCH = auto()
+    EQ = auto()
     PLUS = auto()
-    MINUS = auto()  # -
-    STAR = auto()  # *
-    SLASH = auto()  # /
-    MODULO = auto()  # %
-    LT = auto()  # <
-    GT = auto()  # >
-    LE = auto()  # <
-    GE = auto()  # <=
-    EQEQ = auto()  # ==
-    NE = auto()  # !=
-    ANDAND = auto()  # &&
-    OROR = auto()  # ||
-    BANG = auto()  # !
-    QUESTION = auto()  # ?
-    DOT = auto()  # .
+    MINUS = auto()
+    STAR = auto()
+    SLASH = auto()
+    MODULO = auto()
+    LT = auto()
+    GT = auto()
+    LE = auto()
+    GE = auto()
+    EQEQ = auto()
+    NE = auto()
+    ANDAND = auto()
+    OROR = auto()
+    BANG = auto()
+    QUESTION = auto()
+    DOT = auto()
 
     # Reserved operators (not yet supported, lexed for diagnostics)
-    AMP = auto()  # &
-    PIPE = auto()  # |
-    CARET = auto()  # ^
-    TILDE = auto()  # ~
-    LSHIFT = auto()  # <<
-    RSHIFT = auto()  # >>
+    AMP = auto()
+    PIPE = auto()
+    CARET = auto()
+    TILDE = auto()
+    LSHIFT = auto()
+    RSHIFT = auto()
 
-    FUTURE_EXTENSION = auto()  # placeholder for future tokens
+    FUTURE_EXTENSION = auto()
 
 
 KEYWORDS = {
@@ -137,16 +214,33 @@ KEYWORDS = {
 
 @dataclass
 class Token:
+    """A single token produced by the lexer.
+
+    Attributes:
+        kind: The kind of token.
+        text: The literal text of the token.
+        line: 1-based line number in source.
+        column: 1-based column number in source.
+    """
     kind: TokenKind
     text: str
     line: int
     column: int
 
     def __repr__(self) -> str:
+        """Returns a string representation of the token."""
         return f"{self.text!r}" if self.kind != TokenKind.EOF else "end-of-file"
 
 
 def is_reserved_keyword(word: str) -> bool:
+    """Check if a word is a reserved L0 keyword.
+
+    Args:
+        word: The word to check.
+
+    Returns:
+        True if the word is a keyword, False otherwise.
+    """
     return word in KEYWORDS
 
 
@@ -169,7 +263,25 @@ HEX_CHARS = "0123456789abcdefABCDEF"
 
 
 class Lexer:
+    """Tokenizes L0 source code.
+
+    This lexer scans source text and produces a list of Token objects.
+    It tracks line and column information for diagnostics.
+
+    Attributes:
+        source: The source code string.
+        filename: Name of the file being tokenized.
+        diagnostics: List of collected diagnostics.
+    """
+
     def __init__(self, source: str, filename: str = "<input>", diagnostics: Optional[List[Diagnostic]] = None) -> None:
+        """Initialize the lexer.
+
+        Args:
+            source: The source code text.
+            filename: The source filename for diagnostics.
+            diagnostics: Optional list to collect diagnostics into.
+        """
         self.source = source
         self.filename = filename
         self.length = len(source)
@@ -181,27 +293,40 @@ class Lexer:
 
     @classmethod
     def from_source(cls, source: str) -> "Lexer":
+        """Create a lexer from a source string with default settings.
+
+        Args:
+            source: The source code text.
+
+        Returns:
+            A new Lexer instance.
+        """
         return cls(source)
 
     # --- low-level char utilities ---
 
     def _error(self, message: str, line: int, column: int) -> None:
+        """Add an error diagnostic."""
         self.diagnostics.append(Diagnostic(kind="error", message=message, filename=self.filename, line=line, column=column))
 
     def _at_end(self) -> bool:
+        """Check if all input has been scanned."""
         return self.index >= self.length
 
     def _peek(self) -> str:
+        """Peek at the current character without advancing."""
         if self._at_end():
             return "\0"
         return self.source[self.index]
 
     def _peek_next(self) -> str:
+        """Peek at the next character without advancing."""
         if self.index + 1 >= self.length:
             return "\0"
         return self.source[self.index + 1]
 
     def _advance(self) -> str:
+        """Advance the current index and return the character."""
         c = self._peek()
         if not self._at_end():
             self.index += 1
@@ -215,6 +340,11 @@ class Lexer:
     # --- main API ---
 
     def tokenize(self) -> List[Token]:
+        """Perform tokenization of the source string.
+
+        Returns:
+            A list of all tokens, ending with an EOF token.
+        """
         tokens: List[Token] = []
         while True:
             tok = self._next_token()
@@ -226,6 +356,7 @@ class Lexer:
         return tokens
 
     def _next_token(self) -> Token:
+        """Scan and return the next token."""
         self._skip_ws_and_comments()
         start_line, start_col = self.line, self.column
 
@@ -362,6 +493,7 @@ class Lexer:
         return self._next_token()
 
     def _read_byte_literal(self, start_col: int, start_line: int) -> str:
+        """Scan a byte/character literal."""
         chars: List[str] = []
         ch = self._peek()
 
@@ -408,6 +540,7 @@ class Lexer:
         return text
 
     def _read_string_literal(self) -> str:
+        """Scan a double-quoted string literal."""
         chars: List[str] = []
         while True:
             ch = self._peek()
@@ -428,12 +561,13 @@ class Lexer:
         return text
 
     def _read_valid_char_escape(self) -> str:
+        """Scan a single escape sequence."""
         chars: List[str] = [self._advance()]
         esc = self._peek()
         if esc in ("\\", "'", '"', "?", "a", "b", "f", "n", "r", "t", "v"):
             chars.append(self._advance())  # valid escapes
 
-        elif esc == "x":  # hex escape of the form \xX+ (where X+ is one or more hex digits)
+        elif esc == "x":  # hex escape of the form \xX+
             chars.append(self._advance())  # append 'x'
             next_ch = self._peek()  # expect at least one hex digit
             if next_ch in HEX_CHARS:
@@ -490,6 +624,7 @@ class Lexer:
         return "".join(chars)
 
     def _read_number(self, c: str, start_col: int, start_line: int, is_negative: bool = False) -> str:
+        """Scan an integer literal."""
         digits = [c]
         while self._peek().isdigit():
             digits.append(self._advance())
@@ -506,6 +641,7 @@ class Lexer:
         return text
 
     def _skip_ws_and_comments(self) -> None:
+        """Skip whitespace and both line and block comments."""
         while True:
             c = self._peek()
             if c in (" ", "\t", "\r", "\n"):

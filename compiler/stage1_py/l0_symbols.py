@@ -1,6 +1,12 @@
 #  SPDX-License-Identifier: MIT OR Apache-2.0
 #  Copyright (c) 2025-2026 gwz
 
+"""Symbol table definitions for the L0 compiler.
+
+This module provides classes for representing resolved symbols and module
+environments during name resolution and type checking.
+"""
+
 from dataclasses import dataclass, field
 from enum import Enum, auto
 from typing import Dict, List, Optional
@@ -11,7 +17,18 @@ from l0_types import Type
 
 
 class SymbolKind(Enum):
-    MODULE = auto()  # reserved for future (aliases/using)
+    """Enumeration of all top-level symbol categories.
+
+    Attributes:
+        MODULE: A module; reserved for future use (aliases, etc.).
+        FUNC: A function.
+        STRUCT: A struct type.
+        ENUM: An enum type.
+        ENUM_VARIANT: An enum variant constructor.
+        TYPE_ALIAS: A type alias.
+        LET: A module-level constant or variable.
+    """
+    MODULE = auto()
     FUNC = auto()
     STRUCT = auto()
     ENUM = auto()
@@ -22,24 +39,35 @@ class SymbolKind(Enum):
 
 @dataclass
 class Symbol:
-    """
-    A resolved symbol at module level.
+    """A resolved module-level symbol.
+
+    Attributes:
+        name: The name of the symbol.
+        kind: The category of the symbol.
+        module: The module that defines this symbol.
+        node: The AST node where the symbol was defined.
+        type: Optional resolved semantic Type.
     """
     name: str
     kind: SymbolKind
-    module: Module  # module that defines this symbol
-    node: object  # AST node that defined this symbol
-    type: Optional[Type] = None  # optional semantic type (for funcs, aliases, etc.)
+    module: Module
+    node: object
+    type: Optional[Type] = None
 
 
 @dataclass
 class ModuleEnv:
-    """
-    Per-module symbol environment.
+    """Per-module symbol environment.
 
-    locals   : symbols defined in this module
-    imported : symbols opened from imported modules (not re-exported)
-    all      : effective view = locals U imported, but with ambiguous names removed
+    Attributes:
+        module: The Module AST node for this environment.
+        locals: Mapping of symbols defined within this module.
+        imported: Mapping of symbols imported from other modules.
+        all: Effective view of all symbols visible in this module (locals +
+            imported), with ambiguous names removed.
+        ambiguous_imports: Mapping of ambiguous names to the list of modules
+            they were imported from.
+        diagnostics: List of diagnostics collected during name resolution.
     """
     module: Module
     locals: Dict[str, Symbol] = field(default_factory=dict)
@@ -50,4 +78,5 @@ class ModuleEnv:
 
     @property
     def name(self) -> str:
+        """Get the name of the module associated with this environment."""
         return self.module.name

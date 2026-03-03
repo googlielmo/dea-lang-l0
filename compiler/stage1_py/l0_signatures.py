@@ -1,6 +1,12 @@
 #  SPDX-License-Identifier: MIT OR Apache-2.0
 #  Copyright (c) 2025-2026 gwz
 
+"""Top-level signature resolution for the L0 compiler.
+
+This module provides the SignatureResolver class which resolves types for
+function parameters, return values, struct fields, enum payloads, and type aliases.
+"""
+
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Set, Tuple
 
@@ -25,65 +31,109 @@ from l0_resolve import resolve_symbol, resolve_type_ref, TypeResolveErrorKind
 
 @dataclass
 class StructFieldInfo:
+    """Information about a single struct field.
+
+    Attributes:
+        name: The name of the field.
+        type: The resolved Type of the field.
+    """
     name: str
     type: Type
 
 
 @dataclass
 class StructInfo:
+    """Resolved type information for a struct.
+
+    Attributes:
+        struct_type: The base StructType.
+        fields: List of StructFieldInfo objects for all fields.
+    """
     struct_type: StructType
     fields: List[StructFieldInfo]
 
 
 @dataclass
 class EnumVariantInfo:
+    """Information about a single enum variant.
+
+    Attributes:
+        name: The name of the variant.
+        field_types: List of resolved types for the variant's payload fields.
+    """
     name: str
     field_types: List[Type]
 
 
 @dataclass
 class EnumInfo:
+    """Resolved type information for an enum.
+
+    Attributes:
+        enum_type: The base EnumType.
+        variants: Mapping from variant names to their variant info.
+    """
     enum_type: EnumType
     variants: Dict[str, EnumVariantInfo]
 
 
 class SignatureResolver:
-    """
-    Resolves top-level signatures:
+    """Resolves top-level type signatures across all modules.
 
-      - Function parameter/return types -> FuncType
-      - Struct field types
-      - Enum variant payload types
-      - Type alias targets
+    The resolver processes:
+    - Function signatures (parameters and return types).
+    - Struct field types.
+    - Enum variant payload types.
+    - Type alias targets.
+    - Module-level constant (let) types.
 
-    Uses ModuleEnv.all for type name lookup and emits diagnostics on errors.
+    It also performs cycle detection for value-type definitions.
+
+    Attributes:
+        cu: The compilation unit being processed.
+        module_envs: Mapping of module names to their environments.
+        diagnostics: Collected list of resolution diagnostics.
+        func_types: Resolved function signatures keyed by (module, name).
+        struct_infos: Resolved struct definitions keyed by (module, name).
+        enum_infos: Resolved enum definitions keyed by (module, name).
+        let_types: Resolved constant types keyed by (module, name).
     """
 
     def __init__(self, cu: CompilationUnit, module_envs: Dict[str, ModuleEnv]):
+        """Initialize the signature resolver.
+
+        Args:
+            cu: The compilation unit.
+            module_envs: Environments produced by name resolution.
+        """
         self.cu = cu
         self.module_envs = module_envs
 
         self.diagnostics: List[Diagnostic] = []
 
-        # Side tables, keyed by (module_name, decl_name) to avoid using
-        # unhashable AST nodes as keys.
+        # Side tables, keyed by (module_name, decl_name)
         self.func_types: Dict[Tuple[str, str], FuncType] = {}
         self.struct_infos: Dict[Tuple[str, str], StructInfo] = {}
         self.enum_infos: Dict[Tuple[str, str], EnumInfo] = {}
         self.let_types: Dict[Tuple[str, str], Type] = {}
 
     def resolve(self) -> None:
+        """Resolve all top-level signatures in the compilation unit.
+
+        This iterates through all modules and their declarations, populating
+        the resolution tables and reporting any errors found.
+        """
         for module in self.cu.modules.values():
             env = self.module_envs[module.name]
             self._resolve_module_signatures(env)
 
         # After resolving all signatures, detect value-type cycles
-        # (cycles would create infinite-size types)
         self._detect_value_type_cycles()
 
     # --- internal helpers ---
 
     def _resolve_module_signatures(self, env: ModuleEnv) -> None:
+        """Resolve all declarations within a single module."""
         for decl in env.module.decls:
             if isinstance(decl, StructDecl):
                 self._resolve_struct(env, decl)
@@ -95,10 +145,9 @@ class SignatureResolver:
                 self._resolve_type_alias(env, decl)
             elif isinstance(decl, LetDecl):
                 self._resolve_let(env, decl)
-            else:
-                continue
 
     def _emit(self, diag: Diagnostic) -> None:
+        """Add a diagnostic to the collection."""
         self.diagnostics.append(diag)
 
     # --- type resolution core ---
@@ -109,12 +158,16 @@ class SignatureResolver:
             tref: TypeRef,
             alias_stack: Optional[Set[Tuple[str, str]]] = None,
     ) -> Optional[Type]:
-        """
-        Resolve a TypeRef in the context of a module env.
+        """Resolve a TypeRef in the context of a module environment.
 
-        Returns a Type or None on error (and emits diagnostics).
+        Args:
+            env: The current module environment.
+            tref: The TypeRef AST node to resolve.
+            alias_stack: Stack of aliases being resolved (for cycle detection).
+
+        Returns:
+            The resolved Type if successful, otherwise None.
         """
-        # Reject overqualified type references (e.g. color::Color::Red as a type)
         if tref.name_qualifier is not None:
             full = "::".join(tref.name_qualifier + [tref.name])
             if tref.module_path:
@@ -212,10 +265,17 @@ class SignatureResolver:
             sym: Symbol,
             alias_stack: Optional[Set[Tuple[str, str]]] = None,
     ) -> Optional[Type]:
-        """
-        Resolve a TYPE_ALIAS symbol to its target Type, caching it in sym.type.
+        """Resolve a TYPE_ALIAS symbol to its target Type.
 
-        alias_stack is used to detect alias cycles via (module_name, alias_name) keys.
+        Caches the result in `sym.type`. Detects recursive alias cycles.
+
+        Args:
+            env: Current module environment.
+            sym: The type alias symbol to resolve.
+            alias_stack: Set of alias identifiers currently being resolved.
+
+        Returns:
+            The target Type if successful, otherwise None.
         """
         if sym.type is not None:
             return sym.type
@@ -242,10 +302,9 @@ class SignatureResolver:
 
         alias_stack.add(key)
 
-        # sym.node should be a TypeAliasDecl
         decl = sym.node
         if not isinstance(decl, TypeAliasDecl):
-            # Should not happen; be defensive
+            # Defensive check - this should not happen if name resolution is correct
             self._emit(
                 diag_from_node(
                     kind="error",
@@ -273,6 +332,7 @@ class SignatureResolver:
     # --- per decl kind ---
 
     def _resolve_struct(self, env: ModuleEnv, decl: StructDecl) -> None:
+        """Resolve field types for a struct declaration."""
         struct_sym = env.locals.get(decl.name)
         if struct_sym is None:
             return
@@ -282,7 +342,7 @@ class SignatureResolver:
 
         fields_info: List[StructFieldInfo] = []
 
-        for field in decl.fields:  # FieldDecl
+        for field in decl.fields:
             assert isinstance(field, FieldDecl)
             ftype = self._resolve_type_ref(env, field.type)
             if ftype is None:
@@ -294,6 +354,7 @@ class SignatureResolver:
         self.struct_infos[key] = StructInfo(struct_type=struct_ty, fields=fields_info)
 
     def _resolve_enum(self, env: ModuleEnv, decl: EnumDecl) -> None:
+        """Resolve variant payload types for an enum declaration."""
         enum_sym = env.locals.get(decl.name)
         if enum_sym is None:
             return
@@ -306,7 +367,7 @@ class SignatureResolver:
         for variant in decl.variants:
             assert isinstance(variant, EnumVariant)
             field_types: List[Type] = []
-            for field in variant.fields:  # FieldDecl list
+            for field in variant.fields:
                 assert isinstance(field, FieldDecl)
                 ftype = self._resolve_type_ref(env, field.type)
                 if ftype is None:
@@ -319,7 +380,7 @@ class SignatureResolver:
         key = (env.name, decl.name)
         self.enum_infos[key] = EnumInfo(enum_type=enum_ty, variants=variant_infos)
 
-        # Also annotate enum-variant symbols with their (tuple) payload type if desired
+        # Also annotate enum-variant symbols with their (tuple) payload type
         for variant in decl.variants:
             sym = env.locals.get(variant.name)
             if sym is not None and sym.kind == SymbolKind.ENUM_VARIANT:
@@ -328,6 +389,7 @@ class SignatureResolver:
                 sym.type = FuncType(tuple(info.field_types), enum_ty)
 
     def _resolve_func(self, env: ModuleEnv, decl: FuncDecl) -> None:
+        """Resolve parameter and return types for a function declaration."""
         func_sym = env.locals.get(decl.name)
         if func_sym is None:
             return
@@ -356,14 +418,15 @@ class SignatureResolver:
         self.func_types[key] = ft
 
     def _resolve_type_alias(self, env: ModuleEnv, decl: TypeAliasDecl) -> None:
+        """Resolve the target type for a type alias."""
         alias_sym = env.locals.get(decl.name)
         if alias_sym is None:
             return
 
-        # This will cache the result in alias_sym.type
         self._resolve_type_alias_symbol(env, alias_sym, alias_stack=None)
 
     def _resolve_let(self, env: ModuleEnv, decl: LetDecl) -> None:
+        """Resolve or infer the type for a module-level 'let' binding."""
         let_sym = env.locals.get(decl.name)
         if let_sym is None:
             return
@@ -413,16 +476,13 @@ class SignatureResolver:
             if sym is None:
                 return None
 
-            # Struct constructor
-            if sym.kind == SymbolKind.STRUCT:
+            if sym.kind is SymbolKind.STRUCT:
                 return StructType(sym.module.name, sym.name)
 
-            # Type alias to struct
-            if sym.kind == SymbolKind.TYPE_ALIAS and isinstance(sym.type, StructType):
+            if sym.kind is SymbolKind.TYPE_ALIAS and isinstance(sym.type, StructType):
                 return sym.type
 
-            # Enum variant constructor
-            if sym.kind == SymbolKind.ENUM_VARIANT:
+            if sym.kind is SymbolKind.ENUM_VARIANT:
                 for decl in sym.module.decls:
                     if isinstance(decl, EnumDecl):
                         for variant in decl.variants:
@@ -436,14 +496,7 @@ class SignatureResolver:
             return None
 
     def _extract_value_type_dependencies(self, typ: Type) -> Set[Tuple[str, str]]:
-        """
-        Extract type dependencies for VALUE fields only.
-
-        Returns set of (module, name) tuples for types that must be defined first.
-
-        Value-type fields create dependencies (types must be fully defined).
-        Pointer-type fields do NOT create dependencies (forward declarations suffice).
-        """
+        """Extract type dependencies for value fields only (pointer-free)."""
         if isinstance(typ, PointerType):
             # Pointers don't create dependencies
             return set()
@@ -472,15 +525,13 @@ class SignatureResolver:
             return set()
 
     def _detect_value_type_cycles(self) -> None:
-        """
-        Detect cycles in value-type dependencies.
+        """Detect and report cycles in value-type definitions.
 
-        Value-type cycles create infinite-size types and must be rejected.
-        Pointer-type fields break cycles (forward declarations work).
-
-        Emits error diagnostic if cycle is detected.
+        Value-type cycles (where A contains B and B contains A directly) create
+        infinite-size types and are prohibited. Pointers must be used to
+        break such cycles.
         """
-        # Build dependency graph (same logic as codegen)
+        # dependency graph maps (module, type) to the set of (module, type) it depends on for value fields
         graph: Dict[Tuple[str, str], Set[Tuple[str, str]]] = {}
 
         # Process all structs

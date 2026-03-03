@@ -1,6 +1,12 @@
 #  SPDX-License-Identifier: MIT OR Apache-2.0
 #  Copyright (c) 2025-2026 gwz
 
+"""Common logic for symbol and type reference resolution in the L0 compiler.
+
+This module provides utility functions used by various compiler stages to
+lookup symbols and resolve AST type references into semantic types.
+"""
+
 from dataclasses import dataclass
 from enum import Enum, auto
 from typing import Dict, List, Optional, Callable, Tuple
@@ -20,6 +26,7 @@ from l0_types import (
 
 
 class ResolveErrorKind(Enum):
+    """Kinds of errors that can occur during symbol resolution."""
     UNKNOWN_MODULE = auto()
     MODULE_NOT_IMPORTED = auto()
     UNKNOWN_SYMBOL = auto()
@@ -27,6 +34,7 @@ class ResolveErrorKind(Enum):
 
 
 class TypeResolveErrorKind(Enum):
+    """Kinds of errors that can occur during type resolution."""
     UNKNOWN_TYPE = auto()
     NOT_A_TYPE = auto()
     UNRESOLVED_ALIAS = auto()
@@ -39,6 +47,15 @@ class TypeResolveErrorKind(Enum):
 
 @dataclass(frozen=True)
 class SymbolResolution:
+    """The result of a symbol resolution attempt.
+
+    Attributes:
+        symbol: The resolved Symbol if successful, otherwise None.
+        error: The kind of error that occurred, or None if successful.
+        module_name: The name of the module where resolution was attempted.
+        name: The name of the symbol being resolved.
+        ambiguous_modules: Tuple of module names if resolution failed due to ambiguity.
+    """
     symbol: Optional[Symbol]
     error: Optional[ResolveErrorKind]
     module_name: str
@@ -48,6 +65,16 @@ class SymbolResolution:
 
 @dataclass(frozen=True)
 class TypeResolution:
+    """The result of a type reference resolution attempt.
+
+    Attributes:
+        type: The resolved Type if successful, otherwise None.
+        error: The kind of error that occurred, or None if successful.
+        module_name: The name of the module where resolution was attempted.
+        name: The name of the type being resolved.
+        symbol: The Symbol object corresponding to the type, if applicable.
+        ambiguous_modules: Tuple of module names if resolution failed due to ambiguity.
+    """
     type: Optional[Type]
     error: Optional[TypeResolveErrorKind]
     module_name: str
@@ -57,6 +84,7 @@ class TypeResolution:
 
 
 def _is_imported(current_env: ModuleEnv, module_name: str) -> bool:
+    """Check if a module is explicitly imported by the current environment."""
     return any(imp.name == module_name for imp in current_env.module.imports)
 
 
@@ -68,14 +96,17 @@ def resolve_symbol(
         *,
         require_import: bool = True,
 ) -> SymbolResolution:
-    """
-    Resolve a symbol by name, optionally qualified by module path.
-    :param module_envs: the mapping of module names to their environments
-    :param current_module: the name of the current module performing the lookup
-    :param name: the name of the symbol to resolve
-    :param module_path: optional list of module names qualifying the symbol
-    :param require_import: whether to require the module to be imported for unqualified lookups
-    :return: a SymbolResolution object containing the result or error information.
+    """Resolve a symbol by name, optionally qualified by module path.
+
+    Args:
+        module_envs: The mapping of module names to their environments.
+        current_module: The name of the module performing the lookup.
+        name: The name of the symbol to resolve.
+        module_path: Optional list of module components for qualified names.
+        require_import: Whether to require an explicit import for qualified lookups.
+
+    Returns:
+        A SymbolResolution object containing the result or error information.
     """
     module_name = ".".join(module_path) if module_path else current_module
     current_env = module_envs.get(current_module)
@@ -115,6 +146,19 @@ def resolve_type_ref(
         resolve_alias: Optional[Callable[[Symbol], Optional[Type]]] = None,
         require_import: bool = True,
 ) -> TypeResolution:
+    """Resolve an AST TypeRef into a semantic Type.
+
+    Args:
+        module_envs: The mapping of module names to their environments.
+        current_module: The name of the module performing the resolution.
+        tref: The TypeRef AST node.
+        module_path: Optional list of module components for qualified types.
+        resolve_alias: Optional callback to resolve type aliases.
+        require_import: Whether to require an explicit import for qualified lookups.
+
+    Returns:
+        A TypeResolution object containing the result or error information.
+    """
     base_name = tref.name
 
     if module_path is None and base_name in L0_PRIMITIVE_TYPES:

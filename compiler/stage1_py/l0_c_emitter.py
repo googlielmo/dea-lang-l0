@@ -1,5 +1,4 @@
-"""
-C Code Emitter
+"""C Code Emitter.
 
 Handles C-specific code emission. Knows how to emit C syntax, but not why or when.
 All high-level orchestration logic and decisions live in the Backend.
@@ -23,51 +22,79 @@ from l0_types import Type, BuiltinType, StructType, EnumType, PointerType, Nulla
 
 @dataclass
 class CCodeBuilder:
-    """
-    Helper for building C code with indentation tracking.
+    """Helper for building C code with indentation tracking.
+
+    Attributes:
+        lines: List of emitted code lines.
+        indent_level: Current indentation depth.
+        indent_str: String used for a single level of indentation. Defaults to 4 spaces.
     """
     lines: List[str] = field(default_factory=list)
     indent_level: int = 0
     indent_str: str = "    "  # 4 spaces
 
     def indent(self) -> None:
+        """Increase the indentation level."""
         self.indent_level += 1
 
     def dedent(self) -> None:
+        """Decrease the indentation level.
+
+        Raises:
+            AssertionError: If indentation level is already zero.
+        """
         assert self.indent_level > 0, "dedent below zero"
         self.indent_level -= 1
 
     def emit(self, line: str = "") -> None:
-        """Emit a line with current indentation."""
+        """Emit a line with current indentation.
+
+        Args:
+            line: The C code line to emit. If empty, emits a blank line.
+        """
         if line:
             self.lines.append(self.indent_str * self.indent_level + line)
         else:
             self.lines.append("")
 
     def emit_raw(self, line: str) -> None:
-        """Emit a line without indentation."""
+        """Emit a line without indentation.
+
+        Args:
+            line: The C code line to emit directly.
+        """
         self.lines.append(line)
 
     def to_string(self) -> str:
+        """Combine all lines into a single string.
+
+        Returns:
+            The complete C source code string with a trailing newline.
+        """
         return "\n".join(self.lines) + "\n"  # Ensure trailing newline
 
 
 @dataclass
 class CEmitter:
-    """
-    C-specific code emitter.
+    """C-specific code emitter.
 
     Responsibilities:
-    - Emit C syntax (knows C keywords, syntax, conventions)
-    - Name mangling for C
-    - Type emission (L0 types -> C types)
-    - Statement/expression emission to C
-    - Cleanup code emission (HOW to clean, not when/why)
+    - Emit C syntax (knows C keywords, syntax, conventions).
+    - Name mangling for C.
+    - Type emission (L0 types -> C types).
+    - Statement/expression emission to C.
+    - Cleanup code emission (HOW to clean, not when/why).
 
     Does NOT:
-    - Make decisions about what to emit
-    - Perform semantic analysis
-    - Manage scopes or lifetimes (queries backend for this)
+    - Make decisions about what to emit.
+    - Perform semantic analysis.
+    - Manage scopes or lifetimes (queries backend for this).
+
+    Attributes:
+        C_KEYWORDS: Set of C keywords and restricted identifiers to be mangled.
+        analysis: Full front-end analysis result.
+        current_module: Name of the module currently being emitted.
+        out: CCodeBuilder instance for output generation.
     """
 
     # C keywords that need to be mangled to avoid compilation errors
@@ -89,6 +116,11 @@ class CEmitter:
     current_module: Optional[str] = None
 
     def set_analysis(self, analysis: AnalysisResult) -> None:
+        """Initialize emitter with analysis data.
+
+        Args:
+            analysis: The AnalysisResult containing the compilation products.
+        """
         self.analysis = analysis
 
     # Output builder
@@ -102,7 +134,11 @@ class CEmitter:
     _opt_emitted: Set[str] = field(default_factory=set)
 
     def get_output(self) -> str:
-        """Returns the complete generated C code."""
+        """Get the generated C code.
+
+        Returns:
+            The complete generated C code string.
+        """
         return self.out.to_string()
 
     # ============================================================================
@@ -112,7 +148,16 @@ class CEmitter:
     def find_variant_decl(
             self, module_name: str, enum_name: str, variant_name: str
     ) -> Optional[EnumVariant]:
-        """Look up an enum variant's AST declaration."""
+        """Look up an enum variant's AST declaration.
+
+        Args:
+            module_name: Name of the module containing the enum.
+            enum_name: Name of the enum.
+            variant_name: Name of the variant to find.
+
+        Returns:
+            The EnumVariant node if found, otherwise None.
+        """
         if self.analysis.cu is None:
             return None
         module = self.analysis.cu.modules.get(module_name)
@@ -126,7 +171,15 @@ class CEmitter:
         return None
 
     def ice(self, message: str, node: Optional[object] = None) -> NoReturn:
-        """Raise an internal compiler error with context."""
+        """Raise an internal compiler error with context.
+
+        Args:
+            message: Descriptive error message.
+            node: Optional AST node to provide source location information.
+
+        Raises:
+            InternalCompilerError: Always raised with provided context.
+        """
         filename = None
         if self.current_module and self.analysis.cu:
             mod = self.analysis.cu.modules.get(self.current_module)
@@ -140,22 +193,54 @@ class CEmitter:
     # ============================================================================
 
     def mangle_struct_name(self, module_name: str, struct_name: str) -> str:
-        """Mangle a struct name to avoid C namespace collisions."""
+        """Mangle a struct name to avoid C namespace collisions.
+
+        Args:
+            module_name: Module name.
+            struct_name: L0 struct name.
+
+        Returns:
+            Mangled C struct name (e.g., "l0_module_Point").
+        """
         mangled_module = module_name.replace(".", "_")
         return f"l0_{mangled_module}_{struct_name}"
 
     def mangle_enum_name(self, module_name: str, enum_name: str) -> str:
-        """Mangle an enum name."""
+        """Mangle an enum name.
+
+        Args:
+            module_name: Module name.
+            enum_name: L0 enum name.
+
+        Returns:
+            Mangled C enum name.
+        """
         mangled_module = module_name.replace(".", "_")
         return f"l0_{mangled_module}_{enum_name}"
 
     def mangle_function_name(self, module_name: str, func_name: str) -> str:
-        """Mangle a function name."""
+        """Mangle a function name.
+
+        Args:
+            module_name: Module name.
+            func_name: L0 function name.
+
+        Returns:
+            Mangled C function name.
+        """
         mangled_module = module_name.replace(".", "_")
         return f"l0_{mangled_module}_{func_name}"
 
     def mangle_let_name(self, module_name: str, let_name: str) -> str:
-        """Mangle a top-level let name to C identifier."""
+        """Mangle a top-level let name to C identifier.
+
+        Args:
+            module_name: Module name.
+            let_name: L0 constant name.
+
+        Returns:
+            Mangled C identifier.
+        """
         safe_module = module_name.replace(".", "_")
         safe_name = let_name
         if safe_name in self.C_KEYWORDS:
@@ -163,24 +248,27 @@ class CEmitter:
         return f"l0_{safe_module}_{safe_name}"
 
     def mangle_identifier(self, name: str) -> str:
-        """
-        Mangle an identifier if it conflicts with C keywords or common extensions.
-        Used for local variables, parameters, and pattern variables.
+        """Mangle an identifier if it conflicts with C keywords or L0 names.
 
-        Appends '__v' suffix to avoid C keyword conflicts.
-        Also mangles names ending with '__v' itself,
-        or starting with '_' or 'l0_'/'L0_' (to avoid clashes with L0 runtime names).
+        Used for local variables, parameters, and pattern variables.
+        Appends '__v' suffix to avoid C keyword conflicts. Also mangles names
+        starting with '_' or 'l0_'/'L0_' to avoid clashes with runtime names.
+
+        Args:
+            name: The L0 identifier to mangle.
+
+        Returns:
+            The safe C identifier.
         """
         if name in self.C_KEYWORDS or name.endswith("__v") or name.startswith("l0_") or name.startswith("L0_") or name.startswith("_"):
             return f"{name}__v"
         return name
 
     def fresh_tmp(self, kind: str = "tmp") -> str:
-        """
-        Generate a unique temporary variable name.
+        """Generate a unique temporary variable name.
 
         Args:
-            kind: Category of temporary (e.g., "tmp", "ptr", "try")
+            kind: Category of temporary (e.g., "tmp", "ptr", "try").
 
         Returns:
             Unique C identifier like "l0_tmp_1", "l0_ptr_2", etc.
@@ -193,19 +281,25 @@ class CEmitter:
     # ============================================================================
 
     def emit_sizeof_type(self, typ: Type) -> str:
-        """
-        Emit C code for sizeof a given L0 type.
+        """Emit C code for sizeof a given L0 type.
 
-        Returns a C expression like "((l0_int)sizeof(l0_int))" or "((l0_int)sizeof(struct l0_module_MyStruct))"
+        Args:
+            typ: The type to measure.
+
+        Returns:
+            A C expression like "((l0_int)sizeof(l0_int))".
         """
         c_type = self.emit_type(typ)
         return f"((l0_int)sizeof({c_type}))"
 
     def emit_ord(self, c_enum_expr: str) -> str:
-        """
-        Emit C code for ord(enum_value) intrinsic.
+        """Emit C code for ord(enum_value) intrinsic.
 
-        Returns a C expression that extracts the tag field and casts to l0_int.
+        Args:
+            c_enum_expr: C expression evaluating to an enum value.
+
+        Returns:
+            A C expression that extracts the tag field and casts to l0_int.
         """
         return f"((l0_int)(({c_enum_expr}).tag))"
 
@@ -214,10 +308,16 @@ class CEmitter:
     # ============================================================================
 
     def emit_type(self, typ: Type) -> str:
-        """
-        Convert an L0 Type to its C representation.
+        """Convert an L0 Type to its C representation.
 
-        Returns a C type string (e.g., "l0_int", "struct l0_main_Point*")
+        Args:
+            typ: The L0 Type to convert.
+
+        Returns:
+            A C type string (e.g., "l0_int", "struct l0_main_Point*").
+
+        Raises:
+            InternalCompilerError: If the type kind is unknown or unsupported.
         """
         if isinstance(typ, BuiltinType):
             if typ.name == "int":
@@ -265,11 +365,18 @@ class CEmitter:
         return isinstance(t.inner, PointerType)
 
     def is_niche_nullable(self, t: NullableType) -> bool:
-        """Public wrapper for nullable shape checks."""
+        """Public check for niche-optimized (pointer-shaped) nullable types.
+
+        Args:
+            t: The NullableType to check.
+
+        Returns:
+            True if the type is represented as a nullable pointer in C.
+        """
         return self._is_niche_nullable(t)
 
     def _opt_key_for_type(self, t: Type) -> str:
-        """Generate a unique key for an optional wrapper type."""
+        """Generate a unique key for an optional wrapper type name."""
         if isinstance(t, BuiltinType):
             return t.name
         if isinstance(t, StructType):
@@ -290,23 +397,49 @@ class CEmitter:
         return f"l0_opt_{self._opt_key_for_type(inner)}"
 
     def emit_none_value_for_nullable(self, t: NullableType) -> str:
-        """Emit C code for the L0 'null' value of a nullable type."""
+        """Emit C code for the L0 'null' value of a nullable type.
+
+        Args:
+            t: The NullableType.
+
+        Returns:
+            C code string representing the 'none' state.
+        """
         if isinstance(t.inner, PointerType):
             return "NULL"
         wrapper_name = self._opt_wrapper_name_for_inner(t.inner)
         return f"(({wrapper_name}){{.has_value = 0}})"
 
     def emit_some_value_for_nullable(self, t: NullableType, c_inner_expr: str) -> str:
-        """Emit C code for wrapping a value in 'some' for a nullable type."""
+        """Emit C code for wrapping a value in 'some' for a nullable type.
+
+        Args:
+            t: The NullableType.
+            c_inner_expr: C expression for the inner value.
+
+        Returns:
+            C code string representing the 'some' state.
+        """
         if isinstance(t.inner, PointerType):
             return c_inner_expr
         wrapper_name = self._opt_wrapper_name_for_inner(t.inner)
         return f"(({wrapper_name}){{.has_value = 1, .value = {c_inner_expr}}})"
 
     def emit_null_literal(self, expected_type: Optional[Type], *, for_initializer: bool = False) -> str:
-        """Emit a null literal appropriate for the expected type."""
-        if isinstance(expected_type, NullableType):
-            if self._is_niche_nullable(expected_type):
+        """Emit a null literal appropriate for the expected type.
+
+        Args:
+            expected_type: The type expected in this context.
+            for_initializer: If True, uses C initializer syntax ({0}).
+
+        Returns:
+            C code for the null value.
+
+        Raises:
+            InternalCompilerError: If expected type is not nullable or a pointer.
+        """
+        if isinstance(expected_type, (NullableType, PointerType)):
+            if isinstance(expected_type, PointerType) or self._is_niche_nullable(expected_type):
                 return "NULL"
             if for_initializer:
                 return "{0}"
@@ -314,7 +447,19 @@ class CEmitter:
         self.ice(f"[ICE-1292] invalid expected type for null literal: '{format_type(expected_type)}'", None)
 
     def emit_widen_int(self, c_expr: str, src_type: BuiltinType, dst_type: BuiltinType) -> str:
-        """Emit C code for implicit integer widening."""
+        """Emit C code for implicit integer widening.
+
+        Args:
+            c_expr: C expression evaluating to the source value.
+            src_type: The smaller source type.
+            dst_type: The larger destination type.
+
+        Returns:
+            C code string for the widening cast.
+
+        Raises:
+            InternalCompilerError: If the widening path is unsupported.
+        """
         if src_type.name == dst_type.name:
             return c_expr
         if src_type.name == "byte" and dst_type.name == "int":
@@ -322,11 +467,26 @@ class CEmitter:
         self.ice(f"[ICE-1293] unsupported widening cast {format_type(src_type)} -> {format_type(dst_type)}", None)
 
     def emit_pointer_type(self, base_type: Type) -> str:
-        """Emit C pointer type for a base type."""
+        """Emit C pointer type for a base type.
+
+        Args:
+            base_type: The L0 type to point to.
+
+        Returns:
+            C type string (e.g., "l0_int*").
+        """
         return f"{self.emit_type(base_type)}*"
 
     def emit_enum_tag(self, enum_type: EnumType, variant_name: str) -> str:
-        """Emit C tag enum value for an enum variant."""
+        """Emit C tag enum value for an enum variant.
+
+        Args:
+            enum_type: The L0 enum type.
+            variant_name: The name of the variant.
+
+        Returns:
+            The mangled C enum tag identifier.
+        """
         c_enum_name = self.mangle_enum_name(enum_type.module, enum_type.name)
         return f"{c_enum_name}_{variant_name}"
 
@@ -335,15 +495,27 @@ class CEmitter:
     # ============================================================================
 
     def emit_section_comment(self, text: str) -> None:
-        """Emit a section comment."""
+        """Emit a decorative section comment.
+
+        Args:
+            text: The comment text.
+        """
         self.out.emit(f"/* {text} */")
 
     def emit_module_comment(self, module_name: str) -> None:
-        """Emit a module comment."""
+        """Emit a module metadata comment.
+
+        Args:
+            module_name: The name of the module.
+        """
         self.out.emit(f"/* Module: {module_name} */")
 
     def emit_module_separator(self, module_name: str) -> None:
-        """Emit a module separator with decorative lines."""
+        """Emit a decorative module separator.
+
+        Args:
+            module_name: The name of the module.
+        """
         self.out.emit("/* -------------------------------- */")
         self.out.emit(f"/* Module: {module_name} */")
         self.out.emit("/* -------------------------------- */")
@@ -353,7 +525,11 @@ class CEmitter:
         self.out.emit("/* unreachable code here */")
 
     def emit_unreachable_marker(self, reason: str = "unreachable") -> None:
-        """Emit an intrinsic or panic for unreachable code paths."""
+        """Emit a runtime panic call for unreachable code paths.
+
+        Args:
+            reason: Description of why the path is unreachable.
+        """
         # escape reason string for C
         c_reason = encode_c_string_bytes(reason.encode("utf-8"))
         self.out.emit(f'L0_UNREACHABLE("{c_reason}");')
@@ -363,7 +539,7 @@ class CEmitter:
     # ============================================================================
 
     def emit_header(self) -> None:
-        """Emit C header boilerplate and L0 type layer."""
+        """Emit C header boilerplate, SipHash implementation, and L0 runtime."""
         self.out.emit("/* Generated by L0 compiler */")
         self.out.emit()
         self.out.emit("#include <stdint.h>")
@@ -383,7 +559,12 @@ class CEmitter:
         self.out.emit()
 
     def emit_line_directive(self, node, current_module: str) -> None:
-        """Emit #line directive if node has span info and context allows it."""
+        """Emit #line directive for debugging generated C.
+
+        Args:
+            node: AST node with span information.
+            current_module: Name of the current module.
+        """
         if not self.analysis.context.emit_line_directives:
             return
         if node is None or node.span is None:
@@ -397,7 +578,7 @@ class CEmitter:
             self.out.emit(f'#line {node.span.start_line} "{filename}"')
 
     def emit_forward_decls(self) -> None:
-        """Emit forward declarations for all structs and enums."""
+        """Emit forward declarations for all structs and enums in compilation unit."""
         self.out.emit("/* Forward declarations */")
 
         for module in self.analysis.cu.modules.values():
@@ -411,8 +592,14 @@ class CEmitter:
 
         self.out.emit()
 
-    def emit_struct(self, module_name: str, decl: StructDecl, struct_info) -> None:
-        """Emit a single struct definition."""
+    def emit_struct(self, module_name: str, decl: StructDecl, struct_info: StructInfo) -> None:
+        """Emit a complete C struct definition.
+
+        Args:
+            module_name: Name of the module.
+            decl: StructDecl AST node.
+            struct_info: Resolved type information for the struct.
+        """
         c_name = self.mangle_struct_name(module_name, decl.name)
         guard = f"L0_DEFINED_{c_name}"
         self.out.emit(f"#ifndef {guard}")
@@ -434,29 +621,16 @@ class CEmitter:
         self.out.emit("#endif")
         self.out.emit()
 
-    def emit_enum(self, module_name: str, decl: EnumDecl, enum_info) -> None:
-        """
-        Emit an enum as a tagged union.
+    def emit_enum(self, module_name: str, decl: EnumDecl, enum_info: EnumInfo) -> None:
+        """Emit an L0 enum as a C tagged union.
 
-        Example for:
-            enum Expr {
-                Int(value: int);
-                Add(left: Expr*, right: Expr*);
-            }
+        Args:
+            module_name: Name of the module.
+            decl: EnumDecl AST node.
+            enum_info: Resolved type information for the enum.
 
-        Generates:
-            enum l0_module_Expr_tag {
-                l0_module_Expr_Int,
-                l0_module_Expr_Add
-            };
-
-            struct l0_module_Expr {
-                enum l0_module_Expr_tag tag;
-                union {
-                    struct { l0_int value; } Int;
-                    struct { struct l0_module_Expr* left; struct l0_module_Expr* right; } Add;
-                } data;
-            };
+        Raises:
+            InternalCompilerError: If variant information is missing.
         """
         c_name = self.mangle_enum_name(module_name, decl.name)
         guard = f"L0_DEFINED_{c_name}"
@@ -513,14 +687,13 @@ class CEmitter:
         self.out.emit()
 
     def emit_let_declaration(self, module_name: str, decl: LetDecl, let_type: Type, let_initializer_callback) -> None:
-        """
-        Emit a single top-level let declaration as a static variable.
+        """Emit a single top-level let declaration as a static variable.
 
         Args:
-            module_name: Module containing the let
-            decl: Let declaration AST node
-            let_type: Resolved type of the let
-            let_initializer_callback: Callback to emit initializer expression
+            module_name: Module containing the let.
+            decl: Let declaration AST node.
+            let_type: Resolved type of the let.
+            let_initializer_callback: Callback to emit initializer expression string.
         """
         c_type = self.emit_type(let_type)
         c_name = self.mangle_let_name(module_name, decl.name)
@@ -528,7 +701,13 @@ class CEmitter:
         self.out.emit(f"static {c_type} {c_name} = {c_init};")
 
     def emit_function_declaration(self, module_name: str, decl: FuncDecl, func_type: FuncType) -> None:
-        """Emit a single function declaration."""
+        """Emit a single function declaration signature.
+
+        Args:
+            module_name: Name of the module.
+            decl: FuncDecl AST node.
+            func_type: Resolved signature of the function.
+        """
         # CRITICAL: extern functions are NOT mangled - they're the FFI boundary
         if decl.is_extern:
             # Wrap extern function names in parens to prevent macro expansion
@@ -553,10 +732,12 @@ class CEmitter:
         self.out.emit(f"{c_return_type} {c_name}({params_str});")
 
     def emit_function_definition_header(self, module_name: str, decl: FuncDecl, func_type: FuncType) -> None:
-        """
-        Emit function definition header (signature + opening brace).
+        """Emit function definition header (signature and opening brace).
 
-        Body emission is handled by the backend's statement emitter.
+        Args:
+            module_name: Name of the module.
+            decl: FuncDecl AST node.
+            func_type: Resolved signature of the function.
         """
         c_name = self.mangle_function_name(module_name, decl.name)
         c_return_type = self.emit_type(func_type.result)
@@ -584,11 +765,11 @@ class CEmitter:
         self.out.emit()
 
     def emit_main_wrapper(self, entry_module: str, func_type: FuncType) -> None:
-        """
-        Emit C main() wrapper that calls the L0 main function.
+        """Emit C main() wrapper that calls the L0 entry function.
 
-        This allows consistent mangling of all L0 functions while providing
-        the expected C entry point.
+        Args:
+            entry_module: Name of the entry module.
+            func_type: Resolved signature of the L0 main function.
         """
         self.out.emit("/* C entry point wrapper */")
         self.out.emit(f"int main(int argc, char **argv)")
@@ -623,7 +804,7 @@ class CEmitter:
     # ============================================================================
 
     def _collect_opt_wrappers_from_type(self, t: Type) -> None:
-        """Recursively collect optional wrapper types needed for a given type."""
+        """Recursively collect optional wrapper types needed."""
         if isinstance(t, NullableType):
             if not self._is_niche_nullable(t):
                 name = self._opt_wrapper_name_for_inner(t.inner)
@@ -646,12 +827,7 @@ class CEmitter:
             return
 
     def _is_early_inner(self, inner: Type) -> bool:
-        """
-        Check if an inner type can be emitted early (before user-defined types).
-
-        Early wrappers are those we can define before user struct/enum definitions.
-        Builtins (including string as l0_string) are fine.
-        """
+        """Check if an inner type wrapper can be emitted before user definitions."""
         if isinstance(inner, BuiltinType):
             return True
         # Nullable-by-value of a builtin is also early (depends on its own wrapper).
@@ -660,9 +836,7 @@ class CEmitter:
         return False
 
     def prepare_optional_wrappers(self) -> None:
-        """
-        Scan all types in the analysis result and collect optional wrappers needed.
-        """
+        """Scan all compilation unit types and collect required optional wrappers."""
         self._opt_wrappers.clear()
         self._opt_emitted.clear()
 
@@ -685,12 +859,11 @@ class CEmitter:
             self._collect_opt_wrappers_from_type(t)
 
     def emit_optional_wrappers(self, *, early: bool) -> None:
-        """
-        Emit typedef declarations for optional wrapper types.
+        """Emit C typedef declarations for collected optional wrapper types.
 
         Args:
-            early: If True, emit wrappers for builtin types only.
-                   If False, emit wrappers for user-defined types.
+            early: If True, emit wrappers for builtins only.
+                   If False, emit wrappers for user-defined structs/enums.
         """
         # Emit typedefs for all needed wrappers whose inner types are ready at this phase.
         items = sorted(self._opt_wrappers.items(), key=lambda kv: kv[0])
@@ -715,12 +888,11 @@ class CEmitter:
     # ============================================================================
 
     def emit_value_cleanup(self, c_expr: str, ty: Type) -> None:
-        """
-        Emit cleanup code for a by-value variable.
+        """Emit C code to clean up an owned by-value variable.
 
         Args:
-            c_expr: C expression for the value (e.g., "x__v", "obj.field")
-            ty: The type of the value being cleaned up
+            c_expr: C expression evaluating to the value.
+            ty: The L0 Type of the value.
         """
         self._emit_cleanup_by_type(c_expr, ty)
 
@@ -754,10 +926,7 @@ class CEmitter:
             self._emit_enum_value_cleanup(c_expr, ty)
 
     def _emit_enum_value_cleanup(self, c_expr: str, enum_type: EnumType) -> None:
-        """
-        Emit cleanup code for an enum by-value variable.
-        Switches on tag to clean up only the active variant's owned fields.
-        """
+        """Emit C cleanup code for an enum by-value variable."""
         self._emit_enum_cleanup_switch(
             enum_type,
             f"({c_expr}).tag",
@@ -846,9 +1015,11 @@ class CEmitter:
         return info
 
     def emit_struct_cleanup(self, c_ptr_expr: str, struct_type: StructType) -> None:
-        """
-        Emit cleanup code for all owned fields in a struct.
-        Recursively handles nested structs (by-value fields).
+        """Emit cleanup code for all owned fields in a struct.
+
+        Args:
+            c_ptr_expr: C expression evaluating to a pointer to the struct.
+            struct_type: The L0 struct type.
         """
         info = self._get_struct_info(struct_type, strict=True)
 
@@ -863,9 +1034,11 @@ class CEmitter:
         self.out.emit("}")
 
     def emit_enum_cleanup(self, c_ptr_expr: str, enum_type: EnumType) -> None:
-        """
-        Emit cleanup code for owned fields in an enum's active variant.
-        Uses switch on tag to only clean up the fields that are actually present.
+        """Emit cleanup code for owned fields in an enum's active variant.
+
+        Args:
+            c_ptr_expr: C expression evaluating to a pointer to the enum.
+            enum_type: The L0 enum type.
         """
         enum_info = self._get_enum_info(enum_type, strict=True)
         if not self._enum_has_arc_data(enum_info):
@@ -884,14 +1057,7 @@ class CEmitter:
         self.out.emit("}")
 
     def _emit_field_cleanup(self, field_expr: str, field_type: Type) -> None:
-        """
-        Emit cleanup code for a single field of a given type.
-
-        - string: release
-        - struct by value: recursively clean up its fields
-        - enum by value: recursively clean up active variant
-        - pointer: no auto-cleanup (user's responsibility)
-        """
+        """Emit recursive cleanup for a field."""
         self._emit_cleanup_by_type(field_expr, field_type)
 
     # ============================================================================
@@ -899,23 +1065,51 @@ class CEmitter:
     # ============================================================================
 
     def emit_int_literal(self, value: int) -> str:
-        """Emit C code for an integer literal."""
+        """Emit C code for an integer literal.
+
+        Args:
+            value: The integer value.
+
+        Returns:
+            C literal string (handles INT32_MIN edge case).
+        """
         # Special-case the min 32-bit int to avoid negative literal issues
         if value == -2147483648:
             return "INT32_MIN"
         return str(value)
 
     def emit_byte_literal(self, value: str) -> str:
-        """Emit C code for a byte literal."""
+        """Emit C code for a byte literal.
+
+        Args:
+            value: The byte literal character.
+
+        Returns:
+            C casted character literal.
+        """
         return f"((l0_byte)'{value}')"
 
     def emit_string_literal(self, value: str) -> str:
-        """Emit C code for a string literal."""
+        """Emit C code for an ARC string literal.
+
+        Args:
+            value: The L0 string token payload.
+
+        Returns:
+            C L0_STRING_CONST expression.
+        """
         c_bytes, c_len = self._string_token_to_c_bytes_and_len(value)
         return f"((l0_string)L0_STRING_CONST(\"{c_bytes}\", {c_len}))"
 
     def emit_const_string_literal(self, value: str) -> str:
-        """Emit C code for a static string literal initializer."""
+        """Emit C code for a static string literal initializer.
+
+        Args:
+            value: The L0 string token payload.
+
+        Returns:
+            C L0_STRING_CONST macro expression.
+        """
         c_bytes, c_len = self._string_token_to_c_bytes_and_len(value)
         return f"L0_STRING_CONST(\"{c_bytes}\", {c_len})"
 
@@ -925,74 +1119,144 @@ class CEmitter:
         return encode_c_string_bytes(decoded), len(decoded)
 
     def emit_bool_literal(self, value: bool) -> str:
-        """Emit C code for a boolean literal."""
+        """Emit C code for a boolean literal expression.
+
+        Args:
+            value: The boolean value.
+
+        Returns:
+            "1" for true, "0" for false.
+        """
         return "1" if value else "0"
 
     def emit_const_bool_literal(self, value: bool) -> str:
-        """Emit C code for a boolean literal in a static initializer."""
+        """Emit C code for a boolean literal in a static initializer.
+
+        Args:
+            value: The boolean value.
+
+        Returns:
+            "true" or "false".
+        """
         return "true" if value else "false"
 
     def emit_var_ref(self, c_name: str) -> str:
-        """Emit C code for a variable reference."""
+        """Emit C code for a variable reference identifier.
+
+        Args:
+            c_name: Mangled C identifier.
+
+        Returns:
+            The identifier string.
+        """
         return c_name
 
     def emit_unary_op(self, op: str, c_operand: str) -> str:
-        """Emit C code for a unary operation."""
+        """Emit C code for a unary operation.
+
+        Args:
+            op: C unary operator string.
+            c_operand: C expression for the operand.
+
+        Returns:
+            C unary expression string.
+        """
         return f"({op}{c_operand})"
 
     def emit_binary_op(self, op: str, c_left: str, c_right: str) -> str:
-        """Emit C code for a simple binary operation."""
+        """Emit C code for a simple binary operation.
+
+        Args:
+            op: C binary operator string.
+            c_left: C expression for left operand.
+            c_right: C expression for right operand.
+
+        Returns:
+            C binary expression string.
+        """
         return f"({c_left} {op} {c_right})"
 
     def emit_checked_int_div(self, c_left: str, c_right: str) -> str:
-        """Emit C code for checked integer division."""
+        """Emit C code for checked integer division runtime call."""
         return f"(_rt_idiv({c_left}, {c_right}))"
 
     def emit_checked_int_mod(self, c_left: str, c_right: str) -> str:
-        """Emit C code for checked integer modulo."""
+        """Emit C code for checked integer modulo runtime call."""
         return f"(_rt_imod({c_left}, {c_right}))"
 
     def emit_checked_int_mul(self, c_left: str, c_right: str) -> str:
-        """Emit C code for checked integer multiplication."""
+        """Emit C code for checked integer multiplication runtime call."""
         return f"(_rt_imul({c_left}, {c_right}))"
 
     def emit_checked_int_add(self, c_left: str, c_right: str) -> str:
-        """Emit C code for checked integer addition."""
+        """Emit C code for checked integer addition runtime call."""
         return f"(_rt_iadd({c_left}, {c_right}))"
 
     def emit_checked_int_sub(self, c_left: str, c_right: str) -> str:
-        """Emit C code for checked integer subtraction."""
+        """Emit C code for checked integer subtraction runtime call."""
         return f"(_rt_isub({c_left}, {c_right}))"
 
     def emit_function_call(self, c_func_name: str, c_args: str) -> str:
-        """Emit C code for a function call."""
+        """Emit C code for a function call.
+
+        Args:
+            c_func_name: C identifier or expression for the function.
+            c_args: Comma-separated C expression string for arguments.
+
+        Returns:
+            C function call expression string.
+        """
         return f"{c_func_name}({c_args})"
 
     def emit_field_access(self, c_obj: str, field_name: str, is_pointer: bool) -> str:
-        """Emit C code for field access."""
+        """Emit C code for field access using '.' or '->'.
+
+        Args:
+            c_obj: C expression for the object.
+            field_name: The field identifier.
+            is_pointer: True if the object is a pointer.
+
+        Returns:
+            C field access expression string.
+        """
         if is_pointer:
             return f"({c_obj})->{field_name}"
         else:
             return f"({c_obj}).{field_name}"
 
     def emit_paren_expr(self, c_inner: str) -> str:
-        """Emit C code for a parenthesized expression."""
+        """Emit C code for a parenthesized expression.
+
+        Args:
+            c_inner: The inner C expression string.
+
+        Returns:
+            Parenthesized expression string.
+        """
         return f"({c_inner})"
 
     def emit_cast(self, c_type: str, c_inner: str) -> str:
-        """Emit C code for a cast."""
+        """Emit C code for a type cast.
+
+        Args:
+            c_type: Target C type string.
+            c_inner: Expression to cast.
+
+        Returns:
+            C cast expression string.
+        """
         return f"(({c_type})({c_inner}))"
 
     def emit_checked_narrow_cast(self, c_dst_type: str, c_inner: str) -> str:
-        """Emit C code for a checked narrowing cast."""
+        """Emit C code for a checked narrowing cast runtime call."""
         return f"(_rt_narrow_{c_dst_type}({c_inner}))"
 
     def emit_unwrap_ptr(self, c_dst_type: str, c_inner: str, type_str: str) -> str:
-        """Emit C code for unwrapping a pointer-shaped optional."""
+        """Emit C code for unwrapping a pointer-shaped optional runtime check."""
         return f"(({c_dst_type}) _unwrap_ptr({c_inner}, \"{type_str}\"))"
 
     def emit_unwrap_opt(self, c_src_type: str, c_inner: str, type_str: str) -> str:
-        """Emit C code for unwrapping a value-optional."""
+        """Emit C code for unwrapping a value-optional runtime check."""
         return f"((({c_src_type}*) _unwrap_opt(&({c_inner}), \"{type_str}\"))->value)"
 
     def emit_null_check_eq(self, c_expr: str) -> str:
@@ -1004,7 +1268,15 @@ class CEmitter:
         return f"(({c_expr}).has_value)"
 
     def emit_pointer_null_check(self, c_expr: str, op: str) -> str:
-        """Emit C code for pointer null check."""
+        """Emit C code for pointer null comparison.
+
+        Args:
+            c_expr: C expression for the pointer.
+            op: Comparison operator (e.g., "==", "!=").
+
+        Returns:
+            C comparison expression string.
+        """
         return f"({c_expr} {op} NULL)"
 
     # ============================================================================
@@ -1012,15 +1284,15 @@ class CEmitter:
     # ============================================================================
 
     def emit_deref_lvalue(self, ptr_expr: str) -> str:
-        """Emit C code for a dereference lvalue: (*ptr)"""
+        """Emit C code for a dereference lvalue: (*ptr)."""
         return f"(*{ptr_expr})"
 
     def emit_field_lvalue(self, obj: str, field: str, is_pointer: bool) -> str:
-        """Emit C code for a field access lvalue: obj->field or obj.field"""
+        """Emit C code for a field access lvalue."""
         return f"{obj}->{field}" if is_pointer else f"{obj}.{field}"
 
     def emit_index_lvalue(self, base: str, index: str) -> str:
-        """Emit C code for an index lvalue: base[idx]"""
+        """Emit C code for an index lvalue: base[idx]."""
         return f"{base}[{index}]"
 
     # ============================================================================
@@ -1028,15 +1300,14 @@ class CEmitter:
     # ============================================================================
 
     def emit_struct_constructor(self, c_struct_name: str, field_inits: List[Tuple[str, str]]) -> str:
-        """
-        Emit C code for a struct constructor.
+        """Emit C code for a struct compound literal constructor.
 
         Args:
-            c_struct_name: Mangled C struct name
-            field_inits: List of (field_name, c_value) tuples
+            c_struct_name: Mangled C struct name.
+            field_inits: List of (field_name, c_value) tuples.
 
         Returns:
-            C compound literal: (struct name){ .f1 = v1, .f2 = v2 }
+            C compound literal: (struct name){ .f1 = v1, .f2 = v2 }.
         """
         if not field_inits:
             return f"(struct {c_struct_name}){{ 0 }}"
@@ -1045,7 +1316,7 @@ class CEmitter:
         return f"(struct {c_struct_name}){{ {inits_str} }}"
 
     def emit_struct_constructor_for_type(self, struct_type: StructType, field_inits: List[Tuple[str, str]]) -> str:
-        """Emit a struct constructor for a given L0 struct type."""
+        """Emit a C struct constructor for an L0 struct type."""
         c_struct_name = self.mangle_struct_name(struct_type.module, struct_type.name)
         return self.emit_struct_constructor(c_struct_name, field_inits)
 
@@ -1056,17 +1327,16 @@ class CEmitter:
             tag_value: str,
             payload_inits: List[Tuple[str, str]]
     ) -> str:
-        """
-        Emit C code for an enum variant constructor.
+        """Emit C code for an enum variant tagged union literal.
 
         Args:
-            c_enum_name: Mangled C enum name
-            variant_name: Name of the variant
-            tag_value: C tag value (e.g., "l0_main_Expr_Int")
-            payload_inits: List of (field_name, c_value) tuples
+            c_enum_name: Mangled C enum name.
+            variant_name: Name of the variant.
+            tag_value: C tag value.
+            payload_inits: List of (field_name, c_value) tuples for payload.
 
         Returns:
-            C tagged union literal: (struct enum){ .tag = X, .data = { .Variant = { .f = v } } }
+            C tagged union literal string.
         """
         if not payload_inits:
             return f"(struct {c_enum_name}){{ .tag = {tag_value} }}"
@@ -1086,16 +1356,15 @@ class CEmitter:
         return self.emit_variant_constructor(c_enum_name, variant_name, tag_value, payload_inits)
 
     def emit_pattern_binding_init(self, scrutinee: str, variant: str, field: str) -> str:
-        """
-        Emit C code for initializing a pattern binding variable.
+        """Emit C code for accessing a variant field during pattern matching.
 
         Args:
-            scrutinee: Name of the scrutinee variable (e.g., "_scrutinee")
-            variant: Name of the variant being matched
-            field: Name of the field being extracted
+            scrutinee: Name of the scrutinee variable.
+            variant: Name of the variant being matched.
+            field: Name of the payload field being extracted.
 
         Returns:
-            C field access expression: _scrutinee.data.Variant.field
+            C field access expression string.
         """
         return f"{scrutinee}.data.{variant}.{field}"
 
@@ -1104,129 +1373,224 @@ class CEmitter:
     # ============================================================================
 
     def emit_expr_stmt(self, c_expr: str) -> None:
-        """Emit an expression statement."""
+        """Emit an expression as a statement.
+
+        Args:
+            c_expr: C expression string.
+        """
         self.out.emit(f"{c_expr};")
 
     def emit_return_stmt(self, c_value: Optional[str]) -> None:
-        """Emit a return statement."""
+        """Emit a C return statement.
+
+        Args:
+            c_value: Optional C expression string to return.
+        """
         if c_value is not None:
             self.out.emit(f"return {c_value};")
         else:
             self.out.emit("return;")
 
     def emit_exit_switch(self) -> None:
-        """Emit a switch-exit break statement."""
+        """Emit a C break statement to exit a switch block."""
         self.out.emit("break;")
 
     def emit_label(self, label: str) -> None:
-        """Emit a C label (for goto targets)."""
+        """Emit a C label followed by a null statement.
+
+        Args:
+            label: C label identifier.
+        """
         self.out.dedent()
         self.out.emit(f"{label}:;")
         self.out.indent()
 
     def emit_goto(self, label: str) -> None:
-        """Emit a goto statement."""
+        """Emit a C goto statement.
+
+        Args:
+            label: Target C label identifier.
+        """
         self.out.emit(f"goto {label};")
 
     def emit_block_start(self) -> None:
-        """Emit opening brace for a block."""
+        """Emit an opening brace and increase indentation."""
         self.out.emit("{")
         self.out.indent()
 
     def emit_block_end(self) -> None:
-        """Emit closing brace for a block."""
+        """Emit a closing brace and decrease indentation."""
         self.out.dedent()
         self.out.emit("}")
 
     def emit_while_header(self, c_cond: str) -> None:
-        """Emit while loop header."""
+        """Emit a C while loop header.
+
+        Args:
+            c_cond: C expression for the loop condition.
+        """
         self.out.emit(f"while ({c_cond})")
 
     def emit_if_header(self, c_cond: str) -> None:
-        """Emit if statement header."""
+        """Emit a C if statement header.
+
+        Args:
+            c_cond: C expression for the condition.
+        """
         self.out.emit(f"if ({c_cond})")
 
     def emit_else(self) -> None:
-        """Emit else keyword."""
+        """Emit a C else keyword."""
         self.out.emit("else")
 
     def emit_for_loop_start(self) -> None:
-        """Emit for loop outer block start."""
+        """Emit a decorative comment and opening brace for a for loop block."""
         self.out.emit("// for loop")
         self.out.emit("{")
         self.out.indent()
 
     def emit_for_loop_end(self) -> None:
-        """Emit for loop outer block end."""
+        """Emit closing brace for a for loop block."""
         self.out.dedent()
         self.out.emit("}")
 
     def emit_let_decl(self, c_type: str, c_var_name: str, c_init: str) -> None:
-        """Emit let variable declaration."""
+        """Emit a C local variable declaration with initializer.
+
+        Args:
+            c_type: C type string.
+            c_var_name: C identifier.
+            c_init: C initializer expression string.
+        """
         self.out.emit(f"{c_type} {c_var_name} = {c_init};")
 
     def emit_assignment(self, c_target: str, c_value: str) -> None:
-        """Emit simple assignment."""
+        """Emit a simple C assignment statement.
+
+        Args:
+            c_target: C lvalue expression.
+            c_value: C expression for the value.
+        """
         self.out.emit(f"{c_target} = {c_value};")
 
     def emit_pointer_assignment(self, c_ptr_name: str, c_value: str) -> None:
-        """Emit assignment through a pointer."""
+        """Emit a C assignment through a pointer.
+
+        Args:
+            c_ptr_name: C expression evaluating to a pointer.
+            c_value: C expression for the value.
+        """
         self.out.emit(f"*{c_ptr_name} = {c_value};")
 
     def emit_temp_decl(self, c_type: str, c_temp_name: str, c_value: str) -> None:
-        """Emit temporary variable declaration."""
+        """Emit a C temporary variable declaration with initializer.
+
+        Args:
+            c_type: C type string.
+            c_temp_name: C identifier for temporary.
+            c_value: C initializer expression string.
+        """
         self.out.emit(f"{c_type} {c_temp_name} = {c_value};")
 
     def emit_string_retain(self, c_expr: str) -> None:
-        """Emit string retain call."""
+        """Emit an ARC string retain runtime call.
+
+        Args:
+            c_expr: C expression evaluating to an l0_string.
+        """
         self.out.emit(f"rt_string_retain({c_expr});")
 
     def emit_string_release(self, c_expr: str) -> None:
-        """Emit string release call."""
+        """Emit an ARC string release runtime call.
+
+        Args:
+            c_expr: C expression evaluating to an l0_string.
+        """
         self.out.emit(f"rt_string_release({c_expr});")
 
     def emit_comment(self, comment: str) -> None:
-        """Emit a C comment."""
+        """Emit a C block comment.
+
+        Args:
+            comment: The comment text.
+        """
         self.out.emit(f"/* {comment} */")
 
     def emit_match_scrutinee_decl(self, c_type: str, c_expr: str) -> None:
-        """Emit match scrutinee declaration."""
+        """Emit the scrutinee declaration for a match/case statement.
+
+        Args:
+            c_type: C type string of scrutinee.
+            c_expr: C expression for scrutinee value.
+        """
         self.out.emit(f"{c_type} _scrutinee = {c_expr};")
 
     def emit_switch_start(self, c_expr: str) -> None:
-        """Emit switch statement start."""
+        """Emit a C switch statement header and opening brace.
+
+        Args:
+            c_expr: C expression to switch on.
+        """
         self.out.emit(f"switch ({c_expr}) {{")
 
     def emit_match_switch_start(self, scrutinee_name: str) -> None:
-        """Emit a match switch over the enum tag."""
+        """Emit a match switch over an enum tag.
+
+        Args:
+            scrutinee_name: Identifier of the scrutinee variable.
+        """
         self.emit_switch_start(f"{scrutinee_name}.tag")
 
     def emit_switch_end(self) -> None:
-        """Emit switch statement end."""
+        """Emit a C switch statement closing brace."""
         self.out.emit("}")
 
     def emit_case_label(self, c_tag_value: str) -> None:
-        """Emit case label."""
+        """Emit a C case label.
+
+        Args:
+            c_tag_value: The constant C tag identifier or literal.
+        """
         self.out.emit(f"case {c_tag_value}:")
 
     def emit_default_label(self) -> None:
-        """Emit default case label."""
+        """Emit a C default case label."""
         self.out.emit("default:")
 
     def emit_drop_call(self, c_ptr_expr: str) -> None:
-        """Emit drop runtime call."""
+        """Emit a heap memory release runtime call.
+
+        Args:
+            c_ptr_expr: C expression evaluating to the object pointer.
+        """
         self.out.emit(f"_rt_drop((void*){c_ptr_expr});")
 
     def emit_null_assignment(self, c_var: str) -> None:
-        """Emit assignment to NULL."""
+        """Emit a NULL assignment to a variable.
+
+        Args:
+            c_var: C lvalue expression.
+        """
         self.out.emit(f"{c_var} = NULL;")
 
     def emit_alloc_obj(self, c_ptr_type: str, c_base_type: str, c_temp_name: str) -> None:
-        """Emit heap allocation for new expression."""
+        """Emit a heap allocation runtime call.
+
+        Args:
+            c_ptr_type: C pointer type string.
+            c_base_type: C base object type string.
+            c_temp_name: Name of temporary to hold the pointer.
+        """
         self.out.emit(f"{c_ptr_type} {c_temp_name} = ({c_ptr_type})_rt_alloc_obj((l0_int)sizeof({c_base_type}));")
 
     def emit_struct_init(self, c_temp_name: str, c_base_type: str, c_init_str: str) -> None:
-        """Emit struct initialization for new expression."""
+        """Emit an object initialization through a pointer.
+
+        Args:
+            c_temp_name: Name of the pointer variable.
+            c_base_type: C base object type string.
+            c_init_str: C compound initializer body.
+        """
         self.out.emit(f"*{c_temp_name} = ({c_base_type}){{ {c_init_str} }};")
 
     def emit_struct_init_from_fields(
@@ -1235,7 +1599,13 @@ class CEmitter:
             base_type: Type,
             field_inits: List[Tuple[str, str]]
     ) -> None:
-        """Emit struct initialization using field initializers."""
+        """Emit struct initialization using positional field values.
+
+        Args:
+            c_temp_name: Name of the pointer variable.
+            base_type: L0 base object type.
+            field_inits: List of (field_name, c_value) tuples.
+        """
         c_base_type = self.emit_type(base_type)
         init_str = ", ".join(f".{name} = {value}" for name, value in field_inits)
         self.emit_struct_init(c_temp_name, c_base_type, init_str)
@@ -1247,7 +1617,14 @@ class CEmitter:
             variant_name: str,
             payload_inits: List[Tuple[str, str]]
     ) -> None:
-        """Emit enum variant initialization for a heap-allocated enum."""
+        """Emit enum variant initialization for a heap-allocated enum.
+
+        Args:
+            c_temp_name: Name of the pointer variable.
+            enum_type: L0 enum type.
+            variant_name: Name of the active variant.
+            payload_inits: List of (field_name, c_value) tuples for payload.
+        """
         c_base_type = self.emit_type(enum_type)
         tag_value = self.emit_enum_tag(enum_type, variant_name)
         if not payload_inits:
@@ -1258,17 +1635,39 @@ class CEmitter:
         self.emit_struct_init(c_temp_name, c_base_type, init_str)
 
     def emit_zero_init(self, c_temp_name: str, c_base_type: str) -> None:
-        """Emit zero initialization."""
+        """Emit zero-initialization through a pointer.
+
+        Args:
+            c_temp_name: Name of the pointer variable.
+            c_base_type: C base object type string.
+        """
         self.out.emit(f"*{c_temp_name} = ({c_base_type}){{ 0 }};")
 
     def emit_try_check_niche(self, c_tmp: str, ret_none: str) -> None:
-        """Emit try expression null check for niche-optimized optional."""
+        """Emit a NULL check for a niche-optimized optional.
+
+        Args:
+            c_tmp: C identifier of the temporary holding the optional.
+            ret_none: C expression for the 'none' return value.
+        """
         self.out.emit(f"if ({c_tmp} == NULL) return {ret_none};")
 
     def emit_try_check_value(self, c_tmp: str, ret_none: str) -> None:
-        """Emit try expression check for value-optional."""
+        """Emit a has_value check for a value-optional.
+
+        Args:
+            c_tmp: C identifier of the temporary holding the optional.
+            ret_none: C expression for the 'none' return value.
+        """
         self.out.emit(f"if (!{c_tmp}.has_value) return {ret_none};")
 
     def emit_try_extract_value(self, c_tmp: str) -> str:
-        """Emit extraction of value from value-optional."""
+        """Emit C code to extract the inner value from an optional.
+
+        Args:
+            c_tmp: C identifier of the temporary holding the optional.
+
+        Returns:
+            C expression string for the extracted value.
+        """
         return f"({c_tmp}.value)"

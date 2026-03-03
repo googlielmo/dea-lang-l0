@@ -1,12 +1,11 @@
 #  SPDX-License-Identifier: MIT OR Apache-2.0
 #  Copyright (c) 2026 gwz
 
-"""
-String escape helpers shared by semantic checks and C codegen.
+"""String escape utilities for the L0 compiler.
 
-Lexer keeps string token text with escape sequences preserved (e.g. "\\n").
-This module decodes that token text to raw bytes and encodes bytes back to a
-C-safe string-literal body.
+This module provides helpers for decoding L0 string literals (with escape
+sequences preserved) into raw bytes, and encoding raw bytes into C-compatible
+string literal bodies.
 """
 
 from dataclasses import dataclass
@@ -31,15 +30,29 @@ _SIMPLE_ESCAPES = {
 
 @dataclass(frozen=True)
 class EscapeDecodeError(ValueError):
+    """Raised when an invalid escape sequence is encountered during decoding.
+
+    Attributes:
+        code: Error code identifying the kind of failure.
+        details: Optional string providing more context.
+    """
     code: str
     details: str = ""
 
 
 def decode_l0_string_token(text: str) -> bytes:
-    """
-    Decode an L0 string token payload to bytes.
+    """Decode an L0 string literal payload to raw bytes.
 
-    Input is lexer-preserved token text (without surrounding quotes).
+    Processes C-style escape sequences including hex, octal, and Unicode.
+
+    Args:
+        text: The string literal content (without surrounding quotes).
+
+    Returns:
+        The decoded bytes.
+
+    Raises:
+        EscapeDecodeError: If a malformed Unicode escape is encountered.
     """
     out = bytearray()
     i = 0
@@ -70,8 +83,7 @@ def decode_l0_string_token(text: str) -> bytes:
                 i += 1
             hex_digits = text[start:i]
             if not hex_digits:
-                # Lexer should reject this, but keep this robust for malformed ASTs.
-                out.extend(b"x")
+                out.extend(b"x") # would have been rejected by the lexer, but be lenient here and preserve the 'x' as-is
                 continue
             out.append(int(hex_digits, 16) & 0xFF)
             continue
@@ -107,7 +119,7 @@ def decode_l0_string_token(text: str) -> bytes:
             out.append(int(oct_digits, 8) & 0xFF)
             continue
 
-        # Unknown escapes should be rejected by lexer. Preserve best-effort behavior.
+        # Unknown escapes: be lenient and preserve as-is
         out.extend(esc.encode("utf-8"))
         i += 1
 
@@ -115,8 +127,16 @@ def decode_l0_string_token(text: str) -> bytes:
 
 
 def encode_c_string_bytes(data: bytes) -> str:
-    """
-    Encode raw bytes into a C-safe string-literal body (without quotes).
+    """Encode raw bytes into a C-safe string literal body.
+
+    Uses standard escapes for common control characters and fixed-width octal
+    escapes for other non-printable bytes to avoid ambiguity in C.
+
+    Args:
+        data: The raw bytes to encode.
+
+    Returns:
+        A string containing the encoded C literal content (without quotes).
     """
     parts: list[str] = []
     for b in data:

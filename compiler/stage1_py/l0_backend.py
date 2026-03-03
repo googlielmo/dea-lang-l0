@@ -1,5 +1,7 @@
-"""
-L0 Code Generation Backend
+#  SPDX-License-Identifier: MIT OR Apache-2.0
+#  Copyright (c) 2025-2026 gwz
+
+"""L0 Code Generation Backend.
 
 Orchestrates code generation from a fully-analyzed L0 compilation unit.
 
@@ -14,9 +16,6 @@ Responsibilities:
 
 The backend contains zero knowledge of target language syntax.
 """
-
-#  SPDX-License-Identifier: MIT OR Apache-2.0
-#  Copyright (c) 2025-2026 gwz
 
 from dataclasses import dataclass, field
 from typing import List, Optional, Dict, Set, NoReturn, Tuple, Any
@@ -42,18 +41,22 @@ from l0_types import (
 
 @dataclass
 class Backend:
-    """
-    Language-agnostic code generation backend.
+    """Language-agnostic code generation backend.
 
     Orchestrates code generation by:
-    - Managing compilation unit structure and emission order
-    - Resolving types and symbols
-    - Tracking variable scopes and lifetimes
-    - Scheduling cleanup operations
-    - Delegating all target-specific code emission to the emitter
+    - Managing compilation unit structure and emission order.
+    - Resolving types and symbols.
+    - Tracking variable scopes and lifetimes.
+    - Scheduling cleanup operations.
+    - Delegating all target-specific code emission to the emitter.
 
     The backend decides WHAT to emit and WHEN, but not HOW (that's the emitter's job).
     This allows the same backend logic to work with different emitters (C, LLVM IR, WASM, etc.).
+
+    Attributes:
+        analysis: Full front-end analysis result.
+        emitter: Target-specific emitter (handles all code emission).
+        current_module: Name of the module currently being processed.
     """
 
     analysis: AnalysisResult
@@ -90,24 +93,47 @@ class Backend:
         self.emitter.set_analysis(self.analysis)
 
     def _fresh_label(self, prefix: str) -> str:
-        """Generate a unique C label name."""
+        """Generate a unique C label name.
+
+        Args:
+            prefix: Prefix for the label name.
+
+        Returns:
+            A unique label string.
+        """
         self._label_counter += 1
         return f"__{prefix}_{self._label_counter}"
 
     def _push_scope(self) -> ScopeContext:
-        """Enter a new scope."""
+        """Enter a new scope.
+
+        Returns:
+            The newly created ScopeContext.
+        """
         new_scope = ScopeContext(parent=self._current_scope)
         self._current_scope = new_scope
         return new_scope
 
     def _pop_scope(self) -> None:
-        """Exit current scope."""
+        """Exit current scope.
+
+        Raises:
+            InternalCompilerError: If there is no current scope to pop.
+        """
         if self._current_scope is None:
             self.ice("[ICE-1330] scope underflow")
         self._current_scope = self._current_scope.parent
 
     def _types_equal(self, a: Type, b: Type) -> bool:
-        """Check if two types are structurally equal."""
+        """Check if two types are structurally equal.
+
+        Args:
+            a: First type.
+            b: Second type.
+
+        Returns:
+            True if types are equal, False otherwise.
+        """
         if type(a) != type(b):
             # Different kinds of types
             return False
@@ -124,22 +150,40 @@ class Backend:
         return False
 
     def _is_int_assignable(self, typ) -> bool:
+        """Check if a type is assignable to an integer.
+
+        Args:
+            typ: The type to check.
+
+        Returns:
+            True if it's an 'int' or 'byte' builtin type.
+        """
         return typ in (BuiltinType("int"), BuiltinType("byte"))
 
     def _is_binary_op_enabled(self, typ) -> bool:
-        """
-        Check if a type supports binary operations.
+        """Check if a type supports binary operations.
 
         Currently only int, byte, and bool support binary operations.
+
+        Args:
+            typ: The type to check.
+
+        Returns:
+            True if binary operations are supported for the type.
         """
         if isinstance(typ, BuiltinType):
             return typ.name in ("int", "byte", "bool")
         return False
 
     def _is_place_expr(self, expr: Expr) -> bool:
-        """
-        Returns True if expr refers to an existing binding (retain on copy).
-        Returns False if expr produces a fresh value (ownership transfer, no retain).
+        """Check if an expression refers to an existing binding.
+
+        Args:
+            expr: The expression to check.
+
+        Returns:
+            True if expr refers to an existing binding (retain on copy).
+            False if expr produces a fresh value (ownership transfer, no retain).
         """
         if isinstance(expr, VarRef):
             return True
@@ -155,7 +199,14 @@ class Backend:
         return False
 
     def _is_unwrap_cast_from_place(self, expr: Expr) -> bool:
-        """Return True for `T? as T` casts where the optional source is a place."""
+        """Check if an expression is a `T? as T` cast from a place.
+
+        Args:
+            expr: The expression to check.
+
+        Returns:
+            True for `T? as T` casts where the optional source is a place.
+        """
         if not isinstance(expr, CastExpr):
             return False
 
@@ -171,13 +222,27 @@ class Backend:
         """Check if a non-place rvalue with ARC data needs temp materialization.
 
         String literals are static constants and don't need cleanup.
+
+        Args:
+            expr: The expression to check.
+
+        Returns:
+            True if temp materialization is needed.
         """
         if isinstance(expr, StringLiteral):
             return False
         return True
 
     def _should_materialize_arc_temp(self, expr: Expr, expr_type: Type) -> bool:
-        """Return True when an ARC expression should be hoisted to a cleanup temp."""
+        """Check if an ARC expression should be hoisted to a cleanup temp.
+
+        Args:
+            expr: The expression to check.
+            expr_type: The type of the expression.
+
+        Returns:
+            True if the expression should be materialized into a temporary.
+        """
         return (
             self.analysis.has_arc_data(expr_type)
             and not self._is_place_expr(expr)
@@ -186,17 +251,31 @@ class Backend:
         )
 
     def _materialize_arc_temp(self, c_expr: str, expr_type: Type) -> str:
-        """Materialize an ARC rvalue into a scope-owned temporary for automatic cleanup."""
+        """Materialize an ARC rvalue into a scope-owned temporary for automatic cleanup.
+
+        Args:
+            c_expr: The C expression string.
+            expr_type: The type of the expression.
+
+        Returns:
+            The name of the generated temporary variable.
+        """
         temp = self.emitter.fresh_tmp("arc")
         self.emitter.emit_temp_decl(self.emitter.emit_type(expr_type), temp, c_expr)
         self._current_scope.add_owned(temp, expr_type)
         return temp
 
     def _has_side_effects(self, expr: Expr) -> bool:
-        """
-        Returns True if the expression has side effects or contains function calls.
+        """Check if the expression has side effects or contains function calls.
+
         Such expressions should be evaluated once and cached in a temporary to avoid
         multiple evaluation when used in contexts like assignment with ARC operations.
+
+        Args:
+            expr: The expression to check.
+
+        Returns:
+            True if the expression has potential side effects.
         """
         if isinstance(expr, (IntLiteral, ByteLiteral, StringLiteral, BoolLiteral, NullLiteral)):
             return False
@@ -238,10 +317,15 @@ class Backend:
         return True
 
     def _lookup_local_var_type(self, var_name: str) -> Optional[Type]:
-        """
-        Look up a local variable's type in the current scope chain.
+        """Look up a local variable's type in the current scope chain.
+
         Searches declared_vars (includes both locals and parameters).
-        Returns None if not found.
+
+        Args:
+            var_name: The name of the variable to look up.
+
+        Returns:
+            The variable's Type, or None if not found.
         """
         mangled_name = self.emitter.mangle_identifier(var_name)
         scope = self._current_scope
@@ -253,11 +337,16 @@ class Backend:
         return None
 
     def _lookup_owned_local_name(self, expr: VarRef) -> Optional[str]:
-        """
-        Return the mangled local name when a VarRef resolves to an owned local binding.
+        """Return the mangled local name when a VarRef resolves to an owned local binding.
 
         Parameters are local VarRefs but are not owned by the callee, so they do not
         appear in owned_vars and return None.
+
+        Args:
+            expr: The variable reference expression.
+
+        Returns:
+            The mangled local name if it's an owned binding, otherwise None.
         """
         resolution = self.analysis.var_ref_resolution.get(id(expr))
         if resolution is not VarRefResolution.LOCAL:
@@ -273,10 +362,7 @@ class Backend:
         return None
 
     def _extract_value_type_dependencies(self, typ: Type) -> Set[Tuple[str, str]]:
-        """
-        Extract type dependencies for VALUE fields only.
-
-        Returns set of (module, name) tuples for types that must be defined first.
+        """Extract type dependencies for VALUE fields only.
 
         Value-type fields create dependencies (types must be fully defined).
         Pointer-type fields do NOT create dependencies (forward declarations suffice).
@@ -289,6 +375,12 @@ class Backend:
         - NullableType(BuiltinType("int")) -> {} (value-optional of builtin, no dependency)
         - NullableType(StructType("main", "Point")) -> {("main", "Point")} (value-optional of struct)
         - BuiltinType("int") -> {} (no dependency)
+
+        Args:
+            typ: The type to extract dependencies from.
+
+        Returns:
+            Set of (module, name) tuples for types that must be defined first.
         """
         if isinstance(typ, PointerType):
             # Pointers don't create dependencies - forward declarations handle them
@@ -318,13 +410,13 @@ class Backend:
             return set()
 
     def _build_type_dependency_graph(self) -> Dict[Tuple[str, str], Set[Tuple[str, str]]]:
-        """
-        Build dependency graph for type definitions.
-
-        Returns: Dict mapping (module, type_name) -> Set of (module, type_name) dependencies
+        """Build dependency graph for type definitions.
 
         A type X depends on type Y if X has a VALUE field of type Y.
         Pointer fields do NOT create dependencies (forward declarations handle them).
+
+        Returns:
+            Dict mapping (module, type_name) -> Set of (module, type_name) dependencies.
         """
         graph = {}
 
@@ -358,7 +450,15 @@ class Backend:
             graph: Dict[Tuple[str, str], Set[Tuple[str, str]]],
             unresolved: List[Tuple[str, str]]
     ) -> str:
-        """Find and format cycle details for error message."""
+        """Find and format cycle details for error message.
+
+        Args:
+            graph: The type dependency graph.
+            unresolved: List of unresolved nodes.
+
+        Returns:
+            A string describing the detected cycle details.
+        """
         # Simple approach: list unresolved nodes and their dependencies
         details = []
         for node in unresolved[:5]:  # Limit to first 5 for readability
@@ -375,12 +475,16 @@ class Backend:
             self,
             graph: Dict[Tuple[str, str], Set[Tuple[str, str]]]
     ) -> List[Tuple[str, str]]:
-        """
-        Perform topological sort on type dependency graph using Kahn's algorithm.
+        """Perform topological sort on type dependency graph using Kahn's algorithm.
 
-        Returns: List of (module, type_name) in dependency order (dependencies first)
+        Args:
+            graph: The type dependency graph.
 
-        Raises: InternalCompilerError on cycles (value-type cycles are impossible in valid L0)
+        Returns:
+            List of (module, type_name) in dependency order (dependencies first).
+
+        Raises:
+            InternalCompilerError: On cycles (value-type cycles are impossible in valid L0).
         """
         from collections import deque
 
@@ -416,7 +520,15 @@ class Backend:
         return result
 
     def _find_struct_decl(self, module_name: str, struct_name: str) -> Optional[StructDecl]:
-        """Find the StructDecl AST node for a given struct."""
+        """Find the StructDecl AST node for a given struct.
+
+        Args:
+            module_name: Name of the module.
+            struct_name: Name of the struct.
+
+        Returns:
+            The StructDecl if found, otherwise None.
+        """
         module = self.analysis.cu.modules.get(module_name)
         if not module:
             return None
@@ -428,7 +540,15 @@ class Backend:
         return None
 
     def _find_enum_decl(self, module_name: str, enum_name: str) -> Optional[EnumDecl]:
-        """Find the EnumDecl AST node for a given enum."""
+        """Find the EnumDecl AST node for a given enum.
+
+        Args:
+            module_name: Name of the module.
+            enum_name: Name of the enum.
+
+        Returns:
+            The EnumDecl if found, otherwise None.
+        """
         module = self.analysis.cu.modules.get(module_name)
         if not module:
             return None
@@ -440,10 +560,13 @@ class Backend:
         return None
 
     def generate(self) -> str:
-        """
-        Main entry point: generate complete C source for the compilation unit.
+        """Main entry point: generate complete C source for the compilation unit.
 
-        Returns C source code as a string.
+        Returns:
+            C source code as a string.
+
+        Raises:
+            ValueError: If there is no compilation unit or if there are semantic errors.
         """
         log_stage(self.analysis.context, "Generating C code")
         if self.analysis.cu is None:
@@ -511,6 +634,15 @@ class Backend:
     # -------------------------------------------------------------------------
 
     def ice(self, message: str, *, node=None) -> NoReturn:
+        """Raise an internal compiler error.
+
+        Args:
+            message: The error message.
+            node: Optional AST node associated with the error.
+
+        Raises:
+            InternalCompilerError: Always raised with the provided message and location.
+        """
         filename = None
         if self.current_module and self.analysis.cu is not None:
             mod = self.analysis.cu.modules.get(self.current_module)
@@ -520,13 +652,28 @@ class Backend:
         raise InternalCompilerError(message, ICELocation(filename=filename, span=span))
 
     def _expect_expr_type(self, expr) -> Type:
+        """Look up an expression's type and fail if missing.
+
+        Args:
+            expr: The expression to look up.
+
+        Returns:
+            The resolved Type of the expression.
+
+        Raises:
+            InternalCompilerError: If the type is missing from the analysis.
+        """
         ty = self.analysis.expr_types.get(id(expr))
         if ty is None:
             self.ice("[ICE-1310] missing inferred type for expression", node=expr)
         return ty
 
     def _emit_line_directive(self, node) -> None:
-        """Emit #line directive if node has span info and context allows it."""
+        """Emit #line directive if node has span info and context allows it.
+
+        Args:
+            node: The AST node containing span information.
+        """
         self.emitter.emit_line_directive(node, self.current_module)
 
     # -------------------------------------------------------------------------
@@ -553,7 +700,12 @@ class Backend:
                     self._emit_let_declaration(module.name, decl)
 
     def _emit_let_declaration(self, module_name: str, decl: LetDecl) -> None:
-        """Emit a single top-level let declaration as a static variable."""
+        """Emit a single top-level let declaration as a static variable.
+
+        Args:
+            module_name: Name of the module containing the declaration.
+            decl: The LetDecl AST node.
+        """
         # Get the resolved type
         let_type = self.analysis.let_types.get((module_name, decl.name))
         if not let_type:
@@ -564,9 +716,19 @@ class Backend:
         self.emitter.emit_let_declaration(module_name, decl, let_type, self._emit_let_initializer)
 
     def _emit_let_initializer(self, expr: Expr, expected_type: Type) -> str:
-        """
-        Generate C initializer expression for a top-level let.
+        """Generate C initializer expression for a top-level let.
+
         Supports compile-time constant literals and struct/enum construction.
+
+        Args:
+            expr: The initializer expression.
+            expected_type: The expected type of the constant.
+
+        Returns:
+            A C initializer expression string.
+
+        Raises:
+            InternalCompilerError: If the initializer is not constant or supported.
         """
         if isinstance(expr, IntLiteral):
             return self.emitter.emit_int_literal(expr.value)
@@ -591,9 +753,19 @@ class Backend:
             self.ice(f"[ICE-1181] unsupported top-level let initializer: {type(expr).__name__}", node=expr)
 
     def _emit_const_constructor(self, expr: CallExpr, expected_type: Type) -> str:
-        """
-        Emit a constant struct or enum constructor for static initialization.
+        """Emit a constant struct or enum constructor for static initialization.
+
         Similar to _try_emit_constructor but only handles constant expressions.
+
+        Args:
+            expr: The constructor call expression.
+            expected_type: The expected struct or enum type.
+
+        Returns:
+            A C initializer string.
+
+        Raises:
+            InternalCompilerError: If symbol or constructor type is invalid.
         """
         assert isinstance(expr.callee, VarRef)
         name = expr.callee.name
@@ -623,7 +795,18 @@ class Backend:
             self.ice(f"[ICE-1034] CallExpr is not a constructor", node=expr)
 
     def _emit_const_struct_constructor(self, expr: CallExpr, struct_type: StructType) -> str:
-        """Emit constant struct constructor for static initialization."""
+        """Emit constant struct constructor for static initialization.
+
+        Args:
+            expr: The constructor call expression.
+            struct_type: The struct type.
+
+        Returns:
+            A C struct initializer string.
+
+        Raises:
+            InternalCompilerError: If struct info is missing or argument count mismatches.
+        """
         # Look up struct info to get field names and types
         info = self.analysis.struct_infos.get((struct_type.module, struct_type.name))
         if info is None:
@@ -645,7 +828,18 @@ class Backend:
         return self.emitter.emit_struct_constructor_for_type(struct_type, field_inits)
 
     def _emit_const_variant_constructor(self, expr: CallExpr, enum_type: EnumType) -> str:
-        """Emit constant enum variant constructor for static initialization."""
+        """Emit constant enum variant constructor for static initialization.
+
+        Args:
+            expr: The variant call expression.
+            enum_type: The enum type.
+
+        Returns:
+            A C enum variant initializer string.
+
+        Raises:
+            InternalCompilerError: If variant info or declaration is missing.
+        """
         assert isinstance(expr.callee, VarRef)
         variant_name = expr.callee.name
 
@@ -699,7 +893,15 @@ class Backend:
                     self._emit_function_declaration(module.name, decl)
 
     def _emit_function_declaration(self, module_name: str, decl: FuncDecl) -> None:
-        """Emit a single function declaration."""
+        """Emit a single function declaration.
+
+        Args:
+            module_name: Name of the module.
+            decl: The FuncDecl AST node.
+
+        Raises:
+            InternalCompilerError: If FuncType is missing.
+        """
         func_type = self.analysis.func_types.get((module_name, decl.name))
         if not func_type:
             self.ice(f"[ICE-1150] missing FuncType for {module_name}.{decl.name}", node=decl)
@@ -721,7 +923,15 @@ class Backend:
                     self._emit_function_definition(module.name, decl)
 
     def _emit_function_definition(self, module_name: str, decl: FuncDecl) -> None:
-        """Emit a complete function definition with body."""
+        """Emit a complete function definition with body.
+
+        Args:
+            module_name: Name of the module.
+            decl: The FuncDecl AST node.
+
+        Raises:
+            InternalCompilerError: If scope is not reset or FuncType is missing.
+        """
         if self._current_scope is not None:
             self.ice(f"[ICE-1160] scope not reset before function {module_name}.{decl.name}")
 
@@ -761,8 +971,7 @@ class Backend:
         self.emitter.emit_function_definition_footer()
 
     def _emit_main_wrapper_if_needed(self) -> None:
-        """
-        If the entry module has a main function, emit a C main() wrapper that calls it.
+        """If the entry module has a main function, emit a C main() wrapper.
 
         This allows us to consistently mangle all L0 functions (including main)
         while still providing the expected C entry point.
@@ -791,7 +1000,11 @@ class Backend:
     # -------------------------------------------------------------------------
 
     def _scope_chain_has_cleanup(self) -> bool:
-        """Return True if any scope in the chain has with-cleanup or owned vars."""
+        """Check if any scope in the chain has cleanup requirements.
+
+        Returns:
+            True if any scope has a with-cleanup or owned ARC variables.
+        """
         scope = self._current_scope
         while scope is not None:
             if ((scope.with_cleanup_block is not None or scope.with_cleanup_inline)
@@ -804,13 +1017,16 @@ class Backend:
         return False
 
     def _emit_cleanup_for_return(self, returned_var: Optional[str] = None) -> None:
-        """
-        Emit cleanup for return statement.
+        """Emit cleanup logic for a return statement.
+
         Walks up scope chain, executes any with-statement cleanup data,
         then cleans ALL owned variables (except return value).
         The with-cleanup runs first because user cleanup code may reference
         variables whose owned resources (e.g. string refcounts) are released
         by the automatic owned-var cleanup.
+
+        Args:
+            returned_var: Mangled name of variable being returned (to skip cleanup).
         """
         scope = self._current_scope
         while scope is not None:
@@ -831,12 +1047,18 @@ class Backend:
             scope = scope.parent
 
     def _emit_cleanup_for_loop_exit(self, *, is_break: bool) -> None:
-        """
-        Emit cleanup for break/continue.
+        """Emit cleanup for break/continue.
+
         Walks from current scope up to and including the innermost loop cleanup target,
         executing any with-statement cleanup data along the way.
         The with-cleanup runs before owned-var cleanup (see
         ``_emit_cleanup_for_return`` for rationale).
+
+        Args:
+            is_break: True if cleaning for 'break', False for 'continue'.
+
+        Raises:
+            InternalCompilerError: If called outside of a loop.
         """
         if not self._loop_cleanup_scope_stack:
             # Shouldn't happen if semantic analysis caught it
@@ -866,16 +1088,24 @@ class Backend:
             scope = scope.parent
 
     def _emit_cleanup_at_scope_exit(self, scope: ScopeContext) -> None:
-        """
-        Emit cleanup at scope exit.
+        """Emit cleanup at scope exit.
+
         Only cleans variables declared in THIS scope that have owned fields.
+
+        Args:
+            scope: The scope being exited.
         """
         for var_name, var_type in reversed(scope.owned_vars):
             if self.analysis.has_arc_data(var_type):
                 self._emit_value_cleanup(var_name, var_type)
 
     def _emit_with_cleanup_from_scope(self, scope: ScopeContext, module_name: str) -> None:
-        """Emit with-statement cleanup for a scope."""
+        """Emit with-statement cleanup for a scope.
+
+        Args:
+            scope: The scope containing cleanup logic.
+            module_name: Name of current module.
+        """
         if scope.with_cleanup_block is None and not scope.with_cleanup_inline:
             return
 
@@ -899,8 +1129,7 @@ class Backend:
             scope.with_cleanup_in_progress = old_with_cleanup_in_progress
 
     def _emit_value_cleanup(self, c_expr: str, ty: Type) -> None:
-        """
-        Emit cleanup code for a by-value variable before reassignment.
+        """Emit cleanup code for a by-value variable before reassignment.
 
         Similar to _emit_field_cleanup, but expects c_expr to be a direct
         value reference (not a pointer), so uses '.' instead of '->'.
@@ -912,16 +1141,24 @@ class Backend:
         self.emitter.emit_value_cleanup(c_expr, ty)
 
     def _emit_struct_cleanup(self, c_ptr_expr: str, struct_type: StructType) -> None:
-        """
-        Emit cleanup code for all owned fields in a struct.
+        """Emit cleanup code for all owned fields in a struct.
+
         Recursively handles nested structs (by-value fields).
+
+        Args:
+            c_ptr_expr: C expression evaluating to a pointer to the struct.
+            struct_type: The struct type.
         """
         self.emitter.emit_struct_cleanup(c_ptr_expr, struct_type)
 
     def _emit_enum_cleanup(self, c_ptr_expr: str, enum_type: EnumType) -> None:
-        """
-        Emit cleanup code for owned fields in an enum's active variant.
+        """Emit cleanup code for owned fields in an enum's active variant.
+
         Uses switch on tag to only clean up the fields that are actually present.
+
+        Args:
+            c_ptr_expr: C expression evaluating to a pointer to the enum.
+            enum_type: The enum type.
         """
         self.emitter.emit_enum_cleanup(c_ptr_expr, enum_type)
 
@@ -930,14 +1167,27 @@ class Backend:
     # -------------------------------------------------------------------------
 
     def _emit_block_sequence(self, block: Block, module_name: str) -> None:
-        """Emit statements in a block."""
+        """Emit statements in a block.
+
+        Args:
+            block: The Block AST node.
+            module_name: Name of current module.
+        """
         for stmt in block.stmts:
             self._emit_stmt(stmt, module_name)
 
         return None
 
     def _emit_stmt(self, stmt: Stmt, module_name: str) -> None:
-        """Emit a single statement."""
+        """Emit a single statement.
+
+        Args:
+            stmt: The Stmt AST node.
+            module_name: Name of current module.
+
+        Raises:
+            InternalCompilerError: If statement type is unsupported.
+        """
 
         self._emit_line_directive(stmt)
 
@@ -1021,6 +1271,12 @@ class Backend:
             self.ice(f"[ICE-1250] unsupported statement type for code generation: {type(stmt).__name__}", node=stmt)
 
     def _emit_block(self, stmt: Block, module_name: str) -> Any:
+        """Emit a block statement with its own scope.
+
+        Args:
+            stmt: The Block AST node.
+            module_name: Name of current module.
+        """
         self.emitter.emit_block_start()
 
         block_scope = self._push_scope()
@@ -1035,6 +1291,11 @@ class Backend:
         return None
 
     def _emit_return(self, stmt: ReturnStmt) -> Any:
+        """Emit a return statement with cleanup.
+
+        Args:
+            stmt: The ReturnStmt AST node.
+        """
         if stmt.value is None:
             if self._current_scope is not None:
                 self._emit_cleanup_for_return()
@@ -1073,6 +1334,12 @@ class Backend:
         return None
 
     def _emit_while(self, stmt: WhileStmt, module_name: str) -> Any:
+        """Emit a while loop.
+
+        Args:
+            stmt: The WhileStmt AST node.
+            module_name: Name of current module.
+        """
         break_label = self._fresh_label("lbrk")
         continue_label = self._fresh_label("lcont")
         self._loop_label_stack.append((break_label, continue_label))
@@ -1101,6 +1368,12 @@ class Backend:
         return None
 
     def _emit_for(self, stmt: ForStmt, module_name: str) -> Any:
+        """Emit a for loop.
+
+        Args:
+            stmt: The ForStmt AST node.
+            module_name: Name of current module.
+        """
         break_label = self._fresh_label("lbrk")
         continue_label = self._fresh_label("lcont")
         self._loop_label_stack.append((break_label, continue_label))
@@ -1152,6 +1425,12 @@ class Backend:
         return None
 
     def _emit_if_else(self, stmt: IfStmt, module_name: str) -> Any:
+        """Emit an if-else statement.
+
+        Args:
+            stmt: The IfStmt AST node.
+            module_name: Name of current module.
+        """
         c_cond = self._emit_expr(stmt.cond)
         self.emitter.emit_if_header(c_cond)
 
@@ -1172,8 +1451,14 @@ class Backend:
         return None
 
     def _gen_if_else_branch(self, stmt: Stmt, module_name: str) -> bool:
-        """
-        Emit a branch of an if/else. Returns True if branch is unreachable at end.
+        """Emit a branch of an if/else.
+
+        Args:
+            stmt: The statement in the branch.
+            module_name: Name of current module.
+
+        Returns:
+            True if branch is unreachable at end.
         """
         if isinstance(stmt, Block):
             self._emit_block(stmt, module_name)
@@ -1184,7 +1469,14 @@ class Backend:
         return self._next_stmt_unreachable
 
     def _find_declaring_scope(self, mangled_name: str) -> 'Optional[ScopeContext]':
-        """Walk the scope chain; return the scope whose declared_vars contains the name."""
+        """Walk the scope chain to find where a name was declared.
+
+        Args:
+            mangled_name: The mangled name to search for.
+
+        Returns:
+            The scope where the name was declared, or None if not found.
+        """
         scope = self._current_scope
         while scope is not None:
             for name, _ in scope.declared_vars:
@@ -1194,7 +1486,15 @@ class Backend:
         return None
 
     def _is_borrowed_arc_param(self, target_expr: Expr, dst_ty: Type) -> tuple:
-        """Check if target is a borrowed ARC param (declared but not owned anywhere)."""
+        """Check if target is a borrowed ARC param.
+
+        Args:
+            target_expr: The target expression.
+            dst_ty: The destination type.
+
+        Returns:
+            A tuple (is_borrowed: bool, declaring_scope: Optional[ScopeContext]).
+        """
         if not isinstance(target_expr, VarRef):
             return False, None
         if not self.analysis.has_arc_data(dst_ty):
@@ -1214,6 +1514,14 @@ class Backend:
         return True, declaring
 
     def _emit_reassignment(self, stmt: AssignStmt) -> None:
+        """Emit an assignment statement.
+
+        Args:
+            stmt: The AssignStmt AST node.
+
+        Raises:
+            InternalCompilerError: If types are missing or emission fails.
+        """
         # Resolve source and destination types
         src_ty = self.analysis.expr_types.get(id(stmt.value))
         dst_ty = self.analysis.expr_types.get(id(stmt.target))
@@ -1249,11 +1557,19 @@ class Backend:
         return None
 
     def _emit_lvalue_with_caching(self, target: Expr) -> str:
-        """
-        Emit an lvalue expression, caching sub-expressions with side effects.
+        """Emit an lvalue expression, caching sub-expressions with side effects.
 
         For targets like `*(func_call())`, the pointer expression `func_call()` must
         be evaluated exactly once, not multiple times during release/assign/retain.
+
+        Args:
+            target: The lvalue expression.
+
+        Returns:
+            A C lvalue expression string.
+
+        Raises:
+            InternalCompilerError: If types are missing for complex lvalues.
         """
         # Case 1: Dereference with side effects in operand
         if isinstance(target, UnaryOp) and target.op == "*":
@@ -1311,6 +1627,15 @@ class Backend:
         return self._emit_expr(target)
 
     def _emit_let(self, stmt: LetStmt, module_name: str) -> Any:
+        """Emit a local 'let' declaration.
+
+        Args:
+            stmt: The LetStmt AST node.
+            module_name: Name of current module.
+
+        Raises:
+            InternalCompilerError: If type cannot be inferred.
+        """
         # Resolve declared type (if any) or use inferred type
         var_ty = None
         if stmt.type is not None:
@@ -1334,7 +1659,18 @@ class Backend:
         return None
 
     def _resolve_let_type(self, stmt: LetStmt, module_name: str) -> Type:
-        """Resolve concrete type for a let declaration."""
+        """Resolve concrete type for a let declaration.
+
+        Args:
+            stmt: The LetStmt AST node.
+            module_name: Name of current module.
+
+        Returns:
+            The resolved Type.
+
+        Raises:
+            InternalCompilerError: If type cannot be inferred.
+        """
         var_ty = None
         if stmt.type is not None:
             var_ty = self._resolve_type_ref(stmt.type, module_name)
@@ -1345,13 +1681,19 @@ class Backend:
         return var_ty
 
     def _emit_with_cleanup_header_let_predecl(self, stmt: LetStmt, module_name: str) -> Optional[Type]:
-        """
-        Predeclare a nullable `with`-header let for cleanup-block form.
+        """Predeclare a nullable `with`-header let for cleanup-block form.
 
         Nullable lets are predeclared as `null` so cleanup code can
         reference them on header `?` failure paths.
 
         Non-nullable lets use the normal declaration+initializer path and return None here.
+
+        Args:
+            stmt: The LetStmt AST node.
+            module_name: Name of current module.
+
+        Returns:
+            The Type if it was a nullable let, otherwise None.
         """
         var_ty = self._resolve_let_type(stmt, module_name)
         if not isinstance(var_ty, NullableType):
@@ -1368,17 +1710,28 @@ class Backend:
         return var_ty
 
     def _emit_with_cleanup_header_let_assign(self, stmt: LetStmt, var_ty: Type) -> None:
-        """Emit initializer assignment for a predeclared cleanup-block let."""
+        """Emit initializer assignment for a predeclared cleanup-block let.
+
+        Args:
+            stmt: The LetStmt AST node.
+            var_ty: The resolved type of the let.
+        """
         c_var_name = self.emitter.mangle_identifier(stmt.name)
         c_value = self._emit_owned_expr_with_expected_type(stmt.value, var_ty)
         self.emitter.emit_assignment(c_var_name, c_value)
 
     def _emit_retain_for_copied_value(self, c_expr: str, ty: Type) -> None:
-        """
-        Emit retain operations for a copied owned value.
+        """Emit retain operations for a copied owned value.
 
         Used when copying from place expressions so source and destination own
         independent references.
+
+        Args:
+            c_expr: C expression evaluating to the value.
+            ty: The type of the value.
+
+        Raises:
+            InternalCompilerError: If variant decl is missing for enum types.
         """
         if self.analysis.is_arc_type(ty):
             self.emitter.emit_string_retain(c_expr)
@@ -1430,8 +1783,14 @@ class Backend:
             self.emitter.emit_switch_end()
 
     def _emit_copy_expr_with_retains(self, c_expr: str, ty: Type) -> str:
-        """
-        Materialize copied values in a temp and emit retain logic when needed.
+        """Materialize copied values in a temp and emit retain logic when needed.
+
+        Args:
+            c_expr: C expression evaluating to the value.
+            ty: The type of the value.
+
+        Returns:
+            The name of the temporary containing the copied and retained value.
         """
         if not self.analysis.has_arc_data(ty):
             return c_expr
@@ -1442,8 +1801,14 @@ class Backend:
         return temp
 
     def _emit_match(self, stmt: MatchStmt, module_name: str) -> None:
-        """
-        Emit a match statement as a switch on the tag field.
+        """Emit a match statement as a switch on the tag field.
+
+        Args:
+            stmt: The MatchStmt AST node.
+            module_name: Name of current module.
+
+        Raises:
+            InternalCompilerError: If types or patterns are unsupported.
         """
         scrutinee_expr_type = self.analysis.expr_types.get(id(stmt.expr))
         if not scrutinee_expr_type:
@@ -1519,8 +1884,14 @@ class Backend:
         self.emitter.emit_block_end()
 
     def _emit_case(self, stmt: CaseStmt, module_name: str) -> None:
-        """
-        Emit a case statement as a scalar switch or string if/else chain.
+        """Emit a case statement as a scalar switch or string if/else chain.
+
+        Args:
+            stmt: The CaseStmt AST node.
+            module_name: Name of current module.
+
+        Raises:
+            InternalCompilerError: If types or literals are unsupported.
         """
         scrutinee_expr_type = self.analysis.expr_types.get(id(stmt.expr))
         if not scrutinee_expr_type:
@@ -1660,6 +2031,17 @@ class Backend:
         self.emitter.emit_block_end()
 
     def _emit_case_literal(self, expr: Expr) -> str:
+        """Emit a constant literal for a case statement.
+
+        Args:
+            expr: The literal expression.
+
+        Returns:
+            A C constant string.
+
+        Raises:
+            InternalCompilerError: If literal type is unsupported.
+        """
         if isinstance(expr, IntLiteral):
             return self.emitter.emit_int_literal(expr.value)
         if isinstance(expr, ByteLiteral):
@@ -1677,7 +2059,16 @@ class Backend:
             enum_type: EnumType,
             arm_scope: ScopeContext
     ) -> None:
-        """Emit pattern variable bindings and add them to arm scope."""
+        """Emit pattern variable bindings and add them to arm scope.
+
+        Args:
+            pattern: The variant pattern.
+            enum_type: The enum type.
+            arm_scope: The scope for the match arm.
+
+        Raises:
+            InternalCompilerError: If variant decl is missing.
+        """
         variant_decl = self.find_variant_decl(
             enum_type.module,
             enum_type.name,
@@ -1715,8 +2106,7 @@ class Backend:
             arm_scope.add_declared(c_pat_var, field_type)
 
     def _emit_with(self, stmt: WithStmt, module_name: str) -> None:
-        """
-        Emit a with statement.
+        """Emit a with statement.
 
         Inline => form (LIFO cleanup):
             Emit init statements, then body, then cleanup statements in reverse order.
@@ -1733,6 +2123,10 @@ class Backend:
         so that any declarations inside them do not collide with the header
         scope (e.g., legal L0 shadowing like ``let x`` in both the header
         and body).
+
+        Args:
+            stmt: The WithStmt AST node.
+            module_name: Name of current module.
         """
         self.emitter.emit_block_start()
         with_scope = self._push_scope()
@@ -1792,12 +2186,18 @@ class Backend:
         self.emitter.emit_block_end()
 
     def _emit_drop(self, stmt: DropStmt, module_name: str) -> None:
-        """
-        Emit drop statement with automatic cleanup of owned string fields.
+        """Emit drop statement with automatic cleanup of owned fields.
 
-        For structs: releases all string fields
-        For enums: switches on tag, releases strings in active variant
+        For structs: releases all string fields.
+        For enums: switches on tag, releases strings in active variant.
         Then calls _rt_drop() to free the memory.
+
+        Args:
+            stmt: The DropStmt AST node.
+            module_name: Name of current module.
+
+        Raises:
+            InternalCompilerError: If variable is undefined or not a pointer.
         """
         c_name = self.emitter.mangle_identifier(stmt.name)
 
@@ -1843,9 +2243,13 @@ class Backend:
     # -------------------------------------------------------------------------
 
     def _try_emit_intrinsic(self, expr: CallExpr) -> Optional[str]:
-        """
-        Expand compiler intrinsics inline.
-        Returns None if not an intrinsic.
+        """Expand compiler intrinsics inline.
+
+        Args:
+            expr: The call expression to check.
+
+        Returns:
+            C code string if it is an intrinsic, otherwise None.
         """
         if not isinstance(expr.callee, VarRef):
             return None
@@ -1862,7 +2266,17 @@ class Backend:
         return None
 
     def _emit_sizeof_intrinsic(self, expr: CallExpr) -> str:
-        """Emit sizeof intrinsic."""
+        """Emit sizeof intrinsic.
+
+        Args:
+            expr: The sizeof call expression.
+
+        Returns:
+            A C sizeof expression string.
+
+        Raises:
+            InternalCompilerError: If target type cannot be resolved.
+        """
         target_ty = self.analysis.intrinsic_targets.get(id(expr))
         if target_ty is None:
             self.ice("[ICE-1120] failed to resolve sizeof target type", node=expr)
@@ -1870,7 +2284,19 @@ class Backend:
         return self.emitter.emit_sizeof_type(target_ty)
 
     def _emit_ord_intrinsic(self, expr: CallExpr) -> str:
-        """Emit ord(enum_value) intrinsic - returns 0-based ordinal of enum variant."""
+        """Emit ord(enum_value) intrinsic.
+
+        Returns 0-based ordinal of enum variant.
+
+        Args:
+            expr: The ord call expression.
+
+        Returns:
+            A C expression string for the ordinal value.
+
+        Raises:
+            InternalCompilerError: If argument count is incorrect.
+        """
         if len(expr.args) != 1:
             self.ice("[ICE-1121] ord expects exactly 1 argument", node=expr)
 
@@ -1884,13 +2310,16 @@ class Backend:
     # -------------------------------------------------------------------------
 
     def _try_emit_constructor(self, expr: CallExpr) -> Optional[str]:
-        """
-        Check if expr is a constructor call and emit appropriate C initialization.
-
-        Returns C code string if this is a constructor, None otherwise.
+        """Check if expr is a constructor call and emit appropriate initialization.
 
         Struct: Point(1, 2) -> { .x = 1, .y = 2 }
         Enum: Int(42) -> { .tag = Expr_Int, .data = { .Int = { .value = 42 } } }
+
+        Args:
+            expr: The call expression to check.
+
+        Returns:
+            C code string if this is a constructor, otherwise None.
         """
         assert isinstance(expr.callee, VarRef)
         name = expr.callee.name
@@ -1919,10 +2348,19 @@ class Backend:
         return None
 
     def _emit_struct_constructor(self, expr: CallExpr, struct_type: StructType) -> str:
-        """
-        Emit struct constructor as C designated initializer.
+        """Emit struct constructor as C designated initializer.
 
         Point(1, 2) -> (struct l0_modulename_Point){ .x = 1, .y = 2 }
+
+        Args:
+            expr: The constructor call expression.
+            struct_type: The struct type.
+
+        Returns:
+            A C struct initializer expression string.
+
+        Raises:
+            InternalCompilerError: If struct info is missing or argument count mismatches.
         """
         # Look up struct info to get field names
         info = self.analysis.struct_infos.get((struct_type.module, struct_type.name))
@@ -1943,11 +2381,20 @@ class Backend:
         return self.emitter.emit_struct_constructor_for_type(struct_type, field_inits)
 
     def _emit_variant_constructor(self, expr: CallExpr, enum_type: EnumType) -> str:
-        """
-        Emit enum variant constructor as C tagged union initializer.
+        """Emit enum variant constructor as C tagged union initializer.
 
         Example:
             Int(42) -> (struct l0_modulename_Int){ .tag = l0_modulename_Int_Int, .data.Int.value = 42 }
+
+        Args:
+            expr: The variant call expression.
+            enum_type: The enum type.
+
+        Returns:
+            A C variant initializer expression string.
+
+        Raises:
+            InternalCompilerError: If variant info or declaration is missing.
         """
         assert isinstance(expr.callee, VarRef)
         variant_name = expr.callee.name
@@ -1987,6 +2434,17 @@ class Backend:
     # -------------------------------------------------------------------------
 
     def _emit_new_expr(self, expr: NewExpr) -> str:
+        """Emit a heap allocation `new` expression.
+
+        Args:
+            expr: The NewExpr AST node.
+
+        Returns:
+            A C expression string for the newly allocated pointer.
+
+        Raises:
+            InternalCompilerError: If type or symbol resolution fails, or if args mismatch.
+        """
         # Allocate and return a non-null heap pointer for a single object.
         new_ty = self.analysis.expr_types.get(id(expr))
         if new_ty is None or not isinstance(new_ty, PointerType):
@@ -2081,7 +2539,16 @@ class Backend:
     # -------------------------------------------------------------------------
 
     def _convert_expr_with_expected_type(self, c_expr: str, natural_ty: Optional[Type], expected: Type) -> str:
-        """Convert a pre-emitted expression into the expected type when required."""
+        """Convert a pre-emitted expression into the expected type when required.
+
+        Args:
+            c_expr: The C expression string.
+            natural_ty: The natural type of the expression.
+            expected: The expected type.
+
+        Returns:
+            A C expression string, potentially wrapped or widened.
+        """
         if natural_ty is None:
             return c_expr
 
@@ -2103,7 +2570,18 @@ class Backend:
         return c_expr
 
     def _emit_expr_with_expected_type(self, e: Expr, expected: Type) -> str:
-        """Emit expression with implicit type conversion to expected type if needed."""
+        """Emit expression with implicit type conversion to expected type.
+
+        Args:
+            e: The expression to emit.
+            expected: The expected type.
+
+        Returns:
+            A C expression string.
+
+        Raises:
+            InternalCompilerError: If null literal is assigned to invalid type.
+        """
 
         # Special case: null literal
         if isinstance(e, NullLiteral):
@@ -2116,12 +2594,18 @@ class Backend:
         return self._convert_expr_with_expected_type(c_expr, natural_ty, expected)
 
     def _emit_owned_expr_with_expected_type(self, e: Expr, expected: Type) -> str:
-        """
-        Emit expression for contexts that create a new owner.
+        """Emit expression for contexts that create a new owner.
 
         This applies retain-on-copy when a place expression is copied into an
         owned destination, while delegating regular type conversion to
         `_emit_expr_with_expected_type`.
+
+        Args:
+            e: The expression to emit.
+            expected: The expected type.
+
+        Returns:
+            A C expression string.
         """
         natural_ty = self.analysis.expr_types.get(id(e))
 
@@ -2140,13 +2624,24 @@ class Backend:
         if isinstance(expected, NullableType) and self._types_equal(expected.inner, natural_ty):
             if self.emitter.is_niche_nullable(expected):
                 return c_expr
-            retained_inner = self._emit_copy_expr_with_retains(c_expr, expected.inner)
+            retained_inner = self._emit_copy_expr_with_retains(c_expr, natural_ty)
             return self.emitter.emit_some_value_for_nullable(expected, retained_inner)
 
         return self._convert_expr_with_expected_type(c_expr, natural_ty, expected)
 
     def _emit_expr(self, expr: Expr, *, is_statement: bool = False) -> str:
-        """Emit an expression and return the C code as a string."""
+        """Emit an expression and return the C code.
+
+        Args:
+            expr: The expression to emit.
+            is_statement: True if the expression is used as a statement.
+
+        Returns:
+            A C expression string, or empty string if used as a statement and no-op.
+
+        Raises:
+            InternalCompilerError: If expression type is unsupported or resolution fails.
+        """
         if isinstance(expr, IntLiteral):
             if is_statement:
                 self.emitter.emit_comment(f"int literal {expr.value}")
@@ -2389,6 +2884,16 @@ class Backend:
         self.ice(f"[ICE-9149] unknown expression type: {type(expr).__name__}", node=expr)
 
     def _emit_unwrap(self, c_dst: str, c_inner: str, src_ty: NullableType) -> str:
+        """Emit code to unwrap a nullable value.
+
+        Args:
+            c_dst: C type of destination.
+            c_inner: C expression of nullable value.
+            src_ty: The NullableType.
+
+        Returns:
+            C code for unwrapped value.
+        """
         # Pointer-shaped optionals (niche): empty is NULL.
         if self.emitter.is_niche_nullable(src_ty):
             return self.emitter.emit_unwrap_ptr(c_dst, c_inner, format_type(src_ty))
@@ -2400,6 +2905,20 @@ class Backend:
         return self.emitter.emit_unwrap_opt(c_src, tmp, format_type(src_ty))
 
     def _emit_binary_op(self, expr_node: Expr, expr_op: str, expr_left: Expr, expr_right: Expr) -> str:
+        """Emit code for a binary operation.
+
+        Args:
+            expr_node: The BinaryOp AST node.
+            expr_op: The operator string.
+            expr_left: The left operand.
+            expr_right: The right operand.
+
+        Returns:
+            C code string for the operation.
+
+        Raises:
+            InternalCompilerError: If types are missing, mismatch, or operation is unsupported.
+        """
         # Special-case: nullable wrapper compared with null
         if expr_op in ("==", "!=") and (isinstance(expr_left, NullLiteral) or isinstance(expr_right, NullLiteral)):
             other = expr_right if isinstance(expr_left, NullLiteral) else expr_left
@@ -2468,39 +2987,67 @@ class Backend:
     # -------------------------------------------------------------------------
 
     def _resolve_type_ref(self, tref, module_name: str):
-        """
-        Resolve an AST TypeRef (from l0_ast.TypeRef) into an l0_types.Type for codegen.
+        """Resolve an AST TypeRef into an l0_types.Type.
 
         This is needed so `let x: int? = null;` uses the declared type (int?) instead of
         the initializer type (null).
+
+        Args:
+            tref: The TypeRef AST node.
+            module_name: Name of current module.
+
+        Returns:
+            The resolved Type.
         """
         result = resolve_type_ref(self.analysis.module_envs, module_name, tref)
         return result.type
 
     def _lookup_symbol(self, name: str, current_module_name: str, module_path: Optional[List[str]] = None) -> Optional[
         Symbol]:
-        """
-        Look up a symbol in the current module's environment.
+        """Look up a symbol in the current module's environment.
 
         This is used to determine which module a function is defined in
         so we can generate the correct mangled name.
+
+        Args:
+            name: The name of the symbol.
+            current_module_name: Name of current module.
+            module_path: Optional module path for qualified names.
+
+        Returns:
+            The resolved Symbol, or None if not found.
         """
         result = resolve_symbol(self.analysis.module_envs, current_module_name, name, module_path=module_path)
         return result.symbol
 
     def _is_extern_function(self, sym: Symbol) -> bool:
-        if sym.kind is not SymbolKind.FUNC:
-            return False
-        return isinstance(sym.node, FuncDecl) and sym.node.is_extern
+        """Check if a symbol is an 'extern' function.
+
+        Args:
+            sym: The symbol to check.
+
+        Returns:
+            True if it is an extern function.
+        """
+        if sym.kind is SymbolKind.FUNC:
+            return isinstance(sym.node, FuncDecl) and sym.node.is_extern
+        return False
 
     def find_variant_decl(
             self, module_name: str, enum_name: str, variant_name: str
     ) -> Optional[EnumVariant]:
-        """
-        Find the EnumVariant AST node for a given variant in an enum.
+        """Find the EnumVariant AST node for a given variant in an enum.
 
         This is needed to get field names when binding pattern variables,
         since pattern variables are positional, but we need to access fields by name.
+
+        Args:
+            module_name: Name of module containing the enum.
+            enum_name: Name of the enum.
+            variant_name: Name of the variant.
+
+        Returns:
+            The EnumVariant AST node if found, otherwise None.
         """
         module = self.analysis.cu.modules.get(module_name)
         if not module:
@@ -2522,6 +3069,17 @@ class Backend:
     # -------------------------------------------------------------------------
 
     def _int_type_size(self, src_ty):
+        """Get the byte size of an integer builtin type.
+
+        Args:
+            src_ty: The type to check.
+
+        Returns:
+            Byte size (1 for byte, 4 for int).
+
+        Raises:
+            InternalCompilerError: If type is not an integer builtin.
+        """
         match src_ty:
             case BuiltinType(name="byte"):
                 return 1

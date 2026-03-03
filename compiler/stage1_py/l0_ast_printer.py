@@ -1,6 +1,8 @@
 #  SPDX-License-Identifier: MIT OR Apache-2.0
 #  Copyright (c) 2025-2026 gwz
 
+"""AST pretty-printing utility for the L0 compiler."""
+
 from dataclasses import is_dataclass, fields
 from typing import List, Any
 
@@ -8,19 +10,38 @@ from l0_ast import Span, Node, Module
 
 
 def _format_span(span: Span | None) -> str:
+    """Format a source span for printing.
+
+    Args:
+        span: The source span to format, or None.
+
+    Returns:
+        A string representation of the span (e.g., " @1:1-2:1"), or an empty
+        string if the span is None.
+    """
     if span is None:
         return ""
     return f" @{span.start_line}:{span.start_column}-{span.end_line}:{span.end_column}"
 
 
 def format_node(node: Any, indent: int = 0) -> List[str]:
-    """
-    Generic, reflection-based AST pretty-printer.
+    """Generic, reflection-based AST pretty-printer.
+
+    This function recursively traverses an AST node (or a list of nodes) and
+    produces a human-readable string representation. It uses reflection to
+    discover fields in dataclasses.
 
     - Shows the node class name.
     - Prints simple scalar fields inline (excluding `span`).
-    - Recursively prints child Node / list-of-Node fields on new indented lines.
-    - Appends a concise span annotation like `@1:1-7:1` when available.
+    - Recursively prints child Node or list-of-Node fields on new indented lines.
+    - Appends a concise span annotation when available.
+
+    Args:
+        node: The AST node, list of nodes, or other object to format.
+        indent: The current indentation level (number of 2-space increments).
+
+    Returns:
+        A list of strings representing the formatted AST, one line per string.
     """
     ind = "  " * indent
 
@@ -80,8 +101,13 @@ def format_node(node: Any, indent: int = 0) -> List[str]:
 
 
 def format_module(mod: Module) -> str:
-    """
-    Convenience: pretty-print a single Module as a string.
+    """Convenience function to pretty-print a single Module as a string.
+
+    Args:
+        mod: The module to format.
+
+    Returns:
+        A multiline string representing the formatted module.
     """
     lines = format_node(mod, indent=0)
     return "\n".join(lines)

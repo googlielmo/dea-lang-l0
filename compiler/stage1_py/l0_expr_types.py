@@ -1,6 +1,8 @@
 #  SPDX-License-Identifier: MIT OR Apache-2.0
 #  Copyright (c) 2025-2026 gwz
 
+"""Expression-level type checking for the L0 compiler."""
+
 from dataclasses import dataclass
 from typing import Dict, Optional, List, Set, Tuple
 
@@ -32,35 +34,27 @@ from l0_types import (
     format_type, )
 
 
-# Expression type checking for L0
-
-
 @dataclass
 class ExpressionTypeChecker:
-    """Minimal expression-level type checker for L0.
+    """Expression-level type checker for L0.
 
-    Implements:
+    This checker implements:
       - Expression typing: literals, variables, operators, calls, constructors,
-        casts, dereference, indexing, field access, try-operator, sizeof
-      - Structs and enums (construction, field access, variant patterns, ord)
-      - Function calls (with argument checking)
-      - Basic type compatibility rules (int, bool, string, pointers, nullability)
-      - Widening from inferred types to annotated types
-      - Statement checking: let (with inference), return, if, while, match, drop
-      - Type system: resolution, compatibility, nullability, pointers, aliases
-      - Pattern analysis: binding, exhaustiveness, redundant wildcard warnings
-      - Control flow: return path checking, unreachable code warnings,
-        flow-sensitive liveness for dropped variables
-      - Infrastructure: type memoization, scoped local tracking, diagnostics,
-        error recovery
-      - Basic error recovery to continue checking after errors
-      - Diagnostic reporting
+        casts, dereference, indexing, field access, try-operator, sizeof.
+      - Structs and enums: construction, field access, variant patterns, ord.
+      - Function calls: argument validation and signature matching.
+      - Type compatibility: int, bool, string, pointers, nullability.
+      - Statement checking: let (with inference), return, if, while, match, drop.
+      - Control flow: return path analysis, unreachable code detection.
+      - Memory safety: flow-sensitive liveness for dropped variables.
 
-    Populates `analysis.expr_types[id(expr)]` and appends diagnostics to `analysis.diagnostics`.
+    Attributes:
+        analysis: The AnalysisResult to populate with types and diagnostics.
     """
     analysis: AnalysisResult
 
     def __post_init__(self) -> None:
+        """Initialize checker with analysis data and cache builtin types."""
         if self.analysis.cu is None:
             raise ValueError("ExpressionTypeChecker requires a non-empty CompilationUnit")
 
@@ -88,7 +82,7 @@ class ExpressionTypeChecker:
         self._alive_scopes: List[Dict[str, bool]] = []  # definite liveness (True=usable)
         self._return_paths: bool = False  # does current path guarantee a return?
         self._breakable_loop_depth: int = 0  # depth of loops allowing 'break'/'continue'
-        self._next_stmt_unreachable: bool = False  # is next statement unreachable (after break/continue)?
+        self._next_stmt_unreachable: bool = False  # is next statement unreachable?
         # Stack of guards for cleanup-block references to header vars that may
         # be uninitialized on header `?` failure paths.
         self._cleanup_header_ref_guard_stack: List[Tuple[int, Set[str]]] = []
@@ -100,8 +94,8 @@ class ExpressionTypeChecker:
     def check(self) -> None:
         """Run expression/type checking for all non-extern functions.
 
-        This is meant to be called once from L0Driver.analyze, after
-        name resolution, signatures, and local scopes have been built.
+        This is the main entry point for expression analysis. It should be
+        called after top-level signature resolution is complete and local scopes have been built.
         """
         if self.cu is None:
             self._error(
@@ -130,6 +124,12 @@ class ExpressionTypeChecker:
     # ------------------------------------------------------------------
 
     def _check_function(self, func_env: FunctionEnv, func_type: FuncType) -> None:
+        """Check a single function definition.
+
+        Args:
+            func_env: The function's environment containing AST and module info.
+            func_type: The function's resolved signature.
+        """
         self._current_func_env = func_env
         self._current_func_type = func_type
 
@@ -157,6 +157,7 @@ class ExpressionTypeChecker:
         self._current_func_type = None
 
     def _make_param_scope(self, func_env: FunctionEnv, func_type: FuncType) -> Dict[str, Type]:
+        """Create a name-to-type mapping for function parameters."""
         scope: Dict[str, Type] = {}
         func = func_env.func
         for param, param_ty in zip(func.params, func_type.params):
@@ -164,6 +165,7 @@ class ExpressionTypeChecker:
         return scope
 
     def _make_param_alive_scope(self, func_env: FunctionEnv) -> Dict[str, bool]:
+        """Initialize liveness tracking for function parameters."""
         scope: Dict[str, bool] = {}
         func = func_env.func
         for param in func.params:
@@ -173,17 +175,23 @@ class ExpressionTypeChecker:
     # Basic lexical scope stack (function body and nested blocks)
 
     def _push_scope(self) -> None:
+        """Enter a new lexical scope."""
         self._local_scopes.append({})
         self._alive_scopes.append({})
 
     def _pop_scope(self) -> None:
+        """Exit the current lexical scope."""
         assert self._local_scopes, "scope stack underflow"
         self._local_scopes.pop()
         self._alive_scopes.pop()
 
     def _declare_local(self, name: str, typ: Type, node: Node) -> None:
-        """Declare a local in the innermost scope.
+        """Declare a local variable in the innermost scope.
 
+        Args:
+            name: The name of the variable.
+            typ: The resolved Type of the variable.
+            node: The AST node where the declaration occurs.
         """
         assert self._local_scopes, "no active scope"
         local = self._local_scopes[-1]
@@ -238,6 +246,7 @@ class ExpressionTypeChecker:
         return None
 
     def _lookup_local(self, name: str) -> Optional[Type]:
+        """Look up a local variable's type in the scope stack."""
         for scope in reversed(self._local_scopes):
             if name in scope:
                 return scope[name]
@@ -258,6 +267,7 @@ class ExpressionTypeChecker:
         return False
 
     def _expr_contains_try(self, expr: Expr) -> bool:
+        """Check if an expression contains a '?' try operator."""
         if isinstance(expr, TryExpr):
             return True
         if isinstance(expr, UnaryOp):
@@ -281,6 +291,7 @@ class ExpressionTypeChecker:
         return False
 
     def _stmt_contains_try(self, stmt: Stmt) -> bool:
+        """Check if a statement contains a '?' try operator."""
         if isinstance(stmt, LetStmt):
             return self._expr_contains_try(stmt.value)
         if isinstance(stmt, AssignStmt):
@@ -290,18 +301,27 @@ class ExpressionTypeChecker:
         return False
 
     def _lookup_alive(self, name: str) -> Optional[bool]:
+        """Check if a variable is currently alive (not dropped)."""
         for scope in reversed(self._alive_scopes):
             if name in scope:
                 return scope[name]
         return None
 
     def _set_alive(self, name: str, alive: bool) -> None:
+        """Set the liveness state of a variable."""
         for scope in reversed(self._alive_scopes):
             if name in scope:
                 scope[name] = alive
                 return
 
     def _check_block(self, block: Block, *, check_return_paths: bool = False, push_new_scope: bool = True) -> None:
+        """Check a block of statements.
+
+        Args:
+            block: The Block node.
+            check_return_paths: Whether to track return paths in this block.
+            push_new_scope: Whether to push a new lexical scope for this block.
+        """
         if push_new_scope:
             self._push_scope()
         try:
@@ -322,7 +342,7 @@ class ExpressionTypeChecker:
                 if check_return_paths:
                     guarantees_return = guarantees_return or self._return_paths
                     if guarantees_return:
-                        check_or_not = False  # no need to check further statements (they are unreachable)
+                        check_or_not = False  # no need to check further statements
 
             if check_return_paths:
                 self._return_paths = guarantees_return
@@ -332,6 +352,12 @@ class ExpressionTypeChecker:
                 self._pop_scope()
 
     def _check_stmt(self, stmt: Stmt, *, check_return_paths: bool = False) -> None:
+        """Check a single statement.
+
+        Args:
+            stmt: The Stmt node.
+            check_return_paths: Whether to update return path tracking.
+        """
 
         if check_return_paths:
             self._return_paths = False  # reset before checking this statement
@@ -742,7 +768,6 @@ class ExpressionTypeChecker:
                 self._check_block(stmt.body, check_return_paths=check_return_paths)
 
                 # Inline cleanups (=>) in reverse order (LIFO), only if reachable.
-                # Actually, cleanups are always analyzed as they are part of the scope exit.
                 for item in reversed(stmt.items):
                     if item.cleanup is not None:
                         self._check_stmt(item.cleanup)
@@ -785,12 +810,7 @@ class ExpressionTypeChecker:
     # ------------------------------------------------------------------
 
     def _infer_type_expr(self, expr: TypeExpr) -> Optional[Type]:
-        """
-        TypeExpr is only valid as an argument to type-accepting intrinsics.
-        When encountered standalone, it's an error.
-        """
-        # Type expressions don't have a runtime value type.
-        # They're handled specially in _infer_call for intrinsics.
+        """TypeExpr is only valid as an argument to type-accepting intrinsics."""
         self._error(expr,
                     "[TYP-0290] type expression is only valid as argument to type-accepting intrinsics such as 'sizeof'")
         return None
@@ -799,6 +819,17 @@ class ExpressionTypeChecker:
                     widening_type: Optional[Type] = None,
                     context_code="TYP-0319",
                     context_descriptor="expression") -> Optional[Type]:
+        """Infer the type of an expression.
+
+        Args:
+            expr: The expression to type-check.
+            widening_type: Optional expected type for context-sensitive checking.
+            context_code: Diagnostic code for type mismatch.
+            context_descriptor: Description of context for diagnostic.
+
+        Returns:
+            The resolved Type of the expression, or None on error.
+        """
         if expr is None:
             return self._error(Expr(), "[TYP-0149] cannot infer type of None expression")
 
@@ -876,6 +907,7 @@ class ExpressionTypeChecker:
         return result
 
     def _infer_var_ref(self, expr: VarRef) -> Optional[Type]:
+        """Infer type for a variable reference."""
         # Reject overqualified names early (e.g. color::Color::Red)
         if self._reject_name_qualifier(expr, expr.name, expr.name_qualifier, expr.module_path):
             return None
@@ -933,8 +965,7 @@ class ExpressionTypeChecker:
             return None
 
         if sym.kind is SymbolKind.FUNC and sym.type is not None:
-            # Functions have a FuncType; at expression level their type is
-            # precisely that.
+            # Functions have a FuncType
             self.analysis.var_ref_resolution[id(expr)] = VarRefResolution.MODULE
             return sym.type
 
@@ -959,12 +990,11 @@ class ExpressionTypeChecker:
             return None
 
         # Struct, enum, and other type symbols are not values by themselves.
-        # They only become values when used in constructor calls (handled in _infer_call).
         self._error(expr, f"[TYP-0151] symbol '{expr.name}' is not a value")
         return None
 
-    def _infer_unary(self, expr) -> Optional[Type]:
-        assert isinstance(expr, UnaryOp)
+    def _infer_unary(self, expr: UnaryOp) -> Optional[Type]:
+        """Infer type for a unary operation."""
         op = expr.op
         operand_ty = self._infer_expr(expr.operand)
 
@@ -992,8 +1022,6 @@ class ExpressionTypeChecker:
 
         # Dereference: T* -> T
         if op == "*":
-            from l0_types import PointerType
-
             if isinstance(operand_ty, PointerType):
                 return operand_ty.inner
             if operand_ty is not None:
@@ -1004,10 +1032,10 @@ class ExpressionTypeChecker:
                 )
             return None
 
-        # Unknown unary operator: just traverse operand for now.
         return operand_ty
 
     def _infer_binary(self, expr: BinaryOp) -> Optional[Type]:
+        """Infer type for a binary operation."""
         op = expr.op
         left_ty = self._infer_expr(expr.left)
         right_ty = self._infer_expr(expr.right)
@@ -1035,6 +1063,7 @@ class ExpressionTypeChecker:
     def _binary_expect_both_int(
             self, expr: BinaryOp, left: Optional[Type], right: Optional[Type], result: Optional[Type]
     ) -> Optional[Type]:
+        """Check that both operands of a binary op are int-assignable."""
         if self._is_int_assignable(left) and self._is_int_assignable(right):
             return result
         if left is not None and right is not None:
@@ -1048,6 +1077,7 @@ class ExpressionTypeChecker:
     def _binary_expect_both_bool(
             self, expr: BinaryOp, left: Optional[Type], right: Optional[Type], result: Optional[Type]
     ) -> Optional[Type]:
+        """Check that both operands of a binary op are bool."""
         if self._is_bool(left) and self._is_bool(right):
             return result
         if left is not None and right is not None:
@@ -1061,6 +1091,7 @@ class ExpressionTypeChecker:
     def _binary_equality(
             self, expr: BinaryOp, left: Optional[Type], right: Optional[Type]
     ) -> Optional[Type]:
+        """Infer type for equality/inequality comparison."""
         if left is None or right is None:
             return None
 
@@ -1092,11 +1123,7 @@ class ExpressionTypeChecker:
         return self.bool_type
 
     def _try_infer_intrinsic(self, expr: CallExpr) -> Optional[Type]:
-        """
-        Check if this is an intrinsic call and infer its type.
-        Returns None if not an intrinsic (caller should continue with normal call handling).
-        Returns a Type if intrinsic was handled (even on error, returns a recovery type).
-        """
+        """Handle compiler intrinsics calls."""
         if not isinstance(expr.callee, VarRef):
             return None
 
@@ -1158,7 +1185,7 @@ class ExpressionTypeChecker:
             node: Optional[Node] = None,
             module_path: Optional[List[str]] = None,
     ) -> Optional[Type]:
-        """Try to resolve an identifier as a type name. Returns None if not a type."""
+        """Try to resolve an identifier as a type name."""
         assert self._current_func_env is not None
         module_name = self._current_func_env.module_name
 
@@ -1216,7 +1243,6 @@ class ExpressionTypeChecker:
             )
             return None
 
-        # It's a function or variable, not a type
         return None
 
     def _store_sizeof_target(self, expr: CallExpr, target_ty: Type) -> None:
@@ -1242,6 +1268,7 @@ class ExpressionTypeChecker:
         return self.int_type
 
     def _infer_call(self, expr: CallExpr) -> Optional[Type]:
+        """Infer type for a function or constructor call."""
         # Check for intrinsic calls first
         if isinstance(expr.callee, VarRef):
             intrinsic_result = self._try_infer_intrinsic(expr)
@@ -1262,7 +1289,6 @@ class ExpressionTypeChecker:
         ):
             return None
 
-        # Look up the callee symbol to determine if it's a function, struct, or enum variant
         assert self._current_func_env is not None
         module_name = self._current_func_env.module_name
 
@@ -1326,7 +1352,7 @@ class ExpressionTypeChecker:
                 f"expected {expected_arity}, got {given_arity}",
             )
 
-        # Type-check arguments (where we have enough information)
+        # Type-check arguments
         for index, arg in enumerate(expr.args):
             if index < len(callee_ty.params):
                 param_ty = callee_ty.params[index]
@@ -1336,12 +1362,7 @@ class ExpressionTypeChecker:
         return callee_ty.result
 
     def _infer_struct_constructor(self, expr: CallExpr, sym: Symbol) -> Optional[Type]:
-        """
-        Infer type for struct constructor call: Point(1, 2) or MyAlias(1, 2) where
-        MyAlias is a type alias to a struct.
-
-        Arguments must match struct fields in declaration order.
-        """
+        """Infer type for a struct constructor call."""
         assert isinstance(expr.callee, VarRef)
         if sym.kind is SymbolKind.TYPE_ALIAS and isinstance(sym.type, StructType):
             # Type alias to struct
@@ -1381,12 +1402,7 @@ class ExpressionTypeChecker:
         return struct_type
 
     def _infer_variant_constructor(self, expr: CallExpr, sym: Symbol) -> Optional[Type]:
-        """
-        Infer type for enum variant constructor call: Int(42)
-
-        Arguments must match variant payload fields in declaration order.
-        Returns the enum type (not the variant type).
-        """
+        """Infer type for an enum variant constructor call."""
         assert isinstance(expr.callee, VarRef)
         variant_name = expr.callee.name
 
@@ -1425,6 +1441,7 @@ class ExpressionTypeChecker:
         return enum_type
 
     def _infer_index(self, expr: IndexExpr) -> Optional[Type]:
+        """Infer type for an indexing expression."""
         array_ty = self._infer_expr(expr.array)
         index_ty = self._infer_expr(expr.index)
 
@@ -1450,6 +1467,7 @@ class ExpressionTypeChecker:
         return None
 
     def _infer_field_access(self, expr: FieldAccessExpr) -> Optional[Type]:
+        """Infer type for a field access expression."""
         obj_ty = self._infer_expr(expr.obj)
 
         if isinstance(obj_ty, NullableType) and isinstance(obj_ty.inner, StructType):
@@ -1487,6 +1505,7 @@ class ExpressionTypeChecker:
         return None
 
     def _infer_cast(self, expr: CastExpr) -> Optional[Type]:
+        """Infer type for a cast expression and validate compatibility."""
         expr_ty = self._infer_expr(expr.expr)
         if expr_ty is None:
             return None
@@ -1495,16 +1514,16 @@ class ExpressionTypeChecker:
         if target_ty is None:
             return None
 
-        # Allow the cast if the types are assignable (including nullability changes)
+        # Allow the cast if the types are assignable
         if self._can_assign(target_ty, expr_ty, allow_promotion=True):
             return target_ty
 
-        # Otherwise, report an error
         return self._error(
             expr, f"[TYP-0230] cannot cast from '{format_type(expr_ty)}' to '{format_type(target_ty)}'"
         )
 
     def _infer_try(self, expr: TryExpr) -> Optional[Type]:
+        """Infer type for a '?' try operator expression."""
         if self._current_func_type is None:
             return None
 
@@ -1527,6 +1546,7 @@ class ExpressionTypeChecker:
     # ------------------------------------------------------------------
 
     def _check_return(self, stmt: ReturnStmt) -> None:
+        """Check return statement validity and type compatibility."""
         if self._current_func_type is None:
             self._error(stmt, "[TYP-0260] return statement outside of function")
             return
@@ -1534,6 +1554,8 @@ class ExpressionTypeChecker:
         expected = self._current_func_type.result
         if stmt.value is None:
             actual = self.void_type
+            if not self._can_assign(expected, actual):
+                self._error(stmt, f"[TYP-0315] return value type mismatch: expected '{format_type(expected)}', got 'void'")
         else:
             # Use expected type as widening context for return value
             actual = self._infer_expr(stmt.value,
@@ -1542,26 +1564,14 @@ class ExpressionTypeChecker:
                                       context_descriptor="return value")
             # If _infer_expr returns None, it already reported the error
             if actual is None:
-                return
+                return # TODO review
 
     # ------------------------------------------------------------------
     # Helpers: TypeRef resolution (mirrors SignatureResolver logic)
     # ------------------------------------------------------------------
 
     def _resolve_type_ref(self, tref) -> Optional[Type]:
-        """
-        Resolve a frontend TypeRef to a semantic Type in the context of the
-        *current function's module*.
-
-        This mirrors the rules used in SignatureResolver:
-
-          - builtin names: int, bool, string, void
-          - struct / enum names from the module env
-          - type aliases via the symbol's already-resolved sym.type
-          - pointer_depth and is_nullable are applied afterward
-        """
-
-        # We need to know which module we are in.
+        """Resolve a TypeRef to a semantic Type."""
         if self._current_func_env is None:
             return None
 
@@ -1620,16 +1630,12 @@ class ExpressionTypeChecker:
     # ------------------------------------------------------------------
 
     def _can_assign(self, target: Type, source: Type, *, allow_promotion=False) -> bool:
-        """
-        Check if 'source' type can be assigned to 'target' type.
-        Implements implicit promotion rules and null assignment.
-        """
+        """Check if 'source' type can be assigned to 'target' type."""
         # Exact match
         if self._types_equal(target, source):
             return True
 
         # Null assignment
-        # null -> T?
         if isinstance(source, NullType):
             if isinstance(target, NullableType):
                 return True
@@ -1670,15 +1676,19 @@ class ExpressionTypeChecker:
         return False
 
     def _is_nullable_or_ptr(self, t: Type) -> bool:
+        """Check if type is nullable or a pointer."""
         return isinstance(t, (NullableType, PointerType))
 
     def _error(self, node: Optional[Node], message: str) -> None:
+        """Report an error diagnostic."""
         self._diagnostic(node, message, kind="error")
 
     def _warn(self, node: Optional[Node], message: str) -> None:
+        """Report a warning diagnostic."""
         self._diagnostic(node, message, kind="warning")
 
     def _diagnostic(self, node: Optional[Node], message: str, kind: str = "info") -> None:
+        """Internal helper to create and append a diagnostic."""
         mod_name = None
         filename = None
         if self.cu is not None and self._current_func_env is not None:
@@ -1698,15 +1708,19 @@ class ExpressionTypeChecker:
         )
 
     def _is_int_assignable(self, typ: Optional[Type]) -> bool:
+        """Check if type is 'int' or 'byte'."""
         return isinstance(typ, BuiltinType) and (typ.name == "int" or typ.name == "byte")
 
     def _is_bool(self, typ: Optional[Type]) -> bool:
+        """Check if type is 'bool'."""
         return isinstance(typ, BuiltinType) and typ.name == "bool"
 
     def _is_string(self, typ: NullType | Type) -> bool:
+        """Check if type is 'string'."""
         return isinstance(typ, BuiltinType) and typ.name == "string"
 
     def _case_literal_info(self, expr: Expr) -> Optional[tuple[Type, object]]:
+        """Get type and value for a case arm literal."""
         if isinstance(expr, IntLiteral):
             return self.int_type, expr.value
         if isinstance(expr, ByteLiteral):
@@ -1725,6 +1739,7 @@ class ExpressionTypeChecker:
         return None
 
     def _decode_escaped_bytes(self, text: str, node: Node) -> Optional[bytes]:
+        """Decode a string literal, reporting errors."""
         try:
             return decode_l0_string_token(text)
         except EscapeDecodeError as err:
@@ -1738,10 +1753,11 @@ class ExpressionTypeChecker:
             return None
 
     def _is_void(self, typ: Type) -> bool:
+        """Check if type is 'void'."""
         return isinstance(typ, BuiltinType) and typ.name == "void"
 
     def _types_equal(self, a: Type, b: Type) -> bool:
-        # Rely on dataclass value equality for now.
+        """Check if two types are exactly the same."""
         return a == b
 
     def _describe_lvalue(self, expr: Expr) -> str:
@@ -1764,7 +1780,7 @@ class ExpressionTypeChecker:
             name_qualifier: Optional[List[str]],
             module_path: Optional[List[str]],
     ) -> bool:
-        """If name_qualifier is present, emit error and return True."""
+        """Check for and reject unsupported qualified name syntax (::)."""
         if name_qualifier is None:
             return False
         full = "::".join(name_qualifier + [name])
@@ -1781,9 +1797,7 @@ class ExpressionTypeChecker:
         return True
 
     def _infer_new(self, expr: NewExpr) -> Optional[Type]:
-        # `new TYPE(args...)` allocates a TYPE instance on the heap and returns a pointer.
-        # TYPE can be any type (builtin/struct/type-alias) or an enum variant constructor.
-
+        """Infer type for a 'new' heap allocation expression."""
         if self._current_func_env is None:
             return self._error(expr, f"[TYP-9288] internal error: 'new' outside function context")
 

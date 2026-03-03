@@ -9,4 +9,5 @@ DIR=$(dirname "$0")
 # Set the L0_HOME environment variable to point to the compiler root if not already set.
 export L0_HOME="${L0_HOME:-$DIR/compiler}"
 
+# Run the Stage 1 compiler (l0c.py) with the provided arguments.
 python3 "$L0_HOME/stage1_py/l0c.py" "$@"

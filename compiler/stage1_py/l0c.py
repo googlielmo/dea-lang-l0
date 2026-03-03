@@ -35,7 +35,7 @@ from l0_types import (
 
 
 def _init_env_defaults() -> None:
-    """Initialize environment variables for system root and runtime include paths based on L0_HOME."""
+    """Initialize default environment variables based on L0_HOME."""
     l0_home = os.getenv("L0_HOME")
     if not l0_home:
         return
@@ -46,7 +46,15 @@ def _init_env_defaults() -> None:
 
 
 def _load_file_lines(path: str, cache: Dict[str, List[str]]) -> List[str]:
-    """Load lines of a source file, using a cache to avoid redundant reads."""
+    """Load lines of a source file, using a cache to avoid redundant reads.
+
+    Args:
+        path: Path to the source file.
+        cache: Cache of file lines keyed by path.
+
+    Returns:
+        A list of strings representing the lines of the file.
+    """
     if path not in cache:
         text = load_source_utf8(path)
         cache[path] = text.splitlines()
@@ -54,12 +62,22 @@ def _load_file_lines(path: str, cache: Dict[str, List[str]]) -> List[str]:
 
 
 def print_diagnostics(result: AnalysisResult, context: CompilationContext) -> None:
-    """Print diagnostics from the analysis result, including source snippets if possible."""
+    """Print diagnostics from the analysis result.
+
+    Args:
+        result: The analysis result containing diagnostics.
+        context: The compilation context for logging and formatting.
+    """
     print_diagnostic_list(result.diagnostics, context)
 
 
 def print_diagnostic_list(diagnostics: List[Diagnostic], context: CompilationContext) -> None:
-    """Print a list of diagnostics, using a file cache to optimize source snippet retrieval."""
+    """Print a list of diagnostics, using a file cache for source snippets.
+
+    Args:
+        diagnostics: List of diagnostics to print.
+        context: The compilation context for logging and formatting.
+    """
     file_cache: Dict[str, List[str]] = {}
 
     for diag in diagnostics:
@@ -68,7 +86,13 @@ def print_diagnostic_list(diagnostics: List[Diagnostic], context: CompilationCon
 
 def print_diagnostic_with_snippet(diag: Diagnostic, file_cache: Dict[str, List[str]],
                                   context: CompilationContext = None) -> None:
-    """Print a single diagnostic, including the source line and a caret pointing to the error location if available."""
+    """Print a single diagnostic, including the source line and a caret.
+
+    Args:
+        diag: The diagnostic to print.
+        file_cache: Cache of file lines keyed by path.
+        context: Optional compilation context for logging. Defaults to None.
+    """
     # First line: header
     log_error(context, diag.format())
 
@@ -114,7 +138,14 @@ def print_diagnostic_with_snippet(diag: Diagnostic, file_cache: Dict[str, List[s
 
 
 def _is_valid_module_name(module_name: str) -> bool:
-    """Check if a module name is valid (dot-separated identifiers)."""
+    """Check if a module name is valid (dot-separated identifiers).
+
+    Args:
+        module_name: The module name to validate.
+
+    Returns:
+        True if the module name is valid, False otherwise.
+    """
     if not module_name:
         return False
     parts = module_name.split(".")
@@ -124,7 +155,18 @@ def _is_valid_module_name(module_name: str) -> bool:
 
 
 def build_search_paths(context: CompilationContext, args: argparse.Namespace) -> Optional[SourceSearchPaths]:
-    """Build source search paths from command-line arguments, handling entry path parsing and defaults."""
+    """Build source search paths from command-line arguments.
+
+    Handles entry path parsing and default values from environment variables.
+
+    Args:
+        context: The compilation context for logging.
+        args: Parsed command-line arguments.
+
+    Returns:
+        A SourceSearchPaths object if successful, or None if the entry name
+        is invalid.
+    """
     # if args.entry is a path, split into dir and module name
     entry_path = Path(args.entry)
     if entry_path.suffix == ".l0" or entry_path.is_absolute() or entry_path.parent != Path('.'):
@@ -165,7 +207,14 @@ def build_search_paths(context: CompilationContext, args: argparse.Namespace) ->
 
 
 def build_compilation_context(args: argparse.Namespace) -> CompilationContext:
-    """Build a CompilationContext from command-line arguments."""
+    """Build a CompilationContext from command-line arguments.
+
+    Args:
+        args: Parsed command-line arguments.
+
+    Returns:
+        A new CompilationContext configured based on arguments.
+    """
     from l0_context import LogLevel
 
     # Log format
@@ -190,7 +239,15 @@ def build_compilation_context(args: argparse.Namespace) -> CompilationContext:
 
 
 def _run_analysis(args):
-    """Run the analysis pipeline, returning (result, context, exit_code)."""
+    """Run the analysis pipeline.
+
+    Args:
+        args: Parsed command-line arguments.
+
+    Returns:
+        A tuple of (AnalysisResult, CompilationContext, int) where the integer
+        is the suggested exit code.
+    """
     context = build_compilation_context(args)
     search_paths = build_search_paths(context, args)
     if search_paths is None:
@@ -203,26 +260,33 @@ def _run_analysis(args):
 
 
 def _get_module_names(args, cu) -> List[str]:
-    """Get the list of module names based on the `--all-modules` flag."""
+    """Get the list of module names based on the `--all-modules` flag.
+
+    Args:
+        args: Parsed command-line arguments.
+        cu: The compilation unit.
+
+    Returns:
+        A list of module names to process.
+    """
     if getattr(args, 'all_modules', False):
         return sorted(cu.modules.keys())
     return [args.entry]
 
 
 def _find_cc() -> Optional[str]:
-    """
-    Find the best available C compiler (to use in codegen and build stages
-    if the user didn't specify one explicitly with --c-compiler/-c).
+    """Find the best available C compiler.
 
-    The search order is:
-    1. L0_CC environment variable
-    2. Common compiler names in PATH in this order: tcc, gcc, clang, cc
-    3. CC environment variable (this step is meant for using a local
-       system C compiler in unusual environments that may or may not be
-       supported by L0; users of such environments may also choose to set
-       L0_CC directly to avoid any ambiguity)
+    Used in codegen and build stages if the user didn't specify one explicitly.
 
-    Returns the compiler command if found, or None if no compiler is found.
+        The search order is:
+
+        1. L0_CC environment variable.
+        2. Common compiler names in PATH: tcc, gcc, clang, cc (in that order).
+        3. CC environment variable.
+
+    Returns:
+        The compiler command if found, or None if no compiler is found.
     """
     from_env = os.environ.get("L0_CC")
     if from_env:
@@ -237,11 +301,17 @@ def _find_cc() -> Optional[str]:
 
 
 def _compiler_flag_family(compiler):
-    """
-    Determine the compiler family for flag selection using a simple heuristic.
+    """Determine the compiler family for flag selection using a simple heuristic.
 
     Uses pattern matching to handle cases like "gcc-10" or "clang-14" on Unix
     and "gcc.exe" or "clang.exe" on Windows.
+
+    Args:
+        compiler: The compiler command string.
+
+    Returns:
+        A string representing the compiler family ("tcc", "gcc", "cc", "msvc",
+        or "unknown").
     """
     if compiler.endswith("tcc") or search(r"tcc(\.exe)?$", compiler):
         return "tcc"
@@ -257,7 +327,16 @@ def _compiler_flag_family(compiler):
 
 
 def _check_entry_main_for_build(result: AnalysisResult, entry_name: str, context: CompilationContext) -> bool:
-    """Check that the entry module defines a valid 'main' function for build/run modes."""
+    """Check that the entry module defines a valid 'main' function for build/run.
+
+    Args:
+        result: The analysis result.
+        entry_name: The name of the entry module.
+        context: The compilation context for logging.
+
+    Returns:
+        True if a valid 'main' function is found, False otherwise.
+    """
     entry_env = result.module_envs.get(entry_name)
     if entry_env is None:
         log_error(context, f"error: [L0C-0012] entry module '{entry_name}' not found in analysis result")
@@ -290,7 +369,15 @@ def _check_entry_main_for_build(result: AnalysisResult, entry_name: str, context
 
 
 def _validate_runtime_library_path(runtime_lib_path: str, context: CompilationContext) -> bool:
-    """Validate that the provided runtime library path exists and contains expected L0 runtime library files."""
+    """Validate that the provided runtime library path exists and is valid.
+
+    Args:
+        runtime_lib_path: Path to the runtime library directory.
+        context: The compilation context for logging.
+
+    Returns:
+        True if the path is valid and contains runtime libraries, False otherwise.
+    """
     runtime_dir = Path(runtime_lib_path)
     if not runtime_dir.is_dir():
         log_error(
@@ -312,8 +399,15 @@ def _validate_runtime_library_path(runtime_lib_path: str, context: CompilationCo
 
 
 def _get_optimize_flag(flag_family, extra_opts) -> Optional[str]:
-    """Determine the appropriate optimization flag for the detected compiler family.
-    Returns the optimization flag string (e.g. '-O2') or None if no suitable flag is found.
+    """Determine the appropriate optimization flag for the compiler family.
+
+    Args:
+        flag_family: The detected compiler family string.
+        extra_opts: List of extra C compiler options.
+
+    Returns:
+        The optimization flag string (e.g., '-O1') or None if no suitable flag
+        is found or if the user provided explicit optimization flags.
     """
     # if any opt starts with -O or /O, assume user is explicitly controlling optimization and do not add a default optimize flag
     if extra_opts and any(opt.startswith("-O") or opt.startswith("/O") for opt in extra_opts):
@@ -338,7 +432,14 @@ def _get_optimize_flag(flag_family, extra_opts) -> Optional[str]:
 
 
 def cmd_build(args: argparse.Namespace) -> int:
-    """Build an executable from an L0 module."""
+    """Build an executable from an L0 module.
+
+    Args:
+        args: Parsed command-line arguments.
+
+    Returns:
+        Exit code (0 for success, non-zero for failure).
+    """
     context = build_compilation_context(args)
     search_paths = build_search_paths(context, args)
     if search_paths is None:
@@ -469,7 +570,14 @@ def cmd_build(args: argparse.Namespace) -> int:
 
 
 def cmd_run(args: argparse.Namespace) -> int:
-    """Build and run an L0 module."""
+    """Build and run an L0 module.
+
+    Args:
+        args: Parsed command-line arguments.
+
+    Returns:
+        Exit code from the executed program or the build process.
+    """
     context = build_compilation_context(args)
     # Create temporary executable
     with tempfile.NamedTemporaryFile(mode='w', suffix='', delete=False) as f:
@@ -530,7 +638,14 @@ def cmd_run(args: argparse.Namespace) -> int:
 
 
 def cmd_codegen(args: argparse.Namespace) -> int:
-    """Generate C code for a module."""
+    """Generate C code for a module.
+
+    Args:
+        args: Parsed command-line arguments.
+
+    Returns:
+        Exit code (0 for success, non-zero for failure).
+    """
     result, context, exit_code = _run_analysis(args)
     if exit_code != 0:
         return exit_code
@@ -552,17 +667,29 @@ def cmd_codegen(args: argparse.Namespace) -> int:
 
 
 def cmd_check(args: argparse.Namespace) -> int:
-    """Run analysis and type checking without code generation."""
+    """Run analysis and type checking without code generation.
+
+    Args:
+        args: Parsed command-line arguments.
+
+    Returns:
+        Exit code (0 for success, non-zero for failure).
+    """
     _, _, exit_code = _run_analysis(args)
     return exit_code
 
 
 def cmd_ast(args: argparse.Namespace) -> int:
-    """
-    Pretty-print the parsed AST.
+    """Pretty-print the parsed AST.
 
-    By default, prints only the entry module.
-    With --all-modules, prints every module in the compilation unit.
+    By default, prints only the entry module. With --all-modules, prints
+    every module in the compilation unit.
+
+    Args:
+        args: Parsed command-line arguments.
+
+    Returns:
+        Exit code (0 for success, non-zero for failure).
     """
     context = build_compilation_context(args)
     search_paths = build_search_paths(context, args)
@@ -596,7 +723,16 @@ def cmd_ast(args: argparse.Namespace) -> int:
 
 
 def _dump_tokens_for_file(path: Path, include_eof: bool, context=None) -> int:
-    """Dump lexer tokens for a single file, including line and column information."""
+    """Dump lexer tokens for a single file.
+
+    Args:
+        path: Path to the source file.
+        include_eof: Whether to include the EOF token in the output.
+        context: Optional compilation context for logging. Defaults to None.
+
+    Returns:
+        Exit code (0 for success, non-zero for failure).
+    """
     try:
         text = load_source_utf8(path)
     except OSError as e:
@@ -628,11 +764,16 @@ def _dump_tokens_for_file(path: Path, include_eof: bool, context=None) -> int:
 
 
 def cmd_tok(args: argparse.Namespace) -> int:
-    """
-    Dump lexer tokens.
+    """Dump lexer tokens.
 
-    By default, dumps tokens for the entry module only.
-    With --all-modules, dumps tokens for all modules in the compilation unit.
+    By default, dumps tokens for the entry module only. With --all-modules,
+    dumps tokens for all modules in the compilation unit.
+
+    Args:
+        args: Parsed command-line arguments.
+
+    Returns:
+        Exit code (0 for success, non-zero for failure).
     """
     context = build_compilation_context(args)
     search_paths = build_search_paths(context, args)
@@ -678,11 +819,16 @@ def cmd_tok(args: argparse.Namespace) -> int:
 
 
 def cmd_sym(args: argparse.Namespace) -> int:
-    """
-    Dump module-level symbol tables.
+    """Dump module-level symbol tables.
 
-    By default, dumps symbols only for the entry module.
-    With --all-modules, dumps symbols for all modules in the compilation unit.
+    By default, dumps symbols only for the entry module. With --all-modules,
+    dumps symbols for all modules in the compilation unit.
+
+    Args:
+        args: Parsed command-line arguments.
+
+    Returns:
+        Exit code (0 for success, non-zero for failure).
     """
     result, _, _ = _run_analysis(args)
     if result.cu is None:
@@ -744,13 +890,16 @@ def cmd_sym(args: argparse.Namespace) -> int:
 
 
 def cmd_type(args: argparse.Namespace) -> int:
-    """
-    Dump resolved type information:
+    """Dump resolved type information.
 
-      - function signatures
-      - struct field types
-      - enum variant payloads
-      - type aliases
+    Dumps function signatures, struct field types, enum variant payloads,
+    and type aliases.
+
+    Args:
+        args: Parsed command-line arguments.
+
+    Returns:
+        Exit code (0 for success, non-zero for failure).
     """
     result, _, _ = _run_analysis(args)
     if result.cu is None:
@@ -830,7 +979,11 @@ def cmd_type(args: argparse.Namespace) -> int:
 
 
 def _add_target_args(parser: argparse.ArgumentParser) -> None:
-    """Add target module/file arguments."""
+    """Add target module/file arguments to the parser.
+
+    Args:
+        parser: The argument parser to update.
+    """
     parser.add_argument(
         "targets",
         nargs="+",
@@ -839,7 +992,11 @@ def _add_target_args(parser: argparse.ArgumentParser) -> None:
 
 
 def _add_all_modules_arg(parser: argparse.ArgumentParser) -> None:
-    """Add the --all-modules flag."""
+    """Add the --all-modules flag to the parser.
+
+    Args:
+        parser: The argument parser to update.
+    """
     parser.add_argument(
         "--all-modules", "-a",
         action="store_true",
@@ -848,7 +1005,11 @@ def _add_all_modules_arg(parser: argparse.ArgumentParser) -> None:
 
 
 def _add_runtime_args(parser: argparse.ArgumentParser) -> None:
-    """Add runtime-related arguments (compiler, include, lib paths)."""
+    """Add runtime-related arguments to the parser.
+
+    Args:
+        parser: The argument parser to update.
+    """
     parser.add_argument(
         "--c-compiler", "-c",
         help=(
@@ -872,7 +1033,11 @@ def _add_runtime_args(parser: argparse.ArgumentParser) -> None:
 
 
 def _add_codegen_arg(parser: argparse.ArgumentParser) -> None:
-    """Add codegen-related arguments."""
+    """Add codegen-related arguments to the parser.
+
+    Args:
+        parser: The argument parser to update.
+    """
     parser.add_argument(
         "--no-line-directives", "-NLD",
         action="store_true",
@@ -902,7 +1067,14 @@ _OPTIONS_REQUIRING_VALUE = {
 
 
 def _split_cli_and_program_args(argv: Sequence[str]) -> Tuple[List[str], List[str]]:
-    """Split compiler CLI arguments from program arguments passed after `--`."""
+    """Split compiler CLI arguments from program arguments.
+
+    Args:
+        argv: The complete list of command-line arguments.
+
+    Returns:
+        A tuple of (compiler_args, program_args).
+    """
     argv_list = list(argv)
     if "--" not in argv_list:
         return argv_list, []
@@ -911,7 +1083,12 @@ def _split_cli_and_program_args(argv: Sequence[str]) -> Tuple[List[str], List[st
 
 
 def _validate_mode_scoped_flags(parser: argparse.ArgumentParser, args: argparse.Namespace) -> None:
-    """Reject flags that were provided for a mode where they are not valid."""
+    """Reject flags that were provided for a mode where they are not valid.
+
+    Args:
+        parser: The argument parser for reporting errors.
+        args: The parsed command-line arguments.
+    """
     mode = args.mode
 
     scoped_flags = [
@@ -940,7 +1117,11 @@ def _validate_mode_scoped_flags(parser: argparse.ArgumentParser, args: argparse.
 
 
 def main(argv=None) -> None:
-    """Parse CLI arguments, dispatch the selected mode, and exit with its status."""
+    """Parse CLI arguments, dispatch the selected mode, and exit.
+
+    Args:
+        argv: Optional list of arguments to parse. Defaults to sys.argv[1:].
+    """
     _init_env_defaults()
     parser = argparse.ArgumentParser(
         prog="l0c",
