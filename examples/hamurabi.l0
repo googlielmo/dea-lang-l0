@@ -3,9 +3,9 @@
  * Copyright (c) 2025-2026 gwz
  */
 
-// ============================================================================
+// ===========================================================================
 // HAMURABI - Ancient Sumeria Resource Management
-// ============================================================================
+// ===========================================================================
 //
 // A faithful port to L0 of the classic BASIC game that taught a generation
 // to program.
@@ -58,7 +58,7 @@
 //
 // "Try your hand at governing ancient Sumeria for a ten-year term of office."
 //
-// ============================================================================
+// ===========================================================================
 
 module hamurabi;
 
@@ -69,6 +69,9 @@ import std.rand;
 import std.unit;
 import std.system;
 
+/**
+ * Represents the state of the game.
+ */
 struct GameState {
     year: int;
     population: int;
@@ -84,6 +87,11 @@ struct GameState {
     impeachment_count: int;
 }
 
+/**
+ * Initializes and returns a new GameState.
+ *
+ * @return A pointer to the newly allocated GameState.
+ */
 func init_game() -> GameState* {
     let state: GameState* = new GameState;
     state.year = 0;
@@ -101,6 +109,11 @@ func init_game() -> GameState* {
     return state;
 }
 
+/**
+ * Prints the annual report of the city's status.
+ *
+ * @param state The pointer to the current GameState.
+ */
 func print_report(state: GameState*) {
     printl();
     printl();
@@ -136,6 +149,13 @@ func print_report(state: GameState*) {
     printl();
 }
 
+/**
+ * Prompts the user for integer input.
+ *
+ * @param prompt The string prompt to display.
+ * @return The integer value entered by the user, -1 if the input is invalid
+ *         (negative or too long), or null on EOF.
+ */
 func get_int_input(prompt: string) -> int? {
     let RETRY = -1 as int?; // sentinel for retry
     print_s(prompt);
@@ -152,6 +172,12 @@ func get_int_input(prompt: string) -> int? {
     return n;
 }
 
+/**
+ * Handles the logic for buying and selling land.
+ *
+ * @param state The pointer to the current GameState.
+ * @return True if a transaction occurred, false if cancelled, null on error.
+ */
 func handle_land_trading(state: GameState*) -> bool? {
     state.land_value = rand_int_range(17, 27);
     printl();
@@ -202,6 +228,12 @@ func handle_land_trading(state: GameState*) -> bool? {
     return true as bool?;
 }
 
+/**
+ * Handles the logic for feeding the population.
+ *
+ * @param state The pointer to the current GameState.
+ * @return The number of bushels allocated for feeding, or null on error.
+ */
 func handle_feeding(state: GameState*) -> int? {
     let RETRY = -1 as int?; // sentinel for retry
     printl();
@@ -223,6 +255,13 @@ func handle_feeding(state: GameState*) -> int? {
     return feed as int?;
 }
 
+/**
+ * Handles the logic for planting seeds.
+ *
+ * @param state The pointer to the current GameState.
+ * @param fed_bushels The number of bushels already allocated for feeding.
+ * @return The number of acres planted, or null on error.
+ */
 func handle_planting(state: GameState*, fed_bushels: int) -> int? {
     let RETRY = -1 as int?; // sentinel for retry
     printl();
@@ -261,6 +300,13 @@ func handle_planting(state: GameState*, fed_bushels: int) -> int? {
     return plant as int?;
 }
 
+/**
+ * Simulates a single year's harvest, plague, rats, and population changes.
+ *
+ * @param state The pointer to the current GameState.
+ * @param fed_bushels The number of bushels allocated for feeding.
+ * @param planted_acres The number of acres planted.
+ */
 func simulate_year(state: GameState*, fed_bushels: int, planted_acres: int) {
     let rand_c: int = rand_int_range(1, 6);
     state.bushels_per_acre = rand_c;
@@ -315,6 +361,12 @@ func simulate_year(state: GameState*, fed_bushels: int, planted_acres: int) {
     state.year = state.year + 1;
 }
 
+/**
+ * Checks if the player has been impeached due to mismanagement.
+ *
+ * @param state The pointer to the current GameState.
+ * @return True if impeached, false otherwise.
+ */
 func check_impeachment(state: GameState*) -> bool {
     if (state.impeachment_count > 0) {
         printl();
@@ -329,6 +381,11 @@ func check_impeachment(state: GameState*) -> bool {
     return false;
 }
 
+/**
+ * Prints the final performance report after a 10-year term.
+ *
+ * @param state The pointer to the current GameState.
+ */
 func final_report(state: GameState*) {
     print_report(state);
     printl();
@@ -387,6 +444,11 @@ func final_report(state: GameState*) {
     printl_s("Jefferson combined could not have done better!");
 }
 
+/**
+ * Exits the game and cleans up state.
+ *
+ * @param state The pointer to the current GameState.
+ */
 func so_long(state: GameState*) {
     printl();
     printl_s("So long for now.");
@@ -396,7 +458,13 @@ func so_long(state: GameState*) {
     exit(0);
 }
 
-func run_game(state: GameState*) -> bool? { // returns null on EOF / error, true if completed, false if impeached
+/**
+ * Runs the main game loop for a 10-year term.
+ *
+ * @param state The pointer to the current GameState.
+ * @return True if completed successfully, false if impeached, null on EOF or error.
+ */
+func run_game(state: GameState*) -> bool? {
      while (state.year < 10) {
         print_report(state);
 
@@ -425,6 +493,9 @@ func run_game(state: GameState*) -> bool? { // returns null on EOF / error, true
     return true as bool?; // completed successfully
 }
 
+/**
+ * Main entry point for the Hamurabi game.
+ */
 func main() {
     rand_seed(0); // Seed random number generator; 0 = system time (always different)
 
@@ -445,7 +516,7 @@ func main() {
 
     let success = run_game(state);
     if (success == null) {
-        // EOF / error
+        // EOF or error
         printl();
     }
     else if ((success as bool) == true) {

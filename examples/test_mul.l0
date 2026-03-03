@@ -8,6 +8,9 @@ module test_mul;
 import std.io;
 
 
+/**
+ * Tests multiplication cases involving zero.
+ */
 func test_zero_cases() -> void {
     print_s("Testing zero cases...\n");
     
@@ -26,6 +29,9 @@ func test_zero_cases() -> void {
     }
 }
 
+/**
+ * Tests multiplication of positive numbers.
+ */
 func test_positive_positive() -> void {
     print_s("Testing positive * positive...\n");
     
@@ -45,6 +51,9 @@ func test_positive_positive() -> void {
     }
 }
 
+/**
+ * Tests multiplication of negative numbers.
+ */
 func test_negative_negative() -> void {
     print_s("Testing negative * negative...\n");
     
@@ -60,6 +69,9 @@ func test_negative_negative() -> void {
     }
 }
 
+/**
+ * Tests multiplication with mixed signs.
+ */
 func test_mixed_signs() -> void {
     print_s("Testing mixed signs...\n");
 
@@ -80,6 +92,9 @@ func test_mixed_signs() -> void {
     }
 }
 
+/**
+ * Tests edge cases in multiplication, specifically INT_MAX and INT_MIN boundaries.
+ */
 func test_edge_cases() -> void {
     print_s("Testing edge cases...\n");
     
@@ -99,42 +114,65 @@ func test_edge_cases() -> void {
     }
 }
 
+/**
+ * Tests positive integer overflow.
+ */
 func test_overflow_positive() -> void {
     print_s("Testing overflow: 46341 * 46341 (should panic)...\n");
     let bad: int = 46341 * 46341;
     print_s("  FAIL: Should have panicked!\n");
 }
 
+/**
+ * Tests INT_MAX multiplied by 2 overflow.
+ */
 func test_overflow_max_times_2() -> void {
     print_s("Testing overflow: INT32_MAX * 2 (should panic)...\n");
     let bad: int = 2147483647 * 2;
     print_s("  FAIL: Should have panicked!\n");
 }
 
+/**
+ * Tests large positive overflow.
+ */
 func test_overflow_large() -> void {
     print_s("Testing overflow: 100000 * 100000 (should panic)...\n");
     let bad: int = 100000 * 100000;
     print_s("  FAIL: Should have panicked!\n");
 }
 
+/**
+ * Tests negative integer overflow.
+ */
 func test_overflow_negative() -> void {
     print_s("Testing overflow: -46341 * -46341 (should panic)...\n");
     let bad: int = -46341 * -46341;
     print_s("  FAIL: Should have panicked!\n");
 }
 
+/**
+ * Tests mixed sign underflow.
+ */
 func test_underflow_mixed() -> void {
     print_s("Testing underflow: 46341 * -46341 (should panic)...\n");
     let bad: int = 46341 * -46341;
     print_s("  FAIL: Should have panicked!\n");
 }
 
+/**
+ * Tests INT_MIN multiplied by -1 overflow.
+ */
 func test_int32_min_times_minus_one() -> void {
     print_s("Testing overflow: INT32_MIN * -1 (should panic)...\n");
     let bad: int = -2147483648 * -1;
     print_s("  FAIL: Should have panicked!\n");
 }
 
+/**
+ * Main entry point for the test_mul example.
+ *
+ * @return 0 on success.
+ */
 func main() -> int {
     print_s("==================================================\n");
     print_s("L0 Multiplication Operator Test Suite\n");

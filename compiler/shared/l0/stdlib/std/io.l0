@@ -15,12 +15,16 @@ import sys.rt;
 
 import std.unit;
 
-// -----------------------------
-// File I/O
-// -----------------------------
+/* ---------------------------------
+   File I/O
+   --------------------------------- */
 
-// Read the entire content of a file as a string optional.
-// Returns the content of the file, or null on error.
+/**
+ * Read the entire content of a file as a string optional.
+ *
+ * @param path The path to the file.
+ * @return The content of the file, or null on error.
+ */
 func read_file(path: string) -> string? {
     let rd_opt = rt_read_file_all(path);
     if (rd_opt == null) {
@@ -29,8 +33,13 @@ func read_file(path: string) -> string? {
     return rd_opt;
 }
 
-// Write a string as the entire content of a file.
-// Returns null on error.
+/**
+ * Write a string as the entire content of a file.
+ *
+ * @param path The path to the file.
+ * @param data The string content to write.
+ * @return present() on success, or null on error.
+ */
 func write_file(path: string, data: string) -> Unit? {
     let ok = rt_write_file_all(path, data);
     if (!ok) {
@@ -39,10 +48,15 @@ func write_file(path: string, data: string) -> Unit? {
     return present();
 }
 
-// Input
+/* ---------------------------------
+   Input
+   --------------------------------- */
 
-// Read a line from standard input.
-// Returns null on EOF or error.
+/**
+ * Read a line from standard input.
+ *
+ * @return The line read, or null on EOF or error.
+ */
 func read_line() -> string? {
     let rl = rt_read_line();
     if (rl == null) {
@@ -52,8 +66,11 @@ func read_line() -> string? {
     return rl;
 }
 
-// Read a single character from standard input.
-// Returns null on EOF or error.
+/**
+ * Read a single character from standard input.
+ *
+ * @return The character read as an integer, or null on EOF or error.
+ */
 func read_char() -> int? {
     let c = rt_read_char();
     if (c == -1) {
@@ -63,8 +80,11 @@ func read_char() -> int? {
     return c as int?;
 }
 
-// Read a single character from standard input.
-// Returns -1 on EOF or error.
+/**
+ * Read a single character from standard input.
+ *
+ * @return The character read, or -1 on EOF or error.
+ */
 func read_char_or_eof() -> int {
     let c = rt_read_char();
     // EOF or error
@@ -74,132 +94,222 @@ func read_char_or_eof() -> int {
     return c;
 }
 
-// Flush output buffers
+/* ---------------------------------
+   Flush output buffers
+   --------------------------------- */
 
-// Flush stdout.
+/**
+ * Flush the standard output buffer.
+ */
 func flush_stdout() -> void {
     rt_flush_stdout();
 }
 
-// Flush stderr.
+/**
+ * Flush the standard error buffer.
+ */
 func flush_stderr() -> void {
     rt_flush_stderr();
 }
 
-// -----------------------------
-// Print variants (stdout)
-// -----------------------------
+/* ---------------------------------
+   Print variants (stdout)
+   --------------------------------- */
 
-// Print a newline to stdout.
+/**
+ * Print a newline to standard output.
+ */
 func printl() -> void {
     rt_println();
 }
 
-// print_*() primitive types
+/* ---------------------------------
+   Print primitive types
+   --------------------------------- */
 
-// Print a string to stdout.
+/**
+ * Print a string to standard output.
+ *
+ * @param s The string to print.
+ */
 func print_s(s: string) -> void {
     rt_print(s);
 }
 
-// Print an integer to stdout.
+/**
+ * Print an integer to standard output.
+ *
+ * @param x The integer to print.
+ */
 func print_i(x: int) -> void {
     rt_print_int(x);
 }
 
-// Print a boolean to stdout.
+/**
+ * Print a boolean to standard output.
+ *
+ * @param x The boolean to print.
+ */
 func print_b(x: bool) -> void {
     rt_print_bool(x);
 }
 
-// printl_* primitive types
+/* ---------------------------------
+   Print primitive types with newline
+   --------------------------------- */
 
-// Print a string to stdout followed by a newline.
+/**
+ * Print a string to standard output followed by a newline.
+ *
+ * @param s The string to print.
+ */
 func printl_s(s: string) -> void {
     rt_print(s);
     rt_println();
 }
 
-// Print an integer to stdout followed by a newline.
+/**
+ * Print an integer to standard output followed by a newline.
+ *
+ * @param x The integer to print.
+ */
 func printl_i(x: int) -> void {
     rt_print_int(x);
     rt_println();
 }
 
-// Print a boolean to stdout followed by a newline.
+/**
+ * Print a boolean to standard output followed by a newline.
+ *
+ * @param x The boolean to print.
+ */
 func printl_b(x: bool) -> void {
     rt_print_bool(x);
     rt_println();
 }
 
-// print_** 2 params
+/* ---------------------------------
+   Print two-parameter variants
+   --------------------------------- */
 
-// Print two strings to stdout separated by a space.
+/**
+ * Print two strings to standard output separated by a space.
+ *
+ * @param s1 The first string.
+ * @param s2 The second string.
+ */
 func print_ss(s1: string, s2: string) -> void {
     rt_print(s1);
     rt_print(" ");
     rt_print(s2);
 }
 
-// Print a string and an integer to stdout separated by a space.
+/**
+ * Print a string and an integer to standard output separated by a space.
+ *
+ * @param s The string to print.
+ * @param x The integer to print.
+ */
 func print_si(s: string, x: int) -> void {
     rt_print(s);
     rt_print(" ");
     rt_print_int(x);
 }
 
-// Print a string and a boolean to stdout separated by a space.
+/**
+ * Print a string and a boolean to standard output separated by a space.
+ *
+ * @param s The string to print.
+ * @param b The boolean to print.
+ */
 func print_sb(s: string, b: bool) -> void {
     rt_print(s);
     rt_print(" ");
     rt_print_bool(b);
 }
 
-// Print an integer and a string to stdout separated by a space.
+/**
+ * Print an integer and a string to standard output separated by a space.
+ *
+ * @param x The integer to print.
+ * @param s The string to print.
+ */
 func print_is(x: int, s: string) -> void {
     rt_print_int(x);
     rt_print(" ");
     rt_print(s);
 }
 
-// Print two integers to stdout separated by a space.
+/**
+ * Print two integers to standard output separated by a space.
+ *
+ * @param x1 The first integer.
+ * @param x2 The second integer.
+ */
 func print_ii(x1: int, x2: int) -> void {
     rt_print_int(x1);
     rt_print(" ");
     rt_print_int(x2);
 }
 
-// Print an integer and a boolean to stdout separated by a space.
+/**
+ * Print an integer and a boolean to standard output separated by a space.
+ *
+ * @param x The integer to print.
+ * @param b The boolean to print.
+ */
 func print_ib(x: int, b: bool) -> void {
     rt_print_int(x);
     rt_print(" ");
     rt_print_bool(b);
 }
 
-// Print a boolean and a string to stdout separated by a space.
+/**
+ * Print a boolean and a string to standard output separated by a space.
+ *
+ * @param b The boolean to print.
+ * @param s The string to print.
+ */
 func print_bs(b: bool, s: string) -> void {
     rt_print_bool(b);
     rt_print(" ");
     rt_print(s);
 }
 
-// Print a boolean and an integer to stdout separated by a space.
+/**
+ * Print a boolean and an integer to standard output separated by a space.
+ *
+ * @param b The boolean to print.
+ * @param x The integer to print.
+ */
 func print_bi(b: bool, x: int) -> void {
     rt_print_bool(b);
     rt_print(" ");
     rt_print_int(x);
 }
 
-// Print two booleans to stdout separated by a space.
+/**
+ * Print two booleans to standard output separated by a space.
+ *
+ * @param b1 The first boolean.
+ * @param b2 The second boolean.
+ */
 func print_bb(b1: bool, b2: bool) -> void {
     rt_print_bool(b1);
     rt_print(" ");
     rt_print_bool(b2);
 }
 
-// printl_** 2 params
+/* ---------------------------------
+   Print two-parameter variants with \n
+   --------------------------------- */
 
-// Print two strings to stdout separated by a space, followed by a newline.
+/**
+ * Print two strings to standard output separated by a space, followed by a newline.
+ *
+ * @param s1 The first string.
+ * @param s2 The second string.
+ */
 func printl_ss(s1: string, s2: string) -> void {
     rt_print(s1);
     rt_print(" ");
@@ -207,7 +317,12 @@ func printl_ss(s1: string, s2: string) -> void {
     rt_println();
 }
 
-// Print a string and an integer to stdout separated by a space, followed by a newline.
+/**
+ * Print a string and an integer to standard output separated by a space, followed by a newline.
+ *
+ * @param s The string to print.
+ * @param x The integer to print.
+ */
 func printl_si(s: string, x: int) -> void {
     rt_print(s);
     rt_print(" ");
@@ -215,7 +330,12 @@ func printl_si(s: string, x: int) -> void {
     rt_println();
 }
 
-// Print a string and a boolean to stdout separated by a space, followed by a newline.
+/**
+ * Print a string and a boolean to standard output separated by a space, followed by a newline.
+ *
+ * @param s The string to print.
+ * @param b The boolean to print.
+ */
 func printl_sb(s: string, b: bool) -> void {
     rt_print(s);
     rt_print(" ");
@@ -223,7 +343,12 @@ func printl_sb(s: string, b: bool) -> void {
     rt_println();
 }
 
-// Print an integer and a string to stdout separated by a space, followed by a newline.
+/**
+ * Print an integer and a string to standard output separated by a space, followed by a newline.
+ *
+ * @param x The integer to print.
+ * @param s The string to print.
+ */
 func printl_is(x: int, s: string) -> void {
     rt_print_int(x);
     rt_print(" ");
@@ -231,7 +356,12 @@ func printl_is(x: int, s: string) -> void {
     rt_println();
 }
 
-// Print two integers to stdout separated by a space, followed by a newline.
+/**
+ * Print two integers to standard output separated by a space, followed by a newline.
+ *
+ * @param x1 The first integer.
+ * @param x2 The second integer.
+ */
 func printl_ii(x1: int, x2: int) -> void {
     rt_print_int(x1);
     rt_print(" ");
@@ -239,7 +369,12 @@ func printl_ii(x1: int, x2: int) -> void {
     rt_println();
 }
 
-// Print an integer and a boolean to stdout separated by a space, followed by a newline.
+/**
+ * Print an integer and a boolean to standard output separated by a space, followed by a newline.
+ *
+ * @param x The integer to print.
+ * @param b The boolean to print.
+ */
 func printl_ib(x: int, b: bool) -> void {
     rt_print_int(x);
     rt_print(" ");
@@ -247,7 +382,12 @@ func printl_ib(x: int, b: bool) -> void {
     rt_println();
 }
 
-// Print a boolean and a string to stdout separated by a space, followed by a newline.
+/**
+ * Print a boolean and a string to standard output separated by a space, followed by a newline.
+ *
+ * @param b The boolean to print.
+ * @param s The string to print.
+ */
 func printl_bs(b: bool, s: string) -> void {
     rt_print_bool(b);
     rt_print(" ");
@@ -255,7 +395,12 @@ func printl_bs(b: bool, s: string) -> void {
     rt_println();
 }
 
-// Print a boolean and an integer to stdout separated by a space, followed by a newline.
+/**
+ * Print a boolean and an integer to standard output separated by a space, followed by a newline.
+ *
+ * @param b The boolean to print.
+ * @param x The integer to print.
+ */
 func printl_bi(b: bool, x: int) -> void {
     rt_print_bool(b);
     rt_print(" ");
@@ -263,7 +408,12 @@ func printl_bi(b: bool, x: int) -> void {
     rt_println();
 }
 
-// Print two booleans to stdout separated by a space, followed by a newline.
+/**
+ * Print two booleans to standard output separated by a space, followed by a newline.
+ *
+ * @param b1 The first boolean.
+ * @param b2 The second boolean.
+ */
 func printl_bb(b1: bool, b2: bool) -> void {
     rt_print_bool(b1);
     rt_print(" ");
@@ -271,111 +421,188 @@ func printl_bb(b1: bool, b2: bool) -> void {
     rt_println();
 }
 
-// -----------------------------
-// Error Print variants (stderr)
-// -----------------------------
+/* ---------------------------------
+   Error Print variants (stderr)
+   --------------------------------- */
 
-// Print a newline to stderr.
+/**
+ * Print a newline to standard error.
+ */
 func err_printl() -> void {
     rt_println_stderr();
 }
 
-// err_print_*() primitive types
+/* ---------------------------------
+   Error Print primitive types
+   --------------------------------- */
 
-// Print a string to stderr.
+/**
+ * Print a string to standard error.
+ *
+ * @param s The string to print.
+ */
 func err_print_s(s: string) -> void {
     rt_print_stderr(s);
 }
 
-// Print an integer to stderr.
+/**
+ * Print an integer to standard error.
+ *
+ * @param x The integer to print.
+ */
 func err_print_i(x: int) -> void {
     rt_print_int_stderr(x);
 }
 
-// Print a boolean to stderr.
+/**
+ * Print a boolean to standard error.
+ *
+ * @param x The boolean to print.
+ */
 func err_print_b(x: bool) -> void {
     rt_print_bool_stderr(x);
 }
 
-// err_printl_* primitive types
+/* ---------------------------------
+   Error Print primitive types with \n
+   --------------------------------- */
 
-// Print a string to stderr followed by a newline.
+/**
+ * Print a string to standard error followed by a newline.
+ *
+ * @param s The string to print.
+ */
 func err_printl_s(s: string) -> void {
     rt_print_stderr(s);
     rt_println_stderr();
 }
 
-// Print an integer to stderr followed by a newline.
+/**
+ * Print an integer to standard error followed by a newline.
+ *
+ * @param x The integer to print.
+ */
 func err_printl_i(x: int) -> void {
     rt_print_int_stderr(x);
     rt_println_stderr();
 }
 
-// Print a boolean to stderr followed by a newline.
+/**
+ * Print a boolean to standard error followed by a newline.
+ *
+ * @param x The boolean to print.
+ */
 func err_printl_b(x: bool) -> void {
     rt_print_bool_stderr(x);
     rt_println_stderr();
 }
 
-// err_print_** 2 params
+/* ---------------------------------
+   Error Print two-parameter variants
+   --------------------------------- */
 
-// Print two strings to stderr separated by a space.
+/**
+ * Print two strings to standard error separated by a space.
+ *
+ * @param s1 The first string.
+ * @param s2 The second string.
+ */
 func err_print_ss(s1: string, s2: string) -> void {
     rt_print_stderr(s1);
     rt_print_stderr(" ");
     rt_print_stderr(s2);
 }
 
-// Print a string and an integer to stderr separated by a space.
+/**
+ * Print a string and an integer to standard error separated by a space.
+ *
+ * @param s The string to print.
+ * @param x The integer to print.
+ */
 func err_print_si(s: string, x: int) -> void {
     rt_print_stderr(s);
     rt_print_stderr(" ");
     rt_print_int_stderr(x);
 }
 
-// Print a string and a boolean to stderr separated by a space.
+/**
+ * Print a string and a boolean to standard error separated by a space.
+ *
+ * @param s The string to print.
+ * @param b The boolean to print.
+ */
 func err_print_sb(s: string, b: bool) -> void {
     rt_print_stderr(s);
     rt_print_stderr(" ");
     rt_print_bool_stderr(b);
 }
 
-// Print an integer and a string to stderr separated by a space.
+/**
+ * Print an integer and a string to standard error separated by a space.
+ *
+ * @param x The integer to print.
+ * @param s The string to print.
+ */
 func err_print_is(x: int, s: string) -> void {
     rt_print_int_stderr(x);
     rt_print_stderr(" ");
     rt_print_stderr(s);
 }
 
-// Print two integers to stderr separated by a space.
+/**
+ * Print two integers to standard error separated by a space.
+ *
+ * @param x1 The first integer.
+ * @param x2 The second integer.
+ */
 func err_print_ii(x1: int, x2: int) -> void {
     rt_print_int_stderr(x1);
     rt_print_stderr(" ");
     rt_print_int_stderr(x2);
 }
 
-// Print an integer and a boolean to stderr separated by a space.
+/**
+ * Print an integer and a boolean to standard error separated by a space.
+ *
+ * @param x The integer to print.
+ * @param b The boolean to print.
+ */
 func err_print_ib(x: int, b: bool) -> void {
     rt_print_int_stderr(x);
     rt_print_stderr(" ");
     rt_print_bool_stderr(b);
 }
 
-// Print a boolean and a string to stderr separated by a space.
+/**
+ * Print a boolean and a string to standard error separated by a space.
+ *
+ * @param b The boolean to print.
+ * @param s The string to print.
+ */
 func err_print_bs(b: bool, s: string) -> void {
     rt_print_bool_stderr(b);
     rt_print_stderr(" ");
     rt_print_stderr(s);
 }
 
-// Print a boolean and an integer to stderr separated by a space.
+/**
+ * Print a boolean and an integer to standard error separated by a space.
+ *
+ * @param b The boolean to print.
+ * @param x The integer to print.
+ */
 func err_print_bi(b: bool, x: int) -> void {
     rt_print_bool_stderr(b);
     rt_print_stderr(" ");
     rt_print_int_stderr(x);
 }
 
-// Print two booleans to stderr separated by a space.
+/**
+ * Print two booleans to standard error separated by a space.
+ *
+ * @param b1 The first boolean.
+ * @param b2 The second boolean.
+ */
 func err_print_bb(b1: bool, b2: bool) -> void {
     rt_print_bool_stderr(b1);
     rt_print_stderr(" ");

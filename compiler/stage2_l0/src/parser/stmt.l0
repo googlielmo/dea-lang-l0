@@ -15,10 +15,16 @@ import ast;
 import parser.shared;
 import parser.expr;
 
-/* ------------------------------------
+/* ---------------------------------
    Pattern parsing
-   ------------------------------------ */
+   --------------------------------- */
 
+/**
+ * Parse a match pattern.
+ *
+ * @param self Parser state to advance.
+ * @return Parsed pattern, or `null` on error.
+ */
 func ps_parse_pattern(self: ParserState*) -> PatternId? {
     let start = ps_span_start(self);
 
@@ -74,10 +80,16 @@ func ps_parse_pattern(self: ParserState*) -> PatternId? {
     return null;
 }
 
-/* ------------------------------------
+/* ---------------------------------
    Statement parsing
-   ------------------------------------ */
+   --------------------------------- */
 
+/**
+ * Parse a block statement.
+ *
+ * @param self Parser state to advance.
+ * @return Parsed block statement id, or `null` on error.
+ */
 func ps_parse_block(self: ParserState*) -> StmtId? {
     let start = ps_span_start(self);
     ps_expect(self, ord(TT_LBRACE), "PAR-0090", "[PAR-0090] expected '{' to start block")?;
@@ -97,6 +109,12 @@ func ps_parse_block(self: ParserState*) -> StmtId? {
     }
 }
 
+/**
+ * Parse a `break` statement.
+ *
+ * @param self Parser state to advance.
+ * @return Parsed `break` statement id, or `null` on error.
+ */
 func ps_parse_break_stmt(self: ParserState*) -> StmtId? {
     let start = ps_span_start(self);
     ps_expect(self, ord(TT_BREAK), "PAR-0190", "[PAR-0190] expected 'break'")?;
@@ -104,6 +122,12 @@ func ps_parse_break_stmt(self: ParserState*) -> StmtId? {
     return stmt_arena_add(self.stmt_arena, node);
 }
 
+/**
+ * Parse a `continue` statement.
+ *
+ * @param self Parser state to advance.
+ * @return Parsed `continue` statement id, or `null` on error.
+ */
 func ps_parse_continue_stmt(self: ParserState*) -> StmtId? {
     let start = ps_span_start(self);
     ps_expect(self, ord(TT_CONTINUE), "PAR-0200", "[PAR-0200] expected 'continue'")?;
@@ -111,6 +135,12 @@ func ps_parse_continue_stmt(self: ParserState*) -> StmtId? {
     return stmt_arena_add(self.stmt_arena, node);
 }
 
+/**
+ * Parse a `return` statement.
+ *
+ * @param self Parser state to advance.
+ * @return Parsed `return` statement id, or `null` on error.
+ */
 func ps_parse_return_stmt(self: ParserState*) -> StmtId? {
     let start = ps_span_start(self);
     ps_expect(self, ord(TT_RETURN), "PAR-0150", "[PAR-0150] expected 'return'")?;
@@ -123,6 +153,12 @@ func ps_parse_return_stmt(self: ParserState*) -> StmtId? {
     return stmt_arena_add(self.stmt_arena, node);
 }
 
+/**
+ * Parse a `drop` statement.
+ *
+ * @param self Parser state to advance.
+ * @return Parsed `drop` statement id, or `null` on error.
+ */
 func ps_parse_drop_stmt(self: ParserState*) -> StmtId? {
     let start = ps_span_start(self);
     ps_expect(self, ord(TT_DROP), "PAR-0160", "[PAR-0160] expected 'drop'")?;
@@ -133,6 +169,12 @@ func ps_parse_drop_stmt(self: ParserState*) -> StmtId? {
     return stmt_arena_add(self.stmt_arena, node);
 }
 
+/**
+ * Parse a local `let` statement.
+ *
+ * @param self Parser state to advance.
+ * @return Parsed `let` statement id, or `null` on error.
+ */
 func ps_parse_let_stmt(self: ParserState*) -> StmtId? {
     let start = ps_span_start(self);
     ps_expect(self, ord(TT_LET), "PAR-0110", "[PAR-0110] expected 'let'")?;
@@ -155,6 +197,12 @@ func ps_parse_let_stmt(self: ParserState*) -> StmtId? {
     }
 }
 
+/**
+ * Parse an `if` statement.
+ *
+ * @param self Parser state to advance.
+ * @return Parsed `if` statement id, or `null` on error.
+ */
 func ps_parse_if_stmt(self: ParserState*) -> StmtId? {
     let start = ps_span_start(self);
     ps_expect(self, ord(TT_IF), "PAR-0120", "[PAR-0120] expected 'if'")?;
@@ -181,6 +229,12 @@ func ps_parse_if_stmt(self: ParserState*) -> StmtId? {
     return stmt_arena_add(self.stmt_arena, node);
 }
 
+/**
+ * Parse a `while` statement.
+ *
+ * @param self Parser state to advance.
+ * @return Parsed `while` statement id, or `null` on error.
+ */
 func ps_parse_while_stmt(self: ParserState*) -> StmtId? {
     let start = ps_span_start(self);
     ps_expect(self, ord(TT_WHILE), "PAR-0130", "[PAR-0130] expected 'while'")?;
@@ -196,6 +250,12 @@ func ps_parse_while_stmt(self: ParserState*) -> StmtId? {
     return stmt_arena_add(self.stmt_arena, node);
 }
 
+/**
+ * Parse a `for` statement.
+ *
+ * @param self Parser state to advance.
+ * @return Parsed `for` statement id, or `null` on error.
+ */
 func ps_parse_for_stmt(self: ParserState*) -> StmtId? {
     let start = ps_span_start(self);
     ps_expect(self, ord(TT_FOR), "PAR-0140", "[PAR-0140] expected 'for'")?;
@@ -284,6 +344,12 @@ func ps_parse_for_stmt(self: ParserState*) -> StmtId? {
     return stmt_arena_add(self.stmt_arena, node4);
 }
 
+/**
+ * Parse a `match` statement.
+ *
+ * @param self Parser state to advance.
+ * @return Parsed `match` statement id, or `null` on error.
+ */
 func ps_parse_match_stmt(self: ParserState*) -> StmtId? {
     let start = ps_span_start(self);
     ps_expect(self, ord(TT_MATCH), "PAR-0170", "[PAR-0170] expected 'match'")?;
@@ -338,6 +404,12 @@ func ps_parse_match_stmt(self: ParserState*) -> StmtId? {
     }
 }
 
+/**
+ * Parse one item inside a `with` header.
+ *
+ * @param self Parser state to advance.
+ * @return Parsed `with` item, or `null` on error.
+ */
 func ps_parse_with_item(self: ParserState*) -> WithItem*? {
     let start = ps_span_start(self);
     let init = ps_parse_simple_stmt(self)?;
@@ -353,6 +425,12 @@ func ps_parse_with_item(self: ParserState*) -> WithItem*? {
     return new WithItem(init, cleanup_stmt, has_cleanup, ps_extend_span(self, start));
 }
 
+/**
+ * Parse a `with` statement.
+ *
+ * @param self Parser state to advance.
+ * @return Parsed `with` statement id, or `null` on error.
+ */
 func ps_parse_with_stmt(self: ParserState*) -> StmtId? {
     let start = ps_span_start(self);
     ps_expect(self, ord(TT_WITH), "PAR-0500", "[PAR-0500] expected 'with'")?;
@@ -415,6 +493,12 @@ func ps_parse_with_stmt(self: ParserState*) -> StmtId? {
     }
 }
 
+/**
+ * Parse a literal allowed in a `case` arm.
+ *
+ * @param self Parser state to advance.
+ * @return Parsed literal expression id, or `null` on error.
+ */
 func ps_parse_case_literal(self: ParserState*) -> ExprId? {
     let start = ps_span_start(self);
 
@@ -454,6 +538,12 @@ func ps_parse_case_literal(self: ParserState*) -> ExprId? {
     return null;
 }
 
+/**
+ * Parse a `case` statement.
+ *
+ * @param self Parser state to advance.
+ * @return Parsed `case` statement id, or `null` on error.
+ */
 func ps_parse_case_stmt(self: ParserState*) -> StmtId? {
     let start = ps_span_start(self);
     ps_expect(self, ord(TT_CASE), "PAR-0230", "[PAR-0230] expected 'case'")?;
@@ -515,6 +605,12 @@ func ps_parse_case_stmt(self: ParserState*) -> StmtId? {
     }
 }
 
+/**
+ * Parse a statement that does not consume its trailing semicolon.
+ *
+ * @param self Parser state to advance.
+ * @return Parsed simple statement id, or `null` on error.
+ */
 func ps_parse_simple_stmt(self: ParserState*) -> StmtId? {
     let start = ps_span_start(self);
 
@@ -548,6 +644,12 @@ func ps_parse_simple_stmt(self: ParserState*) -> StmtId? {
     return stmt_arena_add(self.stmt_arena, node);
 }
 
+/**
+ * Parse one statement.
+ *
+ * @param self Parser state to advance.
+ * @return Parsed statement id, or `null` on error.
+ */
 func ps_parse_stmt(self: ParserState*) -> StmtId? {
     if (ps_check(self, ord(TT_LBRACE))) {
         return ps_parse_block(self);

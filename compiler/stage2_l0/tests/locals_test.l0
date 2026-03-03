@@ -17,20 +17,40 @@ import locals;
 import source_paths;
 import util.log;
 
+/**
+ * Returns the root directory for test fixtures.
+ *
+ * @return The semantics fixture directory used by these tests.
+ */
 func fixture_root() -> string {
     return "compiler/stage2_l0/tests/fixtures/semantics";
 }
 
+/**
+ * Creates and configures source search paths for testing.
+ *
+ * @return Source search paths rooted at the semantics fixtures directory.
+ */
 func make_paths() -> SourceSearchPaths* {
     let sp = sp_create();
     sp_add_project_root(sp, fixture_root());
     return sp;
 }
 
+/**
+ * Retrieves the statement ID at the given index from a block.
+ *
+ * @param block The block whose statement list is being indexed.
+ * @param index The zero-based statement index to read.
+ * @return The statement ID stored at the given index.
+ */
 func nth_stmt_id(block: StmtNode*, index: int) -> StmtId {
     return id_vec_get(block.ids as VectorBase*, index);
 }
 
+/**
+ * Tests test_local_scope_construction.
+ */
 func test_local_scope_construction() {
     let sp = make_paths();
     with (let cfg = log_config_create(LL_SILENT, false) => drop cfg) {
@@ -106,6 +126,9 @@ func test_local_scope_construction() {
     sp_free(sp);
 }
 
+/**
+ * Main entry point for the module.
+ */
 func main() {
     test_local_scope_construction();
     printl_s("locals_test: all tests passed");

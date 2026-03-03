@@ -7,6 +7,11 @@ module cycle_b;
 
 import cycle_a;
 
+/**
+ * Participates in the import cycle with `cycle_a`.
+ *
+ * @return `0`.
+ */
 func b() -> int {
     return 0;
 }

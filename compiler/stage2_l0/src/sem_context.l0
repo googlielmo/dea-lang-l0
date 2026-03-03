@@ -15,11 +15,17 @@ import name_resolver;
 import signatures;
 import types;
 
+/**
+ * Defines the VarRefResolution enumeration.
+ */
 enum VarRefResolution {
     VAR_RES_LOCAL;
     VAR_RES_MODULE;
 }
 
+/**
+ * Represents the AnalysisResult structure.
+ */
 struct AnalysisResult {
     driver_state: DriverState*;
     diags: DiagCollector*;
@@ -31,6 +37,11 @@ struct AnalysisResult {
     intrinsic_targets: StringPtrMap*;  // key (module::expr_id) -> Type*
 }
 
+/**
+ * Free an analysis result and all owned semantic tables.
+ *
+ * @param self Analysis result to free.
+ */
 func analysis_result_free(self: AnalysisResult*) {
     if (self.locals_result != null) {
         locals_free(self.locals_result as LocalsResult*);
@@ -63,34 +74,83 @@ func analysis_result_free(self: AnalysisResult*) {
     drop self;
 }
 
+/**
+ * Report whether analysis produced any errors.
+ *
+ * @param self Analysis result to inspect.
+ * @return `true` if the diagnostic collector contains an error.
+ */
 func analysis_has_errors(self: AnalysisResult*) -> bool {
     return diag_has_errors(self.diags);
 }
 
+/**
+ * Return the number of diagnostics produced by analysis.
+ *
+ * @param self Analysis result to inspect.
+ * @return Total diagnostic count.
+ */
 func analysis_diag_count(self: AnalysisResult*) -> int {
     return diag_count(self.diags);
 }
 
+/**
+ * Return a diagnostic from the analysis result.
+ *
+ * @param self Analysis result to inspect.
+ * @param index Zero-based diagnostic index.
+ * @return Diagnostic at `index`.
+ */
 func analysis_diag_get(self: AnalysisResult*, index: int) -> Diagnostic* {
     return diag_get(self.diags, index);
 }
 
+/**
+ * Return source filenames captured during driver analysis.
+ *
+ * @param self Analysis result to inspect.
+ * @return Vector of source filenames.
+ */
 func analysis_source_names(self: AnalysisResult*) -> VectorString* {
     return self.driver_state.source_names;
 }
 
+/**
+ * Return source texts captured during driver analysis.
+ *
+ * @param self Analysis result to inspect.
+ * @return Vector of source texts aligned with `analysis_source_names`.
+ */
 func analysis_source_texts(self: AnalysisResult*) -> VectorString* {
     return self.driver_state.source_texts;
 }
 
+/**
+ * Return the name-resolution tables, if available.
+ *
+ * @param self Analysis result to inspect.
+ * @return Name-resolution result, or `null` if analysis stopped earlier.
+ */
 func analysis_name_resolution(self: AnalysisResult*) -> NameResolution*? {
     return self.names;
 }
 
+/**
+ * Return the signature tables, if available.
+ *
+ * @param self Analysis result to inspect.
+ * @return Signature tables, or `null` if analysis stopped earlier.
+ */
 func analysis_signature_tables(self: AnalysisResult*) -> SignatureTables*? {
     return self.signatures;
 }
 
+/**
+ * Return locals-resolution results, if available.
+ *
+ * @param self Analysis result to inspect.
+ * @return Locals result, or `null` if analysis stopped earlier.
+ */
 func analysis_locals(self: AnalysisResult*) -> LocalsResult*? {
     return self.locals_result;
 }

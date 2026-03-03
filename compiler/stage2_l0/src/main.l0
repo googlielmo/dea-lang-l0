@@ -10,6 +10,9 @@ import std.system;
 
 import lexer;
 
+/**
+ * Main entry point for the stage 2 L0 compiler test harness.
+ */
 func main() {
     printl_s("Hello, World from L0 compiler stage 2!");
 }

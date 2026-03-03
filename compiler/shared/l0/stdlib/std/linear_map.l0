@@ -14,7 +14,7 @@ import sys.hash;
 
 import std.vector;
 
-/*
+/**
  * Linear map implementation using linear search.
  * Note: This is not a hash map.
  * Elements are stored in a vector, and lookups are done via linear search.
@@ -28,16 +28,24 @@ struct LinearMapEntryBase {
     /* followed by inline key data and value data in specific implementations */
 }
 
+/**
+ * Base structure for a linear map.
+ */
 struct LinearMapBase {
     entries: VectorBase*;
     key_size : int; // size of the key element
     value_size: int; // size of the value element
 }
 
-/* ------------------------------------
+/* ---------------------------------
    LinearMapBase internal functions
-   ------------------------------------ */
+   --------------------------------- */
 
+/**
+ * Increases the capacity of the map if needed and grows the length by one.
+ *
+ * @param self The pointer to the LinearMapBase.
+ */
 func _lm_grow(self: LinearMapBase*) {
     // make sure we keep the length <= 80% of capacity
     let cap = vec_capacity(self.entries);
@@ -47,25 +55,51 @@ func _lm_grow(self: LinearMapBase*) {
     vec_grow(self.entries);
 }
 
+/**
+ * Returns a pointer to the entry at the specified index.
+ *
+ * @param self The pointer to the LinearMapBase.
+ * @param index The index of the entry.
+ * @return A pointer to the LinearMapEntryBase.
+ */
 func _lm_entry_by_index(self: LinearMapBase*, index: int) -> LinearMapEntryBase* {
     let entry_ptr = vec_get(self.entries, index) as LinearMapEntryBase*;
     return entry_ptr;
 }
 
-/* unsafe */
+/**
+ * Returns a pointer to the value within an entry.
+ *
+ * @param self The pointer to the LinearMapBase.
+ * @param entry_ptr The pointer to the LinearMapEntryBase.
+ * @return A pointer to the value data.
+ */
 func _lm_value_by_entry(self: LinearMapBase*, entry_ptr: LinearMapEntryBase*) -> void* {
     let value_ptr = rt_array_element(entry_ptr, 1, sizeof(LinearMapEntryBase) + self.key_size); // get pointer to value
     return value_ptr;
 }
 
-/* unsafe */
+/**
+ * Returns a pointer to the key within an entry.
+ *
+ * @param self The pointer to the LinearMapBase.
+ * @param entry_ptr The pointer to the LinearMapEntryBase.
+ * @return A pointer to the key data.
+ */
 func _lm_key_by_entry(self: LinearMapBase*, entry_ptr: LinearMapEntryBase *) -> void* {
     let __ = self.key_size; // suppress unused warning
     let key_ptr = rt_array_element(entry_ptr, 1, sizeof(LinearMapEntryBase)); // get pointer to key
     return key_ptr;
 }
 
-/* unsafe */
+/**
+ * Finds an entry by its hash key and key pointer.
+ *
+ * @param self The pointer to the LinearMapBase.
+ * @param hkey The hash of the key.
+ * @param key_ptr The pointer to the key data to compare.
+ * @return The found entry pointer, or null if not found.
+ */
 func _lm_entry_by_hk_key(self: LinearMapBase*, hkey: int, key_ptr: void*) -> LinearMapEntryBase*? {
     for (let i: int = 0; i < self.entries.length; i = i + 1) {
         let entry_ptr = _lm_entry_by_index(self, i);
@@ -79,7 +113,14 @@ func _lm_entry_by_hk_key(self: LinearMapBase*, hkey: int, key_ptr: void*) -> Lin
     return null;
 }
 
-/* unsafe */
+/**
+ * Finds an entry by its hash value and value pointer.
+ *
+ * @param self The pointer to the LinearMapBase.
+ * @param hval The hash of the value.
+ * @param value_ptr The pointer to the value data to compare.
+ * @return The found entry pointer, or null if not found.
+ */
 func _lm_entry_by_hv_value(self: LinearMapBase*, hval: int, value_ptr: void*) -> LinearMapEntryBase*? {
     for (let i: int = 0; i < self.entries.length; i = i + 1) {
         let entry_ptr = _lm_entry_by_index(self, i);
@@ -93,6 +134,12 @@ func _lm_entry_by_hv_value(self: LinearMapBase*, hval: int, value_ptr: void*) ->
     return null;
 }
 
+/**
+ * Allocates space for a new entry in the map.
+ *
+ * @param self The pointer to the LinearMapBase.
+ * @return A pointer to the new entry.
+ */
 func _lm_new_entry(self: LinearMapBase*) -> void* {
     _lm_grow(self);
     let new_index = self.entries.length - 1;
@@ -100,7 +147,16 @@ func _lm_new_entry(self: LinearMapBase*) -> void* {
     return entry_ptr;
 }
 
-/* unsafe */
+/**
+ * Sets the key and value data for a given entry.
+ *
+ * @param self The pointer to the LinearMapBase.
+ * @param entry_ptr The entry to modify.
+ * @param hkey The hash of the key.
+ * @param key_ptr The pointer to the source key data.
+ * @param hval The hash of the value.
+ * @param value_ptr The pointer to the source value data.
+ */
 func _lm_set_entry(self: LinearMapBase*, entry_ptr: LinearMapEntryBase*, hkey: int, key_ptr: void*, hval: int, value_ptr: void*) {
     entry_ptr.hash_key = hkey;
     entry_ptr.hash_value = hval;
@@ -110,10 +166,18 @@ func _lm_set_entry(self: LinearMapBase*, entry_ptr: LinearMapEntryBase*, hkey: i
     rt_memcpy(dest_value_ptr, value_ptr, self.value_size);
 }
 
-/* ------------------------------------
+/* ---------------------------------
    LinearMapBase public functions
-   ------------------------------------ */
+   --------------------------------- */
 
+/**
+ * Creates a new LinearMapBase with the specified sizes and capacity.
+ *
+ * @param key_size Size of the key in bytes.
+ * @param value_size Size of the value in bytes.
+ * @param initial_capacity Initial number of entries.
+ * @return A pointer to the newly created map.
+ */
 func lm_create(key_size: int, value_size: int, initial_capacity: int) -> LinearMapBase* {
     let entry_size = sizeof(LinearMapEntryBase) + key_size + value_size;
     let self = new LinearMapBase(
@@ -124,27 +188,59 @@ func lm_create(key_size: int, value_size: int, initial_capacity: int) -> LinearM
     return self;
 }
 
+/**
+ * Free a `LinearMapBase` and its entry storage.
+ *
+ * @param self Linear map to free.
+ */
 func lm_free(self: LinearMapBase*) {
     vec_free(self.entries);
     drop self;
 }
 
+/**
+ * Returns the number of entries currently in the map.
+ *
+ * @param self The pointer to the LinearMapBase.
+ * @return The entry count.
+ */
 func lm_len(self: LinearMapBase*) -> int {
     return self.entries.length;
 }
 
+/**
+ * Checks if the map contains the specified key.
+ *
+ * @param self The pointer to the LinearMapBase.
+ * @param key_ptr The pointer to the key data.
+ * @return True if the key is present, false otherwise.
+ */
 func lm_contains_key(self: LinearMapBase*, key_ptr: void*) -> bool {
     let hkey = rt_hash_data(key_ptr, self.key_size);
     let entry_ptr = _lm_entry_by_hk_key(self, hkey, key_ptr);
     return entry_ptr != null;
 }
 
+/**
+ * Checks if the map contains the specified value.
+ *
+ * @param self The pointer to the LinearMapBase.
+ * @param value_ptr The pointer to the value data.
+ * @return True if the value is present, false otherwise.
+ */
 func lm_contains_value(self: LinearMapBase*, value_ptr: void*) -> bool {
     let hval = rt_hash_data(value_ptr, self.value_size);
     let entry_ptr = _lm_entry_by_hv_value(self, hval, value_ptr);
     return entry_ptr != null;
 }
 
+/**
+ * Removes the entry with the specified key.
+ *
+ * @param self The pointer to the LinearMapBase.
+ * @param key_ptr The pointer to the key data to remove.
+ * @return True if the key was found and removed, false otherwise.
+ */
 func lm_remove(self: LinearMapBase*, key_ptr: void*) -> bool {
     let hkey = rt_hash_data(key_ptr, self.key_size);
     for (let i: int = 0; i < self.entries.length; i = i + 1) {
@@ -168,6 +264,13 @@ func lm_remove(self: LinearMapBase*, key_ptr: void*) -> bool {
     return false;
 }
 
+/**
+ * Inserts or updates a key-value pair in the map.
+ *
+ * @param self The pointer to the LinearMapBase.
+ * @param key_ptr The pointer to the key data.
+ * @param value_ptr The pointer to the value data.
+ */
 func lm_set(self: LinearMapBase*, key_ptr: void*, value_ptr: void*) {
     let hkey = rt_hash_data(key_ptr, self.key_size);
     let hval = rt_hash_data(value_ptr, self.value_size);
@@ -181,6 +284,13 @@ func lm_set(self: LinearMapBase*, key_ptr: void*, value_ptr: void*) {
     _lm_set_entry(self, new_entry_ptr as LinearMapEntryBase*, hkey, key_ptr, hval, value_ptr);
 }
 
+/**
+ * Retrieves the value associated with the specified key.
+ *
+ * @param self The pointer to the LinearMapBase.
+ * @param key_ptr The pointer to the key data to look up.
+ * @return A pointer to the value data, or null if not found.
+ */
 func lm_get(self: LinearMapBase*, key_ptr: void*) -> void*? {
     let hkey = rt_hash_data(key_ptr, self.key_size);
     let entry_ptr = _lm_entry_by_hk_key(self, hkey, key_ptr);
@@ -191,31 +301,49 @@ func lm_get(self: LinearMapBase*, key_ptr: void*) -> void*? {
     return null;
 }
 
-/* ------------------------------------
+/* ---------------------------------
    LinearMap string -> string specialization
-   ------------------------------------ */
+   --------------------------------- */
 
+/**
+ * Entry for a string-to-string linear map.
+ */
 struct LinearMapStringStringEntry {
     /* Simple payload, no need for hash codes as they are expensive to compute vs string compare */
     key: string;
     value: string;
 }
 
+/**
+ * A linear map specialized for string keys and string values.
+ */
 struct LinearMapStringString {
     base: LinearMapBase*;
 }
 
-/* ------------------------------------
+/* ---------------------------------
    LinearMapStringString internal functions
-   ------------------------------------ */
+   --------------------------------- */
 
-/* unsafe */
+/**
+ * Returns a pointer to the string-string entry at the specified index.
+ *
+ * @param self The pointer to the LinearMapStringString.
+ * @param index The index of the entry.
+ * @return A pointer to the LinearMapStringStringEntry.
+ */
 func _lmss_entry_by_index(self: LinearMapStringString*, index: int) -> LinearMapStringStringEntry* {
     let entry_ptr = vec_get(self.base.entries, index) as LinearMapStringStringEntry*;
     return entry_ptr;
 }
 
-/* unsafe */
+/**
+ * Finds the index of an entry by its string key.
+ *
+ * @param self The pointer to the LinearMapStringString.
+ * @param key The key string to find.
+ * @return The index of the entry, or -1 if not found.
+ */
 func _lmss_find_by_key(self: LinearMapStringString*, key: string) -> int {
     for (let i: int = 0; i < self.base.entries.length; i = i + 1) {
         let entry_ptr = _lmss_entry_by_index(self, i);
@@ -226,10 +354,16 @@ func _lmss_find_by_key(self: LinearMapStringString*, key: string) -> int {
     return -1;
 }
 
-/* ------------------------------------
+/* ---------------------------------
    LinearMapStringString public functions
-   ------------------------------------ */
+   --------------------------------- */
 
+/**
+ * Creates a new string-to-string linear map.
+ *
+ * @param initial_capacity The initial capacity of the map.
+ * @return A pointer to the newly created map.
+ */
 func lmss_create(initial_capacity: int) -> LinearMapStringString* {
     let entry_size = sizeof(LinearMapStringStringEntry);
     let base = new LinearMapBase(
@@ -240,6 +374,11 @@ func lmss_create(initial_capacity: int) -> LinearMapStringString* {
     return new LinearMapStringString(base);
 }
 
+/**
+ * Free a string-to-string linear map and release stored keys and values.
+ *
+ * @param self Map to free.
+ */
 func lmss_free(self: LinearMapStringString*) {
     // Release all strings before freeing the underlying storage
     for (let i: int = 0; i < self.base.entries.length; i = i + 1) {
@@ -251,10 +390,23 @@ func lmss_free(self: LinearMapStringString*) {
     drop self;
 }
 
+/**
+ * Returns the number of entries in the string-to-string map.
+ *
+ * @param self The pointer to the map.
+ * @return The entry count.
+ */
 func lmss_len(self: LinearMapStringString*) -> int {
     return self.base.entries.length;
 }
 
+/**
+ * Inserts or updates a key-value pair in the string-to-string map.
+ *
+ * @param self The pointer to the map.
+ * @param key The key string.
+ * @param value The value string.
+ */
 func lmss_set(self: LinearMapStringString*, key: string, value: string) {
     let index = _lmss_find_by_key(self, key);
 
@@ -273,6 +425,13 @@ func lmss_set(self: LinearMapStringString*, key: string, value: string) {
     entry_ptr.value = value;
 }
 
+/**
+ * Retrieves the value associated with the specified key string.
+ *
+ * @param self The pointer to the map.
+ * @param key The key string.
+ * @return The associated value string, or null if not found.
+ */
 func lmss_get(self: LinearMapStringString*, key: string) -> string? {
     let index = _lmss_find_by_key(self, key);
     if (index >= 0) {
@@ -282,10 +441,24 @@ func lmss_get(self: LinearMapStringString*, key: string) -> string? {
     return null;
 }
 
+/**
+ * Checks if the map contains the specified key string.
+ *
+ * @param self The pointer to the map.
+ * @param key The key string.
+ * @return True if present, false otherwise.
+ */
 func lmss_contains(self: LinearMapStringString*, key: string) -> bool {
     return _lmss_find_by_key(self, key) >= 0;
 }
 
+/**
+ * Removes the entry with the specified key string.
+ *
+ * @param self The pointer to the map.
+ * @param key The key string to remove.
+ * @return True if found and removed, false otherwise.
+ */
 func lmss_remove(self: LinearMapStringString*, key: string) -> bool {
     let index = _lmss_find_by_key(self, key);
 
@@ -310,43 +483,73 @@ func lmss_remove(self: LinearMapStringString*, key: string) -> bool {
     return true;
 }
 
-/* Get key at index (for iteration) */
+/**
+ * Returns the key string at the specified entry index.
+ *
+ * @param self The pointer to the map.
+ * @param index The entry index.
+ * @return The key string.
+ */
 func lmss_key_at(self: LinearMapStringString*, index: int) -> string {
     let entry_ptr = _lmss_entry_by_index(self, index);
     return entry_ptr.key;
 }
 
-/* Get value at index (for iteration) */
+/**
+ * Returns the value string at the specified entry index.
+ *
+ * @param self The pointer to the map.
+ * @param index The entry index.
+ * @return The value string.
+ */
 func lmss_value_at(self: LinearMapStringString*, index: int) -> string {
     let entry_ptr = _lmss_entry_by_index(self, index);
     return entry_ptr.value;
 }
 
-/* ------------------------------------
+/* ---------------------------------
    LinearMap int -> string specialization
-   ------------------------------------ */
+   --------------------------------- */
 
+/**
+ * Entry for an integer-to-string linear map.
+ */
 struct LinearMapIntStringEntry {
     /* Simple payload, no need for hash codes as int key and string value are straightforward to compare */
     key: int;
     value: string;
 }
 
+/**
+ * A linear map specialized for integer keys and string values.
+ */
 struct LinearMapIntString {
     base: LinearMapBase*;
 }
 
-/* ------------------------------------
+/* ---------------------------------
    LinearMapIntString internal functions
-   ------------------------------------ */
+   --------------------------------- */
 
-/* unsafe */
+/**
+ * Returns a pointer to the int-string entry at the specified index.
+ *
+ * @param self The pointer to the LinearMapIntString.
+ * @param index The index of the entry.
+ * @return A pointer to the LinearMapIntStringEntry.
+ */
 func _lmis_entry_by_index(self: LinearMapIntString*, index: int) -> LinearMapIntStringEntry* {
     let entry_ptr = vec_get(self.base.entries, index) as LinearMapIntStringEntry*;
     return entry_ptr;
 }
 
-/* unsafe */
+/**
+ * Finds the index of an entry by its integer key.
+ *
+ * @param self The pointer to the LinearMapIntString.
+ * @param key The integer key to find.
+ * @return The index of the entry, or -1 if not found.
+ */
 func _lmis_find_by_key(self: LinearMapIntString*, key: int) -> int {
     for (let i: int = 0; i < self.base.entries.length; i = i + 1) {
         let entry_ptr = _lmis_entry_by_index(self, i);
@@ -357,10 +560,16 @@ func _lmis_find_by_key(self: LinearMapIntString*, key: int) -> int {
     return -1;
 }
 
-/* ------------------------------------
+/* ---------------------------------
    LinearMapIntString public functions
-   ------------------------------------ */
+   --------------------------------- */
 
+/**
+ * Creates a new integer-to-string linear map.
+ *
+ * @param initial_capacity The initial capacity of the map.
+ * @return A pointer to the newly created map.
+ */
 func lmis_create(initial_capacity: int) -> LinearMapIntString* {
     let entry_size = sizeof(LinearMapIntStringEntry);
     let base = new LinearMapBase(
@@ -371,6 +580,11 @@ func lmis_create(initial_capacity: int) -> LinearMapIntString* {
     return new LinearMapIntString(base);
 }
 
+/**
+ * Free an integer-to-string linear map and release stored values.
+ *
+ * @param self Map to free.
+ */
 func lmis_free(self: LinearMapIntString*) {
     // Release all string values before freeing the underlying storage
     for (let i: int = 0; i < self.base.entries.length; i = i + 1) {
@@ -381,10 +595,23 @@ func lmis_free(self: LinearMapIntString*) {
     drop self;
 }
 
+/**
+ * Returns the number of entries in the integer-to-string map.
+ *
+ * @param self The pointer to the map.
+ * @return The entry count.
+ */
 func lmis_len(self: LinearMapIntString*) -> int {
     return self.base.entries.length;
 }
 
+/**
+ * Inserts or updates a key-value pair in the integer-to-string map.
+ *
+ * @param self The pointer to the map.
+ * @param key The integer key.
+ * @param value The value string.
+ */
 func lmis_set(self: LinearMapIntString*, key: int, value: string) {
     let index = _lmis_find_by_key(self, key);
 
@@ -403,6 +630,13 @@ func lmis_set(self: LinearMapIntString*, key: int, value: string) {
     entry_ptr.value = value;
 }
 
+/**
+ * Retrieves the value associated with the specified integer key.
+ *
+ * @param self The pointer to the map.
+ * @param key The integer key.
+ * @return The associated value string, or null if not found.
+ */
 func lmis_get(self: LinearMapIntString*, key: int) -> string? {
     let index = _lmis_find_by_key(self, key);
     if (index >= 0) {
@@ -412,10 +646,24 @@ func lmis_get(self: LinearMapIntString*, key: int) -> string? {
     return null;
 }
 
+/**
+ * Checks if the map contains the specified integer key.
+ *
+ * @param self The pointer to the map.
+ * @param key The integer key.
+ * @return True if present, false otherwise.
+ */
 func lmis_contains(self: LinearMapIntString*, key: int) -> bool {
     return _lmis_find_by_key(self, key) >= 0;
 }
 
+/**
+ * Removes the entry with the specified integer key.
+ *
+ * @param self The pointer to the map.
+ * @param key The integer key to remove.
+ * @return True if found and removed, false otherwise.
+ */
 func lmis_remove(self: LinearMapIntString*, key: int) -> bool {
     let index = _lmis_find_by_key(self, key);
 
@@ -439,13 +687,25 @@ func lmis_remove(self: LinearMapIntString*, key: int) -> bool {
     return true;
 }
 
-/* Get key at index (for iteration) */
+/**
+ * Returns the integer key at the specified entry index.
+ *
+ * @param self The pointer to the map.
+ * @param index The entry index.
+ * @return The integer key.
+ */
 func lmis_key_at(self: LinearMapIntString*, index: int) -> int {
     let entry_ptr = _lmis_entry_by_index(self, index);
     return entry_ptr.key;
 }
 
-/* Get value at index (for iteration) */
+/**
+ * Returns the value string at the specified entry index.
+ *
+ * @param self The pointer to the map.
+ * @param index The entry index.
+ * @return The value string.
+ */
 func lmis_value_at(self: LinearMapIntString*, index: int) -> string {
     let entry_ptr = _lmis_entry_by_index(self, index);
     return entry_ptr.value;

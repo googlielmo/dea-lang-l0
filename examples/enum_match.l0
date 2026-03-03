@@ -7,8 +7,17 @@ module enum_match;
 
 import std.io;
 
+/**
+ * Represents a color with an intensity value.
+ */
 enum Color { Red(v: int); Green(v: int); Blue(v: int); }
 
+/**
+ * Returns an integer value based on the provided Color variant.
+ *
+ * @param c The color to evaluate.
+ * @return 1 for Red, 2 for Green, 3 for Blue.
+ */
 func f(c: Color) -> int {
     match (c) {
         Red(r) => { return 1; }
@@ -17,6 +26,9 @@ func f(c: Color) -> int {
     }
 }
 
+/**
+ * Main entry point for the enum_match example.
+ */
 func main() -> void {
     let c1: Color = Red(0);
     let c2: Color = Green(0);

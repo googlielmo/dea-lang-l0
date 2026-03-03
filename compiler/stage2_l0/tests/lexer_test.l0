@@ -11,6 +11,12 @@ import std.string;
 import tokens;
 import lexer;
 
+/**
+ * Helper function to print a labeled boolean value.
+ *
+ * @param label The label to print.
+ * @param val The value to process.
+ */
 func print_bool(label: string, val: bool) {
     if (val) {
         printl_ss(label, "true");
@@ -19,6 +25,9 @@ func print_bool(label: string, val: bool) {
     }
 }
 
+/**
+ * Tests test_token_vector.
+ */
 func test_token_vector() {
     printl_s("=== TokenVector Test ===");
 
@@ -54,6 +63,9 @@ func test_token_vector() {
     printl_s("\nDone!");
 }
 
+/**
+ * Main entry point for the module.
+ */
 func main() {
     test_token_vector();
 }

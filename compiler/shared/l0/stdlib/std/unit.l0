@@ -17,15 +17,25 @@
  */
 module std.unit;
 
-// Definition of the Unit type, representing a value with no information.
+/**
+ * Definition of the Unit type, representing a value with no information.
+ */
 struct Unit {}
 
-// Returns a Unit value.
+/**
+ * Returns a Unit value.
+ *
+ * @return A Unit instance.
+ */
 func unit() -> Unit {
     return Unit();
 }
 
-// Returns a non-null optional Unit value.
+/**
+ * Returns a non-null optional Unit value.
+ *
+ * @return A present Unit optional.
+ */
 func present() -> Unit? {
     return Unit() as Unit?;
 }

@@ -11,6 +11,12 @@ import std.io;
 import std.linear_map;
 import std.vector;
 
+/**
+ * Helper function to print a labeled boolean value.
+ *
+ * @param label The label to print.
+ * @param val The value to process.
+ */
 func print_bool(label: string, val: bool) {
     if (val) {
         printl_ss(label, "true");
@@ -19,6 +25,9 @@ func print_bool(label: string, val: bool) {
     }
 }
 
+/**
+ * Tests test_linear_map_base_ints.
+ */
 func test_linear_map_base_ints() {
     printl_s("=== LinearMapBase (int -> int) Test ===");
 
@@ -102,6 +111,9 @@ func test_linear_map_base_ints() {
     printl_s("LinearMapBase int test passed!\n");
 }
 
+/**
+ * Tests test_linear_map_base_hash_guard.
+ */
 func test_linear_map_base_hash_guard() {
     printl_s("=== LinearMapBase hash/memcmp guard Test ===");
 
@@ -133,6 +145,9 @@ func test_linear_map_base_hash_guard() {
     printl_s("Hash guard test passed!\n");
 }
 
+/**
+ * Main entry point for the module.
+ */
 func main() {
     printl_s("======================================");
     printl_s("     LinearMapBase Test Suite");

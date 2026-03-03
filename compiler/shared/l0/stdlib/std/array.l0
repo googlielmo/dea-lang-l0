@@ -12,11 +12,11 @@ import std.assert;
 import std.string;
 
 
-/* ------------------------------------
-   Array: Fixed-size Array Implementation
-   ------------------------------------ */
+/* ---------------------------------
+   Fixed-size Array Implementation
+   --------------------------------- */
 
-/*
+/**
  * ArrayBase implements an array of elements of a given size.
  * Elements can be accessed via index, and the array can be resized on demand.
  * See VectorBase for a dynamic array implementation.
@@ -30,6 +30,13 @@ struct ArrayBase {
     data: void*;
 }
 
+/**
+ * Creates a new ArrayBase with the specified element size and length.
+ *
+ * @param element_size The size of each element in bytes.
+ * @param length The number of elements in the array.
+ * @return A pointer to the newly created ArrayBase.
+ */
 func arr_create(element_size: int, length: int) -> ArrayBase* {
     assert(element_size > 0, "Element size must be greater than 0 for array creation");
     assert(length >= 0, "Initial length must be non-negative for array creation");
@@ -50,10 +57,22 @@ func arr_create(element_size: int, length: int) -> ArrayBase* {
     return self;
 }
 
+/**
+ * Checks if the given index is within the bounds of the array.
+ *
+ * @param self The pointer to the ArrayBase.
+ * @param index The index to check.
+ */
 func arr_check(self: ArrayBase*, index: int) {
     assert(index >= 0 && index < self.capacity, "Index out of bounds in array access");
 }
 
+/**
+ * Resizes the array to a new length.
+ *
+ * @param self The pointer to the ArrayBase.
+ * @param new_length The new length of the array.
+ */
 func arr_resize(self: ArrayBase*, new_length: int) {
     assert(new_length >= 0, "New length must be non-negative for array resize");
     let old_capacity = self.capacity;
@@ -72,16 +91,34 @@ func arr_resize(self: ArrayBase*, new_length: int) {
     self.data = new_data;
 }
 
+/**
+ * Returns a pointer to the element at the specified index.
+ *
+ * @param self The pointer to the ArrayBase.
+ * @param index The index of the element.
+ * @return A pointer to the element.
+ */
 func arr_get(self: ArrayBase*, index: int) -> void* {
     arr_check(self, index);
     return rt_array_element(self.data, self.element_size, index);
 }
 
+/**
+ * Zeros out the element at the specified index.
+ *
+ * @param self The pointer to the ArrayBase.
+ * @param index The index of the element to zap.
+ */
 func arr_zap(self: ArrayBase*, index: int) {
     let dest_ptr = arr_get(self, index);
     rt_memset(dest_ptr, 0, self.element_size);
 }
 
+/**
+ * Free an `ArrayBase` and its element storage.
+ *
+ * @param self Array to free.
+ */
 func arr_free(self: ArrayBase*) {
     rt_free(self.data);
     drop self;

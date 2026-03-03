@@ -14,10 +14,16 @@ import tokens;
 import ast;
 import parser.shared;
 
-/* ------------------------------------
+/* ---------------------------------
    Expression parsing
-   ------------------------------------ */
+   --------------------------------- */
 
+/**
+ * Check whether the current token is a builtin type name.
+ *
+ * @param self Parser state to inspect.
+ * @return `true` if the current token names a builtin type.
+ */
 func ps_is_builtin_type_name(self: ParserState*) -> bool {
     if (!ps_check_ident(self)) {
         return false;
@@ -26,6 +32,12 @@ func ps_is_builtin_type_name(self: ParserState*) -> bool {
     return eq_s(t, "int") || eq_s(t, "byte") || eq_s(t, "bool") || eq_s(t, "string") || eq_s(t, "void");
 }
 
+/**
+ * Check whether the current token sequence can only start a type.
+ *
+ * @param self Parser state to inspect.
+ * @return `true` if the lookahead unambiguously starts a type reference.
+ */
 func ps_is_unambiguous_type_start(self: ParserState*) -> bool {
     if (ps_is_builtin_type_name(self)) {
         return true;
@@ -50,6 +62,12 @@ func ps_is_unambiguous_type_start(self: ParserState*) -> bool {
     return has_suffix && at_boundary;
 }
 
+/**
+ * Parse one call argument.
+ *
+ * @param self Parser state to advance.
+ * @return Parsed argument expression, or `null` on error.
+ */
 func ps_parse_call_argument(self: ParserState*) -> ExprId? {
     let start = ps_span_start(self);
     if (ps_is_unambiguous_type_start(self)) {
@@ -61,10 +79,22 @@ func ps_parse_call_argument(self: ParserState*) -> ExprId? {
     return ps_parse_expr(self);
 }
 
+/**
+ * Parse an expression.
+ *
+ * @param self Parser state to advance.
+ * @return Parsed expression, or `null` on error.
+ */
 func ps_parse_expr(self: ParserState*) -> ExprId? {
     return ps_parse_or_expr(self);
 }
 
+/**
+ * Parse a logical-or expression.
+ *
+ * @param self Parser state to advance.
+ * @return Parsed logical-or expression, or `null` on error.
+ */
 func ps_parse_or_expr(self: ParserState*) -> ExprId? {
     let start = ps_span_start(self);
     let expr = ps_parse_and_expr(self)?;
@@ -85,6 +115,12 @@ func ps_parse_or_expr(self: ParserState*) -> ExprId? {
     return current;
 }
 
+/**
+ * Parse a logical-and expression.
+ *
+ * @param self Parser state to advance.
+ * @return Parsed logical-and expression, or `null` on error.
+ */
 func ps_parse_and_expr(self: ParserState*) -> ExprId? {
     let start = ps_span_start(self);
     let expr = ps_parse_equality_expr(self)?;
@@ -105,6 +141,12 @@ func ps_parse_and_expr(self: ParserState*) -> ExprId? {
     return current;
 }
 
+/**
+ * Parse an equality expression.
+ *
+ * @param self Parser state to advance.
+ * @return Parsed equality expression, or `null` on error.
+ */
 func ps_parse_equality_expr(self: ParserState*) -> ExprId? {
     let start = ps_span_start(self);
     let expr = ps_parse_rel_expr(self)?;
@@ -123,6 +165,12 @@ func ps_parse_equality_expr(self: ParserState*) -> ExprId? {
     return current;
 }
 
+/**
+ * Parse a relational expression.
+ *
+ * @param self Parser state to advance.
+ * @return Parsed relational expression, or `null` on error.
+ */
 func ps_parse_rel_expr(self: ParserState*) -> ExprId? {
     let start = ps_span_start(self);
     let expr = ps_parse_add_expr(self)?;
@@ -141,6 +189,12 @@ func ps_parse_rel_expr(self: ParserState*) -> ExprId? {
     return current;
 }
 
+/**
+ * Parse additive expressions.
+ *
+ * @param self Parser state to advance.
+ * @return The parsed additive expression, or `null` on error.
+ */
 func ps_parse_add_expr(self: ParserState*) -> ExprId? {
     let start = ps_span_start(self);
     let expr = ps_parse_mul_expr(self)?;
@@ -159,6 +213,12 @@ func ps_parse_add_expr(self: ParserState*) -> ExprId? {
     return current;
 }
 
+/**
+ * Parse a multiplicative expression.
+ *
+ * @param self Parser state to advance.
+ * @return Parsed multiplicative expression, or `null` on error.
+ */
 func ps_parse_mul_expr(self: ParserState*) -> ExprId? {
     let start = ps_span_start(self);
     let expr = ps_parse_unary_expr(self)?;
@@ -177,6 +237,12 @@ func ps_parse_mul_expr(self: ParserState*) -> ExprId? {
     return current;
 }
 
+/**
+ * Parse a unary expression.
+ *
+ * @param self Parser state to advance.
+ * @return Parsed unary expression, or `null` on error.
+ */
 func ps_parse_unary_expr(self: ParserState*) -> ExprId? {
     let start = ps_span_start(self);
 
@@ -217,6 +283,12 @@ func ps_parse_unary_expr(self: ParserState*) -> ExprId? {
     return ps_parse_cast_expr(self);
 }
 
+/**
+ * Parse a cast expression.
+ *
+ * @param self Parser state to advance.
+ * @return Parsed cast expression, or `null` on error.
+ */
 func ps_parse_cast_expr(self: ParserState*) -> ExprId? {
     let start = ps_span_start(self);
     let expr = ps_parse_postfix_expr(self)?;
@@ -230,6 +302,12 @@ func ps_parse_cast_expr(self: ParserState*) -> ExprId? {
     return expr;
 }
 
+/**
+ * Parse a postfix expression.
+ *
+ * @param self Parser state to advance.
+ * @return Parsed postfix expression, or `null` on error.
+ */
 func ps_parse_postfix_expr(self: ParserState*) -> ExprId? {
     let start = ps_span_start(self);
     let primary = ps_parse_primary_expr(self)?;
@@ -292,6 +370,12 @@ func ps_parse_postfix_expr(self: ParserState*) -> ExprId? {
     return current;
 }
 
+/**
+ * Parse a primary expression.
+ *
+ * @param self Parser state to advance.
+ * @return Parsed primary expression, or `null` on error.
+ */
 func ps_parse_primary_expr(self: ParserState*) -> ExprId? {
     let start = ps_span_start(self);
     let tok = ps_peek(self);

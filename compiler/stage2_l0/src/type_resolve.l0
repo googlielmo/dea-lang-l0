@@ -17,10 +17,23 @@ import name_resolver;
 import symbols;
 import types;
 
+/**
+ * Build a fully qualified type-resolution key.
+ *
+ * @param module_name Defining module name.
+ * @param name Symbol name within the module.
+ * @return Key in `module::name` form.
+ */
 func tr_key(module_name: string, name: string) -> string {
     return concat3_s(module_name, "::", name);
 }
 
+/**
+ * Join a parsed module path into dotted form.
+ *
+ * @param path Vector of module-path components.
+ * @return Dotted module name.
+ */
 func tr_module_from_path(path: VectorString*) -> string {
     with (let sb = sb_create() => sb_free(sb)) {
         for (let i = 0; i < vs_size(path); i = i + 1) {
@@ -33,6 +46,15 @@ func tr_module_from_path(path: VectorString*) -> string {
     }
 }
 
+/**
+ * Emit a type-resolution diagnostic for a source span.
+ *
+ * @param diags Diagnostic collector.
+ * @param code Diagnostic code.
+ * @param message Diagnostic message.
+ * @param filename Source filename.
+ * @param span Source span to highlight.
+ */
 func tr_diag_error(diags: DiagCollector*, code: string, message: string, filename: string, span: Span) {
     diag_error(diags, "TypeResolver", code, message, filename, span.start_line, span.start_column, span.end_line,
         span.end_column);
@@ -125,6 +147,15 @@ func tr_resolve_alias(tables: SignatureTables*, nr: NameResolution*, env: Module
     return resolved;
 }
 
+/**
+ * Apply pointer and nullable suffixes from a parsed type reference.
+ *
+ * @param base Resolved base type.
+ * @param tref Parsed type reference supplying suffixes.
+ * @param diags Diagnostic collector.
+ * @param filename Source filename for diagnostics.
+ * @return Suffixed type, or `null` if suffix validation fails.
+ */
 func tr_apply_suffix(base: Type*, tref: TypeRef*, diags: DiagCollector*, filename: string) -> Type*? {
     let current = base;
     for (let i = 0; i < tref.pointer_depth; i = i + 1) {

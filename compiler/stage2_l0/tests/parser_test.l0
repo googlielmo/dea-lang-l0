@@ -12,6 +12,12 @@ import std.assert;
 import parser;
 import std.text;
 
+/**
+ * Parses source and asserts that the first diagnostic matches `expected`.
+ *
+ * @param source The module source to parse.
+ * @param expected The expected diagnostic code.
+ */
 func expect_error_code(source: string, expected: string) {
     let result = parse_module_source(source, "<test>");
     if (!parse_has_errors(result)) {
@@ -30,6 +36,11 @@ func expect_error_code(source: string, expected: string) {
     parse_result_free(result);
 }
 
+/**
+ * Parses source and asserts that it succeeds without diagnostics.
+ *
+ * @param source The module source to parse.
+ */
 func expect_ok(source: string) {
     let result = parse_module_source(source, "<test>");
     if (parse_has_errors(result)) {
@@ -45,6 +56,12 @@ func expect_ok(source: string) {
     parse_result_free(result);
 }
 
+/**
+ * Parses source and asserts that at least `expected_min` diagnostics are reported.
+ *
+ * @param source The module source to parse.
+ * @param expected_min The minimum number of diagnostics expected.
+ */
 func expect_min_error_count(source: string, expected_min: int) {
     let result = parse_module_source(source, "<test>");
     if (!parse_has_errors(result)) {
@@ -58,95 +75,152 @@ func expect_min_error_count(source: string, expected_min: int) {
     parse_result_free(result);
 }
 
+/**
+ * Tests test_valid_module.
+ */
 func test_valid_module() {
     let src = "module main; import std.io; func add(a: int, b: int) -> int { return 0; }";
     expect_ok(src);
 }
 
+/**
+ * Tests test_module_decl_error.
+ */
 func test_module_decl_error() {
     expect_error_code("module ;", "PAR-0311");
 }
 
+/**
+ * Tests test_reserved_variable_name_error.
+ */
 func test_reserved_variable_name_error() {
     let src = "module main; func main() -> int { let uint: int = 0; return uint; }";
     expect_error_code(src, "PAR-0010");
 }
 
+/**
+ * Tests test_reserved_operator_error.
+ */
 func test_reserved_operator_error() {
     let src = "module main; func main() -> int { let x: int = ~1; return x; }";
     expect_error_code(src, "PAR-0226");
 }
 
+/**
+ * Tests test_with_mixed_forms_error.
+ */
 func test_with_mixed_forms_error() {
     let src = "module main; func main() -> int { with (let x: int = 1 => drop x, let y: int = 2) { return 0; } }";
     expect_error_code(src, "PAR-0503");
 }
 
+/**
+ * Tests test_case_empty_error.
+ */
 func test_case_empty_error() {
     let src = "module main; func main() -> int { case (1) { } return 0; }";
     expect_error_code(src, "PAR-0240");
 }
 
+/**
+ * Tests test_expr_precedence_postfix_and_qualified_type_ok.
+ */
 func test_expr_precedence_postfix_and_qualified_type_ok() {
     let src = "module main; extern func sink(x: int) -> int; func helper(v: int*) -> int { return v[0]; } func main() -> int { let p: int* = new int(1); let n: int = sink((1 + 2 * 3) as int); let x: int = helper(p); let y: int = new color::Color::Red*(p).field?; return n + x + y; }";
     expect_ok(src);
 }
 
+/**
+ * Tests test_postfix_chain_ok.
+ */
 func test_postfix_chain_ok() {
     let src = "module main; func main() -> int { let v: int = a.b(1, 2)[0]?; return v; }";
     expect_ok(src);
 }
 
+/**
+ * Tests test_type_expr_call_arg_ok.
+ */
 func test_type_expr_call_arg_ok() {
     let src = "module main; extern func sizeof(x: int) -> int; func main() -> int { return sizeof(int*); }";
     expect_ok(src);
 }
 
+/**
+ * Tests test_reserved_binary_and_error.
+ */
 func test_reserved_binary_and_error() {
     let src = "module main; func main() -> int { let x: int = 1 & 2; return x; }";
     expect_error_code(src, "PAR-0226");
 }
 
+/**
+ * Tests test_reserved_binary_shift_error.
+ */
 func test_reserved_binary_shift_error() {
     let src = "module main; func main() -> int { let x: int = 1 << 2; return x; }";
     expect_error_code(src, "PAR-0226");
 }
 
+/**
+ * Tests test_qualified_type_name_ok.
+ */
 func test_qualified_type_name_ok() {
     let src = "module main; func f(x: color::Color::Red*) -> color::Color::Red? { return null; }";
     expect_ok(src);
 }
 
+/**
+ * Tests test_top_level_let_expr_error.
+ */
 func test_top_level_let_expr_error() {
     let src = "module main; let x: int = ~1;";
     expect_error_code(src, "PAR-0226");
 }
 
+/**
+ * Tests test_type_alias_missing_semi_error.
+ */
 func test_type_alias_missing_semi_error() {
     let src = "module main; type Foo = int func main() -> int { return 0; }";
     expect_error_code(src, "PAR-0073");
 }
 
+/**
+ * Tests test_struct_field_error.
+ */
 func test_struct_field_error() {
     let src = "module main; struct Foo { x: 123; }";
     expect_error_code(src, "PAR-0400");
 }
 
+/**
+ * Tests test_enum_variant_field_error.
+ */
 func test_enum_variant_field_error() {
     let src = "module main; enum Foo { Bar(x: 123); }";
     expect_error_code(src, "PAR-0400");
 }
 
+/**
+ * Tests test_new_expr_bad_arg_error.
+ */
 func test_new_expr_bad_arg_error() {
     let src = "module main; func main() -> int { let x: Foo* = new Foo(~1); return 0; }";
     expect_error_code(src, "PAR-0226");
 }
 
+/**
+ * Tests test_top_level_multi_error_collection.
+ */
 func test_top_level_multi_error_collection() {
     let src = "module main; struct Broken { x: 123; } type T = int func good() -> int { return 0; }";
     expect_min_error_count(src, 2);
 }
 
+/**
+ * Main entry point for the module.
+ */
 func main() {
     test_valid_module();
     test_module_decl_error();

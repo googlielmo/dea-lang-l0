@@ -10,6 +10,9 @@ import util.strings;
 import ast;
 import types;
 
+/**
+ * Defines the SymbolKind enumeration.
+ */
 enum SymbolKind {
     SYM_FUNC;
     SYM_STRUCT;
@@ -19,6 +22,9 @@ enum SymbolKind {
     SYM_LET;
 }
 
+/**
+ * Represents the Symbol structure.
+ */
 struct Symbol {
     name: string;
     kind: SymbolKind;
@@ -34,6 +40,12 @@ func symbol_create(name: string, kind: SymbolKind, module_name: string, owner_na
     return new Symbol(us_clone_s(name), kind, us_clone_s(module_name), us_clone_s(owner_name), decl_ptr, span, null);
 }
 
+/**
+ * Replace a symbol's resolved type with a cloned copy.
+ *
+ * @param self Symbol to update.
+ * @param resolved_type Resolved type to clone into the symbol.
+ */
 func symbol_set_type_clone(self: Symbol*, resolved_type: Type*) {
     if (self.resolved_type != null) {
         type_free(self.resolved_type as Type*);
@@ -41,6 +53,12 @@ func symbol_set_type_clone(self: Symbol*, resolved_type: Type*) {
     self.resolved_type = type_clone(resolved_type);
 }
 
+/**
+ * Return the printable name for a symbol kind.
+ *
+ * @param kind Symbol kind to format.
+ * @return Uppercase display name for `kind`.
+ */
 func symbol_kind_name(kind: SymbolKind) -> string {
     match (kind) {
         SYM_FUNC => { return "FUNC"; }
@@ -52,6 +70,11 @@ func symbol_kind_name(kind: SymbolKind) -> string {
     }
 }
 
+/**
+ * Free a symbol and any owned resolved type.
+ *
+ * @param self Symbol to free.
+ */
 func symbol_free(self: Symbol*) {
     if (self.resolved_type != null) {
         type_free(self.resolved_type as Type*);

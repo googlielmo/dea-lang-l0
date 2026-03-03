@@ -15,6 +15,13 @@ import std.hashmap;
 import std.hashset;
 import std.vector;
 
+/**
+ * Creates a key string with a prefix and an integer index.
+ *
+ * @param prefix The key prefix to prepend.
+ * @param i The numeric suffix to append.
+ * @return The concatenated key string.
+ */
 func make_key(prefix: string, i: int) -> string {
     with (let sb = sb_create() => sb_free(sb)) {
         sb_append(sb, prefix);
@@ -23,10 +30,13 @@ func make_key(prefix: string, i: int) -> string {
     }
 }
 
-/* ========================================
+/* =================================
    StringPtrMap tests
-   ======================================== */
+   ================================= */
 
+/**
+ * Tests test_spm_basic.
+ */
 func test_spm_basic() {
     printl_s("=== Test spm_basic ===");
 
@@ -70,6 +80,9 @@ func test_spm_basic() {
     printl_s("spm_basic passed!\n");
 }
 
+/**
+ * Tests test_spm_update.
+ */
 func test_spm_update() {
     printl_s("=== Test spm_update ===");
 
@@ -97,6 +110,9 @@ func test_spm_update() {
     printl_s("spm_update passed!\n");
 }
 
+/**
+ * Tests test_spm_remove.
+ */
 func test_spm_remove() {
     printl_s("=== Test spm_remove ===");
 
@@ -127,6 +143,9 @@ func test_spm_remove() {
     printl_s("spm_remove passed!\n");
 }
 
+/**
+ * Tests test_spm_reinsert_after_remove.
+ */
 func test_spm_reinsert_after_remove() {
     printl_s("=== Test spm_reinsert_after_remove ===");
 
@@ -154,6 +173,9 @@ func test_spm_reinsert_after_remove() {
     printl_s("spm_reinsert_after_remove passed!\n");
 }
 
+/**
+ * Tests test_spm_grow.
+ */
 func test_spm_grow() {
     printl_s("=== Test spm_grow (rehash) ===");
 
@@ -196,6 +218,9 @@ func test_spm_grow() {
     printl_s("spm_grow passed!\n");
 }
 
+/**
+ * Tests test_spm_keys.
+ */
 func test_spm_keys() {
     printl_s("=== Test spm_keys ===");
 
@@ -225,6 +250,9 @@ func test_spm_keys() {
     printl_s("spm_keys passed!\n");
 }
 
+/**
+ * Tests test_spm_clear.
+ */
 func test_spm_clear() {
     printl_s("=== Test spm_clear ===");
 
@@ -251,10 +279,13 @@ func test_spm_clear() {
     printl_s("spm_clear passed!\n");
 }
 
-/* ========================================
+/* =================================
    StringIntMap tests
-   ======================================== */
+   ================================= */
 
+/**
+ * Tests test_sim_basic.
+ */
 func test_sim_basic() -> Unit? {
     printl_s("=== Test sim_basic ===");
 
@@ -285,6 +316,9 @@ func test_sim_basic() -> Unit? {
     return present();
 }
 
+/**
+ * Tests test_sim_update_and_remove.
+ */
 func test_sim_update_and_remove() -> Unit? {
     printl_s("=== Test sim_update_and_remove ===");
 
@@ -310,6 +344,9 @@ func test_sim_update_and_remove() -> Unit? {
     return present();
 }
 
+/**
+ * Tests test_sim_grow.
+ */
 func test_sim_grow() -> Unit? {
     printl_s("=== Test sim_grow (rehash) ===");
 
@@ -335,10 +372,13 @@ func test_sim_grow() -> Unit? {
     return present();
 }
 
-/* ========================================
+/* =================================
    StringSet tests
-   ======================================== */
+   ================================= */
 
+/**
+ * Tests test_ss_basic.
+ */
 func test_ss_basic() {
     printl_s("=== Test ss_basic ===");
 
@@ -364,6 +404,9 @@ func test_ss_basic() {
     printl_s("ss_basic passed!\n");
 }
 
+/**
+ * Tests test_ss_remove.
+ */
 func test_ss_remove() {
     printl_s("=== Test ss_remove ===");
 
@@ -389,6 +432,9 @@ func test_ss_remove() {
     printl_s("ss_remove passed!\n");
 }
 
+/**
+ * Tests test_ss_grow.
+ */
 func test_ss_grow() {
     printl_s("=== Test ss_grow (rehash) ===");
 
@@ -412,6 +458,9 @@ func test_ss_grow() {
     printl_s("ss_grow passed!\n");
 }
 
+/**
+ * Tests test_ss_to_vector.
+ */
 func test_ss_to_vector() {
     printl_s("=== Test ss_to_vector ===");
 
@@ -430,10 +479,13 @@ func test_ss_to_vector() {
     printl_s("ss_to_vector passed!\n");
 }
 
-/* ========================================
+/* =================================
    Stress test: heavy insert/remove/lookup
-   ======================================== */
+   ================================= */
 
+/**
+ * Tests test_stress.
+ */
 func test_stress() -> Unit? {
     printl_s("=== Test stress ===");
 
@@ -494,10 +546,13 @@ func test_stress() -> Unit? {
     return present();
 }
 
-/* ========================================
+/* =================================
    Entry point
-   ======================================== */
+   ================================= */
 
+/**
+ * Main entry point for the module.
+ */
 func main() {
     printl_s("======================================");
     printl_s("    HashMap / HashSet Test Suite");

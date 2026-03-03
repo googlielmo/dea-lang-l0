@@ -16,45 +16,102 @@ import util.diag;
 import util.path;
 import util.strings;
 
+/**
+ * Represents the SourceSearchPaths structure.
+ */
 struct SourceSearchPaths {
     system_roots: VectorString*;
     project_roots: VectorString*;
 }
 
+/**
+ * Create an empty source search-path collection.
+ *
+ * @return New search-path set with separate system and project root vectors.
+ */
 func sp_create() -> SourceSearchPaths* {
     return new SourceSearchPaths(vs_create(2), vs_create(2));
 }
 
+/**
+ * Free a source search-path collection.
+ *
+ * @param self Search paths to free.
+ */
 func sp_free(self: SourceSearchPaths*) {
     vs_free(self.system_roots);
     vs_free(self.project_roots);
     drop self;
 }
 
+/**
+ * Append a system root directory.
+ *
+ * @param self Search paths to update.
+ * @param root Root directory to search before project roots.
+ */
 func sp_add_system_root(self: SourceSearchPaths*, root: string) {
     vs_push(self.system_roots, root);
 }
 
+/**
+ * Append a project root directory.
+ *
+ * @param self Search paths to update.
+ * @param root Project root directory to search.
+ */
 func sp_add_project_root(self: SourceSearchPaths*, root: string) {
     vs_push(self.project_roots, root);
 }
 
+/**
+ * Return the number of configured system roots.
+ *
+ * @param self Search paths to inspect.
+ * @return Number of system root directories.
+ */
 func sp_system_root_count(self: SourceSearchPaths*) -> int {
     return vs_size(self.system_roots);
 }
 
+/**
+ * Return the number of configured project roots.
+ *
+ * @param self Search paths to inspect.
+ * @return Number of project root directories.
+ */
 func sp_project_root_count(self: SourceSearchPaths*) -> int {
     return vs_size(self.project_roots);
 }
 
+/**
+ * Return a system root by index.
+ *
+ * @param self Search paths to inspect.
+ * @param index Zero-based system-root index.
+ * @return System root at `index`.
+ */
 func sp_system_root_get(self: SourceSearchPaths*, index: int) -> string {
     return vs_get(self.system_roots, index);
 }
 
+/**
+ * Return a project root by index.
+ *
+ * @param self Search paths to inspect.
+ * @param index Zero-based project-root index.
+ * @return Project root at `index`.
+ */
 func sp_project_root_get(self: SourceSearchPaths*, index: int) -> string {
     return vs_get(self.project_roots, index);
 }
 
+/**
+ * Convert a dotted module name to its relative `.l0` path.
+ *
+ * @param module_name Dotted module name such as `foo.bar`.
+ * @return Relative source path such as `foo/bar.l0`.
+ */
 func sp_module_relpath(module_name: string) -> string {
     with (let cb = cb_create() => cb_free(cb)) {
         for (let i = 0; i < len_s(module_name); i = i + 1) {
@@ -70,6 +127,13 @@ func sp_module_relpath(module_name: string) -> string {
     }
 }
 
+/**
+ * Resolve a module name against configured search roots.
+ *
+ * @param self Search paths to inspect.
+ * @param module_name Dotted module name to resolve.
+ * @return First matching source path, or `null` if the module is not found.
+ */
 func sp_resolve(self: SourceSearchPaths*, module_name: string) -> string? {
     let rel = sp_module_relpath(module_name);
 
@@ -90,6 +154,12 @@ func sp_resolve(self: SourceSearchPaths*, module_name: string) -> string? {
     return null;
 }
 
+/**
+ * Check whether a module-name component is a valid identifier.
+ *
+ * @param component Module-name component to validate.
+ * @return `true` if the component matches identifier rules.
+ */
 func sp_is_valid_ident_component(component: string) -> bool {
     let n = len_s(component);
     if (n == 0) {
@@ -111,6 +181,12 @@ func sp_is_valid_ident_component(component: string) -> bool {
     return true;
 }
 
+/**
+ * Check whether a dotted module name is valid.
+ *
+ * @param module_name Module name to validate.
+ * @return `true` if every component is a valid identifier.
+ */
 func sp_is_valid_module_name(module_name: string) -> bool {
     if (is_empty_s(module_name)) {
         return false;
@@ -127,12 +203,22 @@ func sp_is_valid_module_name(module_name: string) -> bool {
     return true;
 }
 
+/**
+ * Ensure a default project root exists.
+ *
+ * @param project_roots Project-root vector to update.
+ */
 func sp_apply_default_project_roots(project_roots: VectorString*) {
     if (vs_size(project_roots) == 0) {
         vs_push(project_roots, ".");
     }
 }
 
+/**
+ * Populate default system roots from `L0_SYSTEM` when needed.
+ *
+ * @param sys_roots System-root vector to update.
+ */
 func sp_apply_default_sys_roots(sys_roots: VectorString*) {
     if (vs_size(sys_roots) > 0) {
         return;
@@ -152,6 +238,13 @@ func sp_apply_default_sys_roots(sys_roots: VectorString*) {
     }
 }
 
+/**
+ * Build a search-path collection from explicit root vectors.
+ *
+ * @param project_roots Project roots to copy.
+ * @param sys_roots System roots to copy.
+ * @return New search-path collection containing both root sets.
+ */
 func sp_build_from_roots(project_roots: VectorString*, sys_roots: VectorString*) -> SourceSearchPaths* {
     let sp = sp_create();
 
@@ -166,6 +259,14 @@ func sp_build_from_roots(project_roots: VectorString*, sys_roots: VectorString*)
     return sp;
 }
 
+/**
+ * Normalize a CLI entry target to a module name.
+ *
+ * @param target CLI target, either a module name or a path-like input.
+ * @param project_roots Project-root vector to extend when `target` includes a parent path.
+ * @param diags Diagnostic collector for validation errors.
+ * @return Normalized module name, or `null` if validation fails.
+ */
 func sp_normalize_entry_target(target: string, project_roots: VectorString*, diags: DiagCollector*) -> string? {
     if (up_is_l0_file(target) || up_is_absolute(target) || up_has_parent(target)) {
         let module_name = "";

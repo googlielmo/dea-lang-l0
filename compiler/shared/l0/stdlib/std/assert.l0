@@ -10,8 +10,13 @@ module std.assert;
 
 import sys.rt;
 
-// Asserts that the given condition is true.
-// If the condition is false, aborts the program with the provided message.
+/**
+ * Asserts that the given condition is true.
+ * If the condition is false, aborts the program with the provided message.
+ *
+ * @param cond The condition to evaluate.
+ * @param msg The message to display if the assertion fails.
+ */
 func assert(cond: bool, msg: string) {
     if (!cond) rt_abort(msg);
 }

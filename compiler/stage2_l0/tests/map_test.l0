@@ -10,6 +10,12 @@ import std.string;
 import std.linear_map;
 import std.text;
 
+/**
+ * Helper function to print a labeled boolean value.
+ *
+ * @param label The label to print.
+ * @param val The value to process.
+ */
 func print_bool(label: string, val: bool) {
     if (val) {
         printl_ss(label, "true");
@@ -18,6 +24,9 @@ func print_bool(label: string, val: bool) {
     }
 }
 
+/**
+ * Tests test_lmss.
+ */
 func test_lmss() {
     printl_s("=== LinearMapStringString Test ===");
 
@@ -102,6 +111,9 @@ func test_lmss() {
     printl_s("Done!");
 }
 
+/**
+ * Tests test_lmis.
+ */
 func test_lmis() {
     printl_s("\n=== LinearMapIntString Test ===");
 
@@ -188,6 +200,9 @@ func test_lmis() {
     printl_s("Done!");
 }
 
+/**
+ * Tests test_empty_lmss.
+ */
 func test_empty_lmss() {
     printl_s("\n=== Empty LinearMapStringString Test ===");
 
@@ -224,6 +239,9 @@ func test_empty_lmss() {
     printl_s("Empty map test passed!");
 }
 
+/**
+ * Tests test_lmss_growth.
+ */
 func test_lmss_growth() {
     printl_s("\n=== LinearMapStringString Growth Test ===");
 
@@ -278,6 +296,9 @@ func test_lmss_growth() {
     printl_s("Growth test passed!");
 }
 
+/**
+ * Tests test_empty_lmis.
+ */
 func test_empty_lmis() {
     printl_s("\n=== Empty LinearMapIntString Test ===");
 
@@ -313,6 +334,9 @@ func test_empty_lmis() {
     printl_s("Empty map test passed!");
 }
 
+/**
+ * Tests test_lmis_growth.
+ */
 func test_lmis_growth() {
     printl_s("\n=== LinearMapIntString Growth Test ===");
 
@@ -367,6 +391,9 @@ func test_lmis_growth() {
     printl_s("Growth test passed!");
 }
 
+/**
+ * Main entry point for the module.
+ */
 func main() {
     test_lmss();
     test_lmis();

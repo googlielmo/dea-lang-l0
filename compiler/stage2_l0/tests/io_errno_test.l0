@@ -10,6 +10,9 @@ import std.io;
 import std.string;
 import sys.rt;
 
+/**
+ * Tests test_stale_errno_does_not_break_std_io.
+ */
 func test_stale_errno_does_not_break_std_io() {
     let missing_path = "/tmp/l0_io_errno_missing_probe_20260225.txt";
     let target_path = "/tmp/l0_io_errno_probe_20260225.txt";
@@ -29,6 +32,9 @@ func test_stale_errno_does_not_break_std_io() {
     assert(deleted, "cleanup delete failed");
 }
 
+/**
+ * Main entry point for the module.
+ */
 func main() {
     test_stale_errno_does_not_break_std_io();
     printl_s("io_errno_test: all tests passed");

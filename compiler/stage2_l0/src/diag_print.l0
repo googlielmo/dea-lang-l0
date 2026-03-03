@@ -13,6 +13,12 @@ import std.text;
 import std.vector;
 import util.diag;
 
+/**
+ * Return the lowercase display name for a diagnostic severity.
+ *
+ * @param sev Severity to format.
+ * @return Lowercase severity name.
+ */
 func dp_severity_name(sev: DiagnosticSeverity) -> string {
     match (sev) {
         Error => { return "error"; }
@@ -21,6 +27,12 @@ func dp_severity_name(sev: DiagnosticSeverity) -> string {
     }
 }
 
+/**
+ * Format the first line of a diagnostic message.
+ *
+ * @param diag Diagnostic to format.
+ * @return Header string containing location, severity, code, and message.
+ */
 func dp_format_header(diag: Diagnostic*) -> string {
     with (let sb = sb_create() => sb_free(sb)) {
         // Location prefix: path:line:column
@@ -55,10 +67,21 @@ func dp_format_header(diag: Diagnostic*) -> string {
     }
 }
 
+/**
+ * Prints the dp print header.
+ *
+ * @param diag The diag.
+ */
 func dp_print_header(diag: Diagnostic*) {
     err_printl_s(dp_format_header(diag));
 }
 
+/**
+ * Render a source snippet for a diagnostic.
+ *
+ * @param diag Diagnostic to render.
+ * @param src Source text corresponding to `diag.filename`.
+ */
 func dp_render_snippet(diag: Diagnostic*, src: string) {
     if (is_empty_s(src)) {
         return;
@@ -112,6 +135,11 @@ func dp_render_snippet(diag: Diagnostic*, src: string) {
     }
 }
 
+/**
+ * Prints the dp print snippet.
+ *
+ * @param diag The diag.
+ */
 func dp_print_snippet(diag: Diagnostic*) {
     if (is_empty_s(diag.filename) || diag.line <= 0) {
         return;
@@ -125,6 +153,14 @@ func dp_print_snippet(diag: Diagnostic*) {
     dp_render_snippet(diag, src_opt as string);
 }
 
+/**
+ * Return cached source text for a filename, loading and caching it on demand.
+ *
+ * @param cache_names Cached filenames.
+ * @param cache_texts Cached source texts aligned with `cache_names`.
+ * @param filename Filename to load.
+ * @return Cached or newly loaded source text, or an empty string on read failure.
+ */
 func dp_source_cached(cache_names: VectorString*, cache_texts: VectorString*, filename: string) -> string {
     for (let i = 0; i < vs_size(cache_names); i = i + 1) {
         if (eq_s(vs_get(cache_names, i), filename)) {
@@ -142,6 +178,11 @@ func dp_source_cached(cache_names: VectorString*, cache_texts: VectorString*, fi
     return text;
 }
 
+/**
+ * Prints the dp print diag.
+ *
+ * @param diag The diag.
+ */
 func dp_print_diag(diag: Diagnostic*) {
     dp_print_header(diag);
     dp_print_snippet(diag);
@@ -159,6 +200,11 @@ func dp_print_collector_with_sources(dc: DiagCollector*,
     }
 }
 
+/**
+ * Prints the dp print collector.
+ *
+ * @param dc The dc.
+ */
 func dp_print_collector(dc: DiagCollector*) {
     with (
         let cache_names = vs_create(4) => vs_free(cache_names),

@@ -7,6 +7,12 @@ module fact;
 
 import std.io;
 
+/**
+ * Calculates the factorial of a given integer recursively.
+ *
+ * @param n The integer to calculate the factorial for.
+ * @return The factorial of n.
+ */
 func factorial(n: int) -> int {
     if (n <= 1) {
         return 1;
@@ -15,6 +21,9 @@ func factorial(n: int) -> int {
     }
 }
 
+/**
+ * Main entry point for the fact example.
+ */
 func main() -> void {
     let fact5: int = factorial(5);
     printl_si("Factorial of 5 is:", fact5);

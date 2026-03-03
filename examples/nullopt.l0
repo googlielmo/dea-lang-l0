@@ -10,12 +10,22 @@ import std.io;
 import std.unit;
 import std.optional;
 
+/**
+ * Tests returning an optional Unit that propagates a null value.
+ *
+ * @return null to simulate an early return.
+ */
 func test_opt_Unit_return() -> Unit? {
     printl_s("entering test_opt_Unit_return (inner)");
     // simulate some condition that causes early return
     return null;
 }
 
+/**
+ * Tests try-propagation for an optional Unit.
+ *
+ * @return present() on success, or null if an inner call fails.
+ */
 func test_Unit_return() -> Unit? {
     printl_s("entering test_Unit_return (outer)");
     test_opt_Unit_return()?; // propagate null return value with try operator
@@ -23,12 +33,22 @@ func test_Unit_return() -> Unit? {
     return present(); // return a non-null Unit?
 }
 
+/**
+ * Tests returning an optional integer that propagates a null value.
+ *
+ * @return null to simulate an early return.
+ */
 func test_opt_int_return() -> int? {
     printl_s("entering test_opt_int_return (inner)");
     // simulate some condition that causes early return
     return null;
 }
 
+/**
+ * Tests try-propagation for an optional integer.
+ *
+ * @return 42 on success, or null if an inner call fails.
+ */
 func test_int_return() -> int? {
     printl_s("entering test_int_return (outer)");
 
@@ -39,6 +59,11 @@ func test_int_return() -> int? {
     return 42 as int?;
 }
 
+/**
+ * Tests try-propagation of an explicitly null optional integer variable.
+ *
+ * @return 42 on success, or null if the variable holds null.
+ */
 func test_opt_int_return2() -> int? {
     printl_s("entering test_opt_int_return2 (outer)");
 
@@ -50,31 +75,59 @@ func test_opt_int_return2() -> int? {
     return 42 as int?;
 }
 
+/**
+ * Returns a null string to simulate failure.
+ *
+ * @return A null optional string.
+ */
 func failing_string() -> string? {
     return null;
 }
 
+/**
+ * Tests failing unwrap on a string optional.
+ *
+ * @return The length of the string, or null on failure.
+ */
 func test_failing_unwrap_s() -> int? {
     let s: string = failing_string()?;
     let val: int? = len_s(s) as int?;
     return val;
 }
 
+/**
+ * Returns a null integer to simulate failure.
+ *
+ * @return A null optional integer.
+ */
 func failing_i() -> int? {
     return null;
 }
 
+/**
+ * Tests failing unwrap on an integer optional.
+ *
+ * @return A constant integer, or null on failure.
+ */
 func test_failing_unwrap_i() -> int? {
     let i: int = failing_i()?;
     let val = 10 as int?;
     return val;
 }
 
+/**
+ * Tests successful return of an optional integer.
+ *
+ * @return A valid optional integer (10).
+ */
 func test_opt_i() -> int? {
     let val = 10 as int?;
     return val;
 }
 
+/**
+ * Main entry point for the module.
+ */
 func main() -> void {
 
     let z = test_Unit_return();

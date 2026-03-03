@@ -10,6 +10,9 @@ import std.text;
 import std.vector;
 import util.diag;
 
+/**
+ * Defines the CliMode enumeration.
+ */
 enum CliMode {
     CM_RUN;
     CM_BUILD;
@@ -21,6 +24,9 @@ enum CliMode {
     CM_TYPE;
 }
 
+/**
+ * Represents the CliOptions structure.
+ */
 struct CliOptions {
     mode: CliMode;
     mode_explicit: bool;
@@ -50,11 +56,19 @@ struct CliOptions {
     program_args: VectorString*;
 }
 
+/**
+ * Represents the CliParseResult structure.
+ */
 struct CliParseResult {
     options: CliOptions*?;
     diags: DiagCollector*;
 }
 
+/**
+ * Create a `CliOptions` instance with default values.
+ *
+ * @return New CLI options object.
+ */
 func cli_options_create() -> CliOptions* {
     return new CliOptions(
         CM_BUILD,
@@ -80,6 +94,11 @@ func cli_options_create() -> CliOptions* {
     );
 }
 
+/**
+ * Free a `CliOptions` instance.
+ *
+ * @param self CLI options to free.
+ */
 func cli_options_free(self: CliOptions*) {
     vs_free(self.project_roots);
     vs_free(self.sys_roots);
@@ -87,18 +106,33 @@ func cli_options_free(self: CliOptions*) {
     drop self;
 }
 
+/**
+ * Free a nullable `CliOptions` instance when present.
+ *
+ * @param self Optional CLI options to free.
+ */
 func cli_options_free_opt(self: CliOptions*?) {
     if (self != null) {
         cli_options_free(self as CliOptions*);
     }
 }
 
+/**
+ * Free a nullable diagnostic collector when present.
+ *
+ * @param self Optional diagnostic collector to free.
+ */
 func cli_diag_free_opt(self: DiagCollector*?) {
     if (self != null) {
         diag_free(self as DiagCollector*);
     }
 }
 
+/**
+ * Free a CLI parse result and any owned options.
+ *
+ * @param self Parse result to free.
+ */
 func cli_parse_result_free(self: CliParseResult*) {
     if (self.options != null) {
         cli_options_free(self.options as CliOptions*);
@@ -107,10 +141,23 @@ func cli_parse_result_free(self: CliParseResult*) {
     drop self;
 }
 
+/**
+ * Emit a command-line diagnostic without source coordinates.
+ *
+ * @param diags Diagnostic collector.
+ * @param code Diagnostic code.
+ * @param message Diagnostic message.
+ */
 func cli_emit_error(diags: DiagCollector*, code: string, message: string) {
     diag_error(diags, "l0c", code, message, "", 0, 0, 0, 0);
 }
 
+/**
+ * Return the canonical long flag for a CLI mode.
+ *
+ * @param mode CLI mode to format.
+ * @return Long-form flag such as `--check`.
+ */
 func cli_mode_flag(mode: CliMode) -> string {
     match (mode) {
         CM_RUN => { return "--run"; }
@@ -124,6 +171,12 @@ func cli_mode_flag(mode: CliMode) -> string {
     }
 }
 
+/**
+ * Return the short display name for a CLI mode.
+ *
+ * @param mode CLI mode to format.
+ * @return Short mode name such as `check`.
+ */
 func cli_mode_name(mode: CliMode) -> string {
     match (mode) {
         CM_RUN => { return "run"; }
@@ -137,6 +190,13 @@ func cli_mode_name(mode: CliMode) -> string {
     }
 }
 
+/**
+ * Set the active CLI mode or emit an error for conflicting mode flags.
+ *
+ * @param opts Parsed CLI options.
+ * @param diags Diagnostic collector.
+ * @param mode Mode requested by the current flag.
+ */
 func cli_try_set_mode(opts: CliOptions*, diags: DiagCollector*, mode: CliMode) {
     if (!opts.mode_explicit) {
         opts.mode = mode;
@@ -158,6 +218,12 @@ func cli_try_set_mode(opts: CliOptions*, diags: DiagCollector*, mode: CliMode) {
     }
 }
 
+/**
+ * Return the index of the `--` argument separator.
+ *
+ * @param argv Full argument vector.
+ * @return Separator index, or `-1` if `--` is not present.
+ */
 func cli_split_index(argv: VectorString*) -> int {
     for (let i = 0; i < vs_size(argv); i = i + 1) {
         if (eq_s(vs_get(argv, i), "--")) {
@@ -167,6 +233,12 @@ func cli_split_index(argv: VectorString*) -> int {
     return -1;
 }
 
+/**
+ * Count verbosity flags in a short option cluster.
+ *
+ * @param token Argument token to inspect.
+ * @return Number of `v` characters in a token like `-vvv`, or `-1` if the token is not such a cluster.
+ */
 func cli_verbose_cluster_count(token: string) -> int {
     if (len_s(token) < 2 || char_at_s(token, 0) != '-') {
         return -1;
@@ -181,6 +253,15 @@ func cli_verbose_cluster_count(token: string) -> int {
     return len_s(token) - 1;
 }
 
+/**
+ * Return the value following an option that requires one.
+ *
+ * @param argv Full argument vector.
+ * @param i Index of the option token.
+ * @param opt_name Option name used in diagnostics.
+ * @param diags Diagnostic collector.
+ * @return Following argument value, or `null` after emitting a missing-value error.
+ */
 func cli_require_next_value(argv: VectorString*, i: int, opt_name: string, diags: DiagCollector*) -> string? {
     if (i + 1 >= vs_size(argv)) {
         cli_emit_error(diags, "L0C-2003", concat3_s("missing value for option '", opt_name, "'"));
@@ -189,6 +270,12 @@ func cli_require_next_value(argv: VectorString*, i: int, opt_name: string, diags
     return vs_get(argv, i + 1);
 }
 
+/**
+ * Assign a positional target argument.
+ *
+ * @param opts Parsed CLI options.
+ * @param token Positional argument to record.
+ */
 func cli_assign_target(opts: CliOptions*, token: string) {
     if (opts.entry_target == null) {
         opts.entry_target = token;
@@ -197,6 +284,12 @@ func cli_assign_target(opts: CliOptions*, token: string) {
     }
 }
 
+/**
+ * Validate that mode-specific flags are used with compatible modes.
+ *
+ * @param opts Parsed CLI options.
+ * @param diags Diagnostic collector for incompatibility errors.
+ */
 func cli_validate_mode_scoped_flags(opts: CliOptions*, diags: DiagCollector*) {
     let mode = opts.mode;
 
@@ -249,6 +342,12 @@ func cli_validate_mode_scoped_flags(opts: CliOptions*, diags: DiagCollector*) {
     }
 }
 
+/**
+ * Parse command-line arguments into structured options.
+ *
+ * @param argv Argument vector excluding the executable name.
+ * @return Parsed options together with any diagnostics produced during parsing.
+ */
 func cli_parse(argv: VectorString*) -> CliParseResult* {
     with (
         let opts: CliOptions*? = cli_options_create() => cli_options_free_opt(opts),

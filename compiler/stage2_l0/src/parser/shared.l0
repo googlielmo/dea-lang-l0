@@ -15,6 +15,9 @@ import util.diag;
 import tokens;
 import ast;
 
+/**
+ * Represents the ImplParseResult structure.
+ */
 struct ImplParseResult {
     root_module: Module*?;
     expr_arena: ExprArena*;
@@ -23,10 +26,13 @@ struct ImplParseResult {
     diags: DiagCollector*;
 }
 
-/* ------------------------------------
+/* ---------------------------------
    Parser state
-   ------------------------------------ */
+   --------------------------------- */
 
+/**
+ * Represents the ParserState structure.
+ */
 struct ParserState {
     tokens: TokenVector;
     index: int;
@@ -38,6 +44,13 @@ struct ParserState {
     pattern_arena: PatternArena*;
 }
 
+/**
+ * Create a parser state for a token stream and source file.
+ *
+ * @param tokens Token stream to parse.
+ * @param filename Source filename used in diagnostics.
+ * @return A new parser state with fresh arenas and diagnostics.
+ */
 func ps_create(tokens: TokenVector, filename: string) -> ParserState* {
     return new ParserState(
         tokens,
@@ -50,10 +63,23 @@ func ps_create(tokens: TokenVector, filename: string) -> ParserState* {
     );
 }
 
+/**
+ * Release a parser state and its owned data.
+ *
+ * @param self Parser state to free.
+ */
 func ps_destroy(self: ParserState*) {
     drop self;
 }
 
+/**
+ * Emit a parser diagnostic anchored to a token.
+ *
+ * @param self Parser state collecting diagnostics.
+ * @param code Diagnostic code.
+ * @param message Diagnostic message.
+ * @param tok Token whose span should be highlighted.
+ */
 func ps_emit_error(self: ParserState*, code: string, message: string, tok: Token) {
     diag_error(
         self.diags,
@@ -68,18 +94,37 @@ func ps_emit_error(self: ParserState*, code: string, message: string, tok: Token
     );
 }
 
+/**
+ * Report whether the parser has recorded any errors.
+ *
+ * @param self Parser state to inspect.
+ * @return `true` if parser diagnostics contain an error.
+ */
 func ps_has_error(self: ParserState*) -> bool {
     return diag_has_errors(self.diags);
 }
 
-/* ------------------------------------
+/* ---------------------------------
    Token utilities
-   ------------------------------------ */
+   --------------------------------- */
 
+/**
+ * Check whether a token has the given kind ordinal.
+ *
+ * @param tok Token to inspect.
+ * @param kind_ord Token kind ordinal to compare against.
+ * @return `true` if `tok` has the requested kind.
+ */
 func tok_is(tok: Token, kind_ord: int) -> bool {
     return ord(tok.token_type) == kind_ord;
 }
 
+/**
+ * Check whether a token is an identifier.
+ *
+ * @param tok Token to inspect.
+ * @return `true` if `tok` is a `TT_IDENT`.
+ */
 func tok_is_ident(tok: Token) -> bool {
     match (tok.token_type) {
         TT_IDENT(t) => { return true; }
@@ -87,6 +132,12 @@ func tok_is_ident(tok: Token) -> bool {
     }
 }
 
+/**
+ * Check whether a token is an integer literal.
+ *
+ * @param tok Token to inspect.
+ * @return `true` if `tok` is a `TT_INT`.
+ */
 func tok_is_int(tok: Token) -> bool {
     match (tok.token_type) {
         TT_INT(t, v) => { return true; }
@@ -94,6 +145,12 @@ func tok_is_int(tok: Token) -> bool {
     }
 }
 
+/**
+ * Check whether a token is a byte literal.
+ *
+ * @param tok Token to inspect.
+ * @return `true` if `tok` is a `TT_BYTE`.
+ */
 func tok_is_byte(tok: Token) -> bool {
     match (tok.token_type) {
         TT_BYTE(t, v) => { return true; }
@@ -101,6 +158,12 @@ func tok_is_byte(tok: Token) -> bool {
     }
 }
 
+/**
+ * Check whether a token is a string literal.
+ *
+ * @param tok Token to inspect.
+ * @return `true` if `tok` is a `TT_STRING`.
+ */
 func tok_is_string(tok: Token) -> bool {
     match (tok.token_type) {
         TT_STRING(t, v) => { return true; }
@@ -108,14 +171,32 @@ func tok_is_string(tok: Token) -> bool {
     }
 }
 
+/**
+ * Check whether a token is reserved for a future language extension.
+ *
+ * @param tok Token to inspect.
+ * @return `true` if `tok` is `TT_FUTURE_EXTENSION`.
+ */
 func tok_is_future_extension(tok: Token) -> bool {
     return ord(tok.token_type) == ord(TT_FUTURE_EXTENSION);
 }
 
+/**
+ * Return the current lookahead token.
+ *
+ * @param self Parser state to inspect.
+ * @return Token at the current parse position.
+ */
 func ps_peek(self: ParserState*) -> Token {
     return tv_get(self.tokens, self.index);
 }
 
+/**
+ * Return the most recently consumed token.
+ *
+ * @param self Parser state to inspect.
+ * @return Last consumed token, or the first token if nothing has been consumed yet.
+ */
 func ps_last(self: ParserState*) -> Token {
     if (self.index > 0) {
         return tv_get(self.tokens, self.index - 1);
@@ -123,10 +204,22 @@ func ps_last(self: ParserState*) -> Token {
     return tv_get(self.tokens, 0);
 }
 
+/**
+ * Check whether the parser is positioned at EOF.
+ *
+ * @param self Parser state to inspect.
+ * @return `true` if the current token is `TT_EOF`.
+ */
 func ps_at_end(self: ParserState*) -> bool {
     return tok_is(ps_peek(self), ord(TT_EOF));
 }
 
+/**
+ * Consume and return the current token.
+ *
+ * @param self Parser state to advance.
+ * @return Token that was current before advancing.
+ */
 func ps_advance(self: ParserState*) -> Token {
     let tok = ps_peek(self);
     if (!ps_at_end(self)) {
@@ -135,10 +228,24 @@ func ps_advance(self: ParserState*) -> Token {
     return tok;
 }
 
+/**
+ * Check whether the current token has the given kind ordinal.
+ *
+ * @param self Parser state to inspect.
+ * @param kind_ord Token kind ordinal to compare against.
+ * @return `true` if the current token matches `kind_ord`.
+ */
 func ps_check(self: ParserState*, kind_ord: int) -> bool {
     return tok_is(ps_peek(self), kind_ord);
 }
 
+/**
+ * Consume the current token if it has the given kind ordinal.
+ *
+ * @param self Parser state to advance.
+ * @param kind_ord Token kind ordinal to match.
+ * @return `true` if a matching token was consumed.
+ */
 func ps_match(self: ParserState*, kind_ord: int) -> bool {
     if (ps_check(self, kind_ord)) {
         ps_advance(self);
@@ -147,6 +254,14 @@ func ps_match(self: ParserState*, kind_ord: int) -> bool {
     return false;
 }
 
+/**
+ * Consume the current token if it matches either of two kinds.
+ *
+ * @param self Parser state to advance.
+ * @param k1 First acceptable token kind ordinal.
+ * @param k2 Second acceptable token kind ordinal.
+ * @return `true` if one of the requested token kinds was consumed.
+ */
 func ps_match_any2(self: ParserState*, k1: int, k2: int) -> bool {
     if (ps_match(self, k1)) {
         return true;
@@ -157,6 +272,15 @@ func ps_match_any2(self: ParserState*, k1: int, k2: int) -> bool {
     return false;
 }
 
+/**
+ * Consume the current token if it matches any of three kinds.
+ *
+ * @param self Parser state to advance.
+ * @param k1 First acceptable token kind ordinal.
+ * @param k2 Second acceptable token kind ordinal.
+ * @param k3 Third acceptable token kind ordinal.
+ * @return `true` if one of the requested token kinds was consumed.
+ */
 func ps_match_any3(self: ParserState*, k1: int, k2: int, k3: int) -> bool {
     if (ps_match(self, k1)) {
         return true;
@@ -170,6 +294,16 @@ func ps_match_any3(self: ParserState*, k1: int, k2: int, k3: int) -> bool {
     return false;
 }
 
+/**
+ * Consume the current token if it matches any of four kinds.
+ *
+ * @param self Parser state to advance.
+ * @param k1 First acceptable token kind ordinal.
+ * @param k2 Second acceptable token kind ordinal.
+ * @param k3 Third acceptable token kind ordinal.
+ * @param k4 Fourth acceptable token kind ordinal.
+ * @return `true` if one of the requested token kinds was consumed.
+ */
 func ps_match_any4(self: ParserState*, k1: int, k2: int, k3: int, k4: int) -> bool {
     if (ps_match(self, k1)) {
         return true;
@@ -186,10 +320,22 @@ func ps_match_any4(self: ParserState*, k1: int, k2: int, k3: int, k4: int) -> bo
     return false;
 }
 
+/**
+ * Check whether the current token is an identifier.
+ *
+ * @param self Parser state to inspect.
+ * @return `true` if the current token is `TT_IDENT`.
+ */
 func ps_check_ident(self: ParserState*) -> bool {
     return tok_is_ident(ps_peek(self));
 }
 
+/**
+ * Consume the current token if it is an identifier.
+ *
+ * @param self Parser state to advance.
+ * @return `true` if an identifier token was consumed.
+ */
 func ps_match_ident(self: ParserState*) -> bool {
     if (ps_check_ident(self)) {
         ps_advance(self);
@@ -198,10 +344,22 @@ func ps_match_ident(self: ParserState*) -> bool {
     return false;
 }
 
+/**
+ * Check whether the current token is an integer literal.
+ *
+ * @param self Parser state to inspect.
+ * @return `true` if the current token is `TT_INT`.
+ */
 func ps_check_int(self: ParserState*) -> bool {
     return tok_is_int(ps_peek(self));
 }
 
+/**
+ * Consume the current token if it is an integer literal.
+ *
+ * @param self Parser state to advance.
+ * @return `true` if an integer literal token was consumed.
+ */
 func ps_match_int(self: ParserState*) -> bool {
     if (ps_check_int(self)) {
         ps_advance(self);
@@ -210,10 +368,22 @@ func ps_match_int(self: ParserState*) -> bool {
     return false;
 }
 
+/**
+ * Check whether the current token is a byte literal.
+ *
+ * @param self Parser state to inspect.
+ * @return `true` if the current token is `TT_BYTE`.
+ */
 func ps_check_byte(self: ParserState*) -> bool {
     return tok_is_byte(ps_peek(self));
 }
 
+/**
+ * Consume the current token if it is a byte literal.
+ *
+ * @param self Parser state to advance.
+ * @return `true` if a byte literal token was consumed.
+ */
 func ps_match_byte(self: ParserState*) -> bool {
     if (ps_check_byte(self)) {
         ps_advance(self);
@@ -222,10 +392,22 @@ func ps_match_byte(self: ParserState*) -> bool {
     return false;
 }
 
+/**
+ * Check whether the current token is a string literal.
+ *
+ * @param self Parser state to inspect.
+ * @return `true` if the current token is `TT_STRING`.
+ */
 func ps_check_string(self: ParserState*) -> bool {
     return tok_is_string(ps_peek(self));
 }
 
+/**
+ * Consume the current token if it is a string literal.
+ *
+ * @param self Parser state to advance.
+ * @return `true` if a string literal token was consumed.
+ */
 func ps_match_string(self: ParserState*) -> bool {
     if (ps_check_string(self)) {
         ps_advance(self);
@@ -234,6 +416,12 @@ func ps_match_string(self: ParserState*) -> bool {
     return false;
 }
 
+/**
+ * Check whether the current token can start a top-level declaration.
+ *
+ * @param self Parser state to inspect.
+ * @return `true` if the current token starts a declaration accepted at module scope.
+ */
 func ps_is_top_level_start(self: ParserState*) -> bool {
     return ps_check(self, ord(TT_EXTERN)) ||
            ps_check(self, ord(TT_FUNC)) ||
@@ -243,6 +431,11 @@ func ps_is_top_level_start(self: ParserState*) -> bool {
            ps_check(self, ord(TT_LET));
 }
 
+/**
+ * Recover after a parse error by advancing to the next top-level boundary.
+ *
+ * @param self Parser state to resynchronize.
+ */
 func ps_sync_top_level(self: ParserState*) {
     while (!ps_at_end(self)) {
         if (ps_is_top_level_start(self)) {
@@ -258,6 +451,15 @@ func ps_sync_top_level(self: ParserState*) {
     }
 }
 
+/**
+ * Require the current token to have a specific kind.
+ *
+ * @param self Parser state to inspect.
+ * @param kind_ord Required token kind ordinal.
+ * @param code Diagnostic code to emit on mismatch.
+ * @param msg Expectation message prefix used in the diagnostic.
+ * @return Consumed token, or `null` after emitting an error if the token does not match.
+ */
 func ps_expect(self: ParserState*, kind_ord: int, code: string, msg: string) -> Token? {
     if (!ps_check(self, kind_ord)) {
         let got = token_to_string(ps_peek(self));
@@ -267,6 +469,14 @@ func ps_expect(self: ParserState*, kind_ord: int, code: string, msg: string) -> 
     return ps_advance(self);
 }
 
+/**
+ * Require the current token to be an identifier.
+ *
+ * @param self Parser state to inspect.
+ * @param code Diagnostic code to emit on mismatch.
+ * @param msg Expectation message prefix used in the diagnostic.
+ * @return Consumed identifier token, or `null` after emitting an error.
+ */
 func ps_expect_ident(self: ParserState*, code: string, msg: string) -> Token? {
     if (!ps_check_ident(self)) {
         let got = token_to_string(ps_peek(self));
@@ -276,6 +486,12 @@ func ps_expect_ident(self: ParserState*, code: string, msg: string) -> Token? {
     return ps_advance(self);
 }
 
+/**
+ * Extract identifier text from a token.
+ *
+ * @param tok Token to inspect.
+ * @return Identifier spelling, or `null` if `tok` is not `TT_IDENT`.
+ */
 func token_ident_text(tok: Token) -> string? {
     match (tok.token_type) {
         TT_IDENT(t) => { return t; }
@@ -283,6 +499,12 @@ func token_ident_text(tok: Token) -> string? {
     }
 }
 
+/**
+ * Extract integer literal text from a token.
+ *
+ * @param tok Token to inspect.
+ * @return Integer literal spelling, or `null` if `tok` is not `TT_INT`.
+ */
 func token_int_text(tok: Token) -> string? {
     match (tok.token_type) {
         TT_INT(t, v) => { return t; }
@@ -290,6 +512,12 @@ func token_int_text(tok: Token) -> string? {
     }
 }
 
+/**
+ * Extract the parsed integer value from a token.
+ *
+ * @param tok Token to inspect.
+ * @return Parsed integer value, or `null` if `tok` is not `TT_INT`.
+ */
 func token_int_value(tok: Token) -> int? {
     match (tok.token_type) {
         TT_INT(t, v) => { return v; }
@@ -297,6 +525,12 @@ func token_int_value(tok: Token) -> int? {
     }
 }
 
+/**
+ * Extract byte literal text from a token.
+ *
+ * @param tok Token to inspect.
+ * @return Byte literal spelling, or `null` if `tok` is not `TT_BYTE`.
+ */
 func token_byte_text(tok: Token) -> string? {
     match (tok.token_type) {
         TT_BYTE(t, v) => { return t; }
@@ -304,6 +538,12 @@ func token_byte_text(tok: Token) -> string? {
     }
 }
 
+/**
+ * Extract string literal text from a token.
+ *
+ * @param tok Token to inspect.
+ * @return String literal spelling, or `null` if `tok` is not `TT_STRING`.
+ */
 func token_string_text(tok: Token) -> string? {
     match (tok.token_type) {
         TT_STRING(t, v) => { return t; }
@@ -311,6 +551,12 @@ func token_string_text(tok: Token) -> string? {
     }
 }
 
+/**
+ * Return the source-like text used to measure a token's display width.
+ *
+ * @param tok Token to inspect.
+ * @return Source spelling or token label used for width calculations.
+ */
 func token_text_for_width(tok: Token) -> string {
     match (tok.token_type) {
         TT_IDENT(t) => { return t; }
@@ -322,15 +568,34 @@ func token_text_for_width(tok: Token) -> string {
     }
 }
 
+/**
+ * Compute the display width of a token for diagnostics.
+ *
+ * @param tok Token to measure.
+ * @return Width of the token text in bytes.
+ */
 func token_width(tok: Token) -> int {
     return len_s(token_text_for_width(tok));
 }
 
+/**
+ * Capture a zero-width span at the current token position.
+ *
+ * @param self Parser state to inspect.
+ * @return Span starting and ending at the current token location.
+ */
 func ps_span_start(self: ParserState*) -> Span {
     let here = ps_peek(self);
     return Span(here.line, here.column, here.line, here.column);
 }
 
+/**
+ * Extend a starting span to the end of the last consumed token.
+ *
+ * @param self Parser state providing the current position.
+ * @param start Starting span captured before parsing the construct.
+ * @return Span from `start` through the last consumed token.
+ */
 func ps_extend_span(self: ParserState*, start: Span) -> Span {
     let here = ps_last(self);
     return Span(
@@ -341,6 +606,14 @@ func ps_extend_span(self: ParserState*, start: Span) -> Span {
     );
 }
 
+/**
+ * Require an identifier that is legal as a variable name.
+ *
+ * @param self Parser state to inspect.
+ * @param code Diagnostic code to emit on mismatch.
+ * @param msg Expectation message prefix used in the diagnostic.
+ * @return Variable-name token, or `null` after emitting an error.
+ */
 func ps_expect_variable_name(self: ParserState*, code: string, msg: string) -> Token? {
     let tok = ps_peek(self);
     if (tok_is_future_extension(tok)) {
@@ -357,10 +630,17 @@ func ps_expect_variable_name(self: ParserState*, code: string, msg: string) -> T
     return got;
 }
 
-/* ------------------------------------
+/* ---------------------------------
    Name helpers
-   ------------------------------------ */
+   --------------------------------- */
 
+/**
+ * Parse the remaining components of a dotted name.
+ *
+ * @param self Parser state to advance.
+ * @param first Already parsed first identifier component.
+ * @return Full dotted name, or `null` on parse error.
+ */
 func parse_dotted_name_rest(self: ParserState*, first: string) -> string? {
     let name = first;
     while (ps_match(self, ord(TT_DOT))) {
@@ -371,18 +651,32 @@ func parse_dotted_name_rest(self: ParserState*, first: string) -> string? {
     return name;
 }
 
+/**
+ * Represents the QualifiedNameResult structure.
+ */
 struct QualifiedNameResult {
     module_path: VectorString*;
     name_qualifier: VectorString*?;
     name_tok: Token;
 }
 
+/**
+ * Free a qualified-name parse result and its owned vectors.
+ *
+ * @param self Qualified-name result to free.
+ */
 func qn_result_free_all(self: QualifiedNameResult*) {
     vs_free(self.module_path);
     vs_free_opt(self.name_qualifier);
     drop self;
 }
 
+/**
+ * Parse a qualified name when the lookahead matches `Module.Path::Name`.
+ *
+ * @param self Parser state to inspect.
+ * @return Parsed qualified-name components, or `null` if the lookahead is not a qualified name.
+ */
 func ps_try_parse_qualified_name(self: ParserState*) -> QualifiedNameResult*? {
     if (!ps_check_ident(self)) {
         return null;
@@ -437,10 +731,16 @@ func ps_try_parse_qualified_name(self: ParserState*) -> QualifiedNameResult*? {
     }
 }
 
-/* ------------------------------------
+/* ---------------------------------
    Type parsing
-   ------------------------------------ */
+   --------------------------------- */
 
+/**
+ * Parse a type reference.
+ *
+ * @param self Parser state to advance.
+ * @return Parsed type reference, or `null` on parse error.
+ */
 func ps_parse_type(self: ParserState*) -> TypeRef*? {
     let start = ps_span_start(self);
 
@@ -479,6 +779,12 @@ func ps_parse_type(self: ParserState*) -> TypeRef*? {
     let type_name = token_ident_text(name_tok) as string;
     return new TypeRef(type_name, pointer_depth, is_nullable, module_path, name_qualifier, ps_extend_span(self, start));
 }
+/**
+ * Reject reserved binary operators at the current parse position.
+ *
+ * @param self Parser state to inspect.
+ * @return `present()` if the token is allowed here, or `null` after emitting an error.
+ */
 func ps_check_reserved_binary_op(self: ParserState*) -> Unit? {
     let tok = ps_peek(self);
     if (tok_is(tok, ord(TT_AMP))) {

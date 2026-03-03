@@ -9,6 +9,9 @@ import std.assert;
 import std.io;
 import std.time;
 
+/**
+ * Tests test_wall_now.
+ */
 func test_wall_now() {
     let now_opt = wall_now();
     assert(now_opt != null, "wall_now should return a value");
@@ -18,6 +21,9 @@ func test_wall_now() {
     assert(now.nsec < 1000000000, "wall_now nsec must be < 1e9");
 }
 
+/**
+ * Tests test_utc_epoch.
+ */
 func test_utc_epoch() {
     let dt_opt = wall_to_utc_datetime(WallTime(0, 0));
     assert(dt_opt != null, "wall_to_utc_datetime(epoch) should succeed");
@@ -36,6 +42,9 @@ func test_utc_epoch() {
     assert(!dt.is_dst, "utc conversion should never set dst");
 }
 
+/**
+ * Tests test_utc_before_epoch.
+ */
 func test_utc_before_epoch() {
     let dt_opt = wall_to_utc_datetime(WallTime(-1, 0));
     assert(dt_opt != null, "wall_to_utc_datetime(-1) should succeed");
@@ -49,6 +58,9 @@ func test_utc_before_epoch() {
     assert(dt.second == 59, "-1 sec second must be 59");
 }
 
+/**
+ * Tests test_monotonic_contract.
+ */
 func test_monotonic_contract() {
     if (!monotonic_supported()) {
         assert(monotonic_now() == null, "monotonic_now should return null when unsupported");
@@ -72,6 +84,9 @@ func test_monotonic_contract() {
     assert(d.nsec < 1000000000, "duration nsec must be normalized");
 }
 
+/**
+ * Tests test_invalid_nsec_rejected.
+ */
 func test_invalid_nsec_rejected() {
     let a = wall_to_utc_datetime(WallTime(0, -1));
     let b = wall_to_utc_datetime(WallTime(0, 1000000000));
@@ -79,6 +94,9 @@ func test_invalid_nsec_rejected() {
     assert(b == null, "nsec >= 1e9 should be rejected");
 }
 
+/**
+ * Tests test_local_datetime_shape.
+ */
 func test_local_datetime_shape() {
     let dt_opt = wall_to_local_datetime(WallTime(0, 123));
     assert(dt_opt != null, "local conversion for epoch should succeed");
@@ -95,6 +113,9 @@ func test_local_datetime_shape() {
     assert(dt.utc_offset_sec > -86400 && dt.utc_offset_sec < 86400, "offset must be within one day");
 }
 
+/**
+ * Main entry point for the module.
+ */
 func main() {
     test_wall_now();
     test_utc_epoch();

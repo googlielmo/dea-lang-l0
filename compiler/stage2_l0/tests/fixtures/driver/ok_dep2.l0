@@ -5,6 +5,11 @@
 
 module ok_dep2;
 
+/**
+ * Exposes a dependency function for the transitive import fixture.
+ *
+ * @return `2`.
+ */
 func g() -> int {
     return 2;
 }

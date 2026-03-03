@@ -5,6 +5,11 @@
 
 module shared_more;
 
+/**
+ * Provides a helper integer value.
+ *
+ * @return A small integer used by semantics fixtures.
+ */
 func helper_value() -> int {
     return 5;
 }

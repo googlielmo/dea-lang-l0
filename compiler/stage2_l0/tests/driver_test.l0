@@ -13,16 +13,33 @@ import source_paths;
 import driver;
 import util.log;
 
+/**
+ * Returns the root directory for test fixtures.
+ *
+ * @return The driver fixture directory used by these tests.
+ */
 func fixture_root() -> string {
     return "compiler/stage2_l0/tests/fixtures/driver";
 }
 
+/**
+ * Creates and configures source search paths for testing.
+ *
+ * @return Source search paths rooted at the driver fixtures directory.
+ */
 func make_paths() -> SourceSearchPaths* {
     let sp = sp_create();
     sp_add_project_root(sp, fixture_root());
     return sp;
 }
 
+/**
+ * Checks if a specific diagnostic code is present in the results.
+ *
+ * @param result The driver analysis result to inspect.
+ * @param code The diagnostic code to look for.
+ * @return `true` if the diagnostic code is present, otherwise `false`.
+ */
 func has_driver_diag_code(result: DriverState*, code: string) -> bool {
     for (let i = 0; i < driver_diag_count(result); i = i + 1) {
         let d = driver_diag_get(result, i);
@@ -33,6 +50,9 @@ func has_driver_diag_code(result: DriverState*, code: string) -> bool {
     return false;
 }
 
+/**
+ * Tests test_transitive_import_closure_ok.
+ */
 func test_transitive_import_closure_ok() {
     let sp = make_paths();
     with (let cfg = log_config_create(LL_SILENT, false) => drop cfg) {
@@ -46,6 +66,9 @@ func test_transitive_import_closure_ok() {
     sp_free(sp);
 }
 
+/**
+ * Tests test_import_cycle_reports_error.
+ */
 func test_import_cycle_reports_error() {
     let sp = make_paths();
     with (let cfg = log_config_create(LL_SILENT, false) => drop cfg) {
@@ -59,6 +82,9 @@ func test_import_cycle_reports_error() {
     sp_free(sp);
 }
 
+/**
+ * Tests test_module_name_mismatch_reports_error.
+ */
 func test_module_name_mismatch_reports_error() {
     let sp = make_paths();
     with (let cfg = log_config_create(LL_SILENT, false) => drop cfg) {
@@ -72,6 +98,9 @@ func test_module_name_mismatch_reports_error() {
     sp_free(sp);
 }
 
+/**
+ * Tests test_read_failure_reports_error.
+ */
 func test_read_failure_reports_error() {
     let sp = make_paths();
     with (let cfg = log_config_create(LL_SILENT, false) => drop cfg) {
@@ -85,6 +114,9 @@ func test_read_failure_reports_error() {
     sp_free(sp);
 }
 
+/**
+ * Main entry point for the module.
+ */
 func main() {
     test_transitive_import_closure_ok();
     test_import_cycle_reports_error();

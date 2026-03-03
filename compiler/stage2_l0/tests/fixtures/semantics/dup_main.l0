@@ -5,6 +5,11 @@
 
 module dup_main;
 
+/**
+ * Declares a function whose name collides with the module-level `item` binding.
+ *
+ * @return `0`.
+ */
 func item() -> int {
     return 0;
 }

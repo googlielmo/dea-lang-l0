@@ -11,6 +11,9 @@ module util.diag;
 
 import std.vector;
 
+/**
+ * Defines the DiagnosticSeverity enumeration.
+ */
 enum DiagnosticSeverity {
     Error;
     Warning;
@@ -34,16 +37,27 @@ struct Diagnostic {
     column_end: int;    // spanning column number for the diagnostic context, or 0 if not applicable
 }
 
-/* ------------------------------------
+/* ---------------------------------
    Vector of Diagnostics
-   ------------------------------------ */
+   --------------------------------- */
 
 type DiagnosticVector = VectorBase;
 
+/**
+ * Create an empty vector of diagnostics.
+ *
+ * @return Diagnostic vector with an initial small capacity.
+ */
 func dgv_create() -> DiagnosticVector* {
     return vec_create(sizeof(Diagnostic), 4);
 }
 
+/**
+ * Append a diagnostic to the vector.
+ *
+ * @param self Diagnostic vector to extend.
+ * @param diag Diagnostic value to copy into the vector.
+ */
 func dgv_push(self: DiagnosticVector*, diag: Diagnostic) {
     vec_grow(self);
     let index = self.length - 1;
@@ -51,14 +65,32 @@ func dgv_push(self: DiagnosticVector*, diag: Diagnostic) {
     *slot = diag;  // copy the diagnostic into the vector
 }
 
+/**
+ * Return a diagnostic from the vector.
+ *
+ * @param self Diagnostic vector to inspect.
+ * @param index Zero-based diagnostic index.
+ * @return Diagnostic at `index`.
+ */
 func dgv_get(self: DiagnosticVector*, index: int) -> Diagnostic* {
     return vec_get(self, index) as Diagnostic*;
 }
 
+/**
+ * Return the number of diagnostics stored in the vector.
+ *
+ * @param self Diagnostic vector to inspect.
+ * @return Total diagnostic count.
+ */
 func dgv_length(self: DiagnosticVector*) -> int {
     return self.length;
 }
 
+/**
+ * Free a diagnostic vector and release ARC-owned fields in each entry.
+ *
+ * @param self Diagnostic vector to free.
+ */
 func dgv_free(self: DiagnosticVector*) {
     // release all ARC resources held by diagnostics (e.g., strings)
     for (let i = 0; i < self.length; i = i + 1) {
@@ -71,15 +103,23 @@ func dgv_free(self: DiagnosticVector*) {
     vec_free(self);
 }
 
-/* ------------------------------------
+/* ---------------------------------
    DiagCollector: Collects Diagnostics
-   ------------------------------------ */
+   --------------------------------- */
 
+/**
+ * Represents the DiagCollector structure.
+ */
 struct DiagCollector {
     items: DiagnosticVector*;
     error_count: int;    // avoids scanning the vector
 }
 
+/**
+ * Create an empty diagnostic collector.
+ *
+ * @return New collector with no diagnostics.
+ */
 func diag_create() -> DiagCollector* {
     let self = new DiagCollector(
         dgv_create(),
@@ -140,18 +180,43 @@ func diag_note(dc: DiagCollector*, phase: string, code: string,
     dgv_push(dc.items, diag);
 }
 
+/**
+ * Report whether the collector contains any errors.
+ *
+ * @param dc Diagnostic collector to inspect.
+ * @return `true` if at least one error diagnostic has been recorded.
+ */
 func diag_has_errors(dc: DiagCollector*) -> bool {
     return dc.error_count > 0;
 }
 
+/**
+ * Return the number of collected diagnostics.
+ *
+ * @param dc Diagnostic collector to inspect.
+ * @return Total diagnostic count.
+ */
 func diag_count(dc: DiagCollector*) -> int {
     return dgv_length(dc.items);
 }
 
+/**
+ * Return a diagnostic from the collector.
+ *
+ * @param dc Diagnostic collector to inspect.
+ * @param index Zero-based diagnostic index.
+ * @return Diagnostic at `index`.
+ */
 func diag_get(dc: DiagCollector*, index: int) -> Diagnostic* {
     return dgv_get(dc.items, index);
 }
 
+/**
+ * Copy a diagnostic into another collector.
+ *
+ * @param dst Destination collector.
+ * @param src Diagnostic to copy.
+ */
 func diag_copy(dst: DiagCollector*, src: Diagnostic*) {
     match (src.severity) {
         Error => {
@@ -166,6 +231,11 @@ func diag_copy(dst: DiagCollector*, src: Diagnostic*) {
     }
 }
 
+/**
+ * Free a diagnostic collector and its backing storage.
+ *
+ * @param dc Diagnostic collector to free.
+ */
 func diag_free(dc: DiagCollector*) {
     dgv_free(dc.items);
     drop dc;

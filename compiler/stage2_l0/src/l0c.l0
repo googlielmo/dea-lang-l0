@@ -31,28 +31,54 @@ import types;
 import symbols;
 import signatures;
 
+/**
+ * Represents the PreparedInput structure.
+ */
 struct PreparedInput {
     entry_module: string;
     search_paths: SourceSearchPaths*;
 }
 
+/**
+ * Free a prepared CLI input bundle.
+ *
+ * @param self Prepared input to free.
+ */
 func prepared_input_free(self: PreparedInput*) {
     sp_free(self.search_paths);
     drop self;
 }
 
+/**
+ * Free a nullable prepared input bundle when present.
+ *
+ * @param self Optional prepared input to free.
+ */
 func prepared_input_free_opt(self: PreparedInput*?) {
     if (self != null) {
         prepared_input_free(self as PreparedInput*);
     }
 }
 
+/**
+ * Copy every diagnostic from one collector into another.
+ *
+ * @param dst Destination collector.
+ * @param src Source collector.
+ */
 func l0c_copy_collector(dst: DiagCollector*, src: DiagCollector*) {
     for (let i = 0; i < diag_count(src); i = i + 1) {
         diag_copy(dst, diag_get(src, i));
     }
 }
 
+/**
+ * Normalize CLI input into an entry module and search paths.
+ *
+ * @param opts Parsed CLI options.
+ * @param diags Diagnostic collector for normalization errors.
+ * @return Prepared input bundle, or `null` if normalization fails.
+ */
 func l0c_prepare_input(opts: CliOptions*, diags: DiagCollector*) -> PreparedInput*? {
     with (
         let project_roots = us_vs_clone(opts.project_roots) => vs_free(project_roots),
@@ -74,6 +100,12 @@ func l0c_prepare_input(opts: CliOptions*, diags: DiagCollector*) -> PreparedInpu
     }
 }
 
+/**
+ * Print one token with source location metadata.
+ *
+ * @param path Source path owning the token.
+ * @param tok Token to print.
+ */
 func l0c_print_token(path: string, tok: Token) {
     with (let sb = sb_create() => sb_free(sb)) {
         sb_append(sb, path);
@@ -87,6 +119,12 @@ func l0c_print_token(path: string, tok: Token) {
     }
 }
 
+/**
+ * Print a header before dumping tokens for a module.
+ *
+ * @param module_name Module being printed.
+ * @param path Source path for the module.
+ */
 func l0c_print_module_token_header(module_name: string, path: string) {
     with (let sb = sb_create() => sb_free(sb)) {
         sb_append(sb, "=== Tokens for module ");
@@ -98,6 +136,14 @@ func l0c_print_module_token_header(module_name: string, path: string) {
     }
 }
 
+/**
+ * Lex a source file and print its tokens.
+ *
+ * @param path Source file to read.
+ * @param include_eof Whether to print the trailing EOF token.
+ * @param diags Diagnostic collector for I/O and lexing errors.
+ * @return Process-style status code.
+ */
 func l0c_dump_tokens_for_path(path: string, include_eof: bool, diags: DiagCollector*) -> int {
     let text_opt = read_file(path);
     if (text_opt == null) {
@@ -128,6 +174,13 @@ func l0c_dump_tokens_for_path(path: string, include_eof: bool, diags: DiagCollec
     return 0;
 }
 
+/**
+ * Execute Stage 2 `--check` mode.
+ *
+ * @param opts Parsed CLI options.
+ * @param cfg Logging configuration.
+ * @return Process-style status code.
+ */
 func l0c_cmd_check(opts: CliOptions*, cfg: LogConfig*) -> int {
     with (let diags = diag_create() => diag_free(diags)) {
         let prepared = l0c_prepare_input(opts, diags);
@@ -155,6 +208,13 @@ func l0c_cmd_check(opts: CliOptions*, cfg: LogConfig*) -> int {
     }
 }
 
+/**
+ * Execute Stage 2 `--tok` mode.
+ *
+ * @param opts Parsed CLI options.
+ * @param cfg Logging configuration.
+ * @return Process-style status code.
+ */
 func l0c_cmd_tok(opts: CliOptions*, cfg: LogConfig*) -> int {
     with (let diags = diag_create() => diag_free(diags)) {
         let prepared = l0c_prepare_input(opts, diags);
@@ -226,6 +286,13 @@ func l0c_cmd_tok(opts: CliOptions*, cfg: LogConfig*) -> int {
     }
 }
 
+/**
+ * Execute Stage 2 `--sym` mode.
+ *
+ * @param opts Parsed CLI options.
+ * @param cfg Logging configuration.
+ * @return Process-style status code.
+ */
 func l0c_cmd_sym(opts: CliOptions*, cfg: LogConfig*) -> int {
     with (let diags = diag_create() => diag_free(diags)) {
         let prepared = l0c_prepare_input(opts, diags);
@@ -349,6 +416,13 @@ func l0c_cmd_sym(opts: CliOptions*, cfg: LogConfig*) -> int {
     }
 }
 
+/**
+ * Execute Stage 2 `--type` mode.
+ *
+ * @param opts Parsed CLI options.
+ * @param cfg Logging configuration.
+ * @return Process-style status code.
+ */
 func l0c_cmd_type(opts: CliOptions*, cfg: LogConfig*) -> int {
     with (let diags = diag_create() => diag_free(diags)) {
         let prepared = l0c_prepare_input(opts, diags);
@@ -452,6 +526,13 @@ func l0c_cmd_type(opts: CliOptions*, cfg: LogConfig*) -> int {
     }
 }
 
+/**
+ * Report that a requested CLI mode is not implemented in Stage 2 yet.
+ *
+ * @param mode Requested CLI mode.
+ * @param cfg Logging configuration.
+ * @return Process-style status code.
+ */
 func l0c_cmd_nyi(mode: CliMode, cfg: LogConfig*) -> int {
     with (let diags = diag_create() => diag_free(diags)) {
         diag_error(
@@ -470,6 +551,12 @@ func l0c_cmd_nyi(mode: CliMode, cfg: LogConfig*) -> int {
     }
 }
 
+/**
+ * Parse CLI arguments and dispatch the requested command.
+ *
+ * @param argv Argument vector excluding the executable name.
+ * @return Process-style status code.
+ */
 func run_with_argv(argv: VectorString*) -> int {
     let parsed = cli_parse(argv);
     if (diag_has_errors(parsed.diags) || parsed.options == null) {
@@ -516,6 +603,9 @@ func run_with_argv(argv: VectorString*) -> int {
     }
 }
 
+/**
+ * Run the Stage 2 `l0c` entry point with process arguments.
+ */
 func main() {
     with (let argv_vec = vs_create(argc()) => vs_free(argv_vec)) {
         for (let i = 1; i < argc(); i = i + 1) {

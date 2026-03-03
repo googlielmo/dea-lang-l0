@@ -8,6 +8,12 @@ module ok_main;
 import shared_types;
 import shared_more;
 
+/**
+ * Demonstrates variable scope and shadowing.
+ *
+ * @param flag Controls whether the `while` body executes once.
+ * @return The final value assigned to `top`.
+ */
 func scope_demo(flag: bool) -> int {
     let top: int = 0;
 
@@ -58,6 +64,9 @@ func scope_demo(flag: bool) -> int {
     return top;
 }
 
+/**
+ * Main entry point for the module.
+ */
 func main() -> int {
     let p: Point = make_point(1, 2);
     return p.x;

@@ -14,6 +14,9 @@ import std.text;
 import std.vector;
 import std.linear_map;
 
+/**
+ * Defines the TokenType enumeration.
+ */
 enum TokenType {
     TT_EOF;
 
@@ -93,6 +96,9 @@ enum TokenType {
     TT_FUTURE_EXTENSION;  // placeholder for future tokens
 }
 
+/**
+ * Represents the Token structure.
+ */
 struct Token {
     token_type: TokenType;
     index: int;     // offset in source, 0-based
@@ -100,6 +106,12 @@ struct Token {
     column: int;    // 1-based
 }
 
+/**
+ * Render a token as human-readable text.
+ *
+ * @param token Token to format.
+ * @return Readable token spelling for diagnostics and debugging output.
+ */
 func token_to_string(token: Token) -> string {
     match (token.token_type) {
         TT_EOF => { return "end-of-file"; }
@@ -178,11 +190,23 @@ func token_to_string(token: Token) -> string {
     }
 }
 
+/**
+ * Check whether identifier text is reserved as a builtin type name.
+ *
+ * @param word Identifier text to inspect.
+ * @return `true` if `word` is reserved and cannot be used as a plain identifier.
+ */
 func is_reserved_ident_word(word: string) -> bool {
     return eq_s(word, "void") || eq_s(word, "bool") || eq_s(word, "string") ||
            eq_s(word, "int") || eq_s(word, "byte");
 }
 
+/**
+ * Check whether a token is reserved as a keyword or future extension.
+ *
+ * @param token Token to inspect.
+ * @return `true` if the token cannot be used as a variable name.
+ */
 func is_reserved_keyword(token: Token) -> bool {
     match (token.token_type) {
         TT_MODULE => { return true; }
@@ -216,6 +240,15 @@ func is_reserved_keyword(token: Token) -> bool {
     }
 }
 
+/**
+ * Convert identifier text into the appropriate token at a source location.
+ *
+ * @param ident Identifier text as it appeared in source.
+ * @param index Zero-based byte offset in the source.
+ * @param line One-based source line.
+ * @param col One-based source column.
+ * @return Keyword, underscore, future-extension, or identifier token for `ident`.
+ */
 func ident_to_token(ident: string, index: int, line: int, col: int) -> Token {
     case (ident) {
          "module" => return Token(TT_MODULE, index, line, col);
@@ -254,6 +287,12 @@ func ident_to_token(ident: string, index: int, line: int, col: int) -> Token {
     return Token(TT_IDENT(ident), index, line, col);
 }
 
+/**
+ * Check whether a token type can legally terminate an expression.
+ *
+ * @param token_type Token type to inspect.
+ * @return `true` if the token type can appear at the end of an expression.
+ */
 func is_expr_ending_token_type(token_type: TokenType) -> bool {
     match (token_type) {
         TT_IDENT(t) => { return true; }
@@ -273,31 +312,63 @@ func is_expr_ending_token_type(token_type: TokenType) -> bool {
 // Token Vector utilities
 // ------------------------------------
 
+/**
+ * Represents the TokenVector structure.
+ */
 struct TokenVector {
     vec: VectorBase*;
 }
 
+/**
+ * Create an empty token vector.
+ *
+ * @return Token vector with an initial capacity.
+ */
 func tv_create() -> TokenVector {
     let vec = vec_create(sizeof(Token), 16);
     return TokenVector(vec);
 }
 
+/**
+ * Append a token to a token vector.
+ *
+ * @param self Token vector to extend.
+ * @param token Token value to append.
+ */
 func tv_push(self: TokenVector, token: Token) {
     vec_grow(self.vec);
     let data = vec_get(self.vec, self.vec.length - 1) as Token*;
     *data = token;
 }
 
+/**
+ * Return a token from a token vector.
+ *
+ * @param self Token vector to inspect.
+ * @param index Zero-based token index.
+ * @return Token at `index`.
+ */
 func tv_get(self: TokenVector, index: int) -> Token {
     vec_check(self.vec, index);
     let data = vec_get(self.vec, index) as Token*;
     return *data;
 }
 
+/**
+ * Return the number of tokens in a token vector.
+ *
+ * @param self Token vector to inspect.
+ * @return Token count.
+ */
 func tv_len(self: TokenVector) -> int {
     return self.vec.length;
 }
 
+/**
+ * Release ARC-managed payload strings held by a token.
+ *
+ * @param token Token whose payload should be released.
+ */
 func token_release_payload(token: Token) {
     match (token.token_type) {
         TT_IDENT(text) => {
@@ -318,6 +389,11 @@ func token_release_payload(token: Token) {
     }
 }
 
+/**
+ * Free a token vector and release any token payload strings.
+ *
+ * @param self Token vector to free.
+ */
 func tv_free(self: TokenVector) {
     for (let i = 0; i < self.vec.length; i = i + 1) {
         token_release_payload(*(vec_get(self.vec, i) as Token*));

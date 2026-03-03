@@ -5,6 +5,9 @@
 
 module typing_ok;
 
+/**
+ * Exercises basic literal typing.
+ */
 func test_literals() {
     let a: int = 123;
     let b: byte = 'A';
@@ -12,6 +15,12 @@ func test_literals() {
     let d: string = "hello";
 }
 
+/**
+ * Exercises arithmetic and comparison typing.
+ *
+ * @param x The left operand.
+ * @param y The right operand.
+ */
 func test_binary(x: int, y: int) -> int {
     let sum = x + y;
     let diff = x - y;
@@ -20,11 +29,17 @@ func test_binary(x: int, y: int) -> int {
     return sum;
 }
 
+/**
+ * Represents the Point structure.
+ */
 struct Point {
     x: int;
     y: int;
 }
 
+/**
+ * Exercises struct construction and field access.
+ */
 func test_struct() -> int {
     let p = Point(1, 2);
     let px = p.x;
@@ -32,11 +47,19 @@ func test_struct() -> int {
     return px + py;
 }
 
+/**
+ * Defines the Status enumeration.
+ */
 enum Status {
     Idle;
     Active(code: int);
 }
 
+/**
+ * Exercises enum pattern matching.
+ *
+ * @param s The enum value to inspect.
+ */
 func test_enum(s: Status) -> int {
     match (s) {
         Idle => { return 0; }
@@ -44,11 +67,21 @@ func test_enum(s: Status) -> int {
     }
 }
 
+/**
+ * Exercises pointer dereference typing.
+ *
+ * @param p The pointer to dereference.
+ */
 func test_ptr(p: int*) -> int {
     let val = *p;
     return val;
 }
 
+/**
+ * Exercises byte-to-int widening.
+ *
+ * @param b The byte value to widen.
+ */
 func test_widening(b: byte) -> int {
     let i: int = b;
     return i;

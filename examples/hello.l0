@@ -7,6 +7,9 @@ module hello;
 
 import std.io;
 
+/**
+ * Main entry point for the hello world example.
+ */
 func main() {
     let hello = "Hello, World!";
     printl_s(hello);

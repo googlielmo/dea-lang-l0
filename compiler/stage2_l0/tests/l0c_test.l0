@@ -11,14 +11,27 @@ import std.vector;
 
 import l0c;
 
+/**
+ * Returns the root directory for test fixtures.
+ *
+ * @return The driver fixture directory used by command-line tests.
+ */
 func fixture_root() -> string {
     return "compiler/stage2_l0/tests/fixtures/driver";
 }
 
+/**
+ * Returns the semantics fixture directory used by command-line tests.
+ *
+ * @return The semantics fixture directory for semantic failure cases.
+ */
 func semantics_fixture_root() -> string {
     return "compiler/stage2_l0/tests/fixtures/semantics";
 }
 
+/**
+ * Tests test_check_ok.
+ */
 func test_check_ok() {
     with (let argv = vs_create(8) => vs_free(argv)) {
         vs_push(argv, "--check");
@@ -31,6 +44,9 @@ func test_check_ok() {
     }
 }
 
+/**
+ * Tests test_check_cycle_fails.
+ */
 func test_check_cycle_fails() {
     with (let argv = vs_create(8) => vs_free(argv)) {
         vs_push(argv, "--check");
@@ -43,6 +59,9 @@ func test_check_cycle_fails() {
     }
 }
 
+/**
+ * Tests test_check_semantic_failure.
+ */
 func test_check_semantic_failure() {
     with (let argv = vs_create(8) => vs_free(argv)) {
         vs_push(argv, "--check");
@@ -55,6 +74,9 @@ func test_check_semantic_failure() {
     }
 }
 
+/**
+ * Tests test_tok_ok.
+ */
 func test_tok_ok() {
     with (let argv = vs_create(10) => vs_free(argv)) {
         vs_push(argv, "--tok");
@@ -68,6 +90,9 @@ func test_tok_ok() {
     }
 }
 
+/**
+ * Tests test_parse_error_exit_code.
+ */
 func test_parse_error_exit_code() {
     with (let argv = vs_create(8) => vs_free(argv)) {
         vs_push(argv, "--check");
@@ -79,6 +104,9 @@ func test_parse_error_exit_code() {
     }
 }
 
+/**
+ * Tests test_nyi_mode_exit_code.
+ */
 func test_nyi_mode_exit_code() {
     with (let argv = vs_create(8) => vs_free(argv)) {
         vs_push(argv, "ok_main");
@@ -88,6 +116,9 @@ func test_nyi_mode_exit_code() {
     }
 }
 
+/**
+ * Tests test_type_ok.
+ */
 func test_type_ok() {
     with (let argv = vs_create(8) => vs_free(argv)) {
         vs_push(argv, "--type");
@@ -100,6 +131,9 @@ func test_type_ok() {
     }
 }
 
+/**
+ * Tests test_sym_ok.
+ */
 func test_sym_ok() {
     with (let argv = vs_create(8) => vs_free(argv)) {
         vs_push(argv, "--sym");
@@ -112,6 +146,9 @@ func test_sym_ok() {
     }
 }
 
+/**
+ * Main entry point for the module.
+ */
 func main() {
     test_check_ok();
     test_check_cycle_fails();

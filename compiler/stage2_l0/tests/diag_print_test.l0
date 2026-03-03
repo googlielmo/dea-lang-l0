@@ -12,10 +12,18 @@ import util.diag;
 
 import diag_print;
 
+/**
+ * Returns the path to a fixture file.
+ *
+ * @return The source file used for located diagnostic printing tests.
+ */
 func fixture_file() -> string {
     return "compiler/stage2_l0/tests/fixtures/driver/ok_main.l0";
 }
 
+/**
+ * Tests test_format_header_full_location.
+ */
 func test_format_header_full_location() {
     with (let dc = diag_create() => diag_free(dc)) {
         diag_error(dc, "Parser", "PAR-0010", "message", "path", 10, 5, 0, 0);
@@ -25,6 +33,9 @@ func test_format_header_full_location() {
     }
 }
 
+/**
+ * Tests test_format_header_no_file.
+ */
 func test_format_header_no_file() {
     with (let dc = diag_create() => diag_free(dc)) {
         diag_error(dc, "Parser", "PAR-0010", "message", "", 0, 0, 0, 0);
@@ -34,6 +45,9 @@ func test_format_header_no_file() {
     }
 }
 
+/**
+ * Tests test_format_header_no_column.
+ */
 func test_format_header_no_column() {
     with (let dc = diag_create() => diag_free(dc)) {
         diag_error(dc, "Parser", "PAR-0010", "message", "path", 10, 0, 0, 0);
@@ -43,6 +57,9 @@ func test_format_header_no_column() {
     }
 }
 
+/**
+ * Tests test_format_header_no_code.
+ */
 func test_format_header_no_code() {
     with (let dc = diag_create() => diag_free(dc)) {
         diag_error(dc, "", "", "message", "path", 10, 5, 0, 0);
@@ -52,6 +69,9 @@ func test_format_header_no_code() {
     }
 }
 
+/**
+ * Tests test_prints_snippet_for_located_diag.
+ */
 func test_prints_snippet_for_located_diag() {
     with (let diags = diag_create() => diag_free(diags)) {
         diag_error(diags, "diag_print_test", "DPT-0001", "synthetic located diagnostic", fixture_file(), 1, 1, 1, 6);
@@ -60,6 +80,9 @@ func test_prints_snippet_for_located_diag() {
     }
 }
 
+/**
+ * Main entry point for the module.
+ */
 func main() {
     test_format_header_full_location();
     test_format_header_no_file();

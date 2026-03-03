@@ -12,6 +12,9 @@ import std.vector;
 
 import ast;
 
+/**
+ * Defines the TypeKind enumeration.
+ */
 enum TypeKind {
     TY_BUILTIN;
     TY_STRUCT;
@@ -22,6 +25,9 @@ enum TypeKind {
     TY_NULL;
 }
 
+/**
+ * Represents the Type structure.
+ */
 struct Type {
     kind: TypeKind;
     module_name: string;
@@ -31,11 +37,17 @@ struct Type {
     result: Type*?;
 }
 
+/**
+ * Represents the StructFieldInfo structure.
+ */
 struct StructFieldInfo {
     name: string;
     field_type: Type*;
 }
 
+/**
+ * Represents the StructInfo structure.
+ */
 struct StructInfo {
     key: string;
     module_name: string;
@@ -46,11 +58,17 @@ struct StructInfo {
     fields: VectorBase*; // StructFieldInfo*
 }
 
+/**
+ * Represents the EnumVariantInfo structure.
+ */
 struct EnumVariantInfo {
     name: string;
     field_types: VectorBase*; // Type*
 }
 
+/**
+ * Represents the EnumInfo structure.
+ */
 struct EnumInfo {
     key: string;
     module_name: string;
@@ -61,6 +79,9 @@ struct EnumInfo {
     variants: VectorBase*; // EnumVariantInfo*
 }
 
+/**
+ * Represents the SignatureTables structure.
+ */
 struct SignatureTables {
     func_types: StringPtrMap*;   // key -> Type*
     struct_infos: StringPtrMap*; // key -> StructInfo*
@@ -68,6 +89,11 @@ struct SignatureTables {
     let_types: StringPtrMap*;    // key -> Type*
 }
 
+/**
+ * Free a vector of owned parameter types.
+ *
+ * @param items Optional parameter-type vector to free.
+ */
 func type_param_vec_free(items: VectorBase*?) {
     if (items == null) {
         return;
@@ -86,62 +112,150 @@ func type_new(kind: TypeKind, module_name: string, name: string, inner: Type*?, 
     return new Type(kind, module_name, name, inner, params, result);
 }
 
+/**
+ * Create a builtin type descriptor.
+ *
+ * @param name Builtin type name.
+ * @return New builtin type.
+ */
 func type_new_builtin(name: string) -> Type* {
     return type_new(TY_BUILTIN, "", name, null, null, null);
 }
 
+/**
+ * Create the builtin `bool` type.
+ *
+ * @return New `bool` type.
+ */
 func type_builtin_bool() -> Type* {
     return type_new_builtin("bool");
 }
 
+/**
+ * Create the builtin `byte` type.
+ *
+ * @return New `byte` type.
+ */
 func type_builtin_byte() -> Type* {
     return type_new_builtin("byte");
 }
 
+/**
+ * Create the builtin `int` type.
+ *
+ * @return New `int` type.
+ */
 func type_builtin_int() -> Type* {
     return type_new_builtin("int");
 }
 
+/**
+ * Create the builtin `string` type.
+ *
+ * @return New `string` type.
+ */
 func type_builtin_string() -> Type* {
     return type_new_builtin("string");
 }
 
+/**
+ * Create the builtin `void` type.
+ *
+ * @return New `void` type.
+ */
 func type_builtin_void() -> Type* {
     return type_new_builtin("void");
 }
 
+/**
+ * Create the special `null` type.
+ *
+ * @return New `null` type.
+ */
 func type_new_null() -> Type* {
     return type_new(TY_NULL, "", "null", null, null, null);
 }
 
+/**
+ * Create a struct type reference.
+ *
+ * @param module_name Module defining the struct.
+ * @param name Struct name.
+ * @return New struct type.
+ */
 func type_new_struct(module_name: string, name: string) -> Type* {
     return type_new(TY_STRUCT, module_name, name, null, null, null);
 }
 
+/**
+ * Create an enum type reference.
+ *
+ * @param module_name Module defining the enum.
+ * @param name Enum name.
+ * @return New enum type.
+ */
 func type_new_enum(module_name: string, name: string) -> Type* {
     return type_new(TY_ENUM, module_name, name, null, null, null);
 }
 
+/**
+ * Wrap a type in a pointer type.
+ *
+ * @param inner Pointee type.
+ * @return New pointer type.
+ */
 func type_new_pointer(inner: Type*) -> Type* {
     return type_new(TY_POINTER, "", "", inner, null, null);
 }
 
+/**
+ * Wrap a type in a nullable type.
+ *
+ * @param inner Wrapped type.
+ * @return New nullable type.
+ */
 func type_new_nullable(inner: Type*) -> Type* {
     return type_new(TY_NULLABLE, "", "", inner, null, null);
 }
 
+/**
+ * Create a function type.
+ *
+ * @param params Owned vector of parameter types.
+ * @param result Result type.
+ * @return New function type.
+ */
 func type_new_func(params: VectorBase*, result: Type*) -> Type* {
     return type_new(TY_FUNC, "", "", null, params, result);
 }
 
+/**
+ * Check whether a type is a specific builtin.
+ *
+ * @param self Type to inspect.
+ * @param name Builtin name to compare against.
+ * @return `true` if `self` is the named builtin type.
+ */
 func type_is_builtin(self: Type*, name: string) -> bool {
     return ord(self.kind) == ord(TY_BUILTIN) && eq_s(self.name, name);
 }
 
+/**
+ * Check whether a type name is one of the builtin names.
+ *
+ * @param name Type name to inspect.
+ * @return `true` if `name` names a builtin type.
+ */
 func type_is_builtin_name(name: string) -> bool {
     return eq_s(name, "bool") || eq_s(name, "byte") || eq_s(name, "int") || eq_s(name, "string") || eq_s(name, "void");
 }
 
+/**
+ * Deep-clone a type descriptor.
+ *
+ * @param self Type to clone.
+ * @return Deep copy of `self`.
+ */
 func type_clone(self: Type*) -> Type* {
     if (ord(self.kind) == ord(TY_BUILTIN)) {
         return type_new_builtin(self.name);
@@ -171,6 +285,13 @@ func type_clone(self: Type*) -> Type* {
     return type_new_func(params, type_clone(self.result as Type*));
 }
 
+/**
+ * Compare two types for structural equality.
+ *
+ * @param a First type.
+ * @param b Second type.
+ * @return `true` if the types are equal.
+ */
 func type_equals(a: Type*?, b: Type*?) -> bool {
     if (a == null || b == null) {
         return a == null && b == null;
@@ -210,6 +331,12 @@ func type_equals(a: Type*?, b: Type*?) -> bool {
     return type_equals(left.result, right.result);
 }
 
+/**
+ * Format a type as source-like text.
+ *
+ * @param self Type to format.
+ * @return Human-readable type spelling.
+ */
 func type_format(self: Type*) -> string {
     if (ord(self.kind) == ord(TY_BUILTIN) || ord(self.kind) == ord(TY_NULL)) {
         return self.name;
@@ -239,6 +366,11 @@ func type_format(self: Type*) -> string {
     }
 }
 
+/**
+ * Free a type descriptor and any owned child types.
+ *
+ * @param self Type to free.
+ */
 func type_free(self: Type*) {
     if (self.inner != null) {
         type_free(self.inner as Type*);
@@ -252,6 +384,11 @@ func type_free(self: Type*) {
     drop self;
 }
 
+/**
+ * Free resolved struct metadata.
+ *
+ * @param self Struct info to free.
+ */
 func struct_info_free(self: StructInfo*) {
     type_free(self.struct_type);
     for (let i = 0; i < vec_size(self.fields); i = i + 1) {
@@ -263,6 +400,11 @@ func struct_info_free(self: StructInfo*) {
     drop self;
 }
 
+/**
+ * Free resolved enum metadata.
+ *
+ * @param self Enum info to free.
+ */
 func enum_info_free(self: EnumInfo*) {
     type_free(self.enum_type);
     for (let i = 0; i < vec_size(self.variants); i = i + 1) {
@@ -278,6 +420,11 @@ func enum_info_free(self: EnumInfo*) {
     drop self;
 }
 
+/**
+ * Free signature tables and every owned resolved type/info entry.
+ *
+ * @param self Signature tables to free.
+ */
 func sig_tables_free(self: SignatureTables*) {
     for (let i = 0; i < spm_capacity(self.func_types); i = i + 1) {
         if (spm_slot_occupied(self.func_types, i)) {
@@ -305,4 +452,3 @@ func sig_tables_free(self: SignatureTables*) {
     spm_free(self.let_types);
     drop self;
 }
-

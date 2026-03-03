@@ -19,12 +19,18 @@ import source_paths;
 import parser;
 import ast;
 
+/**
+ * Represents the DriverUnit structure.
+ */
 struct DriverUnit {
     module_name: string;
     path: string;
     parse_result: ParseResult*;
 }
 
+/**
+ * Represents the DriverState structure.
+ */
 struct DriverState {
     entry_module: string;
     units: VectorBase*; // DriverUnit*
@@ -34,11 +40,21 @@ struct DriverState {
     source_texts: VectorString*; // source cache: file contents
 }
 
+/**
+ * Free a loaded driver unit and its parse result.
+ *
+ * @param self Driver unit to free.
+ */
 func dr_unit_free(self: DriverUnit*) {
     parse_result_free(self.parse_result);
     drop self;
 }
 
+/**
+ * Free an optional vector of driver units.
+ *
+ * @param units Optional driver-unit vector to free.
+ */
 func dr_units_free(units: VectorBase*?) {
     if (units == null) {
         return;
@@ -52,6 +68,11 @@ func dr_units_free(units: VectorBase*?) {
     vec_free(v);
 }
 
+/**
+ * Free driver state and all owned parse/cache data.
+ *
+ * @param self Driver state to free.
+ */
 func driver_state_free(self: DriverState*) {
     dr_units_free(self.units);
     vs_free(self.loaded);
@@ -61,26 +82,65 @@ func driver_state_free(self: DriverState*) {
     drop self;
 }
 
+/**
+ * Report whether driver analysis produced any errors.
+ *
+ * @param self Driver state to inspect.
+ * @return `true` if the driver's diagnostics contain an error.
+ */
 func driver_has_errors(self: DriverState*) -> bool {
     return diag_has_errors(self.diags);
 }
 
+/**
+ * Return the number of diagnostics collected by the driver.
+ *
+ * @param self Driver state to inspect.
+ * @return Total diagnostic count.
+ */
 func driver_diag_count(self: DriverState*) -> int {
     return diag_count(self.diags);
 }
 
+/**
+ * Return a driver diagnostic by index.
+ *
+ * @param self Driver state to inspect.
+ * @param index Zero-based diagnostic index.
+ * @return Diagnostic at `index`.
+ */
 func driver_diag_get(self: DriverState*, index: int) -> Diagnostic* {
     return diag_get(self.diags, index);
 }
 
+/**
+ * Return the number of loaded driver units.
+ *
+ * @param self Driver state to inspect.
+ * @return Loaded module count.
+ */
 func driver_unit_count(self: DriverState*) -> int {
     return vec_size(self.units);
 }
 
+/**
+ * Return a loaded driver unit by index.
+ *
+ * @param self Driver state to inspect.
+ * @param index Zero-based unit index.
+ * @return Driver unit at `index`.
+ */
 func driver_unit_get(self: DriverState*, index: int) -> DriverUnit* {
     return ptr_vec_get(self.units, index) as DriverUnit*;
 }
 
+/**
+ * Find a loaded driver unit by module name.
+ *
+ * @param self Driver state to inspect.
+ * @param module_name Module name to search for.
+ * @return Matching driver unit, or `null` if not loaded.
+ */
 func driver_find_unit(self: DriverState*, module_name: string) -> DriverUnit*? {
     for (let i = 0; i < vec_size(self.units); i = i + 1) {
         let unit = ptr_vec_get(self.units, i) as DriverUnit*;
@@ -91,6 +151,12 @@ func driver_find_unit(self: DriverState*, module_name: string) -> DriverUnit*? {
     return null;
 }
 
+/**
+ * Return loaded module names in sorted order.
+ *
+ * @param self Driver state to inspect.
+ * @return New vector containing sorted module names.
+ */
 func driver_module_names_sorted(self: DriverState*) -> VectorString* {
     let out = vs_create(vec_size(self.units));
     for (let i = 0; i < vec_size(self.units); i = i + 1) {
@@ -101,16 +167,37 @@ func driver_module_names_sorted(self: DriverState*) -> VectorString* {
     return out;
 }
 
+/**
+ * Copy parse diagnostics into the driver collector.
+ *
+ * @param dst Destination diagnostic collector.
+ * @param pr Parse result providing diagnostics.
+ */
 func dr_copy_parse_diags(dst: DiagCollector*, pr: ParseResult*) {
     for (let i = 0; i < parse_diag_count(pr); i = i + 1) {
         diag_copy(dst, parse_diag_get(pr, i));
     }
 }
 
+/**
+ * Emit a driver diagnostic without a precise source span.
+ *
+ * @param diags Diagnostic collector.
+ * @param code Diagnostic code.
+ * @param message Diagnostic message.
+ * @param filename Filename to attach when known.
+ */
 func dr_emit_error(diags: DiagCollector*, code: string, message: string, filename: string) {
     diag_error(diags, "Driver", code, message, filename, 0, 0, 0, 0);
 }
 
+/**
+ * Check whether a string vector contains a module name.
+ *
+ * @param items Vector to search.
+ * @param module_name Module name to look for.
+ * @return `true` if `module_name` is present in `items`.
+ */
 func dr_vs_has(items: VectorString*, module_name: string) -> bool {
     for (let i = 0; i < vs_size(items); i = i + 1) {
         if (eq_s(vs_get(items, i), module_name)) {
@@ -120,6 +207,12 @@ func dr_vs_has(items: VectorString*, module_name: string) -> bool {
     return false;
 }
 
+/**
+ * Mark a module as loaded if it is not already recorded.
+ *
+ * @param loaded Vector of loaded module names.
+ * @param module_name Module name to record.
+ */
 func dr_mark_loaded(loaded: VectorString*, module_name: string) {
     if (!dr_vs_has(loaded, module_name)) {
         vs_push(loaded, module_name);
@@ -198,6 +291,14 @@ func dr_load_module(state: DriverState*, search_paths: SourceSearchPaths*, loadi
     return ok;
 }
 
+/**
+ * Load and parse an entry module and its imports.
+ *
+ * @param search_paths Source search paths used for module resolution.
+ * @param entry_module Entry module name.
+ * @param cfg Logging configuration.
+ * @return Driver state containing parsed modules, caches, and diagnostics.
+ */
 func driver_analyze_entry(search_paths: SourceSearchPaths*, entry_module: string, cfg: LogConfig*) -> DriverState* {
     log_info(cfg, concat3_s("Starting analysis for entry module '", entry_module, "'"));
     let state = new DriverState(

@@ -8,6 +8,9 @@ module alias_cycle_main;
 type A = B;
 type B = A;
 
+/**
+ * Main entry point for the module.
+ */
 func main() -> int {
     return 0;
 }

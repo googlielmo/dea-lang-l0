@@ -15,16 +15,33 @@ import sem_context;
 import source_paths;
 import util.log;
 
+/**
+ * Returns the root directory for test fixtures.
+ *
+ * @return The typing fixture directory used by these tests.
+ */
 func fixture_root() -> string {
     return "compiler/stage2_l0/tests/fixtures/typing";
 }
 
+/**
+ * Creates and configures source search paths for testing.
+ *
+ * @return Source search paths rooted at the typing fixtures directory.
+ */
 func make_paths() -> SourceSearchPaths* {
     let sp = sp_create();
     sp_add_project_root(sp, fixture_root());
     return sp;
 }
 
+/**
+ * Checks if a specific diagnostic code is present in the results.
+ *
+ * @param result The analysis result to inspect.
+ * @param code The diagnostic code to look for.
+ * @return `true` if the diagnostic code is present, otherwise `false`.
+ */
 func has_diag_code(result: AnalysisResult*, code: string) -> bool {
     for (let i = 0; i < analysis_diag_count(result); i = i + 1) {
         let d = analysis_diag_get(result, i);
@@ -35,6 +52,9 @@ func has_diag_code(result: AnalysisResult*, code: string) -> bool {
     return false;
 }
 
+/**
+ * Tests test_typing_ok.
+ */
 func test_typing_ok() {
     let sp = make_paths();
     with (let cfg = log_config_create(LL_SILENT, false) => drop cfg) {
@@ -45,6 +65,9 @@ func test_typing_ok() {
     sp_free(sp);
 }
 
+/**
+ * Tests test_typing_err.
+ */
 func test_typing_err() {
     let sp = make_paths();
     with (let cfg = log_config_create(LL_SILENT, false) => drop cfg) {
@@ -64,6 +87,9 @@ func test_typing_err() {
     sp_free(sp);
 }
 
+/**
+ * Main entry point for the module.
+ */
 func main() {
     test_typing_ok();
     test_typing_err();

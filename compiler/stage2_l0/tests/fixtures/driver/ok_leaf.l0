@@ -5,6 +5,11 @@
 
 module ok_leaf;
 
+/**
+ * Exposes the leaf dependency in the transitive import fixture.
+ *
+ * @return `3`.
+ */
 func h() -> int {
     return 3;
 }

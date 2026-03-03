@@ -10,6 +10,9 @@ import std.io;
 import std.string;
 import std.vector;
 
+/**
+ * Tests test_basic.
+ */
 func test_basic() {
     printl_s("=== Basic VectorString Test ===");
     let vs = vs_create(1);
@@ -43,6 +46,9 @@ func test_basic() {
     printl_s("Basic test passed!\n");
 }
 
+/**
+ * Tests test_empty_vector.
+ */
 func test_empty_vector() {
     printl_s("=== Empty VectorString Test ===");
 
@@ -63,6 +69,9 @@ func test_empty_vector() {
     printl_s("Empty vector test passed!\n");
 }
 
+/**
+ * Tests test_multiple_resizes.
+ */
 func test_multiple_resizes() {
     printl_s("=== Multiple Resizes Test ===");
 
@@ -126,6 +135,9 @@ func test_multiple_resizes() {
     printl_s("Multiple resizes test passed!\n");
 }
 
+/**
+ * Tests test_single_element.
+ */
 func test_single_element() {
     printl_s("=== Single Element Test ===");
 
@@ -141,6 +153,9 @@ func test_single_element() {
     printl_s("Single element test passed!\n");
 }
 
+/**
+ * Tests test_vs_sort.
+ */
 func test_vs_sort() {
     printl_s("=== Test vs_sort ===");
 
@@ -187,6 +202,9 @@ func test_vs_sort() {
     printl_s("vs_sort tests passed!\n");
 }
 
+/**
+ * Main entry point for the module.
+ */
 func main() {
     printl_s("==========================================");
     printl_s("       VectorString Test Suite");

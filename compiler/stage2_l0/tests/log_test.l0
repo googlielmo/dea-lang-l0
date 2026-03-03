@@ -10,26 +10,41 @@ import std.assert;
 import std.string;
 import util.log;
 
+/**
+ * Tests test_level_from_verbosity_zero.
+ */
 func test_level_from_verbosity_zero() {
     let level = log_level_from_verbosity(0);
     assert(ord(level) == ord(LL_ERROR), "verbosity 0 should map to LL_ERROR");
 }
 
+/**
+ * Tests test_level_from_verbosity_one.
+ */
 func test_level_from_verbosity_one() {
     let level = log_level_from_verbosity(1);
     assert(ord(level) == ord(LL_INFO), "verbosity 1 should map to LL_INFO");
 }
 
+/**
+ * Tests test_level_from_verbosity_two.
+ */
 func test_level_from_verbosity_two() {
     let level = log_level_from_verbosity(2);
     assert(ord(level) == ord(LL_INFO), "verbosity 2 should map to LL_INFO");
 }
 
+/**
+ * Tests test_level_from_verbosity_three.
+ */
 func test_level_from_verbosity_three() {
     let level = log_level_from_verbosity(3);
     assert(ord(level) == ord(LL_DEBUG), "verbosity 3 should map to LL_DEBUG");
 }
 
+/**
+ * Tests test_level_names.
+ */
 func test_level_names() {
     assert(eq_s(log_level_name(LL_SILENT), "SILENT"), "LL_SILENT name");
     assert(eq_s(log_level_name(LL_ERROR), "ERROR"), "LL_ERROR name");
@@ -38,16 +53,25 @@ func test_level_names() {
     assert(eq_s(log_level_name(LL_DEBUG), "DEBUG"), "LL_DEBUG name");
 }
 
+/**
+ * Tests test_format_stage_with_module.
+ */
 func test_format_stage_with_module() {
     let msg = log_format_stage("Loading", "hello");
     assert(eq_s(msg, "Loading module 'hello'"), "stage format with module");
 }
 
+/**
+ * Tests test_format_stage_without_module.
+ */
 func test_format_stage_without_module() {
     let msg = log_format_stage("Resolving names", "");
     assert(eq_s(msg, "Resolving names..."), "stage format without module");
 }
 
+/**
+ * Tests test_log_msg_respects_level.
+ */
 func test_log_msg_respects_level() {
     // LL_ERROR config should not emit INFO messages (visual: no output expected)
     with (let cfg = log_config_create(LL_ERROR, false) => drop cfg) {
@@ -57,6 +81,9 @@ func test_log_msg_respects_level() {
     }
 }
 
+/**
+ * Tests test_log_msg_emits_at_level.
+ */
 func test_log_msg_emits_at_level() {
     // LL_DEBUG config should emit everything (visual: output on stderr)
     with (let cfg = log_config_create(LL_DEBUG, false) => drop cfg) {
@@ -66,6 +93,9 @@ func test_log_msg_emits_at_level() {
     }
 }
 
+/**
+ * Tests test_log_rich_format.
+ */
 func test_log_rich_format() {
     // Rich format prepends [LEVEL] prefix (visual: check stderr)
     with (let cfg = log_config_create(LL_INFO, true) => drop cfg) {
@@ -73,6 +103,9 @@ func test_log_rich_format() {
     }
 }
 
+/**
+ * Main entry point for the module.
+ */
 func main() {
     test_level_from_verbosity_zero();
     test_level_from_verbosity_one();

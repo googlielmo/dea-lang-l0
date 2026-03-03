@@ -9,6 +9,9 @@ import std.io;
 import std.string;
 import std.array;
 
+/**
+ * Tests test_arr_create.
+ */
 func test_arr_create() {
     printl_s("=== Test arr_create ===");
 
@@ -39,6 +42,9 @@ func test_arr_create() {
     printl_s("arr_create tests passed!\n");
 }
 
+/**
+ * Tests test_arr_get_and_set.
+ */
 func test_arr_get_and_set() {
     printl_s("=== Test arr_get (read/write) ===");
 
@@ -76,6 +82,9 @@ func test_arr_get_and_set() {
     printl_s("arr_get tests passed!\n");
 }
 
+/**
+ * Tests test_arr_resize.
+ */
 func test_arr_resize() {
     printl_s("=== Test arr_resize ===");
 
@@ -118,6 +127,9 @@ func test_arr_resize() {
     printl_s("arr_resize tests passed!\n");
 }
 
+/**
+ * Tests test_arr_with_bytes.
+ */
 func test_arr_with_bytes() {
     printl_s("=== Test array with byte elements ===");
 
@@ -150,6 +162,9 @@ func test_arr_with_bytes() {
     printl_s("Byte array tests passed!\n");
 }
 
+/**
+ * Tests test_arr_with_pointers.
+ */
 func test_arr_with_pointers() {
     printl_s("=== Test array with pointer elements ===");
 
@@ -190,6 +205,9 @@ func test_arr_with_pointers() {
     printl_s("Pointer array tests passed!\n");
 }
 
+/**
+ * Main entry point for the module.
+ */
 func main() {
     printl_s("======================================");
     printl_s("       ArrayBase Test Suite");

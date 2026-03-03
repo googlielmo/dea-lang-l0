@@ -13,16 +13,29 @@ import sem_context;
 import source_paths;
 import util.log;
 
+/**
+ * Returns the root directory for test fixtures.
+ *
+ * @return The driver fixture directory used by this test.
+ */
 func fixture_root() -> string {
     return "compiler/stage2_l0/tests/fixtures/driver";
 }
 
+/**
+ * Creates and configures source search paths for testing.
+ *
+ * @return Source search paths rooted at the driver fixtures directory.
+ */
 func make_paths() -> SourceSearchPaths* {
     let sp = sp_create();
     sp_add_project_root(sp, fixture_root());
     return sp;
 }
 
+/**
+ * Tests test_analysis_ok_main.
+ */
 func test_analysis_ok_main() {
     let sp = make_paths();
     with (let cfg = log_config_create(LL_SILENT, false) => drop cfg) {
@@ -34,6 +47,9 @@ func test_analysis_ok_main() {
     sp_free(sp);
 }
 
+/**
+ * Main entry point for the module.
+ */
 func main() {
     test_analysis_ok_main();
     printl_s("analysis_trace_test: all tests passed");

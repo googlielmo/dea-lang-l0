@@ -10,6 +10,9 @@ import std.io;
 import std.string;
 import std.vector;
 
+/**
+ * Tests test_vec_create.
+ */
 func test_vec_create() {
     printl_s("=== Test vec_create ===");
 
@@ -32,6 +35,9 @@ func test_vec_create() {
     printl_s("vec_create tests passed!\n");
 }
 
+/**
+ * Tests test_vec_push_and_grow.
+ */
 func test_vec_push_and_grow() {
     printl_s("=== Test vec_push and vec_grow ===");
 
@@ -63,6 +69,9 @@ func test_vec_push_and_grow() {
     printl_s("vec_push tests passed!\n");
 }
 
+/**
+ * Tests test_vec_push_int.
+ */
 func test_vec_push_int() {
     printl_s("=== Test vec_push_int ===");
 
@@ -84,6 +93,9 @@ func test_vec_push_int() {
     printl_s("vec_push_int tests passed!\n");
 }
 
+/**
+ * Tests test_vec_push_byte.
+ */
 func test_vec_push_byte() {
     printl_s("=== Test vec_push_byte ===");
 
@@ -106,6 +118,9 @@ func test_vec_push_byte() {
     printl_s("vec_push_byte tests passed!\n");
 }
 
+/**
+ * Tests test_vec_push_bool.
+ */
 func test_vec_push_bool() {
     printl_s("=== Test vec_push_bool ===");
 
@@ -128,6 +143,9 @@ func test_vec_push_bool() {
     printl_s("vec_push_bool tests passed!\n");
 }
 
+/**
+ * Tests test_vec_push_ptr.
+ */
 func test_vec_push_ptr() {
     printl_s("=== Test vec_push_ptr ===");
 
@@ -160,6 +178,9 @@ func test_vec_push_ptr() {
     printl_s("vec_push_ptr tests passed!\n");
 }
 
+/**
+ * Tests test_vec_reserve.
+ */
 func test_vec_reserve() {
     printl_s("=== Test vec_reserve ===");
 
@@ -183,6 +204,9 @@ func test_vec_reserve() {
     printl_s("vec_reserve tests passed!\n");
 }
 
+/**
+ * Tests test_vec_zap.
+ */
 func test_vec_zap() {
     printl_s("=== Test vec_zap ===");
 
@@ -211,6 +235,9 @@ func test_vec_zap() {
     printl_s("vec_zap tests passed!\n");
 }
 
+/**
+ * Tests test_vec_clear.
+ */
 func test_vec_clear() {
     printl_s("=== Test vec_clear ===");
 
@@ -243,6 +270,9 @@ func test_vec_clear() {
     printl_s("vec_clear tests passed!\n");
 }
 
+/**
+ * Tests test_many_elements.
+ */
 func test_many_elements() {
     printl_s("=== Test many elements (growth stress test) ===");
 
@@ -271,6 +301,9 @@ func test_many_elements() {
     printl_s("Many elements test passed!\n");
 }
 
+/**
+ * Tests test_vi_sort.
+ */
 func test_vi_sort() {
     printl_s("=== Test vi_sort ===");
 
@@ -321,6 +354,9 @@ func test_vi_sort() {
     printl_s("vi_sort tests passed!\n");
 }
 
+/**
+ * Main entry point for the module.
+ */
 func main() {
     printl_s("======================================");
     printl_s("       VectorBase Test Suite");

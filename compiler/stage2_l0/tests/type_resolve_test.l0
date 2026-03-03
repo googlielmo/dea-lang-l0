@@ -21,16 +21,29 @@ import symbols;
 import util.log;
 import name_resolver;
 
+/**
+ * Returns the root directory for test fixtures.
+ *
+ * @return The semantics fixture directory used by these tests.
+ */
 func fixture_root() -> string {
     return "compiler/stage2_l0/tests/fixtures/semantics";
 }
 
+/**
+ * Creates and configures source search paths for testing.
+ *
+ * @return Source search paths rooted at the semantics fixtures directory.
+ */
 func make_paths() -> SourceSearchPaths* {
     let sp = sp_create();
     sp_add_project_root(sp, fixture_root());
     return sp;
 }
 
+/**
+ * Tests test_tr_symbol_lookup.
+ */
 func test_tr_symbol_lookup() {
     let sp = make_paths();
     with (let cfg = log_config_create(LL_SILENT, false) => drop cfg) {
@@ -62,6 +75,9 @@ func test_tr_symbol_lookup() {
     sp_free(sp);
 }
 
+/**
+ * Tests test_tr_resolve_type_ref.
+ */
 func test_tr_resolve_type_ref() {
     let sp = make_paths();
     with (let cfg = log_config_create(LL_SILENT, false) => drop cfg) {
@@ -102,6 +118,9 @@ func test_tr_resolve_type_ref() {
     sp_free(sp);
 }
 
+/**
+ * Main entry point for the module.
+ */
 func main() {
     test_tr_symbol_lookup();
     test_tr_resolve_type_ref();

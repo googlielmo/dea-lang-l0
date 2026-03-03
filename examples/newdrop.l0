@@ -7,20 +7,34 @@ module newdrop;
 
 import std.io;
 
+/**
+ * Represents a simple structure with two integer fields.
+ */
 struct MyStruct {
     a: int;
     b: int;
 }
 
+/**
+ * An enumeration with two cases containing different payload types.
+ */
 enum MyEnum {
     CaseA(x: int);
     CaseB(y: string);
 }
 
+/**
+ * A helper function that takes a pointer to a string and drops it.
+ *
+ * @param t The pointer to the string to drop.
+ */
 func drop_var(t: string*) -> void {
     drop t;
 }
 
+/**
+ * Main entry point for the newdrop example.
+ */
 func main() -> void {
 
 

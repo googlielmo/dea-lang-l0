@@ -11,34 +11,67 @@ import std.assert;
 
 import std.vector;
 
-/* -------------------------------------
-   StringBuffer for efficient string building
-   ------------------------------------ */
+/* ---------------------------------
+   StringBuffer: efficient building
+   --------------------------------- */
 
+/**
+ * StringBuffer allows for efficient construction of strings by accumulating
+ * parts in a vector.
+ */
 struct StringBuffer {
     parts: VectorString*; // Vector of strings
     size: int; // Total size of all parts (cached for efficiency)
 }
 
+/**
+ * Creates a new, empty StringBuffer.
+ *
+ * @return A pointer to the newly created StringBuffer.
+ */
 func sb_create() -> StringBuffer* {
     let parts = vs_create(8);
     let self = new StringBuffer(parts, 0);
     return self;
 }
 
+/**
+ * Appends a string to the StringBuffer.
+ *
+ * @param self The pointer to the StringBuffer.
+ * @param s The string to append.
+ */
 func sb_append(self: StringBuffer*, s: string) {
     vs_push(self.parts, s);
     self.size = self.size + len_s(s);
 }
 
+/**
+ * Appends an integer to the StringBuffer.
+ *
+ * @param self The pointer to the StringBuffer.
+ * @param value The integer value to append.
+ */
 func sb_append_int(self: StringBuffer*, value: int) {
     sb_append(self, int_to_string(value));
 }
 
+/**
+ * Appends a byte to the StringBuffer.
+ *
+ * @param self The pointer to the StringBuffer.
+ * @param b The byte value to append.
+ */
 func sb_append_byte(self: StringBuffer*, b: byte){
     sb_append(self, byte_to_s(b));
 }
 
+/**
+ * Converts the accumulated contents of the StringBuffer into a single string.
+ *
+ * @param self The pointer to the StringBuffer.
+ * @return The final concatenated string.
+ */
 func sb_to_string(self: StringBuffer*) -> string {
     with (let cb = cb_create() => cb_free(cb)) {
         cb_reserve(cb, self.size);
@@ -49,46 +82,96 @@ func sb_to_string(self: StringBuffer*) -> string {
     }
 }
 
+/**
+ * Returns the current total size of all strings in the StringBuffer.
+ *
+ * @param self The pointer to the StringBuffer.
+ * @return The total size in bytes.
+ */
 func sb_size(self: StringBuffer*) -> int {
     return self.size;
 }
 
+/**
+ * Free a `StringBuffer` and its accumulated string parts.
+ *
+ * @param self String buffer to free.
+ */
 func sb_free(self: StringBuffer*) {
     vs_free(self.parts);
     drop self;
 }
 
-/* ------------------------------------
-   CharBuffer for efficient string building
-   ------------------------------------ */
+/* ---------------------------------
+   CharBuffer: efficient building
+   --------------------------------- */
 
+/**
+ * CharBuffer allows for efficient building of strings by accumulating
+ * individual characters.
+ */
 struct CharBuffer {
     chars: VectorBase*; // Vector of byte
 }
 
+/**
+ * Creates a new, empty CharBuffer.
+ *
+ * @return A pointer to the newly created CharBuffer.
+ */
 func cb_create() -> CharBuffer* {
     let chars = vec_create(sizeof(byte), 16);
     let self = new CharBuffer(chars);
     return self;
 }
 
+/**
+ * Returns the current capacity of the CharBuffer.
+ *
+ * @param self The pointer to the CharBuffer.
+ * @return The total capacity.
+ */
 func cb_capacity(self: CharBuffer*) -> int {
     return vec_capacity(self.chars);
 }
 
+/**
+ * Returns the number of characters currently in the CharBuffer.
+ *
+ * @param self The pointer to the CharBuffer.
+ * @return The character count.
+ */
 func cb_size(self: CharBuffer*) -> int {
     return vec_size(self.chars);
 }
 
+/**
+ * Ensures the CharBuffer has at least the specified capacity.
+ *
+ * @param self The pointer to the CharBuffer.
+ * @param total_capacity The desired capacity.
+ */
 func cb_reserve(self: CharBuffer*, total_capacity: int) {
     vec_reserve(self.chars, total_capacity);
 }
 
+/**
+ * Appends a single character to the CharBuffer.
+ *
+ * @param self The pointer to the CharBuffer.
+ * @param c The character to append.
+ */
 func cb_append(self: CharBuffer*, c: byte) {
     let dest = vec_push(self.chars) as byte*;
     *dest = c;
 }
 
+/**
+ * Appends a string to the CharBuffer.
+ *
+ * @param self The pointer to the CharBuffer.
+ * @param s The string to append.
+ */
 func cb_append_s(self: CharBuffer*, s: string) {
     for (let i: int = 0; i < len_s(s); i = i + 1) {
         let c = char_at_s(s, i);
@@ -96,6 +179,14 @@ func cb_append_s(self: CharBuffer*, s: string) {
     }
 }
 
+/**
+ * Appends a slice of a string to the CharBuffer.
+ *
+ * @param self The pointer to the CharBuffer.
+ * @param s The string containing the slice.
+ * @param start The starting index of the slice.
+ * @param length The number of characters to append.
+ */
 func cb_append_slice(self: CharBuffer*, s: string, start: int, length: int) {
     for (let i: int = 0; i < length; i = i + 1) {
         let c = char_at_s(s, start + i);
@@ -103,10 +194,21 @@ func cb_append_slice(self: CharBuffer*, s: string, start: int, length: int) {
     }
 }
 
+/**
+ * Appends an integer to the CharBuffer.
+ *
+ * @param self The pointer to the CharBuffer.
+ * @param value The integer value to append.
+ */
 func cb_append_int(self: CharBuffer*, value: int) {
     cb_append_s(self, int_to_string(value));
 }
 
+/**
+ * Reverses the contents of the CharBuffer in place.
+ *
+ * @param cb The pointer to the CharBuffer.
+ */
 func cb_reverse(cb: CharBuffer*) {
     let size = cb_size(cb);
     for (let i: int = 0; i < size / 2; i = i + 1) {
@@ -118,27 +220,48 @@ func cb_reverse(cb: CharBuffer*) {
     }
 }
 
+/**
+ * Converts the accumulated characters in the CharBuffer into a string.
+ *
+ * @param self The pointer to the CharBuffer.
+ * @return The final string.
+ */
 func cb_to_string(self: CharBuffer*) -> string {
     let size = cb_size(self);
     let bytes = vec_get(self.chars, 0) as byte*;
     return bytes_to_s(bytes, size);
 }
 
+/**
+ * Clears all characters from the CharBuffer without freeing memory.
+ *
+ * @param self The pointer to the CharBuffer.
+ */
 func cb_clear(self: CharBuffer*) {
     vec_clear(self.chars);
 }
 
+/**
+ * Free a `CharBuffer` and its backing character storage.
+ *
+ * @param self Character buffer to free.
+ */
 func cb_free(self: CharBuffer*) {
     vec_free(self.chars);
     drop self;
 }
 
-/* ------------------------------------
-   Additional string utility functions
-   ------------------------------------ */
+/* ---------------------------------
+   String utility functions
+   --------------------------------- */
 
-/*
- * concat3_s concatenates three strings and returns the result.
+/**
+ * Concatenates three strings and returns the result.
+ *
+ * @param a The first string.
+ * @param b The second string.
+ * @param c The third string.
+ * @return The combined string.
  */
 func concat3_s(a: string, b: string, c: string) -> string {
     let total_len = len_s(a) + len_s(b) + len_s(c);
@@ -154,8 +277,14 @@ func concat3_s(a: string, b: string, c: string) -> string {
     }
 }
 
-/*
- * concat4_s concatenates four strings and returns the result.
+/**
+ * Concatenates four strings and returns the result.
+ *
+ * @param a The first string.
+ * @param b The second string.
+ * @param c The third string.
+ * @param d The fourth string.
+ * @return The combined string.
  */
 func concat4_s(a: string, b: string, c: string, d: string) -> string {
     let total_len = len_s(a) + len_s(b) + len_s(c) + len_s(d);
@@ -172,8 +301,11 @@ func concat4_s(a: string, b: string, c: string, d: string) -> string {
     }
 }
 
-/*
- * to_upper_s converts all characters in the input string to uppercase.
+/**
+ * Converts all characters in the input string to uppercase.
+ *
+ * @param s The string to convert.
+ * @return The uppercase string.
  */
 func to_upper_s(s: string) -> string {
     with (let cb = cb_create() => cb_free(cb)) {
@@ -185,8 +317,11 @@ func to_upper_s(s: string) -> string {
     }
 }
 
-/*
- * to_lower_s converts all characters in the input string to lowercase.
+/**
+ * Converts all characters in the input string to lowercase.
+ *
+ * @param s The string to convert.
+ * @return The lowercase string.
  */
 func to_lower_s(s: string) -> string {
     with (let cb = cb_create() => cb_free(cb)) {
@@ -198,8 +333,12 @@ func to_lower_s(s: string) -> string {
     }
 }
 
-/*
- * repeat_s returns a new string that is the input string `s` repeated `count` times.
+/**
+ * Returns a new string that is the input string `s` repeated `count` times.
+ *
+ * @param s The string to repeat.
+ * @param count The number of repetitions.
+ * @return The repeated string.
  */
 func repeat_s(s: string, count: int) -> string {
     with (let cb = cb_create() => cb_free(cb)) {
@@ -210,6 +349,13 @@ func repeat_s(s: string, count: int) -> string {
     }
 }
 
+/**
+ * Splits a string into parts based on a separator string.
+ *
+ * @param s The string to split.
+ * @param sep The separator string.
+ * @return A new VectorString containing the parts.
+ */
 func split_s(s: string, sep: string) -> VectorString* {
     assert(!is_empty_s(sep), "split_s: separator must be non-empty");
 
@@ -234,6 +380,12 @@ func split_s(s: string, sep: string) -> VectorString* {
     return out;
 }
 
+/**
+ * Internal helper to strip a trailing CR from a line string.
+ *
+ * @param s The string.
+ * @return The stripped string.
+ */
 func _line_strip_trailing_cr(s: string) -> string {
     let n = len_s(s);
     if (n > 0 && char_at_s(s, n - 1) == '\r') {
@@ -242,6 +394,12 @@ func _line_strip_trailing_cr(s: string) -> string {
     return s;
 }
 
+/**
+ * Splits a string into lines, supporting both LF and CRLF.
+ *
+ * @param s The string to split into lines.
+ * @return A new VectorString containing the lines.
+ */
 func lines_s(s: string) -> VectorString* {
     let out = vs_create(16);
     let n = len_s(s);
@@ -264,6 +422,13 @@ func lines_s(s: string) -> VectorString* {
     return out;
 }
 
+/**
+ * Joins parts of a string vector using a separator.
+ *
+ * @param parts The vector of string parts.
+ * @param sep The separator string.
+ * @return The single joined string.
+ */
 func join_s(parts: VectorString*, sep: string) -> string {
     let count = vs_size(parts);
     if (count == 0) {
@@ -288,6 +453,14 @@ func join_s(parts: VectorString*, sep: string) -> string {
     }
 }
 
+/**
+ * Replaces all occurrences of an old substring with a new replacement string.
+ *
+ * @param s The source string.
+ * @param old The substring to replace.
+ * @param replacement The replacement substring.
+ * @return The modified string.
+ */
 func replace_s(s: string, old: string, replacement: string) -> string {
     assert(!is_empty_s(old), "replace_s: old pattern must be non-empty");
 
@@ -310,6 +483,13 @@ func replace_s(s: string, old: string, replacement: string) -> string {
     }
 }
 
+/**
+ * Converts an integer to a string representation in the specified base.
+ *
+ * @param value The integer value.
+ * @param base The numeric base (2-16).
+ * @return The string representation.
+ */
 func int_to_string_base(value: int, base: int) -> string {
     assert(base >= 2 && base <= 16, "Base must be between 2 and 16");
     if (value == 0) {
@@ -344,6 +524,12 @@ func int_to_string_base(value: int, base: int) -> string {
     return result;
 }
 
+/**
+ * Reverses the characters in a string.
+ *
+ * @param s The string to reverse.
+ * @return The reversed string.
+ */
 func reverse_s(s: string) -> string {
     with (let cb = cb_create() => cb_free(cb)) {
         cb_append_s(cb, s);
@@ -352,18 +538,42 @@ func reverse_s(s: string) -> string {
     }
 }
 
+/**
+ * Converts an integer to its decimal string representation.
+ *
+ * @param value The integer value.
+ * @return The decimal string.
+ */
 func int_to_string(value: int) -> string {
     return int_to_string_base(value, 10);
 }
 
+/**
+ * Converts an integer to its hexadecimal string representation.
+ *
+ * @param value The integer value.
+ * @return The hex string.
+ */
 func int_to_hex_string(value: int) -> string {
     return int_to_string_base(value, 16);
 }
 
+/**
+ * Converts an integer to its binary string representation.
+ *
+ * @param value The integer value.
+ * @return The binary string.
+ */
 func int_to_bin_string(value: int) -> string {
     return int_to_string_base(value, 2);
 }
 
+/**
+ * Converts a boolean to its string representation ("true" or "false").
+ *
+ * @param value The boolean value.
+ * @return The string representation.
+ */
 func bool_to_string(value: bool) -> string {
     if (value) {
         return "true";
@@ -371,6 +581,12 @@ func bool_to_string(value: bool) -> string {
     return "false";
 }
 
+/**
+ * Parses a string representation of a boolean.
+ *
+ * @param s The string to parse.
+ * @return The boolean value, or null if invalid.
+ */
 func string_to_bool(s: string) -> bool? {
     if (eq_s(s, "true")) {
         return true;
@@ -381,27 +597,56 @@ func string_to_bool(s: string) -> bool? {
     return null;
 }
 
+/**
+ * Converts a byte to its decimal string representation.
+ *
+ * @param value The byte value.
+ * @return The decimal string.
+ */
 func byte_to_string(value: byte) -> string {
     return byte_to_string_base(value, 10);
 }
 
+/**
+ * Converts a byte to its string representation in the specified base.
+ *
+ * @param value The byte value.
+ * @param base The numeric base (2-16).
+ * @return The string representation.
+ */
 func byte_to_string_base(value: byte, base: int) -> string {
     assert(base >= 2 && base <= 16, "Base must be between 2 and 16");
     return int_to_string_base(value as int, base);
 }
 
-/*
- * string_to_int converts a decimal numeric string to an integer.
+/**
+ * Converts a decimal numeric string to an integer.
  * Returns null when parsing fails or overflows 32-bit signed range.
+ *
+ * @param s The string to parse.
+ * @return The integer value, or null.
  */
 func string_to_int(s: string) -> int? {
     return string_to_int_base(s, 10);
 }
 
+/**
+ * Converts a decimal numeric string to a byte.
+ *
+ * @param s The string to parse.
+ * @return The byte value, or null if invalid or out of range (0-255).
+ */
 func string_to_byte(s: string) -> byte? {
     return string_to_byte_base(s, 10);
 }
 
+/**
+ * Converts a numeric string in the specified base to a byte.
+ *
+ * @param s The string to parse.
+ * @param base The numeric base (2-16).
+ * @return The byte value, or null if invalid or out of range.
+ */
 func string_to_byte_base(s: string, base: int) -> byte? {
     assert(base >= 2 && base <= 16, "Base must be between 2 and 16");
     let parsed = string_to_int_base(s, base)?;
@@ -411,12 +656,16 @@ func string_to_byte_base(s: string, base: int) -> byte? {
     return parsed as byte;
 }
 
-/*
- * string_to_int_base converts a numeric string 's' expressed in base 'base' to an integer.
+/**
+ * Converts a numeric string 's' expressed in base 'base' to an integer.
  * Handles optional leading '-' for negative numbers and ignores leading zeros.
  * No special prefixes like "0x" for hex or "0b" for binary are expected or allowed.
  * Checks for overflow and invalid characters.
  * Returns null if the string is not a valid 32-bit signed integer.
+ *
+ * @param s The string to parse.
+ * @param base The numeric base (2-16).
+ * @return The integer value, or null.
  */
 func string_to_int_base(s: string, base: int) -> int? {
     assert(base >= 2 && base <= 16, "Base must be between 2 and 16");

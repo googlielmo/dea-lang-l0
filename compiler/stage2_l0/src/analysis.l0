@@ -20,12 +20,26 @@ import source_paths;
 import types;
 import util.log;
 
+/**
+ * Copies diagnostic messages from the driver state to a diagnostic collector.
+ *
+ * @param dst The destination diagnostic collector.
+ * @param src The source driver state containing diagnostics.
+ */
 func analysis_copy_driver_diags(dst: DiagCollector*, src: DriverState*) {
     for (let i = 0; i < driver_diag_count(src); i = i + 1) {
         diag_copy(dst, driver_diag_get(src, i));
     }
 }
 
+/**
+ * Analyzes the entry module and its dependencies.
+ *
+ * @param search_paths The source search paths configuration.
+ * @param entry_module The name of the entry module.
+ * @param cfg The logging configuration.
+ * @return The complete analysis result including semantic context.
+ */
 func analysis_analyze_entry(search_paths: SourceSearchPaths*, entry_module: string, cfg: LogConfig*) -> AnalysisResult* {
     let driver_state = driver_analyze_entry(search_paths, entry_module, cfg);
     let result = new AnalysisResult(

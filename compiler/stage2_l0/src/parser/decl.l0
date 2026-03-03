@@ -16,16 +16,34 @@ import parser.shared;
 import parser.expr;
 import parser.stmt;
 
-/* ------------------------------------
+/* ---------------------------------
    Top-level declarations
-   ------------------------------------ */
+   --------------------------------- */
 
+/**
+ * Create an empty block statement node in the statement arena.
+ *
+ * @param self Parser state providing the statement arena.
+ * @param span Source span for the synthetic block.
+ * @return Statement id for the created block.
+ */
 func ps_make_empty_block_stmt(self: ParserState*, span: Span) -> StmtId {
     let node = stmt_node_create(ST_BLOCK, span);
     node.ids = id_vec_create(0);
     return stmt_arena_add(self.stmt_arena, node);
 }
 
+/**
+ * Finish parsing a function declaration after its signature.
+ *
+ * @param self Parser state to advance.
+ * @param start Starting span for the declaration.
+ * @param name_tok Function name token.
+ * @param params Parsed parameter vector.
+ * @param is_extern Whether this is an extern declaration.
+ * @param ret_type Parsed return type.
+ * @return Completed function declaration, or `null` on error.
+ */
 func ps_finish_function(self: ParserState*, start: Span, name_tok: Token, params: VectorBase*, is_extern: bool, ret_type: TypeRef*) -> FuncDecl*? {
     let body = invalid_stmt_id();
     if (is_extern) {
@@ -45,6 +63,13 @@ func ps_finish_function(self: ParserState*, start: Span, name_tok: Token, params
     );
 }
 
+/**
+ * Parse a function declaration.
+ *
+ * @param self Parser state to advance.
+ * @param is_extern Whether the declaration started with `extern`.
+ * @return Parsed function declaration, or `null` on error.
+ */
 func ps_parse_function(self: ParserState*, is_extern: bool) -> FuncDecl*? {
     let start = ps_span_start(self);
     ps_expect(self, ord(TT_FUNC), "PAR-0040", "[PAR-0040] expected 'func'")?;
@@ -82,11 +107,23 @@ func ps_parse_function(self: ParserState*, is_extern: bool) -> FuncDecl*? {
     }
 }
 
+/**
+ * Parse an extern function declaration.
+ *
+ * @param self Parser state to advance.
+ * @return Parsed extern function declaration, or `null` on error.
+ */
 func ps_parse_extern_func(self: ParserState*) -> FuncDecl*? {
     ps_expect(self, ord(TT_EXTERN), "PAR-0030", "[PAR-0030] expected 'extern'")?;
     return ps_parse_function(self, true);
 }
 
+/**
+ * Parse a struct declaration.
+ *
+ * @param self Parser state to advance.
+ * @return Parsed struct declaration, or `null` on error.
+ */
 func ps_parse_struct(self: ParserState*) -> StructDecl*? {
     let start = ps_span_start(self);
     ps_expect(self, ord(TT_STRUCT), "PAR-0050", "[PAR-0050] expected 'struct'")?;
@@ -110,6 +147,12 @@ func ps_parse_struct(self: ParserState*) -> StructDecl*? {
     }
 }
 
+/**
+ * Parse an enum declaration.
+ *
+ * @param self Parser state to advance.
+ * @return Parsed enum declaration, or `null` on error.
+ */
 func ps_parse_enum(self: ParserState*) -> EnumDecl*? {
     let start = ps_span_start(self);
     ps_expect(self, ord(TT_ENUM), "PAR-0060", "[PAR-0060] expected 'enum'")?;
@@ -151,6 +194,12 @@ func ps_parse_enum(self: ParserState*) -> EnumDecl*? {
     }
 }
 
+/**
+ * Parse a type-alias declaration.
+ *
+ * @param self Parser state to advance.
+ * @return Parsed type-alias declaration, or `null` on error.
+ */
 func ps_parse_type_alias(self: ParserState*) -> TypeAliasDecl*? {
     let start = ps_span_start(self);
     ps_expect(self, ord(TT_TYPE), "PAR-0070", "[PAR-0070] expected type name")?;
@@ -165,6 +214,12 @@ func ps_parse_type_alias(self: ParserState*) -> TypeAliasDecl*? {
     }
 }
 
+/**
+ * Parse a top-level `let` declaration.
+ *
+ * @param self Parser state to advance.
+ * @return Parsed top-level `let`, or `null` on error.
+ */
 func ps_parse_top_level_let(self: ParserState*) -> LetDecl*? {
     let start = ps_span_start(self);
     ps_expect(self, ord(TT_LET), "PAR-0080", "[PAR-0080] expected 'let'")?;
@@ -185,6 +240,12 @@ func ps_parse_top_level_let(self: ParserState*) -> LetDecl*? {
     }
 }
 
+/**
+ * Parse one top-level declaration.
+ *
+ * @param self Parser state to advance.
+ * @return Parsed top-level declaration, or `null` on error.
+ */
 func ps_parse_top_level_decl(self: ParserState*) -> TopLevelDecl*? {
     if (ps_check(self, ord(TT_EXTERN))) {
         let decl = ps_parse_extern_func(self)?;
@@ -215,6 +276,12 @@ func ps_parse_top_level_decl(self: ParserState*) -> TopLevelDecl*? {
     return null;
 }
 
+/**
+ * Parse a module declaration and its contents.
+ *
+ * @param self Parser state to advance.
+ * @return Parsed module, or `null` on error.
+ */
 func ps_parse_module(self: ParserState*) -> Module*? {
     let start = ps_span_start(self);
 
@@ -258,10 +325,17 @@ func ps_parse_module(self: ParserState*) -> Module*? {
     }
 }
 
-/* ------------------------------------
+/* ---------------------------------
    Public API
-   ------------------------------------ */
+   --------------------------------- */
 
+/**
+ * Parse a module from a token stream and keep the internal arenas.
+ *
+ * @param tokens Token stream to parse.
+ * @param filename Source filename used in diagnostics.
+ * @return Internal parse result.
+ */
 func impl_parse_module_tokens(tokens: TokenVector, filename: string) -> ImplParseResult* {
     let ps = ps_create(tokens, filename);
     let mod = ps_parse_module(ps);
@@ -278,6 +352,13 @@ func impl_parse_module_tokens(tokens: TokenVector, filename: string) -> ImplPars
     return result;
 }
 
+/**
+ * Build a parser result from lexer diagnostics when tokenization fails.
+ *
+ * @param ls Lexer state holding diagnostics.
+ * @param filename Source filename used for fallback diagnostics.
+ * @return Internal parse result containing copied lexer diagnostics.
+ */
 func ps_lex_error_result(ls: LexerState*, filename: string) -> ImplParseResult* {
     let expr_ar = expr_arena_create(1);
     let stmt_ar = stmt_arena_create(1);
@@ -309,6 +390,14 @@ func ps_lex_error_result(ls: LexerState*, filename: string) -> ImplParseResult* 
     return result;
 }
 
+/**
+ * Parse tokenized source and clean up lexer/token resources.
+ *
+ * @param ls Lexer state to free after parsing.
+ * @param toks Token stream to parse and then free.
+ * @param filename Source filename used in diagnostics.
+ * @return Internal parse result.
+ */
 func ps_tokens_result(ls: LexerState*, toks: TokenVector, filename: string) -> ImplParseResult* {
     let result = impl_parse_module_tokens(toks, filename);
     tv_free(toks);
@@ -316,6 +405,13 @@ func ps_tokens_result(ls: LexerState*, toks: TokenVector, filename: string) -> I
     return result;
 }
 
+/**
+ * Lex and parse a module from source text, preserving internal arenas.
+ *
+ * @param source Source text to parse.
+ * @param filename Source filename used in diagnostics.
+ * @return Internal parse result.
+ */
 func impl_parse_module_source(source: string, filename: string) -> ImplParseResult* {
     let ls = ls_create(source, filename);
     let toks = tokenize(ls);

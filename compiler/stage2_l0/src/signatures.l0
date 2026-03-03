@@ -19,15 +19,36 @@ import symbols;
 import type_resolve;
 import types;
 
+/**
+ * Build a fully qualified signature-table key.
+ *
+ * @param module_name Defining module name.
+ * @param name Symbol name.
+ * @return Key in `module::name` form.
+ */
 func sig_key(module_name: string, name: string) -> string {
     return concat3_s(module_name, "::", name);
 }
 
+/**
+ * Emit a signature-resolution error for a source span.
+ *
+ * @param diags Diagnostic collector.
+ * @param code Diagnostic code.
+ * @param message Diagnostic message.
+ * @param filename Source filename.
+ * @param span Source span to highlight.
+ */
 func sig_diag_error(diags: DiagCollector*, code: string, message: string, filename: string, span: Span) {
     diag_error(diags, "SignatureResolver", code, message, filename, span.start_line, span.start_column, span.end_line,
         span.end_column);
 }
 
+/**
+ * Free a vector of owned types.
+ *
+ * @param items Optional vector of `Type*` values to free.
+ */
 func sig_type_vec_free(items: VectorBase*?) {
     if (items == null) {
         return;
@@ -39,18 +60,33 @@ func sig_type_vec_free(items: VectorBase*?) {
     vec_free(vec);
 }
 
+/**
+ * Free an optional string set.
+ *
+ * @param self Optional string set to free.
+ */
 func sig_set_free_opt(self: StringSet*?) {
     if (self != null) {
         ss_free(self as StringSet*);
     }
 }
 
+/**
+ * Free an optional vector of owned types.
+ *
+ * @param items Optional vector of `Type*` values to free.
+ */
 func sig_type_vec_free_opt(items: VectorBase*?) {
     if (items != null) {
         sig_type_vec_free(items as VectorBase*);
     }
 }
 
+/**
+ * Free a temporary vector of struct-field metadata.
+ *
+ * @param items Optional vector of `StructFieldInfo*` values to free.
+ */
 func sig_struct_field_vec_temp_free(items: VectorBase*?) {
     if (items == null) {
         return;
@@ -64,6 +100,11 @@ func sig_struct_field_vec_temp_free(items: VectorBase*?) {
     vec_free(vec);
 }
 
+/**
+ * Free a temporary vector of enum-variant metadata.
+ *
+ * @param items Optional vector of `EnumVariantInfo*` values to free.
+ */
 func sig_enum_variant_vec_temp_free(items: VectorBase*?) {
     if (items == null) {
         return;
@@ -77,6 +118,14 @@ func sig_enum_variant_vec_temp_free(items: VectorBase*?) {
     vec_free(vec);
 }
 
+/**
+ * Look up a resolved function type.
+ *
+ * @param self Signature tables to inspect.
+ * @param module_name Defining module name.
+ * @param name Function name.
+ * @return Function type, or `null` if absent.
+ */
 func sig_lookup_func_type(self: SignatureTables*, module_name: string, name: string) -> Type*? {
     let value = spm_get(self.func_types, sig_key(module_name, name));
     if (value == null) {
@@ -85,6 +134,14 @@ func sig_lookup_func_type(self: SignatureTables*, module_name: string, name: str
     return value as Type*;
 }
 
+/**
+ * Look up resolved struct metadata.
+ *
+ * @param self Signature tables to inspect.
+ * @param module_name Defining module name.
+ * @param name Struct name.
+ * @return Struct info, or `null` if absent.
+ */
 func sig_lookup_struct_info(self: SignatureTables*, module_name: string, name: string) -> StructInfo*? {
     let value = spm_get(self.struct_infos, sig_key(module_name, name));
     if (value == null) {
@@ -93,6 +150,14 @@ func sig_lookup_struct_info(self: SignatureTables*, module_name: string, name: s
     return value as StructInfo*;
 }
 
+/**
+ * Look up resolved enum metadata.
+ *
+ * @param self Signature tables to inspect.
+ * @param module_name Defining module name.
+ * @param name Enum name.
+ * @return Enum info, or `null` if absent.
+ */
 func sig_lookup_enum_info(self: SignatureTables*, module_name: string, name: string) -> EnumInfo*? {
     let value = spm_get(self.enum_infos, sig_key(module_name, name));
     if (value == null) {
@@ -101,6 +166,14 @@ func sig_lookup_enum_info(self: SignatureTables*, module_name: string, name: str
     return value as EnumInfo*;
 }
 
+/**
+ * Look up a resolved top-level `let` type.
+ *
+ * @param self Signature tables to inspect.
+ * @param module_name Defining module name.
+ * @param name Binding name.
+ * @return Resolved type, or `null` if absent.
+ */
 func sig_lookup_let_type(self: SignatureTables*, module_name: string, name: string) -> Type*? {
     let value = spm_get(self.let_types, sig_key(module_name, name));
     if (value == null) {
@@ -109,6 +182,11 @@ func sig_lookup_let_type(self: SignatureTables*, module_name: string, name: stri
     return value as Type*;
 }
 
+/**
+ * Create empty signature tables.
+ *
+ * @return New signature tables.
+ */
 func sig_make_tables() -> SignatureTables* {
     return new SignatureTables(spm_create(), spm_create(), spm_create(), spm_create());
 }
@@ -326,6 +404,12 @@ func sig_resolve_let(tables: SignatureTables*, nr: NameResolution*, env: ModuleE
     }
 }
 
+/**
+ * Collect value-type dependencies referenced by a type.
+ *
+ * @param ty Type to inspect.
+ * @param out Set that receives fully qualified dependency keys.
+ */
 func sig_extract_dependencies(ty: Type*, out: StringSet*) {
     if (ord(ty.kind) == ord(TY_POINTER)) {
         return;
@@ -413,6 +497,12 @@ func sig_cycle_visit(tables: SignatureTables*, key: string, visiting: StringSet*
     return false;
 }
 
+/**
+ * Detect value-type cycles across resolved structs and enums.
+ *
+ * @param tables Signature tables to inspect.
+ * @param diags Diagnostic collector.
+ */
 func sig_detect_value_type_cycles(tables: SignatureTables*, diags: DiagCollector*) {
     with (let visiting = ss_create() => ss_free(visiting),
           let visited = ss_create() => ss_free(visited),
@@ -431,6 +521,14 @@ func sig_detect_value_type_cycles(tables: SignatureTables*, diags: DiagCollector
     }
 }
 
+/**
+ * Resolve top-level type signatures for parsed modules.
+ *
+ * @param driver_state Parsed driver state.
+ * @param nr Name-resolution result.
+ * @param diags Diagnostic collector.
+ * @return Populated signature tables.
+ */
 func sig_resolve(driver_state: DriverState*, nr: NameResolution*, diags: DiagCollector*) -> SignatureTables* {
     let tables = sig_make_tables();
 

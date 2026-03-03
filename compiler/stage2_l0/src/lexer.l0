@@ -16,33 +16,69 @@ import util.diag;
 
 import tokens;
 
-/* -------------------------------------
+/* ---------------------------------
    Character classification helpers
-   ------------------------------------ */
+   --------------------------------- */
 
+/**
+ * Check whether a byte can start an identifier.
+ *
+ * @param c Byte to inspect.
+ * @return `true` if `c` is alphabetic or `_`.
+ */
 func is_ident_start(c: byte) -> bool {
     return is_alpha(c) || c == '_';
 }
 
+/**
+ * Check whether a byte can continue an identifier.
+ *
+ * @param c Byte to inspect.
+ * @return `true` if `c` is alphanumeric or `_`.
+ */
 func is_ident_part(c: byte) -> bool {
     return is_alnum(c) || c == '_';
 }
 
+/**
+ * Check whether a byte is a supported escape-code character.
+ *
+ * @param c Byte to inspect.
+ * @return `true` if `c` is accepted after a backslash in literals.
+ */
 func is_escape_char(c: byte) -> bool {
     return c == '\\' || c == '\'' || c == '"' || c == '?' || c == 'a' ||
            c == 'b' || c == 'f' || c == 'n' || c == 'r' || c == 't' || c == 'v';
 }
 
+/**
+ * Check whether a byte is an octal digit.
+ *
+ * @param c Byte to inspect.
+ * @return `true` if `c` is in the range `0..7`.
+ */
 func is_octal_digit(c: byte) -> bool {
     return c >= '0' && c <= '7';
 }
 
+/**
+ * Check whether a byte is a hexadecimal digit.
+ *
+ * @param c Byte to inspect.
+ * @return `true` if `c` is in `0..9`, `a..f`, or `A..F`.
+ */
 func is_hex_digit(c: byte) -> bool {
     return (c >= '0' && c <= '9') ||
            (c >= 'a' && c <= 'f') ||
            (c >= 'A' && c <= 'F');
 }
 
+/**
+ * Convert a hexadecimal digit character to its integer value.
+ *
+ * @param c Hexadecimal digit byte.
+ * @return Integer value in the range `0..15`, or `-1` if `c` is not valid.
+ */
 func hex_char_to_int(c: byte) -> int {
     if (c >= '0' && c <= '9') {
         return c - '0';
@@ -54,9 +90,9 @@ func hex_char_to_int(c: byte) -> int {
     return -1; // Should not reach here if input is valid hex digit
 }
 
-/* ------------------------------------
+/* ---------------------------------
    Lexer State and functions
-   ------------------------------------ */
+   --------------------------------- */
 
 /**
  * Lexer state object that keeps track of the current position in the source code being lexed.
@@ -72,6 +108,13 @@ struct LexerState {
     diags: DiagCollector*;
 }
 
+/**
+ * Create a lexer state for source text and filename metadata.
+ *
+ * @param source Source text to tokenize.
+ * @param filename Source filename used in diagnostics.
+ * @return New lexer state.
+ */
 func ls_create(source: string, filename: string) -> LexerState* {
     let self = new LexerState(
         source,
@@ -86,23 +129,57 @@ func ls_create(source: string, filename: string) -> LexerState* {
     return self;
 }
 
+/**
+ * Report whether lexing has produced any errors.
+ *
+ * @param self Lexer state to inspect.
+ * @return `true` if the lexer's diagnostic collector contains an error.
+ */
 func ls_has_errors(self: LexerState*) -> bool {
     return diag_has_errors(self.diags);
 }
 
+/**
+ * Emit a lexer diagnostic at an explicit source span.
+ *
+ * @param self Lexer state collecting diagnostics.
+ * @param code Diagnostic code.
+ * @param message Diagnostic message.
+ * @param line One-based starting line.
+ * @param column One-based starting column.
+ * @param line_end One-based ending line.
+ * @param column_end One-based ending column.
+ */
 func ls_emit_error(self: LexerState*, code: string, message: string, line: int, column: int, line_end: int, column_end: int) {
     diag_error(self.diags, "Lexer", code, message, self.filename, line, column, line_end, column_end);
 }
 
+/**
+ * Free a lexer state and its diagnostics.
+ *
+ * @param self Lexer state to free.
+ */
 func ls_free(self: LexerState*) {
     diag_free(self.diags);
     drop self;
 }
 
+/**
+ * Check whether the lexer cursor is at the end of the source.
+ *
+ * @param self Lexer state to inspect.
+ * @return `true` if no more source bytes remain.
+ */
 func ls_at_end(self: LexerState*) -> bool {
     return self.index >= self.length;
 }
 
+/**
+ * Return the current source byte without advancing.
+ *
+ * @param self Lexer state to inspect.
+ * @return Current source byte, or `\\0` at end of input.
+ */
 func ls_peek(self: LexerState*) -> byte {
     if (ls_at_end(self)) {
         return '\0';
@@ -110,6 +187,12 @@ func ls_peek(self: LexerState*) -> byte {
     return char_at_s(self.source, self.index);
 }
 
+/**
+ * Return the byte after the current source byte without advancing.
+ *
+ * @param self Lexer state to inspect.
+ * @return Next source byte, or `\\0` if there is no next byte.
+ */
 func ls_peek_next(self: LexerState*) -> byte {
     if (self.index + 1 >= self.length) {
         return '\0';
@@ -117,6 +200,12 @@ func ls_peek_next(self: LexerState*) -> byte {
     return char_at_s(self.source, self.index + 1);
 }
 
+/**
+ * Consume and return the current source byte.
+ *
+ * @param self Lexer state to advance.
+ * @return Byte that was current before advancing.
+ */
 func ls_advance(self: LexerState*) -> byte {
     let current_char = ls_peek(self);
     if (!ls_at_end(self)) {
@@ -131,19 +220,22 @@ func ls_advance(self: LexerState*) -> byte {
     return current_char;
 }
 
-/* ------------------------------------
+/* ---------------------------------
    Auxiliary data structures
-   ------------------------------------ */
+   --------------------------------- */
 
 // Struct to represent a valid byte or Unicode code point escape sequence and its corresponding value
+/**
+ * Represents the EscapedChar structure.
+ */
 struct EscapedChar {
     escape_str: string; // The full escape sequence as it appears in the source (e.g., "\\n", "\\x1B", etc.)
     char_value: int;    // The actual character value represented by the escape sequence (e.g., 10 for "\\n", 27 for "\\x1B")
 }
 
-/* ------------------------------------
+/* ---------------------------------
    Main API
-   ------------------------------------ */
+   --------------------------------- */
 
 /**
  * Tokenizes the input source code and returns a vector of tokens.

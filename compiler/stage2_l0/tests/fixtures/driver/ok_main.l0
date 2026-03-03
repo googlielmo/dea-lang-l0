@@ -8,6 +8,9 @@ module ok_main;
 import ok_dep1;
 import ok_dep2;
 
+/**
+ * Main entry point for the module.
+ */
 func main() -> int {
     return 0;
 }

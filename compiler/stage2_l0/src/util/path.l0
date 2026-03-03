@@ -8,10 +8,22 @@ module util.path;
 import std.string;
 import std.text;
 
+/**
+ * Check whether a byte is a path separator.
+ *
+ * @param c Byte to inspect.
+ * @return `true` if `c` is `/` or `\\`.
+ */
 func up_is_sep(c: byte) -> bool {
     return c == '/' || c == '\\';
 }
 
+/**
+ * Check whether a path is absolute.
+ *
+ * @param path Path string to inspect.
+ * @return `true` for POSIX absolute paths and Windows drive-rooted paths.
+ */
 func up_is_absolute(path: string) -> bool {
     let n = len_s(path);
     if (n == 0) {
@@ -26,6 +38,12 @@ func up_is_absolute(path: string) -> bool {
     return false;
 }
 
+/**
+ * Find the last path separator in a string.
+ *
+ * @param path Path string to inspect.
+ * @return Index of the last separator, or `-1` if none is present.
+ */
 func up_find_last_sep(path: string) -> int {
     let n = len_s(path);
     let last = -1;
@@ -37,10 +55,22 @@ func up_find_last_sep(path: string) -> int {
     return last;
 }
 
+/**
+ * Check whether a path has a parent component.
+ *
+ * @param path Path string to inspect.
+ * @return `true` if the path contains a separator.
+ */
 func up_has_parent(path: string) -> bool {
     return up_find_last_sep(path) >= 0;
 }
 
+/**
+ * Return the last component of a path.
+ *
+ * @param path Path string to inspect.
+ * @return Basename with trailing separators ignored.
+ */
 func up_basename(path: string) -> string {
     let n = len_s(path);
     if (n == 0) {
@@ -62,6 +92,12 @@ func up_basename(path: string) -> string {
     return slice_s(path, last + 1, end);
 }
 
+/**
+ * Return the parent directory of a path.
+ *
+ * @param path Path string to inspect.
+ * @return Parent directory, or `.` when the path has no parent.
+ */
 func up_parent(path: string) -> string {
     let n = len_s(path);
     if (n == 0) {
@@ -94,10 +130,22 @@ func up_parent(path: string) -> string {
     return slice_s(path, 0, last);
 }
 
+/**
+ * Check whether a path ends with `.l0`.
+ *
+ * @param path Path string to inspect.
+ * @return `true` if `path` has the `.l0` suffix.
+ */
 func up_is_l0_file(path: string) -> bool {
     return ends_with_s(path, ".l0");
 }
 
+/**
+ * Return a path basename without the `.l0` suffix when present.
+ *
+ * @param path Path string to inspect.
+ * @return Basename stem.
+ */
 func up_stem(path: string) -> string {
     let base = up_basename(path);
     if (up_is_l0_file(base)) {
@@ -106,6 +154,13 @@ func up_stem(path: string) -> string {
     return base;
 }
 
+/**
+ * Join a root path and relative path with one separator.
+ *
+ * @param root Root directory path.
+ * @param rel Relative path to append.
+ * @return Combined path.
+ */
 func up_join(root: string, rel: string) -> string {
     if (is_empty_s(root)) {
         return rel;

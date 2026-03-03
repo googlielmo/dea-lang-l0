@@ -13,6 +13,12 @@ import std.vector;
 
 import std.text;
 
+/**
+ * Helper function to print a labeled boolean value.
+ *
+ * @param label The label to print.
+ * @param val The value to process.
+ */
 func print_bool(label: string, val: bool) {
     if (val) {
         printl_ss(label, "true");
@@ -21,6 +27,9 @@ func print_bool(label: string, val: bool) {
     }
 }
 
+/**
+ * Tests test_is_space.
+ */
 func test_is_space() {
     printl_s("=== Test is_space ===");
 
@@ -42,6 +51,9 @@ func test_is_space() {
     printl_s("is_space tests passed!\n");
 }
 
+/**
+ * Tests test_is_digit.
+ */
 func test_is_digit() {
     printl_s("=== Test is_digit ===");
 
@@ -55,6 +67,9 @@ func test_is_digit() {
     printl_s("is_digit tests passed!\n");
 }
 
+/**
+ * Tests test_is_alpha.
+ */
 func test_is_alpha() {
     printl_s("=== Test is_alpha ===");
 
@@ -79,6 +94,9 @@ func test_is_alpha() {
     printl_s("is_alpha tests passed!\n");
 }
 
+/**
+ * Tests test_is_alnum.
+ */
 func test_is_alnum() {
     printl_s("=== Test is_alnum ===");
 
@@ -97,6 +115,9 @@ func test_is_alnum() {
     printl_s("is_alnum tests passed!\n");
 }
 
+/**
+ * Tests test_to_digit.
+ */
 func test_to_digit() {
     printl_s("=== Test to_digit ===");
 
@@ -113,6 +134,9 @@ func test_to_digit() {
     printl_s("to_digit tests passed!\n");
 }
 
+/**
+ * Tests test_to_upper.
+ */
 func test_to_upper() {
     printl_s("=== Test to_upper ===");
 
@@ -129,6 +153,9 @@ func test_to_upper() {
     printl_s("to_upper tests passed!\n");
 }
 
+/**
+ * Tests test_to_lower.
+ */
 func test_to_lower() {
     printl_s("=== Test to_lower ===");
 
@@ -145,6 +172,9 @@ func test_to_lower() {
     printl_s("to_lower tests passed!\n");
 }
 
+/**
+ * Tests test_string_buffer.
+ */
 func test_string_buffer() {
     printl_s("=== Test StringBuffer ===");
 
@@ -168,6 +198,9 @@ func test_string_buffer() {
     printl_s("StringBuffer tests passed!\n");
 }
 
+/**
+ * Tests test_string_buffer_empty.
+ */
 func test_string_buffer_empty() {
     printl_s("=== Test StringBuffer (empty) ===");
 
@@ -184,6 +217,9 @@ func test_string_buffer_empty() {
     printl_s("Empty StringBuffer tests passed!\n");
 }
 
+/**
+ * Tests test_char_buffer.
+ */
 func test_char_buffer() {
     printl_s("=== Test CharBuffer ===");
 
@@ -208,6 +244,9 @@ func test_char_buffer() {
     printl_s("CharBuffer tests passed!\n");
 }
 
+/**
+ * Tests test_char_buffer_clear.
+ */
 func test_char_buffer_clear() {
     printl_s("=== Test CharBuffer clear ===");
 
@@ -235,6 +274,9 @@ func test_char_buffer_clear() {
     printl_s("CharBuffer clear tests passed!\n");
 }
 
+/**
+ * Tests test_concat3_s.
+ */
 func test_concat3_s() {
     printl_s("=== Test concat3_s ===");
 
@@ -254,6 +296,9 @@ func test_concat3_s() {
     printl_s("concat3_s tests passed!\n");
 }
 
+/**
+ * Tests test_repeat_s.
+ */
 func test_repeat_s() {
     printl_s("=== Test repeat_s ===");
 
@@ -278,6 +323,9 @@ func test_repeat_s() {
     printl_s("repeat_s tests passed!\n");
 }
 
+/**
+ * Tests test_trim_s.
+ */
 func test_trim_s() {
     printl_s("=== Test trim_s ===");
 
@@ -307,6 +355,9 @@ func test_trim_s() {
     printl_s("trim_s tests passed!\n");
 }
 
+/**
+ * Tests test_is_empty_s.
+ */
 func test_is_empty_s() {
     printl_s("=== Test is_empty_s ===");
 
@@ -317,6 +368,9 @@ func test_is_empty_s() {
     printl_s("is_empty_s tests passed!\n");
 }
 
+/**
+ * Tests test_split_s.
+ */
 func test_split_s() {
     printl_s("=== Test split_s ===");
 
@@ -357,6 +411,9 @@ func test_split_s() {
     printl_s("split_s tests passed!\n");
 }
 
+/**
+ * Tests test_find_last_s.
+ */
 func test_find_last_s() {
     printl_s("=== Test find_last_s ===");
 
@@ -369,6 +426,9 @@ func test_find_last_s() {
     printl_s("find_last_s tests passed!\n");
 }
 
+/**
+ * Tests test_lines_s.
+ */
 func test_lines_s() {
     printl_s("=== Test lines_s ===");
 
@@ -402,6 +462,9 @@ func test_lines_s() {
     printl_s("lines_s tests passed!\n");
 }
 
+/**
+ * Tests test_join_s.
+ */
 func test_join_s() {
     printl_s("=== Test join_s ===");
 
@@ -431,6 +494,9 @@ func test_join_s() {
     printl_s("join_s tests passed!\n");
 }
 
+/**
+ * Tests test_replace_s.
+ */
 func test_replace_s() {
     printl_s("=== Test replace_s ===");
 
@@ -443,6 +509,9 @@ func test_replace_s() {
     printl_s("replace_s tests passed!\n");
 }
 
+/**
+ * Tests test_to_upper_s.
+ */
 func test_to_upper_s() {
     printl_s("=== Test to_upper_s ===");
 
@@ -471,6 +540,9 @@ func test_to_upper_s() {
     printl_s("to_upper_s tests passed!\n");
 }
 
+/**
+ * Tests test_to_lower_s.
+ */
 func test_to_lower_s() {
     printl_s("=== Test to_lower_s ===");
 
@@ -499,6 +571,9 @@ func test_to_lower_s() {
     printl_s("to_lower_s tests passed!\n");
 }
 
+/**
+ * Tests test_is_digit_base.
+ */
 func test_is_digit_base() {
     printl_s("=== Test is_digit_base ===");
 
@@ -517,6 +592,9 @@ func test_is_digit_base() {
     printl_s("is_digit_base tests passed!\n");
 }
 
+/**
+ * Tests test_to_digit_base.
+ */
 func test_to_digit_base() -> Unit? {
     printl_s("=== Test to_digit_base ===");
 
@@ -541,6 +619,9 @@ func test_to_digit_base() -> Unit? {
     return std.unit::present();
 }
 
+/**
+ * Tests test_string_to_int_base_valid.
+ */
 func test_string_to_int_base_valid() -> Unit? {
     printl_s("=== Test string_to_int_base (valid) ===");
 
@@ -570,6 +651,9 @@ func test_string_to_int_base_valid() -> Unit? {
     return std.unit::present();
 }
 
+/**
+ * Tests test_string_to_int_base_invalid.
+ */
 func test_string_to_int_base_invalid() {
     printl_s("=== Test string_to_int_base (invalid) ===");
 
@@ -587,6 +671,9 @@ func test_string_to_int_base_invalid() {
     printl_s("string_to_int_base invalid tests passed!\n");
 }
 
+/**
+ * Tests test_string_to_int_base_limits.
+ */
 func test_string_to_int_base_limits() -> Unit? {
     printl_s("=== Test string_to_int_base (limits) ===");
 
@@ -611,6 +698,9 @@ func test_string_to_int_base_limits() -> Unit? {
     return std.unit::present();
 }
 
+/**
+ * Tests test_bool_string_conversions.
+ */
 func test_bool_string_conversions() -> Unit? {
     printl_s("=== Test bool string conversions ===");
 
@@ -634,6 +724,9 @@ func test_bool_string_conversions() -> Unit? {
     return std.unit::present();
 }
 
+/**
+ * Tests test_byte_string_conversions.
+ */
 func test_byte_string_conversions() -> Unit? {
     printl_s("=== Test byte string conversions ===");
 
@@ -669,6 +762,9 @@ func test_byte_string_conversions() -> Unit? {
     return std.unit::present();
 }
 
+/**
+ * Tests test_string_to_int.
+ */
 func test_string_to_int() -> Unit? {
     printl_s("=== Test string_to_int ===");
 
@@ -735,6 +831,9 @@ func test_string_to_int() -> Unit? {
     return std.unit::present();
 }
 
+/**
+ * Tests test_int_to_string.
+ */
 func test_int_to_string() {
     printl_s("=== Test int_to_string ===");
 
@@ -773,6 +872,9 @@ func test_int_to_string() {
 }
 
 // test int_to_hex_string
+/**
+ * Tests test_int_to_hex_string.
+ */
 func test_int_to_hex_string() {
     printl_s("=== Test int_to_hex_string ===");
 
@@ -816,6 +918,9 @@ func test_int_to_hex_string() {
     printl_s("int_to_hex_string tests passed!\n");
 }
 
+/**
+ * Tests test_int_to_bin_string.
+ */
 func test_int_to_bin_string() {
     printl_s("=== Test int_to_bin_string ===");
 
@@ -853,6 +958,9 @@ func test_int_to_bin_string() {
     printl_s("int_to_bin_string tests passed!\n");
 }
 
+/**
+ * Main entry point for the module.
+ */
 func main() -> int {
     printl_s("==========================================");
     printl_s("      String Utilities Test Suite");

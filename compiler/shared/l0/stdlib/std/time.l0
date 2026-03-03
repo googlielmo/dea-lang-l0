@@ -8,21 +8,33 @@ module std.time;
 import sys.rt;
 import std.math;
 
+/**
+ * Represents wall clock time in seconds and nanoseconds since the Unix epoch.
+ */
 struct WallTime {
     sec: int;
     nsec: int;
 }
 
+/**
+ * Represents monotonic time in seconds and nanoseconds.
+ */
 struct MonotonicTime {
     sec: int;
     nsec: int;
 }
 
+/**
+ * Represents a duration of time in seconds and nanoseconds.
+ */
 struct Duration {
     sec: int;
     nsec: int;
 }
 
+/**
+ * Represents a broken-down date and time.
+ */
 struct DateTime {
     year: int;
     month: int;
@@ -37,6 +49,9 @@ struct DateTime {
     is_dst: bool;
 }
 
+/**
+ * Represents a civil date without time components.
+ */
 struct CivilDate {
     year: int;
     month: int;
@@ -45,18 +60,41 @@ struct CivilDate {
     yearday: int;
 }
 
+/**
+ * Returns the maximum value for a 32-bit signed integer.
+ *
+ * @return INT_MAX.
+ */
 func int_max() -> int {
     return 2147483647;
 }
 
+/**
+ * Returns the minimum value for a 32-bit signed integer.
+ *
+ * @return INT_MIN.
+ */
 func int_min() -> int {
     return -2147483647 - 1;
 }
 
+/**
+ * Checks if the nanosecond component is within valid range [0, 1e9).
+ *
+ * @param nsec The nanosecond value.
+ * @return True if valid, false otherwise.
+ */
 func is_valid_nsec(nsec: int) -> bool {
     return nsec >= 0 && nsec < 1000000000;
 }
 
+/**
+ * Performs floor division of two integers.
+ *
+ * @param a The dividend.
+ * @param b The divisor.
+ * @return The floor of a/b.
+ */
 func floor_div(a: int, b: int) -> int {
     let q = a / b;
     let r = a % b;
@@ -66,6 +104,13 @@ func floor_div(a: int, b: int) -> int {
     return q;
 }
 
+/**
+ * Performs checked integer addition.
+ *
+ * @param a The first operand.
+ * @param b The second operand.
+ * @return The sum, or null on overflow.
+ */
 func checked_add_int(a: int, b: int) -> int? {
     if (b > 0 && a > int_max() - b) {
         return null;
@@ -76,6 +121,13 @@ func checked_add_int(a: int, b: int) -> int? {
     return a + b;
 }
 
+/**
+ * Performs checked integer subtraction.
+ *
+ * @param a The first operand.
+ * @param b The second operand.
+ * @return The difference, or null on overflow.
+ */
 func checked_sub_int(a: int, b: int) -> int? {
     if (b < 0 && a > int_max() + b) {
         return null;
@@ -86,6 +138,12 @@ func checked_sub_int(a: int, b: int) -> int? {
     return a - b;
 }
 
+/**
+ * Determines if a given year is a leap year.
+ *
+ * @param year The year to check.
+ * @return True if leap year, false otherwise.
+ */
 func is_leap_year(year: int) -> bool {
     if (year % 4 != 0) {
         return false;
@@ -96,6 +154,13 @@ func is_leap_year(year: int) -> bool {
     return year % 400 == 0;
 }
 
+/**
+ * Returns the number of days in a given month of a given year.
+ *
+ * @param year The year.
+ * @param month The month (1-12).
+ * @return The number of days in the month.
+ */
 func days_in_month(year: int, month: int) -> int {
     if (month == 1 || month == 3 || month == 5 || month == 7 || month == 8 || month == 10 || month == 12) {
         return 31;
@@ -109,6 +174,14 @@ func days_in_month(year: int, month: int) -> int {
     return 28;
 }
 
+/**
+ * Calculates the day of the year for a given date.
+ *
+ * @param year The year.
+ * @param month The month.
+ * @param day The day of the month.
+ * @return The day of the year (1-366).
+ */
 func day_of_year(year: int, month: int, day: int) -> int {
     let total = day;
     let m = 1;
@@ -119,6 +192,12 @@ func day_of_year(year: int, month: int, day: int) -> int {
     return total;
 }
 
+/**
+ * Calculates civil date components from Unix days.
+ *
+ * @param days The number of days since the Unix epoch.
+ * @return The broken-down CivilDate.
+ */
 func civil_from_unix_days(days: int) -> CivilDate {
     let z = days + 719468;
     let era = 0;
@@ -152,6 +231,15 @@ func civil_from_unix_days(days: int) -> CivilDate {
     return CivilDate(year, month, day, weekday, yearday);
 }
 
+/**
+ * Creates a DateTime object from Unix seconds and other components.
+ *
+ * @param unix_sec Seconds since Unix epoch.
+ * @param nsec Nanoseconds component.
+ * @param utc_offset_sec Offset from UTC in seconds.
+ * @param is_dst True if daylight saving time is in effect.
+ * @return The broken-down DateTime, or null if invalid.
+ */
 func datetime_from_unix_sec(unix_sec: int, nsec: int, utc_offset_sec: int, is_dst: bool) -> DateTime? {
     if (!is_valid_nsec(nsec)) {
         return null;
@@ -182,6 +270,11 @@ func datetime_from_unix_sec(unix_sec: int, nsec: int, utc_offset_sec: int, is_ds
     return out;
 }
 
+/**
+ * Returns the current wall clock time.
+ *
+ * @return The current WallTime, or null on error.
+ */
 func wall_now() -> WallTime? {
     with (let parts = new RtTimeParts(0, 0) => drop parts) {
         let ok = rt_time_unix(parts);
@@ -195,10 +288,20 @@ func wall_now() -> WallTime? {
     }
 }
 
+/**
+ * Checks if the monotonic clock is supported by the runtime.
+ *
+ * @return True if supported, false otherwise.
+ */
 func monotonic_supported() -> bool {
     return rt_time_monotonic_supported();
 }
 
+/**
+ * Returns the current monotonic time.
+ *
+ * @return The current MonotonicTime, or null if not supported or error.
+ */
 func monotonic_now() -> MonotonicTime? {
     if (!rt_time_monotonic_supported()) {
         return null;
@@ -216,6 +319,13 @@ func monotonic_now() -> MonotonicTime? {
     }
 }
 
+/**
+ * Calculates the duration between two monotonic time points.
+ *
+ * @param start The starting time.
+ * @param end The ending time.
+ * @return The Duration difference, or null if end < start or overflow.
+ */
 func monotonic_diff(start: MonotonicTime, end: MonotonicTime) -> Duration? {
     if (!is_valid_nsec(start.nsec) || !is_valid_nsec(end.nsec)) {
         return null;
@@ -243,10 +353,22 @@ func monotonic_diff(start: MonotonicTime, end: MonotonicTime) -> Duration? {
     return Duration(sec_diff - 1, nsec_diff);
 }
 
+/**
+ * Converts wall clock time to UTC DateTime.
+ *
+ * @param t The wall clock time.
+ * @return The UTC DateTime, or null on error.
+ */
 func wall_to_utc_datetime(t: WallTime) -> DateTime? {
     return datetime_from_unix_sec(t.sec, t.nsec, 0, false);
 }
 
+/**
+ * Converts wall clock time to local DateTime.
+ *
+ * @param t The wall clock time.
+ * @return The local DateTime, or null on error.
+ */
 func wall_to_local_datetime(t: WallTime) -> DateTime? {
     if (!is_valid_nsec(t.nsec)) {
         return null;
@@ -258,11 +380,21 @@ func wall_to_local_datetime(t: WallTime) -> DateTime? {
     return datetime_from_unix_sec(local_sec, t.nsec, offset, is_dst);
 }
 
+/**
+ * Returns the current date and time in UTC.
+ *
+ * @return The UTC DateTime, or null on error.
+ */
 func utc_now_datetime() -> DateTime? {
     let now = wall_now()?;
     return wall_to_utc_datetime(now);
 }
 
+/**
+ * Returns the current date and time in the local time zone.
+ *
+ * @return The local DateTime, or null on error.
+ */
 func local_now_datetime() -> DateTime? {
     let now = wall_now()?;
     return wall_to_local_datetime(now);

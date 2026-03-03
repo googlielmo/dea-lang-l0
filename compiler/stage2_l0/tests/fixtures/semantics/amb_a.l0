@@ -5,6 +5,11 @@
 
 module amb_a;
 
+/**
+ * Exports one of the colliding `clash` definitions.
+ *
+ * @return `1`.
+ */
 func clash() -> int {
     return 1;
 }

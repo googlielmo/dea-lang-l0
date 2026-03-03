@@ -8,6 +8,9 @@ module amb_main;
 import amb_a;
 import amb_b;
 
+/**
+ * Main entry point for the module.
+ */
 func main() -> int {
     return 0;
 }

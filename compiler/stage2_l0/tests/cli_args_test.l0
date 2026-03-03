@@ -13,6 +13,9 @@ import util.diag;
 
 import cli_args;
 
+/**
+ * Tests test_default_mode_build.
+ */
 func test_default_mode_build() {
     with (let argv = vs_create(2) => vs_free(argv)) {
         vs_push(argv, "app.main");
@@ -30,6 +33,9 @@ func test_default_mode_build() {
     }
 }
 
+/**
+ * Tests test_run_accepts_program_args_after_separator.
+ */
 func test_run_accepts_program_args_after_separator() {
     with (let argv = vs_create(8) => vs_free(argv)) {
         vs_push(argv, "--run");
@@ -52,6 +58,9 @@ func test_run_accepts_program_args_after_separator() {
     }
 }
 
+/**
+ * Tests test_non_run_rejects_program_args_separator.
+ */
 func test_non_run_rejects_program_args_separator() {
     with (let argv = vs_create(8) => vs_free(argv)) {
         vs_push(argv, "--check");
@@ -67,6 +76,9 @@ func test_non_run_rejects_program_args_separator() {
     }
 }
 
+/**
+ * Tests test_mode_scoped_flag_validation.
+ */
 func test_mode_scoped_flag_validation() {
     with (let argv = vs_create(8) => vs_free(argv)) {
         vs_push(argv, "--check");
@@ -81,6 +93,9 @@ func test_mode_scoped_flag_validation() {
     }
 }
 
+/**
+ * Tests test_multiple_targets_rejected.
+ */
 func test_multiple_targets_rejected() {
     with (let argv = vs_create(8) => vs_free(argv)) {
         vs_push(argv, "--check");
@@ -94,6 +109,9 @@ func test_multiple_targets_rejected() {
     }
 }
 
+/**
+ * Tests test_no_legacy_command_rewrite.
+ */
 func test_no_legacy_command_rewrite() {
     with (let argv = vs_create(8) => vs_free(argv)) {
         vs_push(argv, "run");
@@ -105,6 +123,9 @@ func test_no_legacy_command_rewrite() {
     }
 }
 
+/**
+ * Main entry point for the module.
+ */
 func main() {
     test_default_mode_build();
     test_run_accepts_program_args_after_separator();
