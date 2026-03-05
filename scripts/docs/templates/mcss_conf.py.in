@@ -1,0 +1,21 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+# Copyright (c) 2026 gwz
+
+DOXYFILE = r'{{ doxygen_path }}'
+OUTPUT = r'{{ html_output }}'
+PROJECT_TITLE = 'Dea/L0 API'
+THEME_COLOR = '#385170'
+FAVICON = ''
+
+LINKS_NAVBAR1 = [
+    ('<a href="index.html">Home</a>', []),
+    ('<a href="stage1.html">Stage 1</a>', []),
+    ('<a href="stage2.html">Stage 2</a>', []),
+    ('<a href="shared.html">Shared</a>', []),
+]
+
+LINKS_NAVBAR2 = [
+    ('<a href="https://github.com/googlielmo/dea-lang-l0">GitHub</a>', []),
+]
+
+SHOW_UNDOCUMENTED = True

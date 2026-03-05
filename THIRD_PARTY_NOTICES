@@ -1,0 +1,15 @@
+This repository contains third party components vendored into the source tree.
+Each component is distributed under its original license. See the referenced
+license files for the complete terms.
+
+Project dual licensing (MIT OR Apache-2.0) applies to this project's own code
+and does not relicense third-party components.
+
+Component: m.css
+Upstream: https://github.com/mosra/m.css
+Vendored path: tools/m.css/
+Upstream version: commit 0a460a7a9973a41db48f735e7b49e4da9a876325
+License: MIT (SPDX: MIT)
+License text: tools/m.css/COPYING (verbatim upstream license)
+Local modifications: tools/m.css.L0-PATCHES.md
+Purpose: reproducible offline docs generation

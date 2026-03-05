@@ -1,0 +1,68 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+# Copyright (c) 2026 gwz
+
+name: Validate Documentation
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/**"
+      - "compiler/stage1_py/**"
+      - "compiler/docgen/**"
+      - "compiler/stage2_l0/**"
+      - "compiler/shared/**"
+      - "docs/**"
+      - "README.md"
+      - "CLAUDE.md"
+      - "pyproject.toml"
+      - "scripts/docs/**"
+      - "scripts/gen-docs.sh"
+      - "uv.lock"
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/**"
+      - "compiler/stage1_py/**"
+      - "compiler/docgen/**"
+      - "compiler/stage2_l0/**"
+      - "compiler/shared/**"
+      - "docs/**"
+      - "README.md"
+      - "CLAUDE.md"
+      - "pyproject.toml"
+      - "scripts/docs/**"
+      - "scripts/gen-docs.sh"
+      - "uv.lock"
+
+jobs:
+  validate-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Install docs toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y doxygen make
+
+      - name: Sync docs dependencies
+        run: uv sync --group docs
+
+      - name: Build docs strictly
+        run: ./scripts/gen-docs.sh --strict
+
+      - name: Export Chirpy Markdown
+        run: |
+          python -m compiler.docgen.l0_docgen_blog \
+            --input build/docs/markdown \
+            --output build/docs/blog-export

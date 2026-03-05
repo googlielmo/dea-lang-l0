@@ -1,0 +1,405 @@
+version: 2.1
+
+orbs:
+  codecov: codecov/codecov@1.1.1
+
+executors:
+  python-3_06:
+    docker:
+    - image: python:3.6.15
+  python-3_07:
+    docker:
+    - image: python:3.7.12
+  python-3_08:
+    docker:
+    - image: python:3.8.12
+  python-3_09:
+    docker:
+    - image: python:3.9.8
+  python-3_10:
+    docker:
+    - image: python:3.10.15
+  python-3_11:
+    docker:
+    - image: python:3.11.10
+  python-3_12:
+    docker:
+    - image: python:3.12.6
+  node-10:
+    docker:
+    - image: node:10.24.0-buster-slim
+
+commands:
+  install-base:
+    parameters:
+      extra:
+        type: string
+        default: ""
+    steps:
+    - run:
+        name: Update apt and install base packages
+        # Git needed always for verifying we have up-to-date generated files
+        command: |
+          apt update
+          apt install -y git << parameters.extra >>
+
+  install-python-deps:
+    parameters:
+      attrs-version:
+        type: string
+        default: ""
+      docutils-version:
+        type: string
+        default: ""
+      matplotlib-version:
+        type: string
+        default: ""
+      numpy-version:
+        type: string
+        default: ""
+      pelican-version:
+        type: string
+        default: ""
+      pygments-version:
+        type: string
+        default: ""
+      qrcode-version:
+        type: string
+        default: ""
+    steps:
+    - run:
+        name: Install Python dependencies
+        command: |
+          pip install jinja2 docutils<< parameters.docutils-version >> pygments<< parameters.pygments-version >> pelican<< parameters.pelican-version >> Pyphen Pillow coverage codecov qrcode<< parameters.qrcode-version >> matplotlib<< parameters.matplotlib-version >> attrs<< parameters.attrs-version >> numpy<< parameters.numpy-version >>
+    - run:
+        name: Fix unheard-of cursed issues
+        # otherwise i get Error: unsupported locale setting
+        # https://stackoverflow.com/a/59637279
+        command: |
+          apt install -y locales
+          sed -i -e 's/# en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen
+          dpkg-reconfigure --frontend=noninteractive locales
+          echo 'export LC_ALL=en_US.UTF-8' >> $BASH_ENV
+          echo 'export LC_CTYPE=en_US.UTF-8' >> $BASH_ENV
+
+  test-theme:
+    steps:
+    - run:
+        name: Test the theme
+        command: |
+          cd pelican-theme
+          python -m unittest -v
+    - run:
+        name: Verify compiled CSS is up-to-date
+        command: |
+          cd css
+          ./postprocess.sh
+          git diff --color=always . | cat
+          git diff-index --exit-code HEAD -- .
+
+  test-plugins:
+    steps:
+    - run:
+        name: Test plugins
+        # TODO: add tests for the math plugin as well
+        command: |
+          cd plugins
+          coverage run -m unittest -v
+          cp .coverage ../.coverage.plugins
+
+  test-documentation-themes:
+    parameters:
+      pybind-version:
+        type: string
+      python-version:
+        type: string
+      doxygen-version:
+        type: string
+    steps:
+    - run:
+        name: Install Doxygen
+        command: |
+          mkdir -p $HOME/bin
+          export PATH=$HOME/bin:$PATH
+          echo 'export PATH=$HOME/bin:$PATH' >> $BASH_ENV
+          wget https://sourceforge.net/projects/doxygen/files/rel-<< parameters.doxygen-version >>/doxygen-<< parameters.doxygen-version >>.linux.bin.tar.gz
+          tar -xzf doxygen-<< parameters.doxygen-version >>.linux.bin.tar.gz
+          cp doxygen-<< parameters.doxygen-version >>/bin/doxygen $HOME/bin
+          doxygen -v
+    - run:
+        name: Install pybind11
+        command: |
+          apt update
+          apt install -y cmake ninja-build
+          wget --no-clobber https://github.com/pybind/pybind11/archive/v<< parameters.pybind-version >>.tar.gz
+          tar -xzf v<< parameters.pybind-version >>.tar.gz
+
+          cd pybind11-<< parameters.pybind-version >>
+          mkdir -p build && cd build
+          cmake .. \
+            -DCMAKE_INSTALL_PREFIX=$HOME/pybind<< parameters.pybind-version >> \
+            -DPYBIND11_PYTHON_VERSION=<< parameters.python-version >> \
+            -DPYBIND11_TEST=OFF \
+            -G Ninja
+          ninja install
+    - run:
+        name: Build & test Python bindings code
+        command: |
+          cd documentation/test_python
+          mkdir -p build && cd build
+          cmake .. \
+            -DCMAKE_PREFIX_PATH=$HOME/pybind<< parameters.pybind-version >> \
+            -DPYBIND11_PYTHON_VERSION=<< parameters.python-version >> \
+            -G Ninja
+          ninja
+    - run:
+        name: Test documentation themes
+        command: |
+          cd documentation
+          coverage run -m unittest -v
+          cp .coverage ../.coverage.documentation
+
+  test-search:
+    steps:
+    - run:
+        name: Install Node.js dependencies
+        command: |
+          npm install istanbul codecov
+    - run:
+        name: Test JavaScript search
+        command: |
+          cd documentation
+          node ../node_modules/istanbul/lib/cli.js cover test/test-search.js
+    - run:
+        name: Verify JavaScript search data are up-to-date
+        command: |
+          cd documentation/test
+          ./populate-js-test-data.py
+          git diff --color=always . | cat
+          git diff-index --exit-code HEAD -- .
+
+  coverage:
+    steps:
+    - run:
+        name: Collect and upload code coverage
+        command: |
+          coverage combine
+          codecov
+
+# NOTE: Try to keep the versions reflected in doc/build-status.html.in for
+#   easier debugging when something goes wrong
+
+jobs:
+  py306:
+    executor: python-3_06
+    steps:
+    - install-base:
+        extra: graphviz cmake ninja-build wget
+    - install-python-deps:
+        # Since 3.6 is EOL'd, using this job to test with older versions of
+        # various packages to avoid regressions
+        attrs-version: ==19.3.0
+        matplotlib-version: ==3.3.4
+        pelican-version: ==4.2.0
+        # Ubuntu 18.04 has docutils 0.14
+        docutils-version: ==0.14
+        # Pygments 2.9 are the last before 2.10+ starts classifying whitespace
+        # differently. Ubuntu 18.04 has pygments 2.2.0, but when requesting
+        # that one, the pelican version doesn't play well with Jinja, and I
+        # just don't have patience to deal with that for such an old version.
+        pygments-version: ==2.9.0
+    - checkout
+    - test-theme
+    - test-plugins
+    - test-documentation-themes:
+        python-version: "3.6"
+        # We don't support anything before 2.3.0 anymore.
+        pybind-version: "2.3.0"
+        # Ubuntu 18.04 has doxygen 1.8.13, but it's too much of a nightmare to
+        # make the tests working again.
+        # TODO either drop support for everything below 1.8.16 or fix these
+        doxygen-version: "1.8.16"
+    - coverage
+
+  py307:
+    executor: python-3_07
+    steps:
+    - install-base:
+        extra: graphviz cmake ninja-build wget
+    - install-python-deps:
+        # Matplotlib 3.5 has significantly different output, be sure to have
+        # at least one job testing 3.4 so we don't regress
+        matplotlib-version: ==3.4.3
+        # Docutils 0.17 dropped `object_image_types`, test that it works there
+        docutils-version: ==0.17.1
+        # 7.4 has different output, however on 3.7 and older it's too annoying
+        # to check what version is installed, so pin to 7.3
+        qrcode-version: ==7.3.1
+        # Pygments 2.9 are the last before 2.10+ starts classifying whitespace
+        # differently. Ubuntu 20.04 has pygments 2.3.1, but that one has a
+        # slight difference in output and it doesn't make sense to add another
+        # test variant for such an old version.
+        pygments-version: ==2.9.0
+    - checkout
+    - test-theme
+    - test-plugins
+    - test-documentation-themes:
+        python-version: "3.7"
+        pybind-version: "2.3.0"
+        # 1.8.14 and 1.8.15 binaries link against libclang.so.6 so they're
+        # useless
+        doxygen-version: "1.8.16"
+    - coverage
+
+  py308:
+    executor: python-3_08
+    steps:
+    - install-base:
+        extra: graphviz cmake ninja-build wget
+    - install-python-deps:
+        # Matplotlib 3.6+ has slightly different output, be sure to have at
+        # least one job testing 3.5 so we don't regress
+        matplotlib-version: ==3.5.2
+        # Docutils 0.18.0 dropped `in_footnote_list` and made some changes that
+        # 0.18.1 reverted again, test we're not affected by those
+        docutils-version: ==0.18.0
+        # Pygments 2.9 are the last before 2.10+ starts classifying whitespace
+        # differently
+        pygments-version: ==2.9.0
+    - checkout
+    - test-theme
+    - test-plugins
+    - test-documentation-themes:
+        python-version: "3.8"
+        # 2.4.1 fixes a Py3.8-specific bug, so the 2.3 versions are probably
+        # not wise to use here
+        pybind-version: "2.4.3"
+        doxygen-version: "1.8.17"
+    - coverage
+
+  py309:
+    executor: python-3_09
+    steps:
+    - install-base:
+        # libtinfo5 needed by doxygen 1.8.18, wtf
+        extra: graphviz cmake ninja-build wget libtinfo5
+    - install-python-deps:
+        # Matplotlib 3.6 to 3.9.2 is known to have output as expected, pin it
+        # to ensure we don't regress once new versions change something again
+        matplotlib-version: ==3.9.2
+        # NumPy 2.0 only works with pybind 2.12+
+        numpy-version: ==1.26.4
+        # Pygments 2.10 classifies whitespace differently than 2.9 and 2.11
+        pygments-version: ==2.10.0
+    - checkout
+    - test-theme
+    - test-plugins
+    - test-documentation-themes:
+        python-version: "3.9"
+        # 2.5.0 is the first that properly searches for Python 3.9 in CMake, so
+        # anything before that probably won't work at all.
+        pybind-version: "2.5.0"
+        doxygen-version: "1.8.18"
+    - coverage
+
+  py310:
+    executor: python-3_10
+    steps:
+    - install-base:
+        extra: graphviz cmake ninja-build wget
+    - install-python-deps:
+        # Matplotlib 3.10 has different output again
+        # TODO update once I have it in Arch
+        matplotlib-version: ==3.9.3
+        # NumPy 2.0 doesn't work with pybind < 2.12
+        numpy-version: ==1.26.4
+        # Ubuntu 22.04 has pygments 2.11
+        pygments-version: ==2.11.0
+    - checkout
+    - test-theme
+    - test-plugins
+    - test-documentation-themes:
+        python-version: "3.10"
+        # 2.9 series seems to be the first to work with Python 3.10
+        # TODO have something that tests 2.6 and 2.7 explicitly
+        pybind-version: "2.9.2"
+        # 1.9.1 is in Ubuntu 22.04 repos, HOWEVER both 1.9.1 and 1.9.2 link
+        # against libclang-9.so.1, which is stupid. I think I even asked if the
+        # builds could be fixed back then, but of course they didn't even
+        # realize it could be a problem. 1.9.3 is the first working.
+        doxygen-version: "1.9.3"
+    - coverage
+
+  py311:
+    executor: python-3_11
+    steps:
+    - install-base:
+        extra: graphviz cmake ninja-build wget
+    - install-python-deps:
+        # Matplotlib 3.10 has different output again
+        # TODO update once I have it in Arch
+        matplotlib-version: ==3.9.3
+        # NumPy 2.0 doesn't work with pybind < 2.12
+        numpy-version: ==1.26.4
+        # Ubuntu 24.04 has pygments 2.17
+        pygments-version: ==2.17.0
+    - checkout
+    - test-theme
+    - test-plugins
+    - test-documentation-themes:
+        python-version: "3.11"
+        # 2.11.1 is the last that uses pre-PEP585 typing annotations, make sure
+        # it's explicitly tested
+        pybind-version: "2.11.1"
+        # 1.9.8 is in Ubuntu 24.04 repos
+        doxygen-version: "1.9.8"
+    - coverage
+
+  py312:
+    executor: python-3_12
+    steps:
+    - install-base:
+        extra: graphviz cmake ninja-build wget
+    - install-python-deps:
+        # Matplotlib 3.10 has different output again
+        # TODO update once I have it in Arch
+        matplotlib-version: ==3.9.3
+        # pygments 2.19 change the output slightly
+        # TODO update once I dare to update my Arch
+        pygments-version: ==2.18
+    - checkout
+    - test-theme
+    - test-plugins
+    - test-documentation-themes:
+        python-version: "3.12"
+        # 2.12 series is the first that uses PEP585 and first that works with
+        # NumPy 2.0
+        pybind-version: "2.12.1"
+        # 1.11 is the latest that passes all tests, 1.12 first needs
+        # https://github.com/doxygen/doxygen/pull/11141 merged to be usable.
+        doxygen-version: "1.11.0"
+    - coverage
+
+  js:
+    executor: node-10
+    steps:
+    - install-base:
+        extra: python3 curl
+    - checkout
+    - test-search
+    # This FUCKING DAMN THING doesn't propagate a failure if curl doesn't exist
+    # WHAT THE FUCK
+    - codecov/upload
+
+workflows:
+  version: 2
+  build:
+    jobs:
+    - py306
+    - py307
+    - py308
+    - py309
+    - py310
+    - py311
+    - py312
+    - js

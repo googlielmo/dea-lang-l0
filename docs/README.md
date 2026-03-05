@@ -11,6 +11,13 @@ This directory is organized by document intent first, then subsystem.
 - `plans/`: execution plans, especially bug-fix plans.
 - `attic/`: superseded or obsolete documents.
 
+Generated API documentation is not stored in this tree. The docs pipeline writes generated HTML, Markdown, Doxygen XML,
+and Doxygen LaTeX under `build/docs/`. When `./scripts/gen-docs.sh --pdf` is used, the built PDF is copied to
+`build/docs/pdf/` (also with `--pdf-fast`). After each successful docs run, generated artifacts are mirrored into a
+stable preview tree under `build/preview/{html,markdown,pdf}` and overwritten by the next successful run. CI publishing
+also produces a Chirpy-compatible export under `build/docs/blog-export/` before synchronizing it into the separate blog
+repository.
+
 ## Placement Guide
 
 - Use `reference/` when documenting how the system currently works.
@@ -35,6 +42,7 @@ All documentation should follow these metadata standards to ensure consistency a
 Stable or normative documents must include a version line immediately following the main header.
 
 **Template:**
+
 ```markdown
 # [Title]
 
@@ -52,6 +60,7 @@ Version: YYYY-MM-DD
 Plans for bug fixes, features, or refactors follow a more detailed metadata block.
 
 **Template:**
+
 ```markdown
 # [Bug Fix | Feature | Refactor | Tool] Plan
 
@@ -71,6 +80,7 @@ Plans for bug fixes, features, or refactors follow a more detailed metadata bloc
 - Repro: [Reproduction command or path] (optional)
 
 ## Summary
+
 ...
 ```
 
@@ -79,7 +89,8 @@ Plans for bug fixes, features, or refactors follow a more detailed metadata bloc
 - [reference/architecture.md](reference/architecture.md): compiler pipeline and pass structure.
 - [reference/c-backend-design.md](reference/c-backend-design.md): Stage 1 lowering/runtime interaction details.
 - [reference/standard-library.md](reference/standard-library.md): `std.*` and `sys.*` API surface.
-- [reference/ownership.md](reference/ownership.md): canonical ownership rules for `new`/`drop`, ARC strings, and container patterns.
+- [reference/ownership.md](reference/ownership.md): canonical ownership rules for `new`/`drop`, ARC strings, and
+  container patterns.
 
 ### Bug-Fix Plans
 

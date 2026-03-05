@@ -14,6 +14,7 @@ COPYRIGHT_RE = re.compile(r"Copyright\s*\(c\)\s*\d{4}(?:-\d{4})?\b")
 SHELL_SHEBANG_RE = re.compile(r"^#!.*\b(?:bash|sh|zsh)\b")
 TARGET_SUFFIXES = {".c", ".h", ".l0", ".py", ".sh"}
 MAX_SCAN_LINES = 80
+EXCLUDED_PREFIXES = ("tools/",)
 
 
 def _tracked_files(repo_root: Path) -> list[Path]:
@@ -71,12 +72,15 @@ def main() -> int:
     for path in _tracked_files(repo_root):
         if not path.is_file():
             continue
+        rel_path = path.relative_to(repo_root).as_posix()
+        if rel_path.startswith(EXCLUDED_PREFIXES):
+            continue
         if not _is_target_source(path):
             continue
         scanned += 1
         head = _read_head(path, MAX_SCAN_LINES)
         if not COPYRIGHT_RE.search(head):
-            missing.append(path.relative_to(repo_root).as_posix())
+            missing.append(rel_path)
 
     if missing:
         print("Missing copyright notice in:")

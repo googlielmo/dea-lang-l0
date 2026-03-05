@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>m.code | A Pelican Blog</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Source+Code+Pro:400,400i,600%7CSource+Sans+Pro:400,400i,600,600i" />
+  <link rel="stylesheet" href="static/m-dark.css" />
+  <link rel="canonical" href="page.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+</head>
+<body>
+<header><nav id="navigation">
+  <div class="m-container">
+    <div class="m-row">
+      <a href="./" id="m-navbar-brand" class="m-col-t-9 m-col-m-none m-left-m">A Pelican Blog</a>
+    </div>
+  </div>
+</nav></header>
+<main>
+<article>
+  <div class="m-container m-container-inflatable">
+    <div class="m-row">
+      <div class="m-col-l-10 m-push-l-1">
+        <h1>m.code</h1>
+<!-- content -->
+<pre class="m-code"><span class="kt">int</span> <span class="nf">main</span><span class="p">()</span> <span class="p">{</span>
+    <span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span></pre>
+<pre class="m-inverted m-code"><span class="kt">int</span> <span class="nf">main</span><span class="p">()</span> <span class="p">{</span>
+<span class="hll">    <span class="k">return</span> <span class="mi">1</span><span class="p">;</span>
+</span><span class="p">}</span></pre>
+<p>Legacy <code class="m-code"><span class="nc">:hl_lines:</span></code> option should work the same:</p>
+<pre class="m-inverted m-code"><span class="kt">int</span> <span class="nf">main</span><span class="p">()</span> <span class="p">{</span>
+<span class="hll">    <span class="k">return</span> <span class="mi">1</span><span class="p">;</span>
+</span><span class="p">}</span></pre>
+<p>Same as above, but for a <code class="m-code"><span class="p">..</span> <span class="ow">include</span><span class="p">::</span></code>, which should also support line
+highlighting:</p>
+<pre class="m-inverted m-code"><span class="kt">int</span> <span class="nf">main</span><span class="p">()</span> <span class="p">{</span>
+<span class="hll">    <span class="k">return</span> <span class="mi">1</span><span class="p">;</span>
+</span><span class="p">}</span></pre>
+<p>Inline code is here: <code class="cpp m-code"><span class="k">constexpr</span> <span class="kt">int</span> <span class="n">foo</span> <span class="o">=</span> <span class="mi">5</span><span class="p">;</span></code>. Syntax highlighting:</p>
+<pre class="m-code"><span class="c1"># Comment</span>
+<span class="n">var</span> <span class="o">=</span> <span class="s2">&quot;string</span><span class="si">{}</span><span class="s2">escape</span><span class="se">\n</span><span class="s2">&quot;</span></pre>
+<pre class="m-code">// this language is not highlighted</pre>
+<p>Properly preserve backslashes: <code class="m-code"><span class="k">\frac</span><span class="nb">{</span>a<span class="nb">}{</span>b<span class="nb">}</span></code> ... and backticks:
+<code class="m-code"><span class="na">:ref:</span><span class="nv">`a function &lt;os.path.join()&gt;`</span></code></p>
+<p>Don't trim leading spaces in blocks:</p>
+<pre class="m-code">        <span class="n">nope</span><span class="p">();</span>
+    <span class="k">return</span> <span class="nb">false</span><span class="p">;</span>
+<span class="p">}</span></pre>
+<section id="code-with-no-language-specified">
+<h2><a href="#code-with-no-language-specified">Code with no language specified</a></h2>
+<pre class="m-code">This is a plain block.</pre>
+<pre class="m-code m-text m-info">This is a plain block,
+    which is colored.</pre>
+<p>This is a <code class="m-code">plain inline code</code> and <code class="m-code m-text m-success">one which is also colored</code>.</p>
+</section>
+<section id="advanced-file-inclusion">
+<h2><a href="#advanced-file-inclusion">Advanced file inclusion</a></h2>
+<section id="sphinx-gallery-alike-self-contained-code-file">
+<h3><a href="#sphinx-gallery-alike-self-contained-code-file">&quot;Sphinx Gallery&quot;-alike self-contained code file</a></h3>
+<p>This is a reST markup explaining the following code, with the initial
+<code>#&lt;space&gt;</code> stripped, and on blank lines only the <code>#</code> stripped:</p>
+<p>## However in this case both leading <code>##</code> will be kept.</p>
+<p>The <code>math.sin()</code> calculates a sin, <em>of course</em>, and the initial indentation
+of it is stripped also:</p>
+<pre class="m-code"><span class="n">sin</span> <span class="o">=</span> <span class="n">math</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="mf">0.13587</span><span class="p">)</span>
+<span class="n">two_sins</span> <span class="o">=</span> <span class="n">sin</span> <span class="o">+</span> <span class="n">sin</span></pre>
+<p>In comparison, here's the default output without <code class="m-code"><span class="nc">:strip-prefix:</span></code>:</p>
+<pre class="m-code">    <span class="n">sin</span> <span class="o">=</span> <span class="n">math</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="mf">0.13587</span><span class="p">)</span>
+    <span class="n">two_sins</span> <span class="o">=</span> <span class="n">sin</span> <span class="o">+</span> <span class="n">sin</span></pre>
+</section>
+</section>
+<section id="filters">
+<h2><a href="#filters">Filters</a></h2>
+<p>Applied by default, adding typographically correct spaces before and a color
+swatch after --- and for inline as well: <code class="m-code"><span class="nt">p</span> <span class="p">{</span> <span class="k">color</span><span class="p">:</span> <span class="mh">#ff3366<span class="m-code-color" style="background-color: #ff3366;"></span></span><span class="p">;</span> <span class="p">}</span></code></p>
+<pre class="m-code"><span class="nt">p</span> <span class="p">{</span>
+    <span class="k">color</span><span class="p">:</span> <span class="mh">#ff3366<span class="m-code-color" style="background-color: #ff3366;"></span></span><span class="p">;</span>
+<span class="p">}</span></pre>
+<p>Applied explicitly and then by default --- and for inline as well:
+<code class="css-filtered m-code"><span class="nt">p</span> <span class="p">{</span> <span class="k">color</span><span class="p">:</span> <span class="mh">#3bd267<span class="m-code-color" style="background-color: #3bd267;"></span></span><span class="p">;</span> <span class="p">}</span></code></p>
+<pre class="m-code"><span class="nt">p</span> <span class="p">{</span>
+    <span class="k">color</span><span class="p">:</span> <span class="mh">#3bd267<span class="m-code-color" style="background-color: #3bd267;"></span></span><span class="p">;</span>
+<span class="p">}</span></pre>
+<p>Includes too:</p>
+<pre class="m-code"><span class="nt">p</span> <span class="p">{</span>
+    <span class="k">color</span><span class="p">:</span> <span class="mh">#3bd267<span class="m-code-color" style="background-color: #3bd267;"></span></span><span class="p">;</span>
+<span class="p">}</span></pre>
+</section>
+<!-- /content -->
+      </div>
+    </div>
+  </div>
+</article>
+</main>
+</body>
+</html>

@@ -11,8 +11,8 @@
  * SipHash-1-3 and SipHash-2-4 (64-bit tag), portable C99.
  *
  * Header-only / single-header pattern:
- *  - In one translation unit: #define SIPHASH_IMPLEMENTATION before including this header.
- *  - Everywhere else: include this header without SIPHASH_IMPLEMENTATION.
+ *  - In one translation unit: `#define SIPHASH_IMPLEMENTATION` before including this header.
+ *  - Everywhere else: include this header without `SIPHASH_IMPLEMENTATION`.
  */
 
 #include <stddef.h>

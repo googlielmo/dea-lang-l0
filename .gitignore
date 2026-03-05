@@ -415,3 +415,11 @@ Testing/
 
 # Anthropic's Claude AI agent
 .claude/
+
+#######################################
+# Documentation
+#######################################
+docs/gen/
+docs/html/
+docs/latex
+docs/xml

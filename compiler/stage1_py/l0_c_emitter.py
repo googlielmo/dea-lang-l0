@@ -79,6 +79,7 @@ class CEmitter:
     """C-specific code emitter.
 
     Responsibilities:
+
     - Emit C syntax (knows C keywords, syntax, conventions).
     - Name mangling for C.
     - Type emission (L0 types -> C types).
@@ -86,6 +87,7 @@ class CEmitter:
     - Cleanup code emission (HOW to clean, not when/why).
 
     Does NOT:
+
     - Make decisions about what to emit.
     - Perform semantic analysis.
     - Manage scopes or lifetimes (queries backend for this).

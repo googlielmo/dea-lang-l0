@@ -102,6 +102,11 @@ func process_config(path: string) -> int {
 - A C99-compatible compiler (gcc or clang)
 - Git (for cloning the repository)
 
+#### For generating documentation
+
+- **Doxygen**: Can be installed via Homebrew (`brew install doxygen`) on macOS or via package managers on Linux.
+- **uv**: Required to run the vendored docs toolchain (`uv sync --group docs`).
+
 ### Assumptions and Constraints
 
 - Module name components must be valid identifiers (`[A-Za-z_][A-Za-z0-9_]*`), so names like `app.main` are valid while
@@ -157,6 +162,79 @@ If not set, defaults are relative to the repository root:
    ```shell
    ./l0c --help
    ```
+
+#### 4. Generate API documentation:
+
+   ```shell
+   ./scripts/gen-docs.sh --strict
+   ```
+   Strict mode fails on Doxygen warnings and synthetic `__padN__` symbol regressions.
+   The docs-generation tooling modules live under `compiler/docgen/` and are intentionally excluded from the generated
+   API reference source manifest.
+
+Optional modes:
+
+- `./scripts/gen-docs.sh --html-only`
+- `./scripts/gen-docs.sh --markdown-only`
+- `./scripts/gen-docs.sh --latex-only`
+- `./scripts/gen-docs.sh --no-latex`
+- `./scripts/gen-docs.sh --pdf`
+- `./scripts/gen-docs.sh --pdf-fast`
+- `./scripts/gen-docs.sh --pdf --verbose`
+
+Generated outputs are written to:
+
+- `build/docs/html/`
+- `build/docs/markdown/`
+- `build/docs/doxygen/xml/`
+- `build/docs/doxygen/latex/`
+- `build/docs/pdf/` when `--pdf` or `--pdf-fast` is used
+
+At the end of each successful run, generated artifacts are mirrored into a stable preview tree (only overwritten by
+subsequent successful runs):
+
+- `build/preview/html/`
+- `build/preview/markdown/`
+- `build/preview/pdf/`
+
+By default the wrapper keeps `m.css` warnings and LaTeX build output quiet unless a command fails.
+Use `-v` / `--verbose` to stream that output directly.
+
+To build the Doxygen LaTeX output into a PDF and copy `refman.pdf` into `build/docs/pdf/`, install a TeX
+toolchain and run:
+
+```shell
+./scripts/gen-docs.sh --pdf
+```
+
+For faster local preview PDFs (single `pdflatex` pass, potentially less complete references/index):
+
+```shell
+./scripts/gen-docs.sh --pdf-fast --latex-only
+```
+
+### CI publishing
+
+Documentation publishing automation is release-oriented:
+
+- `.github/workflows/docs-validate.yml` validates docs generation and Chirpy export on pull requests and selected
+  pushes.
+- `.github/workflows/docs-publish.yml` publishes the standalone HTML site to GitHub Pages, uploads `refman.pdf` to
+  GitHub Releases, and syncs a Chirpy-compatible Markdown export into a separate blog repository on release or manual
+  trigger.
+
+The publish workflow expects these repository settings:
+
+- Variables:
+    - `BLOG_REPO`
+    - `BLOG_BRANCH` (optional, defaults to `main`)
+    - `BLOG_DOCS_PREFIX` (optional, defaults to `api/reference`)
+    - `BLOG_TAB_TITLE` (optional, defaults to `API`)
+    - `BLOG_TAB_ICON` (optional, defaults to `fas fa-book`)
+    - `BLOG_TAB_ORDER` (optional, defaults to `4`)
+    - `DOCS_SITE_URL` (optional override for the published Pages URL)
+- Secret:
+    - `BLOG_PUSH_TOKEN`
 
 ### First Steps
 
@@ -418,17 +496,15 @@ Enjoy the game! Type your inputs as prompted and see how well you can govern anc
 
 ## Coding conventions
 
-When writing or modifying C/C++ and Dea/L0 code in this repository, please adhere to the following styling and documentation conventions:
+When writing or modifying C and Dea/L0 code in this repository, please adhere to the following styling and documentation
+conventions:
 
-- **Documentation Blocks:** Use Javadoc-style Doxygen comments (`/** ... */`) for functions, types, and files. Omit the `@brief` tag; rely on the first sentence for the brief description.
-- **License Headers:** Use standard C block comments (`/* ... */`) for `SPDX-License-Identifier` and copyright information to separate them from API documentation.
-- **Section Banners:** Keep separator banners within a **79-character maximum line width**. A standard section banner uses exactly 73 equals signs (`=`):
-  ```c
-  /* =========================================================================
-   * Section name
-   * ========================================================================= */
-  ```
-For more details, including Python standards, see [CONTRIBUTING.md](CONTRIBUTING.md).
+- **Documentation Blocks:** Use Javadoc-style Doxygen comments (`/** ... */`) for functions, types, and files. Omit the
+  `@brief` tag; rely on the first sentence for the brief description.
+- **License Headers:** Use standard C block comments (`/* ... */`) for `SPDX-License-Identifier` and copyright
+  information to separate them from API documentation.
+
+For more details, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Project status
 
@@ -442,6 +518,8 @@ This project is dual-licensed under the following terms:
 - Apache License 2.0 (see [LICENSE-APACHE](LICENSE-APACHE))
 
 You may use this software under either license at your option.
+
+Vendored third-party component notices are tracked in [`THIRD_PARTY_NOTICES`](THIRD_PARTY_NOTICES).
 
 ## Author
 

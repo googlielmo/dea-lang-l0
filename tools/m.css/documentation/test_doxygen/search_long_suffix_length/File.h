@@ -1,0 +1,8 @@
+/** @file
+ * @brief A file
+ */
+
+typedef int ThisIsALongTypeForWhichIWantDoxygenToCalculateTheSameHashAlways;
+
+/** @brief One fun function */
+bool aVeryLongFunctionName(ThisIsALongTypeForWhichIWantDoxygenToCalculateTheSameHashAlways a, ThisIsALongTypeForWhichIWantDoxygenToCalculateTheSameHashAlways b, ThisIsALongTypeForWhichIWantDoxygenToCalculateTheSameHashAlways c, ThisIsALongTypeForWhichIWantDoxygenToCalculateTheSameHashAlways d, ThisIsALongTypeForWhichIWantDoxygenToCalculateTheSameHashAlways e, ThisIsALongTypeForWhichIWantDoxygenToCalculateTheSameHashAlways f, ThisIsALongTypeForWhichIWantDoxygenToCalculateTheSameHashAlways g);

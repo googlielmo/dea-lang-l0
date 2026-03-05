@@ -1,0 +1,54 @@
+<table class="m-table build-status">
+  <thead>
+    <tr>
+      <th style="border-bottom-width: 0;"></th>
+      <!-- try to keep these consistent with package/ci/circleci.yml -->
+      <th><abbr title="pygments 2.9.0, pybind11 2.3.0, doxygen 1.8.16">Python<br />3.6</abbr></th>
+      <th><abbr title="pygments 2.9.0, pybind11 2.3.0, doxygen 1.8.16">Python<br />3.7</abbr></th>
+      <th><abbr title="pygments 2.9.0, pybind11 2.4.3, doxygen 1.8.17">Python<br />3.8</abbr></th>
+      <th><abbr title="pygments 2.10.0, pybind11 2.5.0, doxygen 1.8.18">Python<br />3.9</abbr></th>
+      <th><abbr title="pygments 2.11.0, pybind11 2.9.2, doxygen 1.9.3">Python<br />3.10</abbr></th>
+      <th><abbr title="pygments 2.17.0, pybind11 2.11.1, doxygen 1.9.8">Python<br />3.11</abbr></th>
+      <th><abbr title="pybind11 2.12.1, doxygen 1.11.0">Python<br />3.12</abbr></th>
+    </tr>
+    <tr>
+      <th class="m-text-right m-text-middle" style="border-top-width: 0;">code coverage</th>
+      <td colspan="7" id="coverage-mcss"><a>&nbsp;<br/><span class="m-text m-small">&nbsp;</span></a></td>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th class="m-text-right">Pelican theme</th>
+      <td rowspan="4" id="mcss-py306"><a>&nbsp;<br/><span class="m-text m-small">&nbsp;</span></a></td>
+      <td rowspan="4" id="mcss-py307"><a>&nbsp;<br/><span class="m-text m-small">&nbsp;</span></a></td>
+      <td rowspan="4" id="mcss-py308"><a>&nbsp;<br/><span class="m-text m-small">&nbsp;</span></a></td>
+      <td rowspan="4" id="mcss-py309"><a>&nbsp;<br/><span class="m-text m-small">&nbsp;</span></a></td>
+      <td rowspan="4" id="mcss-py310"><a>&nbsp;<br/><span class="m-text m-small">&nbsp;</span></a></td>
+      <td rowspan="4" id="mcss-py311"><a>&nbsp;<br/><span class="m-text m-small">&nbsp;</span></a></td>
+      <td rowspan="4" id="mcss-py312"><a>&nbsp;<br/><span class="m-text m-small">&nbsp;</span></a></td>
+    </tr>
+    <tr>
+      <th class="m-text-right">Plugins</th>
+    </tr>
+    <tr>
+      <th class="m-text-right">Graph rendering</th>
+    </tr>
+    <tr>
+      <th class="m-text-right">Documentation themes</th>
+    </tr>
+    <tr>
+      <th class="m-text-right">Documentation themes<br/>client search</th>
+      <td id="mcss-js" colspan="7"><a>&nbsp;<br/><span class="m-text m-small">&nbsp;</span></a></td>
+    </tr>
+    <tr>
+      <th class="m-text-right">Math rendering</th>
+      <td class="m-dim"></td>
+      <td class="m-dim"></td>
+      <td class="m-dim"></td>
+      <td class="m-dim"></td>
+      <td class="m-dim"></td>
+      <td class="m-dim"></td>
+      <td class="m-dim"></td>
+    </tr>
+  </tbody>
+</table>

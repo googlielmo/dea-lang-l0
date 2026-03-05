@@ -15,7 +15,10 @@ from pathlib import Path
 from textwrap import dedent
 
 STAGE1_ROOT = Path(__file__).parent.parent
+REPO_ROOT = STAGE1_ROOT.parents[1]
 sys.path.insert(0, str(STAGE1_ROOT))
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(1, str(REPO_ROOT))
 
 from l0_driver import L0Driver
 from l0_paths import SourceSearchPaths

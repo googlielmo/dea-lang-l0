@@ -1,0 +1,54 @@
+/** @mainpage
+
+> A blockquote.
+
+Paragraph \n with \n explicit \n line \n breaks.
+
+    Preformatted text.
+
+@section section Page section
+
+<pre>Differently
+  preformatted
+text.</pre>
+
+-   Unordered
+-   list
+-   of
+    -   nested
+    -   items
+-   and back
+
+1.  Ordered
+2.  list
+3.  of
+    1.  nested
+    2.  items
+4.  and back
+
+@anchor an-anchor
+
+This is a `typewriter text`, *emphasis*, **bold**. <em>Emphasis with
+<tt>typewriter</tt> and <strong>bold</strong> nested.</em> http://google.com
+and [URL](http://google.com). <small>Small *text*.</small> En-dash -- and
+em-dash ---. Reference to a @ref section. Named reference with special
+characters in title: @ref section "&raquo; Warnings &laquo;". Reference with
+escaped characters in&nbsp;title: @ref an-anchor "&lt;anchor&gt;".
+
+2<sup>nd</sup> is L<sub>&infin;</sub> &forall; &nabla; &pi; &real; &image;
+This costs no $, &euro;, &pound;, &yen; or &curren;.
+
+Empty elements: <em></em> <tt></tt> <strong></strong> <pre></pre> <small></small>
+
+- - -
+
+Above is a horizontal line.
+
+*/
+
+/**
+@page doxygen1817 Features fully supported since 1.8.17
+
+~~Strikethrough~~ in <s>various</s> <del>ways</del>. 1.8.16 knows only del and
+tildes, 1.8.13 none of these.
+*/
