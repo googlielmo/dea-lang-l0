@@ -10,7 +10,7 @@ set -e
 
 VERBOSE=0
 
-if [ "$1" == "-v" ]; then
+if [ "${1:-}" == "-v" ]; then
     VERBOSE=1
 fi
 
@@ -46,6 +46,38 @@ for test_file in "$TESTS_DIR"/*.l0; do
     else
         # otherwise, capture output to a per-test temp file
         if ./l0c -P compiler/stage2_l0/src --run "$test_file" > "/tmp/test_output_$$_${test_name}.txt" 2>&1; then
+            echo "PASS"
+            passed=$((passed + 1))
+            rm -f "/tmp/test_output_$$_${test_name}.txt"
+        else
+            echo "FAIL"
+            failed=$((failed + 1))
+            failed_tests="$failed_tests $test_name"
+        fi
+    fi
+done
+
+for test_file in "$TESTS_DIR"/*_test.sh; do
+    if [ ! -f "$test_file" ]; then
+        continue
+    fi
+
+    test_name=$(basename "$test_file")
+    echo -n "Running $test_name... "
+
+    if [ $VERBOSE -eq 1 ]; then
+        echo
+        if bash "$test_file"; then
+            echo "PASS"
+            passed=$((passed + 1))
+        else
+            echo "FAIL"
+            failed=$((failed + 1))
+            failed_tests="$failed_tests $test_name"
+        fi
+        continue
+    else
+        if bash "$test_file" > "/tmp/test_output_$$_${test_name}.txt" 2>&1; then
             echo "PASS"
             passed=$((passed + 1))
             rm -f "/tmp/test_output_$$_${test_name}.txt"

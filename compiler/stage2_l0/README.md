@@ -13,6 +13,9 @@ Run Stage 2 L0 tests:
 ./compiler/stage2_l0/run_tests.sh
 ```
 
+This runner executes both `*.l0` test modules and `*_test.sh` regression scripts under
+`compiler/stage2_l0/tests/`.
+
 Options:
 
 - `-v`: verbose output with all test names and outputs.
