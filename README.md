@@ -1,526 +1,374 @@
-# Dea/L<sub>0</sub>: A Small, Safe, C-Family Language
+# Dea/L<sub>0</sub>
 
-> _C-family syntax, with UB-free semantics and modern sum types + pattern matching._
+> _C-family syntax, UB-free semantics, ARC strings, sum types and pattern matching._
 
-**Dea/L<sub>0</sub>** or simply **L0** is a small systems language with a staged compiler.
+**L0 (Level Zero)** is a small systems language that compiles to C99. It is the foundational subset and first bootstrap
+stage of the **Dea** language family.
 
-It is the first step in growing a new, small and carefully designed systems programming language called **Dea**.
+Dea employs a staged compiler bootstrapping architecture (Level 0, Level 1, ..., Level N). Once the Dea/L0 compiler is
+fully self-hosted, it will be used to compile L1. L1 will subsequently self-host to build L2, and the process will
+repeat for successive levels.
 
-The current implementation **emits portable C (C99)** as a bootstrap backend; the backend is intended to evolve (e.g.,
-with LLVM).
+The design is conservative by choice: a small, precisely specified language whose semantics leave no room for undefined
+behavior. Operations are either well-defined or rejected - at compile time or with a named runtime error.
 
-It is designed to eventually **compile its own compiler** (Stage 2: L0-in-L0).
+_Tertium non datur._
 
-This repository is primarily the **L0 language + toolchain**, and includes:
-
-* The language definition and design documents (`docs/`).
-* A **Stage 1 bootstrap compiler** (`l0c`) used to validate the language and generate C99.
-* A small trusted **C kernel/runtime** used by generated programs.
-* A Stage 2 L0-in-L0 compiler (in development).
-
-Stage 1 is implemented in **Python** intentionally (fast iteration, simple reference implementation).
-
-The Python Stage 1 compiler is located in the [`compiler/stage1_py`](compiler/stage1_py) directory.
-
-Generated programs link a small trusted **C kernel/runtime** that encapsulates platform-specific behavior.
-L0 aims to eliminate **undefined behavior**: operations are either well-defined, rejected with diagnostics,
-or (where appropriate) trigger a defined runtime failure.
-
-L0 is C-family in **surface syntax**:
-
-* braces/semicolons, explicit types, pointers, and familiar operator precedence.
-
-It is **not C** in key semantic ways:
-
-* enums with payloads and statement-only **`match`**,
-* explicit **optional types** (`T?`, with `null` as the empty value),
-* a postfix **null propagation operator** (`expr?`) to propagate `null` from an expression of type `T?`,
-* no undefined behavior at the language level.
-
-The design goals and technical model are described in the project documents in the [docs](docs) folder.
-
-## Example
-
-```l0
-module demo;
-
-enum Expr {
-    Int(value: int);
-    Add(left: Expr*, right: Expr*);
-    Comment(text: string);
-}
-
-func eval(e: Expr*) -> int {
-    match (*e) {
-        Int(value) => { return value; }
-        Add(left, right) => { return eval(left) + eval(right); }
-        _ => { return 0; } // wildcard pattern matches anything else
-    }
-}
-
-func add_opt(a: int?, b: int?) -> int? {
-    let x: int = a?;    // propagate `null` if `a` is null
-    let y: int = b?;    // propagate `null` if `b` is null
-    return (x + y) as int?;
-}
-
-func process_config(path: string) -> int {
-    with (let f = open(path, "r") => close(f)) { // `with` ensures `f` is closed when the block exits
-        case (f.read_config_line()) {
-            "" => { printl_s("Empty file"); return -1; }
-            "enable_feature" => {
-                printl_s("Feature enabled");
-                return 1;
-            }
-            else {
-                printl_ss("Unknown config:", line);
-                return 0;
-            }
-        }
-    }
-}
-```
-
-## Table of contents
-
-1. [Getting Started](#getting-started)
-2. [Motivation](#motivation)
-3. [Language overview](#language-overview)
-4. [Grammar](#grammar)
-5. [Compiler implementation architecture](#compiler-implementation-architecture)
-6. [CLI](#cli)
-7. [Coding conventions](#coding-conventions)
-8. [Project status](#project-status)
-9. [License](#license)
-10. [Author](#author)
-
-## Getting Started
-
-### Prerequisites
-
-- Python 3.14 or later
-- A C99-compatible compiler (gcc or clang)
-- Git (for cloning the repository)
-
-#### For generating documentation
-
-- **Doxygen**: Can be installed via Homebrew (`brew install doxygen`) on macOS or via package managers on Linux.
-- **uv**: Required to run the vendored docs toolchain (`uv sync --group docs`).
-
-### Assumptions and Constraints
-
-- Module name components must be valid identifiers (`[A-Za-z_][A-Za-z0-9_]*`), so names like `app.main` are valid while
-  `app.my-module` and `9main` are not.
-- Filesystem module resolution follows host behavior (case-sensitive hosts require exact case matches).
-- Source files are decoded as UTF-8; a UTF-8 BOM is accepted and ignored.
-- `run` and `build` require the entry module to define `main`.
-- Preferred `main` return types are `int`, `void`, or `bool` (`bool` maps to C exit code `0`/`1`).
-- If `--runtime-lib` or `L0_RUNTIME_LIB` is set, an `l0runtime` library artifact must exist in that directory.
-
-### Setup
-
-#### 1. Clone the repository:
-
-   ```shell
-   git clone https://github.com/googlielmo/dea-lang-l0.git
-   cd dea-lang-l0
-   ```
-
-#### 2. Set environment variables (optional):
-
-For interactive shells, source the helper script:
-
-   ```shell
-   source ./l0-env.sh
-   ```
-
-This sets `L0_HOME`, adds the repository root to `PATH`, and sources `.venv/bin/activate` when a repository-local
-virtualenv is present for the current shell session (`bash` and `zsh`).
-
-If you prefer manual setup or want to override values, use:
-
-   ```shell
-   export L0_HOME=/path/to/l0/compiler
-   
-   # Optional: override system and runtime include paths (defaults are relative to L0_HOME)
-   export L0_SYSTEM=/path/to/l0/compiler/shared/l0/stdlib
-   export L0_RUNTIME_INCLUDE=/path/to/l0/compiler/shared/runtime
-
-   # Optional: force a specific C compiler for build/run and compiler tests
-   export L0_CC=/usr/bin/clang
-   ```
-
-If not set, defaults are relative to the repository root:
-
-- `L0_HOME` → `compiler`
-- `L0_SYSTEM` → `$L0_HOME/shared/l0/stdlib`
-- `L0_RUNTIME_INCLUDE` → `$L0_HOME/shared/runtime`
-- `L0_CC` → unset (compiler auto-detection order: `L0_CC`, `tcc`, `gcc`, `clang`, `cc`, then `CC`)
-
-#### 3. Verify installation:
-
-   ```shell
-   ./l0c --help
-   ```
-
-#### 4. Generate API documentation:
-
-   ```shell
-   ./scripts/gen-docs.sh --strict
-   ```
-   Strict mode fails on Doxygen warnings and synthetic `__padN__` symbol regressions.
-   The docs-generation tooling modules live under `compiler/docgen/` and are intentionally excluded from the generated
-   API reference source manifest.
-
-Optional modes:
-
-- `./scripts/gen-docs.sh --html-only`
-- `./scripts/gen-docs.sh --markdown-only`
-- `./scripts/gen-docs.sh --latex-only`
-- `./scripts/gen-docs.sh --no-latex`
-- `./scripts/gen-docs.sh --pdf`
-- `./scripts/gen-docs.sh --pdf-fast`
-- `./scripts/gen-docs.sh --pdf --verbose`
-
-Generated outputs are written to:
-
-- `build/docs/html/`
-- `build/docs/markdown/`
-- `build/docs/doxygen/xml/`
-- `build/docs/doxygen/latex/`
-- `build/docs/pdf/` when `--pdf` or `--pdf-fast` is used
-
-At the end of each successful run, generated artifacts are mirrored into a stable preview tree (only overwritten by
-subsequent successful runs):
-
-- `build/preview/html/`
-- `build/preview/markdown/`
-- `build/preview/pdf/`
-
-By default the wrapper keeps `m.css` warnings and LaTeX build output quiet unless a command fails.
-Use `-v` / `--verbose` to stream that output directly.
-
-To build the Doxygen LaTeX output into a PDF and copy `refman.pdf` into `build/docs/pdf/`, install a TeX
-toolchain and run:
-
-```shell
-./scripts/gen-docs.sh --pdf
-```
-
-For faster local preview PDFs (single `pdflatex` pass, potentially less complete references/index):
-
-```shell
-./scripts/gen-docs.sh --pdf-fast --latex-only
-```
-
-### CI publishing
-
-Documentation publishing automation is release-oriented:
-
-- `.github/workflows/docs-validate.yml` validates docs generation and Chirpy export on pull requests and selected
-  pushes.
-- `.github/workflows/docs-publish.yml` publishes the standalone HTML site to GitHub Pages, uploads `refman.pdf` to
-  GitHub Releases, and syncs a Chirpy-compatible Markdown export into a separate blog repository on release or manual
-  trigger.
-
-The publish workflow expects these repository settings:
-
-- Variables:
-    - `BLOG_REPO`
-    - `BLOG_BRANCH` (optional, defaults to `main`)
-    - `BLOG_DOCS_PREFIX` (optional, defaults to `api/reference`)
-    - `BLOG_TAB_TITLE` (optional, defaults to `API`)
-    - `BLOG_TAB_ICON` (optional, defaults to `fas fa-book`)
-    - `BLOG_TAB_ORDER` (optional, defaults to `4`)
-    - `DOCS_SITE_URL` (optional override for the published Pages URL)
-- Secret:
-    - `BLOG_PUSH_TOKEN`
-
-### First Steps
-
-#### 1. Create a simple L0 program:
-
-Create a file named `hello.l0` with the following content:
-
-   ```l0
-   module hello;
-
-   import std.io;
-
-   func main() -> int {
-       println("Hello, L0!");
-       return 0;
-   }
-   ```
-
-#### 2. Run it:
-
-   ```shell
-   ./l0c --run hello.l0
-   ```
-
-This compiles and executes the program in one step.
-
-You can just use the module name (without `.l0`) and the compiler will use the corresponding file:
-
-   ```shell
-   ./l0c --run hello
-   ```
-
-#### 3. Build an executable:
-
-   ```shell
-   ./l0c --build hello.l0 -o hello
-   ./hello
-   ```
-
-#### 4. Check for errors without building:
-
-   ```shell
-   ./l0c --check hello.l0
-   ```
-
-### Project Structure
-
-When working on L0 projects, use `--project-root` (or `-P`) to specify your source directories:
-
-```shell
-./l0c --run -P ./src -P ./lib main
-```
-
-The compiler searches for modules in:
-
-1. System roots (standard library, specified via `--sys-root`/`-S` or `L0_SYSTEM`)
-2. Project roots (specified via `--project-root`/`-P` or working directory)
-
-### Examples
-
-Explore the `examples/` directory for sample L0 programs demonstrating various language features.
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE-MIT)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE-APACHE)
 
 ## Motivation
 
-The project aims to build a **bootstrap-friendly**, **well-specified**, **simple**, and **safe** systems language.
+Writing a compiler is a systems programming task. You need to manage memory, represent complex data structures, and have
+precise control over performance characteristics.
+Many modern languages either remove that kind of control or bury it under runtime machinery.
 
-In other words, it's "the minimum viable systems language for writing a self-hosted compiler".
+Dea/L0 instead keeps a small, explicit core aimed at bootstrap-friendly implementation work.
+The objective is a small, UB-free systems language sufficient to host its own compiler.
 
-Its first self-hosted compiler is being written in L0 itself (Stage 2).
-To support this, Stage 1 provides:
+That constrains the design considerably. The type system needs sum types and pattern matching - a compiler
+without them is fighting its own data. It needs explicit nullable types, because implicit null is a
+specification gap. It needs deterministic resource management without requiring a garbage-collected runtime.
+It needs pointers without UB. It does not need much else.
 
-* A complete, deterministic parser.
-* A precise semantic model.
-* A small C kernel, isolating all platform-dependent behavior.
-* Predictable, explicit control over types, pointers, and runtime.
+The surface syntax is C-family deliberately: operator precedence, braces, explicit types, `return`.
+Familiarity is load-bearing when the language is also the implementation vehicle.
 
-## Language overview
+The C99 backend is a bootstrap convenience. The trusted C kernel isolates all platform-dependent behavior;
+the rest of the semantics are enforced by L0 itself.
 
-L0's surface syntax is C-like:
+## Project status and directions
+
+L0 is currently at a quite exciting phase: **The Stage 2 Bootstrap**.
+
+* Stage 1: complete and usable.
+
+* Stage 2: lexer, parser, AST, name resolution, top-level signature resolution, local scope construction, and
+  expression/statement type checking are implemented.
+
+* Stage 2 backend/codegen: still in progress.
+
+Today, Stage 2 already has feature parity with Stage 1 for the diagnostic-oriented commands `--check`, `--type`, and
+`--sym`.
+The next major milestone is supporting `--build` and `--run` in Stage 2.
+
+* **Built-in Observability:** Language developers need to know what memory is doing. L0 ships with native compiler flags
+  to trace ARC events and allocations directly to stderr:
+
+```shell
+l0c --run --trace-arc --trace-memory app.l0
+```
+
+## Design highlights
+
+- `match` pattern-matches on enum variants, binding payload fields by name.
+- `T?` is an explicit optional type. `expr?` short-circuits: if the expression is null, the enclosing
+  `T?`-returning function returns null immediately.
+- No exceptions.
+- No `defer`: L0 uses `with` and `cleanup` blocks instead.
+  Cleanup runs when the `with` body exits, the scoping is explicit, and there is nothing to
+  reason about at a distance.
+- No `goto`.
+- `ptr.field` auto-dereferences; `->` is not a dereference operator (it is used for return type annotations).
+- `=` is a statement. `if (x = 0)` is a type error.
+- `case` dispatches on constant values (including strings): `"foobar" => stmt`, or `else stmt` for the
+  default. No implicit fallthrough. Strings are valid case keys.
+- `;` is not a valid empty statement. Use `null;` or an empty block if you need an explicit no-op.
+- Widening conversions are implicit (`byte` to `int`, `T` to `T?`). Narrowing is always explicit and checked both
+  statically and at runtime: `300 as byte` is a compiler error, `my_opt_str as string` panics on null. Use
+  `unwrap_or_s(my_opt_str, "default")` if null is a valid case.
+
+## Getting Started
+
+### Prerequisites for Stage 1
+
+- A C99 compiler
+- Python 3.14+
+- [`uv`](https://github.com/astral-sh/uv) (recommended; any venv manager works)
+
+#### Supported C compilers
+
+The driver will use any C compiler specified in `$L0_CC` if set. Otherwise, it probes the system PATH for the first
+available from this list:
+
+- `tcc`
+- `gcc`
+- `clang`
+- `cc`
+
+The `$CC` environment variable will be checked as a last resort if none of the above are found.
+
+If you need a specific compiler, set `$L0_CC` to its executable name or path. For example:
+
+MSVC is supported by setting `$L0_CC` to point to `CL.EXE`, but it has not been tested (help wanted).
+
+Specific versions of `gcc` and `clang` whose names include version numbers (e.g. `gcc-14`, `clang-22`) are not probed by
+default but can be used by setting `$L0_CC` accordingly and will be recognized as such.
+
+Tiny C Compiler (`tcc`) is the default if available, as it is fast and supports all required C99 features.
+It is recommended to clone and build `tcc` from source if it is not available on your system, as some platform package
+managers provide outdated versions.
+
+### Install
+
+Clone this repository and `cd` into it. Then create a virtual environment and install dependencies:
+
+```shell
+uv sync                  # create local venv from pyproject.toml
+source ./l0-env.sh       # sets L0_HOME, activates venv if present
+l0c --help
+```
+
+### First program
+
+```l0
+module hello;
+
+import std.io;
+
+func main() -> int {
+    printl_s("Hello, L0!");
+    return 0;
+}
+```
+
+```shell
+l0c hello.l0 -o hello && ./hello        # produce a binary and run it
+l0c --run hello.l0                      # compile and execute in one step
+l0c --check hello.l0                    # analyze only, no output (use `-v`/`-vvv` for verbose diagnostics)
+```
+
+### Multi-module projects
+
+```shell
+l0c --run -P ./src -P ./lib main        # -P adds a project root to search for modules; main is the target module (main.l0)
+```
+
+The compiler resolves modules from system roots (stdlib) then project roots in order.
+
+<details>
+<summary>Environment variables</summary>
+<p>
+
+| Variable             | Default                     | Purpose                                  |
+|----------------------|-----------------------------|------------------------------------------|
+| `L0_HOME`            | `compiler/`                 | Compiler root                            |
+| `L0_SYSTEM`          | `$L0_HOME/shared/l0/stdlib` | Standard library roots (colon-separated) |
+| `L0_RUNTIME_INCLUDE` | `$L0_HOME/shared/runtime`   | Runtime header path                      |
+| `L0_RUNTIME_LIB`     | _(unset)_                   | Runtime library path                     |
+| `L0_CC`              | auto-detected               | Override C compiler                      |
+
+</details>
+
+### Examples
+
+```shell
+l0c -P examples --run hamurabi
+```
+
+The `examples/` directory covers most language features and is worth reading as code.
+
+[Hamurabi](examples/hamurabi.l0) is a faithful L0 port of the 1968 resource-management game - ancient Sumeria, grain
+storage, and all.
+
+### A more advanced example
+
+<details>
+<summary>A simple prefix notation calculator</summary>
+<p>
 
 ```l0
 module demo;
 
 import std.io;
+import std.string;
+import std.text;
+import std.system;
 
-struct Token { kind: int; value: string; }
+// A simple expression language with integers, addition, and multiplication.
+enum Expr {
+    Num(value: int);
+    Add(left: Expr*, right: Expr*);
+    Mul(left: Expr*, right: Expr*);
+}
 
-func add(a: int, b: int) -> int {
-    return a + b;
+struct Cursor { pos: int; } // current position in argv
+
+/* Recursively evaluate an expression tree. */
+func eval(e: Expr*) -> int {
+    match (*e) {
+        Num(value)       => { return value; }
+        Add(left, right) => { return eval(left) + eval(right); }
+        Mul(left, right) => { return eval(left) * eval(right); }
+    }
+}
+
+/* Recursively free an expression tree. */
+func free_expr(e: Expr*?) {
+    if (e == null) return;
+    match (*(e as Expr*)) { // unwrap
+        Num(value)       => {}
+        Add(left, right) => { free_expr(left); free_expr(right); }
+        Mul(left, right) => { free_expr(left); free_expr(right); }
+    }
+    drop e;
+}
+
+/* A simple recursive-descent parser for our expression language.
+   Returns null on bad input; ? propagates failure upward. */
+func parse(c: Cursor*) -> Expr*? {
+    if (c.pos >= argc()) { return null; }
+
+    let tok: string = argv(c.pos);
+    c.pos = c.pos + 1;
+
+    let n: int? = string_to_int(tok);
+    if (n != null) { return new Num(n as int); }
+
+    let result: Expr*? = null;
+    with (let left: Expr*? = parse(c)?,
+          let right: Expr*? = parse(c)?) {
+        case (tok) {
+            "add" => { result = new Add(left as Expr*, right as Expr*); }
+            "mul" => { result = new Mul(left as Expr*, right as Expr*); }
+            // unrecognized operator: leave result as null to signal failure
+        }
+        return result;
+    }
+    cleanup {
+        if (result == null) { // on parse failure, free any subtrees we allocated
+            free_expr(left);
+            free_expr(right);
+        }
+    }
+}
+
+/* Main entry point. Expects prefix-notation arguments:
+   demo add 2 3          # prints "= 5"
+   demo mul 6 add 5 2    # prints "= 42" */
+func main() -> int {
+    with (let c = new Cursor(1) => drop c,
+          let expr = parse(c) => free_expr(expr)) { // release c and expr on exit
+        if (expr == null || c.pos != argc()) {
+            printl_s("usage: demo <expr>\n<expr> ::= add|mul <expr> <expr> | <int>");
+            return 1;
+        }
+        printl_si("=", eval(expr as Expr*)); // unwrap
+        return 0;
+    }
 }
 ```
 
-Key properties:
+</details>
 
-* **No UB**: operations are defined or errors.
-* **Modules**: one file = one module (dotted names supported).
-* **Qualified names**: disambiguate imported symbols with `module.path::Symbol` in types, expressions, and patterns.
-* **Types**: builtins, structs, enums with payloads, type aliases.
-* **Automatically reference counted (ARC) string values**: `string` is a first-class type.
-* **Pointers**: `T*`, nullable `T*?`; no address-of operator `&` in early stages.
-* **Auto-dereference**: Field access `ptr.field` automatically dereferences pointers.
-* **Pattern matching**: statement-only, simple variant patterns with `match`.
-* **Expressions**: C-like precedence, no assignment-as-expression.
-* **Statements**: `let` bindings, assignment, `if`/`else`, `while`, C-like `for`, `case` for literal value matching,
-  `with`/`cleanup` blocks for deterministic cleanup.
-* **Flow control**: `return`, `break`, `continue`, `expr?` early return on null.
-* **Extern functions**: interface with the C kernel.
-* **Introspection**: `sizeof()` and `ord()` available at compile time.
-* **Null Safety**:
-    * Postfix **try operator** `?` for short-circuiting null propagation (optional chaining).
-    * Checked casts: `T? as T` (unwrap with panic if null) and `T as T?` widening (safe wrap).
+This program is available in [examples/demo.l0](examples/demo.l0).
+You can run it from the repository root as follows:
+
+```shell
+l0c examples/demo.l0 -o demo
+./demo mul 6 add 5 2 
+```
+
+It will parse the expression `mul 6 add 5 2` as a tree, evaluate it to `6 * (5 + 2)`, and print `= 42`.
+
+## Language overview
+
+**Types:**
+`int`, `bool`, `string`, `byte`, structs, enums with payloads, pointers (`T*`, `T**`),
+nullable pointers (`T*?`), optional values (`T?`), type aliases.
+
+`string` is a convenient, small value type: you can assign it, pass it, and return it cheaply.
+String memory (where the expensive data is stored) is managed automatically via reference counting.
+
+Manual heap allocation of structs and other data in the language is explicit (`new`/`drop`) and delegated to the
+programmer (no GC).
+
+`sizeof()` and `ord()` are language intrinsics that return the size of a type in bytes and the ordinal value of an enum
+variant, respectively.
+
+**Modules:** one file, one module. Dotted names (`std.io`). No forward declarations - all
+top-level symbols in a module are visible throughout it. Symbols are qualified as `module::Symbol`
+where disambiguation is needed.
+
+**Pointers:** `T*` is non-null. `T*?` is nullable. No `&` address-of operator in current stages.
+No pointer arithmetic in Stage 1. Field access auto-dereferences.
+
+**Null safety:** `T?` for optional values; `null` for the empty case. `T` widens to `T?` implicitly.
+`T? as T` narrows with a runtime panic on null; use `unwrap_or_*` variants when null is a valid case.
+`expr?` propagates null from the enclosing function.
+
+**No UB:** every operation is defined, rejected at compile time, or produces a named runtime failure.
+No implicit narrowing conversions. No assignment-as-expression.
+
+**Extern:** `extern` functions interface directly with the C kernel.
+
+**Control flow:** `if`/`else`, `while`, C-style `for`, `return`, `break`, `continue`, `match` (enum
+variant dispatch), `case` (literal dispatch), `with`/`cleanup` (scoped resource management), `expr?`
+(null propagation).
 
 ## Grammar
 
-The authoritative Stage-1 grammar is in [reference/grammar/l0.md](docs/reference/grammar/l0.md).
+The authoritative grammar is in [docs/reference/grammar/l0.md](docs/reference/grammar/l0.md).
 
-Pointer and nullable types look like `T*`, `T**`, `T?`, `T*?`, etc.
-
-Expressions include unary (`-`, `!`, `*`, `~`), binary arithmetic, logical, comparisons, bitwise, indexing,
-calls, field access, `as` casts, and the **try operator** `?`.
+Types compose as: `T*`, `T**`, `T?`, `T*?`. Expressions follow C precedence, extended with the
+postfix `?` operator and `as` casts.
 
 ## Compiler implementation architecture
 
-See [reference/architecture.md](docs/reference/architecture.md) for an overview of the Python L0 stage-1 compiler
-implementation architecture and data flow.
+Stage 1 follows a conventional pipeline: lexer → parser → semantic analysis → backend orchestrator → C99 codegen.
 
-See also [reference/design-decisions.md](docs/reference/design-decisions.md) for additional context.
+The generated C includes a small, trusted, header-only C kernel that encapsulates all platform-specific behavior.
 
-See [reference/ownership.md](docs/reference/ownership.md) for the canonical ownership and memory-management reference
-(`new`/`drop`, ARC strings, and container patterns).
+Stage 2 follows a similar architecture but with a more modular design and better separation of concerns. The lexer,
+parser, AST, name resolution, type checking, and backend are all separate components with well-defined interfaces.
 
-See [specs/compiler/stage1-contract.md](docs/specs/compiler/stage1-contract.md) for the compact Stage 1 contract/index.
+References:
+
+- [Architecture and data flow](docs/reference/architecture.md)
+- [Design decisions](docs/reference/design-decisions.md)
+- [Ownership and memory management](docs/reference/ownership.md)
+- [Stage 1 contract](docs/specs/compiler/stage1-contract.md)
 
 ## CLI
 
-Provided by the `l0c` executable (Python):
+```shell
+l0c [mode] [options] <target>
+```
+
+| Mode           | Action                      |
+|----------------|-----------------------------|
+| `--build`      | Compile to binary (default) |
+| `--run` / `-r` | Compile and execute         |
+| `--gen` / `-g` | Emit C99                    |
+| `--check`      | Analyze only                |
+| `--ast`        | Dump AST                    |
+| `--sym`        | Dump module symbols         |
+| `--type`       | Dump resolved types         |
+| `--tok`        | Dump token stream           |
 
 ```shell
-./l0c --help
+l0c --build --keep-c hello.l0             # retain the generated C
+l0c --run app.main -- arg1 arg2           # pass arguments to the program
+l0c --run --trace-arc --trace-memory app  # trace ARC and allocation to stderr
+l0c -c clang -C "-Og -DDEBUG" hello.l0    # use a specific C compiler with custom flags
 ```
 
-Output:
-
-```
-usage: l0c [-h] [-v] [-l] [-P PROJECT_ROOT] [-S SYS_ROOT] [--run | --build |
-           --gen | --check | --tok | --ast | --sym | --type] [--output OUTPUT]
-           [--c-compiler C_COMPILER] [--c-options C_OPTIONS]
-           [--runtime-include RUNTIME_INCLUDE] [--runtime-lib RUNTIME_LIB]
-           [--no-line-directives] [--trace-arc] [--trace-memory] [--keep-c]
-           [--all-modules] [--include-eof]
-           targets [targets ...]
-
-L0 compiler (Stage 1)
-
-positional arguments:
-  targets               Target module/file name(s); currently exactly one
-                        target is supported
-
-options:
-  -h, --help            show this help message and exit
-  -v, --verbose         Increase verbosity: -v=INFO, -vvv=DEBUG
-  -l, --log             Enable rich log formatting (timestamps, levels)
-  -P, --project-root PROJECT_ROOT
-                        Add a project source root (can be passed multiple
-                        times)
-  -S, --sys-root SYS_ROOT
-                        Add a system/stdlib source root (can be passed
-                        multiple times; default: $L0_SYSTEM as colon-separated
-                        paths)
-  --run, -r             Build and run a module
-  --build               Build an executable (default mode)
-  --gen, -g, --codegen  Generate C code
-  --check, --analyze    Parse and analyze a module
-  --tok, --tokens       Dump lexer tokens
-  --ast                 Pretty-print the AST
-  --sym, --symbols      Dump module-level symbols
-  --type, --types       Dump resolved types
-  --output, -o OUTPUT   Output path (valid in: '--build', '--gen', '--run')
-  --c-compiler, -c C_COMPILER
-                        C compiler to use (default: $L0_CC has highest
-                        precedence if set; then tcc, gcc, clang, cc from PATH,
-                        or $CC, in that order; valid in: '--build', '--run')
-  --c-options, -C C_OPTIONS
-                        Extra options to pass to the C compiler (e.g. -C="-Og
-                        -DDEBUG"; valid in: '--build', '--run')
-  --runtime-include, -I RUNTIME_INCLUDE
-                        Path to L0 runtime headers (default:
-                        $L0_RUNTIME_INCLUDE; valid in: '--build', '--run')
-  --runtime-lib, -L RUNTIME_LIB
-                        Path to L0 runtime library (default: $L0_RUNTIME_LIB;
-                        valid in: '--build', '--run')
-  --no-line-directives, -NLD
-                        Disable #line directives in generated C code (valid
-                        in: '--build', '--run', '--gen')
-  --trace-arc           Enable ARC runtime tracing in generated C code (emits
-                        L0_TRACE_ARC; valid in: '--build', '--run', '--gen')
-  --trace-memory        Enable memory runtime tracing in generated C code
-                        (emits L0_TRACE_MEMORY; valid in: '--build', '--run',
-                        '--gen')
-  --keep-c              Keep generated C file (valid in: '--build', '--run';
-                        use with '--output' to specify C file path
-  --all-modules, -a     Process all modules in the compilation unit (valid in:
-                        '--tok', '--ast', '--sym', '--type')
-  --include-eof         Include the EOF token in output (valid in: '--tok')
-
-Modes are selected with flags (default: --build). Use '--' to pass program
-arguments for --run.
-```
-
-For `--run`, pass program arguments after `--`:
-
-```shell
-./l0c --run app.main -- arg1 arg2
-```
-
-Trace options for generated C/runtime debugging:
-
-```shell
-./l0c --gen --trace-arc app.main
-./l0c --run --trace-memory app.main
-./l0c --run --trace-arc --trace-memory app.main
-```
-
-Trace logs are written to `stderr`. See [specs/runtime/trace.md](docs/specs/runtime/trace.md) for the full contract.
-
-Example usage:
-
-```shell
-./l0c -P examples --run hamurabi
-```
-
-Output:
-
-```
-                                HAMURABI
-               CREATIVE COMPUTING  MORRISTOWN, NEW JERSEY
-                      WITH THANKS TO  DAVID H. AHL
-
-
-
-TRY YOUR HAND AT GOVERNING ANCIENT SUMERIA
-FOR A TEN-YEAR TERM OF OFFICE.
-
-
-
-Hamurabi: I beg to report to you, 
-In year 0, 0 people starved, 5 came to the city.
-Population is now 95
-The city now owns 1000 acres.
-You harvested 3 bushels per acre.
-Rats ate 200 bushels.
-You now have 2800 bushels in store.
-
-Land is trading at 23 bushels per acre.
-How many acres do you wish to buy?
-```
-
-Enjoy the game! Type your inputs as prompted and see how well you can govern ancient Sumeria.
-
-## Coding conventions
-
-When writing or modifying C and Dea/L0 code in this repository, please adhere to the following styling and documentation
-conventions:
-
-- **Documentation Blocks:** Use Javadoc-style Doxygen comments (`/** ... */`) for functions, types, and files. Omit the
-  `@brief` tag; rely on the first sentence for the brief description.
-- **License Headers:** Use standard C block comments (`/* ... */`) for `SPDX-License-Identifier` and copyright
-  information to separate them from API documentation.
-
-For more details, see [CONTRIBUTING.md](CONTRIBUTING.md).
+Trace output contract: [docs/specs/runtime/trace.md](docs/specs/runtime/trace.md).
 
 ## Project status
 
-The authoritative status file is [reference/project-status.md](docs/reference/project-status.md).
+[docs/reference/project-status.md](docs/reference/project-status.md).
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-This project is dual-licensed under the following terms:
+[MIT](LICENSE-MIT) or [Apache 2.0](LICENSE-APACHE), at your option.
 
-- MIT License (see [LICENSE-MIT](LICENSE-MIT))
-- Apache License 2.0 (see [LICENSE-APACHE](LICENSE-APACHE))
-
-You may use this software under either license at your option.
-
-Vendored third-party component notices are tracked in [`THIRD_PARTY_NOTICES`](THIRD_PARTY_NOTICES).
+Third-party notices: [`THIRD_PARTY_NOTICES`](THIRD_PARTY_NOTICES).
 
 ## Author
 
-Created and maintained by `gwz` ([@googlielmo](https://github.com/googlielmo)).
+`gwz` ([@googlielmo](https://github.com/googlielmo)).

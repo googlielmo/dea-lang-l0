@@ -40,4 +40,5 @@ esac
 
 hash -r 2>/dev/null || true
 
-export L0_CC="clang"
+# To pin down a specific C compiler, set the L0_CC environment variable here. For example:
+#export L0_CC="clang"
