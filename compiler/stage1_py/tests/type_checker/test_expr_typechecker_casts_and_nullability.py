@@ -42,6 +42,35 @@ def test_invalid_casts_rejected(src, analyze_single):
     assert has_error_code(result.diagnostics, "TYP-0230")
 
 
+def test_explicit_int_to_byte_constant_overflow_rejected(analyze_single):
+    src = """
+    module main;
+
+    func f() -> byte {
+        return 300 as byte;
+    }
+    """
+
+    result = analyze_single("main", src)
+    assert result.has_errors()
+    assert has_error_code(result.diagnostics, "TYP-0700")
+    assert any("300" in d.message and "0..255" in d.message for d in result.diagnostics)
+
+
+def test_explicit_null_optional_pointer_to_pointer_rejected(analyze_single):
+    src = """
+    module main;
+
+    func f() -> int* {
+        return (null as int*?) as int*;
+    }
+    """
+
+    result = analyze_single("main", src)
+    assert result.has_errors()
+    assert has_error_code(result.diagnostics, "TYP-0701")
+
+
 def test_null_assignment_to_non_nullable_fails(analyze_single):
     src = """
     module main;

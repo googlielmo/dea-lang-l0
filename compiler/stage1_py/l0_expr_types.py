@@ -1514,6 +1514,33 @@ class ExpressionTypeChecker:
         if target_ty is None:
             return None
 
+        # Explicit int -> byte casts with compile-time-known values are checked in analysis.
+        if (
+            isinstance(expr_ty, BuiltinType)
+            and expr_ty.name == "int"
+            and isinstance(target_ty, BuiltinType)
+            and target_ty.name == "byte"
+        ):
+            const_int = self._get_const_int_for_explicit_cast(expr.expr)
+            if const_int is not None and (const_int < 0 or const_int > 255):
+                return self._error(
+                    expr,
+                    f"[TYP-0700] explicit cast from 'int' to 'byte' overflows: {const_int} is outside 0..255",
+                )
+
+        # Explicit unwrap from nullable pointer to pointer cannot be proven-null.
+        if (
+            isinstance(expr_ty, NullableType)
+            and isinstance(expr_ty.inner, PointerType)
+            and isinstance(target_ty, PointerType)
+            and self._types_equal(target_ty, expr_ty.inner)
+            and self._is_const_null_for_explicit_cast(expr.expr)
+        ):
+            return self._error(
+                expr,
+                f"[TYP-0701] explicit cast from '{format_type(expr_ty)}' to '{format_type(target_ty)}' is null at compile time",
+            )
+
         # Allow the cast if the types are assignable
         if self._can_assign(target_ty, expr_ty, allow_promotion=True):
             return target_ty
@@ -1710,6 +1737,28 @@ class ExpressionTypeChecker:
     def _is_int_assignable(self, typ: Optional[Type]) -> bool:
         """Check if type is 'int' or 'byte'."""
         return isinstance(typ, BuiltinType) and (typ.name == "int" or typ.name == "byte")
+
+    def _get_const_int_for_explicit_cast(self, expr: Expr) -> Optional[int]:
+        """Extract a compile-time integer value from a cast operand when available."""
+        if isinstance(expr, IntLiteral):
+            return expr.value
+        if isinstance(expr, ParenExpr):
+            return self._get_const_int_for_explicit_cast(expr.inner)
+        if isinstance(expr, UnaryOp) and expr.op == "-":
+            inner = self._get_const_int_for_explicit_cast(expr.operand)
+            if inner is not None:
+                return -inner
+        return None
+
+    def _is_const_null_for_explicit_cast(self, expr: Expr) -> bool:
+        """Check whether a cast operand is provably null at compile time."""
+        if isinstance(expr, NullLiteral):
+            return True
+        if isinstance(expr, ParenExpr):
+            return self._is_const_null_for_explicit_cast(expr.inner)
+        if isinstance(expr, CastExpr):
+            return self._is_const_null_for_explicit_cast(expr.expr)
+        return False
 
     def _is_bool(self, typ: Optional[Type]) -> bool:
         """Check if type is 'bool'."""

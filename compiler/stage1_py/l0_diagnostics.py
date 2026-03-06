@@ -201,6 +201,7 @@ DIAGNOSTIC_CODE_FAMILIES = {
         "TYP-0290", "TYP-0300", "TYP-0301", "TYP-0303",
         "TYP-0310", "TYP-0311", "TYP-0312", "TYP-0313",
         "TYP-0314", "TYP-0315", "TYP-0316", "TYP-0319",
+        "TYP-0700", "TYP-0701",
         "TYP-9209",
         "TYP-9288", "TYP-9289",
     ],

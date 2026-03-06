@@ -4,16 +4,10 @@ Tests for the L0 byte type: lexer, parser, type checker, and codegen.
 #  SPDX-License-Identifier: MIT OR Apache-2.0
 #  Copyright (c) 2026 gwz
 
-import subprocess
-from pathlib import Path
-from subprocess import CompletedProcess
 from textwrap import dedent
 
-import pytest
-
-from conftest import _find_cc, compile_and_run, has_error_code
+from conftest import compile_and_run, has_error_code
 from l0_ast import ByteLiteral, FuncDecl, LetStmt, ReturnStmt
-from l0_backend import Backend
 from l0_driver import L0Driver
 from l0_lexer import Lexer, TokenKind
 from l0_parser import Parser
@@ -347,6 +341,23 @@ def test_typechecker_int_to_byte_cast(tmp_path):
     )
 
     assert not result.has_errors(), [d.message for d in result.diagnostics]
+
+
+def test_typechecker_int_to_byte_cast_constant_overflow_rejected(tmp_path):
+    """Test that out-of-range explicit int->byte cast fails at type-check time."""
+    result = _analyze_single(
+        tmp_path,
+        "main",
+        """
+        module main;
+        func f() -> byte {
+            return 300 as byte;
+        }
+        """,
+    )
+
+    assert result.has_errors()
+    assert has_error_code(result.diagnostics, "TYP-0700")
 
 
 def test_typechecker_byte_addition(tmp_path):

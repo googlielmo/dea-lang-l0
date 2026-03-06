@@ -490,7 +490,7 @@ TYP_TRIGGERS = {
     "TYP-0201": dedent("""\
         module main;
         enum E { Some(v: int); }
-        func foo() -> int { let e: E = Some(1, 2); return 0; }
+        func foo(e: E) -> int { let e: E = Some(1, 2); return 0; }
     """),
     "TYP-0210": dedent("""\
         module main;
@@ -625,6 +625,14 @@ TYP_TRIGGERS = {
         module main;
         struct S { v: int; }
         func foo() -> int { let p: S* = new S(true); return 0; }
+    """),
+    "TYP-0700": dedent("""\
+        module main;
+        func foo() -> byte { return 300 as byte; }
+    """),
+    "TYP-0701": dedent("""\
+        module main;
+        func foo() -> int* { return (null as int*?) as int*; }
     """),
 }
 
