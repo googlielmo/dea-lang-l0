@@ -129,6 +129,65 @@ def test_build_fails_when_configured_runtime_lib_is_missing(tmp_path, monkeypatc
     assert "[L0C-0015]" in capsys.readouterr().err
 
 
+def test_build_uses_l0_cflags_when_c_options_are_not_provided(tmp_path, monkeypatch):
+    _write_module(
+        tmp_path,
+        "main",
+        """
+        module main;
+        func main() -> int { return 0; }
+        """,
+    )
+    captured = {}
+
+    def _fake_run(cmd, *args, **kwargs):
+        captured["cmd"] = cmd
+        return _RunResult(returncode=0)
+
+    monkeypatch.setenv("L0_CFLAGS", "-g -DENV_FLAG")
+    monkeypatch.delenv("L0_RUNTIME_LIB", raising=False)
+    monkeypatch.setattr("l0c.subprocess.run", _fake_run)
+
+    rc = cmd_build(_build_args(tmp_path, "main", c_compiler="gcc", c_options=None))
+
+    assert rc == 0
+    assert "-g" in captured["cmd"]
+    assert "-DENV_FLAG" in captured["cmd"]
+    assert "-Og" in captured["cmd"]
+    assert "-O1" not in captured["cmd"]
+
+
+def test_build_merges_l0_cflags_and_cli_c_options_with_cli_last(tmp_path, monkeypatch):
+    _write_module(
+        tmp_path,
+        "main",
+        """
+        module main;
+        func main() -> int { return 0; }
+        """,
+    )
+    captured = {}
+
+    def _fake_run(cmd, *args, **kwargs):
+        captured["cmd"] = cmd
+        return _RunResult(returncode=0)
+
+    monkeypatch.setenv("L0_CFLAGS", "-DENV_ONE -DENV_TWO")
+    monkeypatch.delenv("L0_RUNTIME_LIB", raising=False)
+    monkeypatch.setattr("l0c.subprocess.run", _fake_run)
+
+    rc = cmd_build(_build_args(tmp_path, "main", c_compiler="gcc", c_options="-DCLI_ONE -DCLI_TWO"))
+
+    assert rc == 0
+    env_one_idx = captured["cmd"].index("-DENV_ONE")
+    env_two_idx = captured["cmd"].index("-DENV_TWO")
+    cli_one_idx = captured["cmd"].index("-DCLI_ONE")
+    cli_two_idx = captured["cmd"].index("-DCLI_TWO")
+
+    assert env_one_idx < cli_one_idx
+    assert env_two_idx < cli_two_idx
+
+
 def test_run_forwards_c_options_to_build(tmp_path, monkeypatch):
     captured = {}
 

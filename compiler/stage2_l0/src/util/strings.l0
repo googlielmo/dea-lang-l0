@@ -91,6 +91,37 @@ func us_split_chars2_non_empty(s: string, sep1: byte, sep2: byte) -> VectorStrin
 }
 
 /**
+ * Split a string on space characters, dropping empty fields.
+ *
+ * @param s String to split.
+ * @param sep1 First separator byte.
+ * @param sep2 Second separator byte.
+ * @return Vector of non-empty split parts.
+ * @see std.string::is_space for the definition of space characters.
+ */
+func us_split_is_space_non_empty(s: string) -> VectorString* {
+    let out = vs_create(4);
+    let n = len_s(s);
+    let start = 0;
+
+    for (let i = 0; i < n; i = i + 1) {
+        let c = char_at_s(s, i);
+        if (is_space(c)) {
+            if (i > start) {
+                vs_push(out, slice_s(s, start, i));
+            }
+            start = i + 1;
+        }
+    }
+
+    if (start < n) {
+        vs_push(out, slice_s(s, start, n));
+    }
+
+    return out;
+}
+
+/**
  * Strip a leading UTF-8 BOM from a string when present.
  *
  * @param s String to normalize.

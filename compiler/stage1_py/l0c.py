@@ -398,6 +398,20 @@ def _validate_runtime_library_path(runtime_lib_path: str, context: CompilationCo
     return True
 
 
+def _split_c_options(raw_options: Optional[str]) -> List[str]:
+    """Split a raw C options string into individual compiler arguments.
+
+    Args:
+        raw_options: Raw options string, or None.
+
+    Returns:
+        A list of whitespace-delimited compiler option tokens.
+    """
+    if not raw_options:
+        return []
+    return raw_options.split()
+
+
 def _get_optimize_flag(flag_family, extra_opts) -> Optional[str]:
     """Determine the appropriate optimization flag for the compiler family.
 
@@ -422,7 +436,7 @@ def _get_optimize_flag(flag_family, extra_opts) -> Optional[str]:
         elif flag_family == "msvc":
             return "/Od"
 
-    # Default quick optimization level for non-debug builds (can be overridden with --c-options/-C if needed)
+    # Default quick optimization level for non-debug builds (can be overridden with --c-options/-C or L0_CFLAGS)
     if flag_family in {"gcc", "tcc"}:
         return "-O1"
     elif flag_family == "msvc":
@@ -496,12 +510,16 @@ def cmd_build(args: argparse.Namespace) -> int:
         flag_family = _compiler_flag_family(compiler)
         log_info(context, f"Detected compiler flag family: {flag_family}")
 
-        # Extra C compiler flags/options
-        if args.c_options:
-            extra_opts = args.c_options.split()
+        # Extra C compiler flags/options from environment + CLI (CLI appended last).
+        env_opts = _split_c_options(os.getenv("L0_CFLAGS"))
+        cli_opts = _split_c_options(args.c_options)
+        if env_opts:
+            log_info(context, f"C compiler options from $L0_CFLAGS: {env_opts}")
+        if cli_opts:
+            log_info(context, f"C compiler options from --c-options: {cli_opts}")
+        extra_opts = env_opts + cli_opts
+        if extra_opts:
             log_info(context, f"Extra C compiler options: {extra_opts}")
-        else:
-            extra_opts = []
 
         # Build compiler command
         cmd = [compiler, str(c_path), "-o", str(exe_path)]
@@ -1020,7 +1038,11 @@ def _add_runtime_args(parser: argparse.ArgumentParser) -> None:
     )
     parser.add_argument(
         "--c-options", "-C",
-        help="Extra options to pass to the C compiler (e.g. -C=\"-Og -DDEBUG\"; valid in: '--build', '--run')",
+        help=(
+            "Extra options to pass to the C compiler "
+            "(default prepends $L0_CFLAGS; options from --c-options are appended after env options; "
+            "e.g. -C=\"-Og -DDEBUG\"; valid in: '--build', '--run')"
+        ),
     )
     parser.add_argument(
         "--runtime-include", "-I",

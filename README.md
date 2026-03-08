@@ -156,6 +156,7 @@ The compiler resolves modules from system roots (stdlib) then project roots in o
 | `L0_SYSTEM`          | `$L0_HOME/shared/l0/stdlib` | Standard library roots (colon-separated) |
 | `L0_RUNTIME_INCLUDE` | `$L0_HOME/shared/runtime`   | Runtime header path                      |
 | `L0_RUNTIME_LIB`     | _(unset)_                   | Runtime library path                     |
+| `L0_CFLAGS`          | _(unset)_                   | Extra C compiler options (prepended)     |
 | `L0_CC`              | auto-detected               | Override C compiler                      |
 
 </details>

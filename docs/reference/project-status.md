@@ -109,6 +109,7 @@ Common supported options:
 - Build/codegen: `-NLD/--no-line-directives`, `--trace-arc`, `--trace-memory`, `-c/--c-compiler`, `-C/--c-options`,
   `-I/--runtime-include`,
   `-L/--runtime-lib`, `-o/--output`, `--keep-c`
+  - C compiler flags can also be provided via `$L0_CFLAGS`; effective order is `$L0_CFLAGS` first, then `--c-options`.
 - Dumps: `-a/--all-modules` for `tok|ast|sym|type`, `-I/--include-eof` for `tok`
 
 ## Standard Library Status

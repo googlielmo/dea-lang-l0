@@ -63,6 +63,7 @@ Mode-scoped options (enforced by CLI argument validation):
 - `--keep-c` for `build|run` (`run` writes `./a.c` by default, or `<output>.c` with `-o`)
 - `-c` / `--c-compiler` for `build|run`
 - `-C` / `--c-options` for `build|run`
+  - C compiler options are merged as: `$L0_CFLAGS` first, then `--c-options`.
 - `-I` / `--runtime-include` for `build|run`
 - `-L` / `--runtime-lib` for `build|run`
 - `-NLD` / `--no-line-directives` for `build|run|gen`

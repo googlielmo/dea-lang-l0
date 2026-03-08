@@ -7,6 +7,7 @@ module l0c_test;
 
 import std.io;
 import std.assert;
+import std.string;
 import std.vector;
 
 import l0c;
@@ -117,6 +118,33 @@ func test_nyi_mode_exit_code() {
 }
 
 /**
+ * Tests test_merge_c_option_words_cli_last.
+ */
+func test_merge_c_option_words_cli_last() {
+    with (let words = l0c_merge_c_option_words("-DENV_ONE   -DENV_TWO", "-DCLI_ONE -DCLI_TWO") => vs_free(words)) {
+        assert(vs_size(words) == 4, "expected 4 merged C option words");
+        assert(eq_s(vs_get(words, 0), "-DENV_ONE"), "env option #1 should come first");
+        assert(eq_s(vs_get(words, 1), "-DENV_TWO"), "env option #2 should come before CLI options");
+        assert(eq_s(vs_get(words, 2), "-DCLI_ONE"), "cli option #1 should come after env options");
+        assert(eq_s(vs_get(words, 3), "-DCLI_TWO"), "cli option #2 should come last");
+    }
+}
+
+/**
+ * Tests test_merge_c_option_words_ignores_empty_inputs.
+ */
+func test_merge_c_option_words_ignores_empty_inputs() {
+    with (let empty_words = l0c_merge_c_option_words("   \t  ", null) => vs_free(empty_words)) {
+        assert(vs_size(empty_words) == 0, "blank env options should produce no words");
+    }
+
+    with (let cli_words = l0c_merge_c_option_words(null, "  -DCLI_ONLY\t") => vs_free(cli_words)) {
+        assert(vs_size(cli_words) == 1, "single CLI option should be preserved");
+        assert(eq_s(vs_get(cli_words, 0), "-DCLI_ONLY"), "CLI option text mismatch");
+    }
+}
+
+/**
  * Tests test_type_ok.
  */
 func test_type_ok() {
@@ -156,6 +184,8 @@ func main() {
     test_tok_ok();
     test_parse_error_exit_code();
     test_nyi_mode_exit_code();
+    test_merge_c_option_words_cli_last();
+    test_merge_c_option_words_ignores_empty_inputs();
     test_type_ok();
     test_sym_ok();
     printl_s("l0c_test: all tests passed");

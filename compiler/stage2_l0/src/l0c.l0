@@ -527,6 +527,48 @@ func l0c_cmd_type(opts: CliOptions*, cfg: LogConfig*) -> int {
 }
 
 /**
+ * Append whitespace-delimited C option words from one source string.
+ *
+ * @param dst Destination vector for parsed option words.
+ * @param raw Raw options string, or `null`.
+ */
+func l0c_append_c_option_words(dst: VectorString*, raw: string?) {
+    if (raw == null) {
+        return;
+    }
+
+    with (let parts = us_split_is_space_non_empty(raw as string) => vs_free(parts)) {
+        for (let i = 0; i < vs_size(parts); i = i + 1) {
+            vs_push(dst, vs_get(parts, i));
+        }
+    }
+}
+
+/**
+ * Merge C option words from environment and CLI with CLI-last precedence.
+ *
+ * @param env_opts Options from `L0_CFLAGS`.
+ * @param cli_opts Options from `--c-options`.
+ * @return Parsed option words in final order.
+ */
+func l0c_merge_c_option_words(env_opts: string?, cli_opts: string?) -> VectorString* {
+    let out = vs_create(4);
+    l0c_append_c_option_words(out, env_opts);
+    l0c_append_c_option_words(out, cli_opts);
+    return out;
+}
+
+/**
+ * Resolve merged C option words from `L0_CFLAGS` and parsed CLI options.
+ *
+ * @param opts Parsed CLI options.
+ * @return Parsed option words in final order.
+ */
+func l0c_collect_c_option_words(opts: CliOptions*) -> VectorString* {
+    return l0c_merge_c_option_words(env_get("L0_CFLAGS"), opts.c_options);
+}
+
+/**
  * Report that a requested CLI mode is not implemented in Stage 2 yet.
  *
  * @param mode Requested CLI mode.
@@ -578,10 +620,14 @@ func run_with_argv(argv: VectorString*) -> int {
                 rc = l0c_cmd_tok(opts, cfg);
             }
             CM_RUN => {
-                rc = l0c_cmd_nyi(opts.mode, cfg);
+                with (let c_opts = l0c_collect_c_option_words(opts) => vs_free(c_opts)) {
+                    rc = l0c_cmd_nyi(opts.mode, cfg);
+                }
             }
             CM_BUILD => {
-                rc = l0c_cmd_nyi(opts.mode, cfg);
+                with (let c_opts2 = l0c_collect_c_option_words(opts) => vs_free(c_opts2)) {
+                    rc = l0c_cmd_nyi(opts.mode, cfg);
+                }
             }
             CM_GEN => {
                 rc = l0c_cmd_nyi(opts.mode, cfg);
