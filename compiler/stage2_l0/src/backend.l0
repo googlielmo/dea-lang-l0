@@ -18,6 +18,7 @@ import driver;
 import name_resolver;
 import sem_context;
 import signatures;
+import scope_context;
 import symbols;
 import type_resolve;
 import types;
@@ -35,8 +36,33 @@ struct Backend {
     current_unit: DriverUnit*?;
     current_env: ModuleEnv*?;
     current_func_result: Type*?;
+    current_scope: ScopeContext*?;
+    scope_stack: VectorBase*;          // ScopeContext* (for final cleanup)
+    current_loop_labels: LoopLabels*?;
+    current_loop_cleanup_scopes: LoopCleanupScopes*?;
+    scope_counter: int;
     label_counter: int;
     next_stmt_unreachable: bool;
+}
+
+/**
+ * Represents one active loop label pair.
+ */
+struct LoopLabels {
+    parent: LoopLabels*?;
+    break_label: string;
+    continue_label: string;
+}
+
+/**
+ * Represents the cleanup targets for one active loop.
+ */
+struct LoopCleanupScopes {
+    parent: LoopCleanupScopes*?;
+    continue_scope: ScopeContext*;
+    break_scope: ScopeContext*;
+    continue_scope_id: int;
+    break_scope_id: int;
 }
 
 /**
@@ -70,7 +96,8 @@ func be_ice_string(message: string) -> string {
 func be_create(result: AnalysisResult*, opts: CodegenOptions*, cfg: LogConfig*) -> Backend* {
     let emitter = cem_create();
     cem_set_analysis(emitter, result);
-    return new Backend(result, opts, cfg, emitter, null, null, null, null, 0, false);
+    return new Backend(result, opts, cfg, emitter, null, null, null, null, null, ptr_vec_create(8), null, null, 0, 0,
+        false);
 }
 
 /**
@@ -79,6 +106,22 @@ func be_create(result: AnalysisResult*, opts: CodegenOptions*, cfg: LogConfig*) 
  * @param self Backend state to free.
  */
 func be_free(self: Backend*) {
+    for (let i = 0; i < vec_size(self.scope_stack); i = i + 1) {
+        sc_free(ptr_vec_get(self.scope_stack, i) as ScopeContext*);
+    }
+    let labels = self.current_loop_labels;
+    while (labels != null) {
+        let cur = labels as LoopLabels*;
+        labels = cur.parent;
+        drop cur;
+    }
+    let cleanup_scopes = self.current_loop_cleanup_scopes;
+    while (cleanup_scopes != null) {
+        let cur2 = cleanup_scopes as LoopCleanupScopes*;
+        cleanup_scopes = cur2.parent;
+        drop cur2;
+    }
+    vec_free(self.scope_stack);
     cem_free(self.emitter);
     drop self;
 }
@@ -263,6 +306,334 @@ func be_fresh_label(self: Backend*, prefix: string) -> string {
 }
 
 /**
+ * Push one lexical scope and make it current.
+ *
+ * @param self Backend state to update.
+ * @return New current scope.
+ */
+func be_push_scope(self: Backend*) -> ScopeContext* {
+    let scope = sc_create(self.current_scope);
+    self.scope_counter = self.scope_counter + 1;
+    scope.scope_id = self.scope_counter;
+    ptr_vec_push(self.scope_stack, scope as void*);
+    self.current_scope = scope;
+    return scope;
+}
+
+/**
+ * Pop the current lexical scope.
+ *
+ * @param self Backend state to update.
+ */
+func be_pop_scope(self: Backend*) {
+    if (self.current_scope == null) {
+        be_ice("[ICE-1330] scope underflow");
+    }
+    self.current_scope = (self.current_scope as ScopeContext*).parent;
+}
+
+/**
+ * Push one active loop-label frame.
+ *
+ * @param self Backend state to update.
+ * @param break_label Break target label.
+ * @param continue_label Continue target label.
+ */
+func be_push_loop_labels(self: Backend*, break_label: string, continue_label: string) {
+    self.current_loop_labels = new LoopLabels(self.current_loop_labels, break_label, continue_label);
+}
+
+/**
+ * Pop one active loop-label frame.
+ *
+ * @param self Backend state to update.
+ */
+func be_pop_loop_labels(self: Backend*) {
+    if (self.current_loop_labels == null) {
+        be_ice("[ICE-1020] break/continue outside of loop");
+    }
+    let top = self.current_loop_labels as LoopLabels*;
+    self.current_loop_labels = top.parent;
+    drop top;
+}
+
+/**
+ * Push one active loop-cleanup frame.
+ *
+ * @param self Backend state to update.
+ * @param continue_scope Scope to clean for `continue`.
+ * @param break_scope Scope to clean for `break`.
+ */
+func be_push_loop_cleanup_scopes(self: Backend*, continue_scope: ScopeContext*, break_scope: ScopeContext*) {
+    self.current_loop_cleanup_scopes = new LoopCleanupScopes(self.current_loop_cleanup_scopes, continue_scope, break_scope,
+        continue_scope.scope_id, break_scope.scope_id);
+}
+
+/**
+ * Pop one active loop-cleanup frame.
+ *
+ * @param self Backend state to update.
+ */
+func be_pop_loop_cleanup_scopes(self: Backend*) {
+    if (self.current_loop_cleanup_scopes == null) {
+        be_ice("[ICE-1020] break/continue outside of loop");
+    }
+    let top = self.current_loop_cleanup_scopes as LoopCleanupScopes*;
+    self.current_loop_cleanup_scopes = top.parent;
+    drop top;
+}
+
+/**
+ * Return the type of a declared local binding when present.
+ *
+ * @param self Backend state to inspect.
+ * @param var_name Source-level variable name.
+ * @return Borrowed declared type, or `null` if absent.
+ */
+func be_lookup_local_var_type(self: Backend*, var_name: string) -> Type*? {
+    return sc_lookup_declared_type(self.current_scope, cem_mangle_identifier(var_name));
+}
+
+/**
+ * Return the mangled name when a local variable is currently tracked as owned.
+ *
+ * @param self Backend state to inspect.
+ * @param expr_id Variable-reference expression id.
+ * @return Mangled local name, or `null` when not owned by the current scope chain.
+ */
+func be_lookup_owned_local_name(self: Backend*, expr_id: ExprId) -> string? {
+    let expr = expr_arena_get(be_current_expr_arena(self), expr_id);
+    if (ord(expr.kind) != ord(EX_VAR_REF)) {
+        return null;
+    }
+
+    let resolution = analysis_get_var_ref_resolution(self.result, self.current_module as string, expr_id);
+    if (resolution == null || (resolution as int) != ord(VAR_RES_LOCAL)) {
+        return null;
+    }
+
+    let mangled_name = cem_mangle_identifier(expr.text_value);
+    let scope = self.current_scope;
+    while (scope != null) {
+        let cur = scope as ScopeContext*;
+        for (let i = 0; i < vec_size(cur.owned_vars); i = i + 1) {
+            let item = ptr_vec_get(cur.owned_vars, i) as ScopeVar*;
+            if (eq_s(item.name, mangled_name)) {
+                return mangled_name;
+            }
+        }
+        scope = cur.parent;
+    }
+    return null;
+}
+
+/**
+ * Report whether an expression refers to an existing place.
+ *
+ * @param self Backend state to inspect.
+ * @param expr_id Expression to classify.
+ * @return `true` for local/module places, dereferences, indexes, and fields.
+ */
+func be_is_place_expr(self: Backend*, expr_id: ExprId) -> bool {
+    let expr = expr_arena_get(be_current_expr_arena(self), expr_id);
+    if (ord(expr.kind) == ord(EX_VAR_REF) || ord(expr.kind) == ord(EX_INDEX) || ord(expr.kind) == ord(EX_FIELD)) {
+        return true;
+    }
+    if (ord(expr.kind) == ord(EX_UNARY) && eq_s(expr.text_value, "*")) {
+        return true;
+    }
+    if (ord(expr.kind) == ord(EX_PAREN)) {
+        return be_is_place_expr(self, expr.expr_a);
+    }
+    return false;
+}
+
+/**
+ * Report whether an expression is a nullable unwrap cast from a place.
+ *
+ * @param self Backend state to inspect.
+ * @param expr_id Expression to classify.
+ * @return `true` when the cast is `T? as T` and the source is a place expression.
+ */
+func be_is_unwrap_cast_from_place(self: Backend*, expr_id: ExprId) -> bool {
+    let expr = expr_arena_get(be_current_expr_arena(self), expr_id);
+    if (ord(expr.kind) != ord(EX_CAST)) {
+        return false;
+    }
+
+    with (let src_ty = be_expr_type(self, expr.expr_a) => type_free_opt(src_ty),
+          let dst_ty = be_expr_type(self, expr_id) => type_free_opt(dst_ty)) {
+        if (src_ty == null || dst_ty == null) {
+            return false;
+        }
+        if (ord((src_ty as Type*).kind) != ord(TY_NULLABLE)) {
+            return false;
+        }
+        if (!type_equals((dst_ty as Type*), ((src_ty as Type*).inner as Type*))) {
+            return false;
+        }
+        return be_is_place_expr(self, expr.expr_a);
+    }
+}
+
+/**
+ * Report whether a non-place ARC rvalue needs temporary materialization.
+ *
+ * @param self Backend state to inspect.
+ * @param expr_id Expression to classify.
+ * @return `true` when the expression should be hoisted into a cleanup temp.
+ */
+func be_needs_arc_temp(self: Backend*, expr_id: ExprId) -> bool {
+    let expr = expr_arena_get(be_current_expr_arena(self), expr_id);
+    return ord(expr.kind) != ord(EX_STRING);
+}
+
+/**
+ * Report whether an expression should be materialized into a scope-owned temp.
+ *
+ * @param self Backend state to inspect.
+ * @param expr_id Expression to classify.
+ * @param expr_type Inferred type of the expression.
+ * @return `true` when the expression carries ARC data and is not already a place.
+ */
+func be_should_materialize_arc_temp(self: Backend*, expr_id: ExprId, expr_type: Type*) -> bool {
+    return analysis_has_arc_data(self.result, expr_type) &&
+           !be_is_place_expr(self, expr_id) &&
+           !be_is_unwrap_cast_from_place(self, expr_id) &&
+           be_needs_arc_temp(self, expr_id);
+}
+
+/**
+ * Materialize one ARC rvalue into a scope-owned temporary.
+ *
+ * @param self Backend state to update.
+ * @param c_expr Lowered expression to store.
+ * @param expr_type Type of the stored expression.
+ * @return Temporary variable name.
+ */
+func be_materialize_arc_temp(self: Backend*, c_expr: string, expr_type: Type*) -> string {
+    if (self.current_scope == null) {
+        be_ice("[ICE-1311] ARC temp materialization requires an active scope");
+    }
+    let temp = cem_fresh_tmp(self.emitter, "arc");
+    cem_emit_temp_decl(self.emitter, cem_emit_type(expr_type), temp, c_expr);
+    sc_add_owned(self.current_scope as ScopeContext*, temp, expr_type);
+    return temp;
+}
+
+/**
+ * Report whether any scope in the current chain has pending cleanup work.
+ *
+ * @param self Backend state to inspect.
+ * @return `true` when owned values or `with` cleanup are present.
+ */
+func be_scope_chain_has_cleanup(self: Backend*) -> bool {
+    let scope = self.current_scope;
+    while (scope != null) {
+        let cur = scope as ScopeContext*;
+        if (((cur.with_cleanup_block >= 0) || sc_has_inline_cleanup(cur)) && !cur.with_cleanup_in_progress) {
+            return true;
+        }
+        for (let i = 0; i < vec_size(cur.owned_vars); i = i + 1) {
+            let item = ptr_vec_get(cur.owned_vars, i) as ScopeVar*;
+            if (analysis_has_arc_data(self.result, item.var_type)) {
+                return true;
+            }
+        }
+        scope = cur.parent;
+    }
+    return false;
+}
+
+/**
+ * Emit retain operations for one copied owned value.
+ *
+ * @param self Backend state to update.
+ * @param c_expr Lowered expression containing the copied value.
+ * @param ty Type of the copied value.
+ */
+func be_emit_retain_for_copied_value(self: Backend*, c_expr: string, ty: Type*) {
+    if (analysis_is_arc_type(ty)) {
+        cem_emit_string_retain(self.emitter, c_expr);
+        return;
+    }
+
+    if (ord(ty.kind) == ord(TY_NULLABLE)) {
+        if (cem_is_niche_nullable(ty) || !analysis_has_arc_data(self.result, ty.inner as Type*)) {
+            return;
+        }
+        cem_emit_if_header(self.emitter, concat4_s("((", c_expr, ").has_value", ")"));
+        cem_emit_block_start(self.emitter);
+        be_emit_retain_for_copied_value(self, concat4_s("(", c_expr, ").value", ""), ty.inner as Type*);
+        cem_emit_block_end(self.emitter);
+        return;
+    }
+
+    if (ord(ty.kind) == ord(TY_STRUCT)) {
+        let info = sig_lookup_struct_info(self.result.signatures as SignatureTables*, ty.module_name, ty.name);
+        if (info == null) {
+            return;
+        }
+        for (let i = 0; i < vec_size((info as StructInfo*).fields); i = i + 1) {
+            let field = ptr_vec_get((info as StructInfo*).fields, i) as StructFieldInfo*;
+            be_emit_retain_for_copied_value(self, concat4_s(concat4_s("(", c_expr, ").", field.name), "", "", ""),
+                field.field_type);
+        }
+        return;
+    }
+
+    if (ord(ty.kind) == ord(TY_ENUM)) {
+        let enum_info = sig_lookup_enum_info(self.result.signatures as SignatureTables*, ty.module_name, ty.name);
+        let decl = be_find_enum_decl(self, ty.module_name, ty.name);
+        if (enum_info == null || decl == null) {
+            return;
+        }
+
+        cem_emit_switch_start(self.emitter, concat4_s("(", c_expr, ").tag", ""));
+        for (let i = 0; i < vec_size((decl as EnumDecl*).variants); i = i + 1) {
+            let variant = ptr_vec_get((decl as EnumDecl*).variants, i) as EnumVariant*;
+            let info2 = cem_find_enum_variant_info(enum_info as EnumInfo*, variant.name);
+            if (info2 == null) {
+                continue;
+            }
+            cem_emit_case_label(self.emitter, cem_emit_enum_tag(ty, variant.name));
+            cem_emit_block_start(self.emitter);
+            for (let j = 0; j < vec_size((info2 as EnumVariantInfo*).field_types); j = j + 1) {
+                let field_decl = ptr_vec_get(variant.fields, j) as FieldDecl*;
+                let field_ty = ptr_vec_get((info2 as EnumVariantInfo*).field_types, j) as Type*;
+                be_emit_retain_for_copied_value(self,
+                    concat4_s(concat4_s("(", c_expr, ").data.", variant.name), ".", field_decl.name, ""),
+                    field_ty);
+            }
+            cem_emit_exit_switch(self.emitter);
+            cem_emit_block_end(self.emitter);
+        }
+        cem_emit_default_label(self.emitter);
+        cem_emit_exit_switch(self.emitter);
+        cem_emit_switch_end(self.emitter);
+    }
+}
+
+/**
+ * Materialize one copied value into a temp and retain any owned fields.
+ *
+ * @param self Backend state to update.
+ * @param c_expr Lowered source expression.
+ * @param ty Type of the copied value.
+ * @return Lowered expression or new temp name when retain logic is needed.
+ */
+func be_emit_copy_expr_with_retains(self: Backend*, c_expr: string, ty: Type*) -> string {
+    if (!analysis_has_arc_data(self.result, ty)) {
+        return c_expr;
+    }
+
+    let temp = cem_fresh_tmp(self.emitter, "copy");
+    cem_emit_temp_decl(self.emitter, cem_emit_type(ty), temp, c_expr);
+    be_emit_retain_for_copied_value(self, temp, ty);
+    return temp;
+}
+
+/**
  * Return whether a type behaves like an integer.
  *
  * @param ty Type to inspect.
@@ -340,6 +711,40 @@ func be_emit_expr_with_expected_type(self: Backend*, expr_id: ExprId, expected: 
 
     with (let natural_ty = be_expr_type(self, expr_id) => type_free_opt(natural_ty)) {
         let c_expr = be_emit_expr(self, expr_id);
+        return be_convert_expr_with_expected_type(c_expr, natural_ty, expected);
+    }
+}
+
+/**
+ * Emit one expression for a context that creates a new owner.
+ *
+ * @param self Backend state to inspect.
+ * @param expr_id Expression to lower.
+ * @param expected Expected destination type.
+ * @return Lowered expression string, with retain-on-copy when required.
+ */
+func be_emit_owned_expr_with_expected_type(self: Backend*, expr_id: ExprId, expected: Type*) -> string {
+    let expr = expr_arena_get(be_current_expr_arena(self), expr_id);
+    if (ord(expr.kind) == ord(EX_NULL)) {
+        return be_emit_expr_with_expected_type(self, expr_id, expected);
+    }
+
+    with (let natural_ty = be_expr_type(self, expr_id) => type_free_opt(natural_ty)) {
+        let c_expr = be_emit_expr(self, expr_id);
+        let place_like = be_is_place_expr(self, expr_id) || be_is_unwrap_cast_from_place(self, expr_id);
+        if (natural_ty == null || !place_like) {
+            return be_convert_expr_with_expected_type(c_expr, natural_ty, expected);
+        }
+        if (type_equals(natural_ty as Type*, expected)) {
+            return be_emit_copy_expr_with_retains(self, c_expr, expected);
+        }
+        if (ord(expected.kind) == ord(TY_NULLABLE) && type_equals(expected.inner as Type*, natural_ty as Type*)) {
+            if (cem_is_niche_nullable(expected)) {
+                return c_expr;
+            }
+            return cem_emit_some_value_for_nullable(expected,
+                be_emit_copy_expr_with_retains(self, c_expr, natural_ty as Type*));
+        }
         return be_convert_expr_with_expected_type(c_expr, natural_ty, expected);
     }
 }
@@ -937,7 +1342,7 @@ func be_emit_constructor_call(self: Backend*, expr_id: ExprId, sym: Symbol*, res
                 let field = ptr_vec_get(struct_info.fields, i) as StructFieldInfo*;
                 vs_push(field_inits, field.name);
                 vs_push(field_inits,
-                    be_emit_expr_with_expected_type(self, id_vec_get(expr.ids as VectorBase*, i), field.field_type));
+                    be_emit_owned_expr_with_expected_type(self, id_vec_get(expr.ids as VectorBase*, i), field.field_type));
             }
             return cem_emit_struct_constructor_for_type(result_ty, field_inits);
         }
@@ -963,7 +1368,8 @@ func be_emit_constructor_call(self: Backend*, expr_id: ExprId, sym: Symbol*, res
                 let field_decl = ptr_vec_get((variant_decl as EnumVariant*).fields, i) as FieldDecl*;
                 vs_push(payload_inits, field_decl.name);
                 vs_push(payload_inits,
-                    be_emit_expr_with_expected_type(self, id_vec_get(expr.ids as VectorBase*, i), ptr_vec_get(info2.field_types, i) as Type*));
+                    be_emit_owned_expr_with_expected_type(self, id_vec_get(expr.ids as VectorBase*, i),
+                        ptr_vec_get(info2.field_types, i) as Type*));
             }
             return cem_emit_variant_constructor_for_type(result_ty, variant_name, payload_inits);
         }
@@ -1032,9 +1438,21 @@ func be_emit_call(self: Backend*, expr_id: ExprId) -> string {
                         let arg_id = id_vec_get(expr.ids as VectorBase*, i);
                         if (func_ty != null && vec_size((func_ty as Type*).params as VectorBase*) == arg_count) {
                             let param_ty = ptr_vec_get((func_ty as Type*).params as VectorBase*, i) as Type*;
-                            sb_append(sb, be_emit_expr_with_expected_type(self, arg_id, param_ty));
+                            let c_arg = be_emit_expr_with_expected_type(self, arg_id, param_ty);
+                            with (let arg_ty = be_expr_type(self, arg_id) => type_free_opt(arg_ty)) {
+                                if (arg_ty != null && be_should_materialize_arc_temp(self, arg_id, arg_ty as Type*)) {
+                                    c_arg = be_materialize_arc_temp(self, c_arg, arg_ty as Type*);
+                                }
+                                sb_append(sb, c_arg);
+                            }
                         } else {
-                            sb_append(sb, be_emit_expr(self, arg_id));
+                            let c_arg2 = be_emit_expr(self, arg_id);
+                            with (let arg_ty2 = be_expr_type(self, arg_id) => type_free_opt(arg_ty2)) {
+                                if (arg_ty2 != null && be_should_materialize_arc_temp(self, arg_id, arg_ty2 as Type*)) {
+                                    c_arg2 = be_materialize_arc_temp(self, c_arg2, arg_ty2 as Type*);
+                                }
+                                sb_append(sb, c_arg2);
+                            }
                         }
                     }
                     return cem_emit_function_call(c_func_name, sb_to_string(sb));
@@ -1052,9 +1470,99 @@ func be_emit_call(self: Backend*, expr_id: ExprId) -> string {
             if (i > 0) {
                 sb_append(sb2, ", ");
             }
-            sb_append(sb2, be_emit_expr(self, id_vec_get(expr.ids as VectorBase*, i)));
+            let arg_id2 = id_vec_get(expr.ids as VectorBase*, i);
+            let c_arg3 = be_emit_expr(self, arg_id2);
+            with (let arg_ty3 = be_expr_type(self, arg_id2) => type_free_opt(arg_ty3)) {
+                if (arg_ty3 != null && be_should_materialize_arc_temp(self, arg_id2, arg_ty3 as Type*)) {
+                    c_arg3 = be_materialize_arc_temp(self, c_arg3, arg_ty3 as Type*);
+                }
+                sb_append(sb2, c_arg3);
+            }
         }
         return cem_emit_function_call(cem_emit_paren_expr(be_emit_expr(self, expr.expr_a)), sb_to_string(sb2));
+    }
+}
+
+/**
+ * Emit one heap-allocation `new` expression.
+ *
+ * @param self Backend state to inspect.
+ * @param expr_id New-expression id.
+ * @return Lowered pointer expression.
+ */
+func be_emit_new_expr(self: Backend*, expr_id: ExprId) -> string {
+    let expr = expr_arena_get(be_current_expr_arena(self), expr_id);
+    with (let new_ty = be_expr_type(self, expr_id) => type_free_opt(new_ty)) {
+        if (new_ty == null || ord((new_ty as Type*).kind) != ord(TY_POINTER)) {
+            return be_ice_string("[ICE-1200] missing inferred pointer type for new expression");
+        }
+
+        let base_ty = ((new_ty as Type*).inner as Type*);
+        let c_base = cem_emit_type(base_ty);
+        let c_ptr_ty = cem_emit_pointer_type(base_ty);
+        let tmp = cem_fresh_tmp(self.emitter, "new");
+        cem_emit_alloc_obj(self.emitter, c_ptr_ty, c_base, tmp);
+
+        let arg_count = 0;
+        if (expr.ids != null) {
+            arg_count = vec_size(expr.ids as VectorBase*);
+        }
+
+        if (arg_count == 0 && ord(base_ty.kind) != ord(TY_ENUM)) {
+            cem_emit_zero_init(self.emitter, tmp, c_base);
+            return tmp;
+        }
+
+        if (ord(base_ty.kind) == ord(TY_STRUCT)) {
+            let info = sig_lookup_struct_info(self.result.signatures as SignatureTables*, base_ty.module_name, base_ty.name);
+            if (info == null) {
+                return be_ice_string(concat4_s("[ICE-1210] missing StructInfo for ", base_ty.module_name, ".", base_ty.name));
+            }
+            with (let field_inits = vs_create(8) => vs_free(field_inits)) {
+                for (let i = 0; i < arg_count; i = i + 1) {
+                    let field = ptr_vec_get((info as StructInfo*).fields, i) as StructFieldInfo*;
+                    vs_push(field_inits, field.name);
+                    vs_push(field_inits,
+                        be_emit_owned_expr_with_expected_type(self, id_vec_get(expr.ids as VectorBase*, i), field.field_type));
+                }
+                cem_emit_struct_init_from_fields(self.emitter, tmp, base_ty, field_inits);
+                return tmp;
+            }
+        }
+
+        if (ord(base_ty.kind) == ord(TY_ENUM)) {
+            let variant_name = "";
+            if (expr.type_ref != null) {
+                variant_name = (expr.type_ref as TypeRef*).name;
+            }
+            let enum_info = sig_lookup_enum_info(self.result.signatures as SignatureTables*, base_ty.module_name, base_ty.name);
+            if (enum_info == null) {
+                return be_ice_string("[ICE-1220] new enum allocation missing variant symbol");
+            }
+            let variant_decl = be_find_variant_decl(self, base_ty.module_name, base_ty.name, variant_name);
+            let variant_info = cem_find_enum_variant_info(enum_info as EnumInfo*, variant_name);
+            if (variant_decl == null || variant_info == null) {
+                return be_ice_string("[ICE-1220] new enum allocation missing variant symbol");
+            }
+            with (let payload_inits = vs_create(8) => vs_free(payload_inits)) {
+                for (let i = 0; i < arg_count; i = i + 1) {
+                    let field_decl = ptr_vec_get((variant_decl as EnumVariant*).fields, i) as FieldDecl*;
+                    let field_ty = ptr_vec_get((variant_info as EnumVariantInfo*).field_types, i) as Type*;
+                    vs_push(payload_inits, field_decl.name);
+                    vs_push(payload_inits,
+                        be_emit_owned_expr_with_expected_type(self, id_vec_get(expr.ids as VectorBase*, i), field_ty));
+                }
+                cem_emit_enum_variant_init(self.emitter, tmp, base_ty, variant_name, payload_inits);
+                return tmp;
+            }
+        }
+
+        if (arg_count == 1) {
+            cem_emit_pointer_assignment(self.emitter, tmp, be_emit_expr(self, id_vec_get(expr.ids as VectorBase*, 0)));
+            return tmp;
+        }
+
+        return be_ice_string(concat3_s("[ICE-1231] unsupported new expression for type '", type_format(base_ty), "'"));
     }
 }
 
@@ -1170,12 +1678,501 @@ func be_emit_expr(self: Backend*, expr_id: ExprId) -> string {
             return be_ice_string("[ICE-9149] bare type expression cannot be emitted directly");
         }
         EX_NEW => {
-            return be_ice_string("[ICE-2436] new expression lowering belongs to backend phase 2");
+            return be_emit_new_expr(self, expr_id);
         }
         EX_TRY => {
-            return be_ice_string("[ICE-1130] try expression lowering belongs to backend phase 2");
+            with (let src_ty = be_expr_type(self, expr.expr_a) => type_free_opt(src_ty)) {
+                if (src_ty == null || ord((src_ty as Type*).kind) != ord(TY_NULLABLE)) {
+                    return be_ice_string("[ICE-1130] TryExpr operand is not nullable");
+                }
+                if (self.current_func_result == null || ord((self.current_func_result as Type*).kind) != ord(TY_NULLABLE)) {
+                    return be_ice_string("[ICE-1131] TryExpr used in non-nullable function");
+                }
+
+                let tmp = cem_fresh_tmp(self.emitter, "try");
+                cem_emit_temp_decl(self.emitter, cem_emit_type(src_ty as Type*), tmp, be_emit_expr(self, expr.expr_a));
+                let ret_none = cem_emit_null_literal(self.current_func_result as Type*, false);
+
+                if (cem_is_niche_nullable(src_ty as Type*)) {
+                    if (be_scope_chain_has_cleanup(self)) {
+                        cem_emit_if_header(self.emitter, concat4_s(tmp, " == NULL", "", ""));
+                        cem_emit_block_start(self.emitter);
+                        be_emit_cleanup_for_return(self, null);
+                        cem_emit_return_stmt(self.emitter, ret_none);
+                        cem_emit_block_end(self.emitter);
+                    } else {
+                        cem_emit_try_check_niche(self.emitter, tmp, ret_none);
+                    }
+                    return tmp;
+                }
+
+                if (be_scope_chain_has_cleanup(self)) {
+                    cem_emit_if_header(self.emitter, concat4_s("!", tmp, ".has_value", ""));
+                    cem_emit_block_start(self.emitter);
+                    be_emit_cleanup_for_return(self, null);
+                    cem_emit_return_stmt(self.emitter, ret_none);
+                    cem_emit_block_end(self.emitter);
+                } else {
+                    cem_emit_try_check_value(self.emitter, tmp, ret_none);
+                }
+                return cem_emit_try_extract_value(tmp);
+            }
         }
     }
+}
+
+/**
+ * Emit cleanup for one by-value expression.
+ *
+ * @param self Backend state to update.
+ * @param c_expr Lowered value expression.
+ * @param ty Type of the value.
+ */
+func be_emit_value_cleanup(self: Backend*, c_expr: string, ty: Type*) {
+    cem_emit_value_cleanup(self.emitter, c_expr, ty);
+}
+
+/**
+ * Emit cleanup for a pointer-to-struct expression.
+ *
+ * @param self Backend state to update.
+ * @param c_ptr_expr Lowered pointer expression.
+ * @param struct_type Struct type to clean.
+ */
+func be_emit_struct_cleanup(self: Backend*, c_ptr_expr: string, struct_type: Type*) {
+    cem_emit_struct_cleanup(self.emitter, c_ptr_expr, struct_type);
+}
+
+/**
+ * Emit cleanup for a pointer-to-enum expression.
+ *
+ * @param self Backend state to update.
+ * @param c_ptr_expr Lowered pointer expression.
+ * @param enum_type Enum type to clean.
+ */
+func be_emit_enum_cleanup(self: Backend*, c_ptr_expr: string, enum_type: Type*) {
+    cem_emit_enum_cleanup(self.emitter, c_ptr_expr, enum_type);
+}
+
+/**
+ * Emit cleanup for owned values declared in one scope.
+ *
+ * @param self Backend state to update.
+ * @param scope Scope to clean.
+ */
+func be_emit_cleanup_at_scope_exit(self: Backend*, scope: ScopeContext*) {
+    for (let i = vec_size(scope.owned_vars) - 1; i >= 0; i = i - 1) {
+        let item = ptr_vec_get(scope.owned_vars, i) as ScopeVar*;
+        if (analysis_has_arc_data(self.result, item.var_type)) {
+            be_emit_value_cleanup(self, item.name, item.var_type);
+        }
+    }
+}
+
+/**
+ * Emit `with` cleanup recorded on one scope.
+ *
+ * @param self Backend state to update.
+ * @param scope Scope carrying `with` cleanup state.
+ */
+func be_emit_with_cleanup_from_scope(self: Backend*, scope: ScopeContext*) {
+    if (scope.with_cleanup_block < 0 && !sc_has_inline_cleanup(scope)) {
+        return;
+    }
+
+    let old = scope.with_cleanup_in_progress;
+    scope.with_cleanup_in_progress = true;
+    cem_emit_block_start(self.emitter);
+    let cleanup_scope = be_push_scope(self);
+
+    if (scope.with_cleanup_block >= 0) {
+        be_emit_block_sequence(self, scope.with_cleanup_block);
+    } else {
+        let items = scope.with_cleanup_inline as VectorBase*;
+        for (let i = vec_size(items) - 1; i >= 0; i = i - 1) {
+            be_emit_stmt(self, id_vec_get(items, i));
+        }
+    }
+
+    if (!self.next_stmt_unreachable) {
+        be_emit_cleanup_at_scope_exit(self, cleanup_scope);
+    }
+    be_pop_scope(self);
+    cem_emit_block_end(self.emitter);
+    scope.with_cleanup_in_progress = old;
+}
+
+/**
+ * Emit cleanup required before returning from the current function.
+ *
+ * @param self Backend state to update.
+ * @param returned_var Optional owned local to keep alive across cleanup.
+ */
+func be_emit_cleanup_for_return(self: Backend*, returned_var: string?) {
+    let scope = self.current_scope;
+    while (scope != null) {
+        let cur = scope as ScopeContext*;
+        if (((cur.with_cleanup_block >= 0) || sc_has_inline_cleanup(cur)) && !cur.with_cleanup_in_progress) {
+            be_emit_with_cleanup_from_scope(self, cur);
+        }
+        for (let i = vec_size(cur.owned_vars) - 1; i >= 0; i = i - 1) {
+            let item = ptr_vec_get(cur.owned_vars, i) as ScopeVar*;
+            if (returned_var != null && eq_s(item.name, returned_var as string)) {
+                continue;
+            }
+            if (analysis_has_arc_data(self.result, item.var_type)) {
+                be_emit_value_cleanup(self, item.name, item.var_type);
+            }
+        }
+        scope = cur.parent;
+    }
+}
+
+/**
+ * Emit cleanup required before breaking or continuing out of the innermost loop.
+ *
+ * @param self Backend state to update.
+ * @param is_break `true` for break, `false` for continue.
+ */
+func be_emit_cleanup_for_loop_exit(self: Backend*, is_break: bool) {
+    if (self.current_loop_cleanup_scopes == null) {
+        be_ice("[ICE-1020] break/continue outside of loop");
+    }
+
+    let frame = self.current_loop_cleanup_scopes as LoopCleanupScopes*;
+    let target_scope_id = frame.continue_scope_id;
+    if (is_break) {
+        target_scope_id = frame.break_scope_id;
+    }
+
+    let scope = self.current_scope;
+    while (scope != null) {
+        let cur = scope as ScopeContext*;
+        if (((cur.with_cleanup_block >= 0) || sc_has_inline_cleanup(cur)) && !cur.with_cleanup_in_progress) {
+            be_emit_with_cleanup_from_scope(self, cur);
+        }
+        for (let i = vec_size(cur.owned_vars) - 1; i >= 0; i = i - 1) {
+            let item = ptr_vec_get(cur.owned_vars, i) as ScopeVar*;
+            if (analysis_has_arc_data(self.result, item.var_type)) {
+                be_emit_value_cleanup(self, item.name, item.var_type);
+            }
+        }
+        if (cur.scope_id == target_scope_id) {
+            break;
+        }
+        scope = cur.parent;
+    }
+}
+
+/**
+ * Emit one match-pattern payload binding set.
+ *
+ * @param self Backend state to update.
+ * @param pattern_id Pattern id to inspect.
+ * @param enum_type Scrutinee enum type.
+ * @param arm_scope Arm scope receiving borrowed bindings.
+ */
+func be_emit_pattern_bindings(self: Backend*, pattern_id: PatternId, enum_type: Type*, arm_scope: ScopeContext*) {
+    let pattern = pattern_arena_get(be_current_unit(self).parse_result.pattern_arena, pattern_id);
+    if (ord(pattern.kind) != ord(PT_VARIANT)) {
+        return;
+    }
+
+    let variant_decl = be_find_variant_decl(self, enum_type.module_name, enum_type.name, pattern.name);
+    let enum_info = sig_lookup_enum_info(self.result.signatures as SignatureTables*, enum_type.module_name, enum_type.name);
+    if (variant_decl == null || enum_info == null) {
+        return;
+    }
+
+    let variant_info = cem_find_enum_variant_info(enum_info as EnumInfo*, pattern.name);
+    if (variant_info == null || pattern.vars == null) {
+        return;
+    }
+
+    for (let i = 0; i < vs_size(pattern.vars as VectorString*); i = i + 1) {
+        let field_decl = ptr_vec_get((variant_decl as EnumVariant*).fields, i) as FieldDecl*;
+        let field_ty = ptr_vec_get((variant_info as EnumVariantInfo*).field_types, i) as Type*;
+        let c_name = cem_mangle_identifier(vs_get(pattern.vars as VectorString*, i));
+        cem_emit_let_decl(self.emitter, cem_emit_type(field_ty), c_name,
+            cem_emit_pattern_binding_init("_scrutinee", pattern.name, field_decl.name));
+        sc_add_declared(arm_scope, c_name, field_ty);
+    }
+}
+
+/**
+ * Emit one `case` literal.
+ *
+ * @param self Backend state to inspect.
+ * @param expr_id Literal expression id.
+ * @return Lowered constant expression.
+ */
+func be_emit_case_literal(self: Backend*, expr_id: ExprId) -> string {
+    let expr = expr_arena_get(be_current_expr_arena(self), expr_id);
+    match (expr.kind) {
+        EX_INT => { return cem_emit_int_literal(expr.int_value); }
+        EX_BYTE => { return cem_emit_byte_literal(expr.int_value as byte); }
+        EX_BOOL => { return cem_emit_bool_literal(expr.bool_value); }
+        EX_STRING => { return cem_emit_string_literal(expr.text_value); }
+        _ => {
+            return be_ice_string("[ICE-1194] unsupported case literal type");
+        }
+    }
+}
+
+/**
+ * Emit a `drop` statement.
+ *
+ * @param self Backend state to update.
+ * @param stmt Parsed drop statement.
+ */
+func be_emit_drop_stmt(self: Backend*, stmt: StmtNode*) {
+    let c_name = cem_mangle_identifier(stmt.name);
+    let var_type = be_lookup_local_var_type(self, stmt.name);
+    if (var_type == null) {
+        let sym = be_lookup_symbol(self, stmt.name, null, null);
+        if (sym == null) {
+            be_ice(concat3_s("[ICE-1060] undefined variable in drop: ", stmt.name, ""));
+        }
+        var_type = (sym as Symbol*).resolved_type;
+    }
+    if (var_type == null) {
+        be_ice("[ICE-1060] drop requires resolved variable type");
+    }
+
+    let inner_type = var_type as Type*;
+    if (ord((var_type as Type*).kind) == ord(TY_NULLABLE)) {
+        inner_type = ((var_type as Type*).inner as Type*);
+    }
+    if (ord(inner_type.kind) != ord(TY_POINTER)) {
+        be_ice(concat3_s("[ICE-1061] drop requires pointer type, got '", type_format(var_type as Type*), "'"));
+    }
+
+    let pointee = inner_type.inner as Type*;
+    if (ord(pointee.kind) == ord(TY_STRUCT)) {
+        be_emit_struct_cleanup(self, c_name, pointee);
+    } else if (ord(pointee.kind) == ord(TY_ENUM)) {
+        be_emit_enum_cleanup(self, c_name, pointee);
+    } else if (analysis_is_arc_type(pointee)) {
+        cem_emit_if_header(self.emitter, cem_emit_pointer_null_check(c_name, "!="));
+        cem_emit_block_start(self.emitter);
+        cem_emit_string_release(self.emitter, concat3_s("*", c_name, ""));
+        cem_emit_block_end(self.emitter);
+    }
+
+    cem_emit_drop_call(self.emitter, c_name);
+    cem_emit_null_assignment(self.emitter, c_name);
+    self.next_stmt_unreachable = false;
+}
+
+/**
+ * Emit a `match` statement.
+ *
+ * @param self Backend state to update.
+ * @param stmt Parsed match statement.
+ */
+func be_emit_match_stmt(self: Backend*, stmt: StmtNode*) {
+    with (let scrutinee_ty = be_expr_type(self, stmt.expr_a) => type_free_opt(scrutinee_ty)) {
+        if (scrutinee_ty == null) {
+            be_ice("[ICE-1190] missing inferred type for match scrutinee");
+        }
+
+        cem_emit_block_start(self.emitter);
+        let outer_scope = be_push_scope(self);
+        cem_emit_match_scrutinee_decl(self.emitter, cem_emit_type(scrutinee_ty as Type*), be_emit_expr(self, stmt.expr_a));
+        if (!be_is_place_expr(self, stmt.expr_a) && analysis_has_arc_data(self.result, scrutinee_ty as Type*)) {
+            sc_add_owned(outer_scope, "_scrutinee", scrutinee_ty as Type*);
+        }
+
+        cem_emit_match_switch_start(self.emitter, "_scrutinee");
+        let arms = stmt.match_arms as VectorBase*;
+        let unreachable_arms = 0;
+        for (let i = 0; i < vec_size(arms); i = i + 1) {
+            let arm = ptr_vec_get(arms, i) as MatchArm*;
+            let pattern = pattern_arena_get(be_current_unit(self).parse_result.pattern_arena, arm.pattern);
+            if (ord(pattern.kind) == ord(PT_WILDCARD)) {
+                cem_emit_default_label(self.emitter);
+            } else if (ord(pattern.kind) == ord(PT_VARIANT) && ord((scrutinee_ty as Type*).kind) == ord(TY_ENUM)) {
+                cem_emit_case_label(self.emitter, cem_emit_enum_tag(scrutinee_ty as Type*, pattern.name));
+            } else {
+                be_ice("[ICE-1192] unsupported match pattern");
+            }
+
+            cem_emit_block_start(self.emitter);
+            let arm_scope = be_push_scope(self);
+            self.next_stmt_unreachable = false;
+            if (ord(pattern.kind) == ord(PT_VARIANT) && ord((scrutinee_ty as Type*).kind) == ord(TY_ENUM)) {
+                be_emit_pattern_bindings(self, arm.pattern, scrutinee_ty as Type*, arm_scope);
+            }
+            be_emit_block_sequence(self, arm.body);
+            if (!self.next_stmt_unreachable) {
+                be_emit_cleanup_at_scope_exit(self, arm_scope);
+                cem_emit_exit_switch(self.emitter);
+            } else {
+                unreachable_arms = unreachable_arms + 1;
+            }
+            be_pop_scope(self);
+            cem_emit_block_end(self.emitter);
+        }
+        cem_emit_switch_end(self.emitter);
+        self.next_stmt_unreachable = unreachable_arms == vec_size(arms);
+        if (!self.next_stmt_unreachable) {
+            be_emit_cleanup_at_scope_exit(self, outer_scope);
+        } else {
+            cem_emit_unreachable_marker(self.emitter, "'match'");
+        }
+        be_pop_scope(self);
+        cem_emit_block_end(self.emitter);
+    }
+}
+
+/**
+ * Emit a `case` statement.
+ *
+ * @param self Backend state to update.
+ * @param stmt Parsed case statement.
+ */
+func be_emit_case_stmt(self: Backend*, stmt: StmtNode*) {
+    with (let scrutinee_ty = be_expr_type(self, stmt.expr_a) => type_free_opt(scrutinee_ty)) {
+        if (scrutinee_ty == null) {
+            be_ice("[ICE-1193] missing inferred type for case scrutinee");
+        }
+
+        cem_emit_block_start(self.emitter);
+        let outer_scope = be_push_scope(self);
+        cem_emit_match_scrutinee_decl(self.emitter, cem_emit_type(scrutinee_ty as Type*), be_emit_expr(self, stmt.expr_a));
+        if (!be_is_place_expr(self, stmt.expr_a) && analysis_has_arc_data(self.result, scrutinee_ty as Type*)) {
+            sc_add_owned(outer_scope, "_scrutinee", scrutinee_ty as Type*);
+        }
+
+        let arms = stmt.case_arms as VectorBase*;
+        let total_arms = vec_size(arms);
+        if (stmt.case_else != null) {
+            total_arms = total_arms + 1;
+        }
+        let unreachable_arms = 0;
+
+        if (type_is_builtin(scrutinee_ty as Type*, "string")) {
+            for (let i = 0; i < vec_size(arms); i = i + 1) {
+                let arm = ptr_vec_get(arms, i) as CaseArm*;
+                let cond = concat4_s("rt_string_equals(_scrutinee, ", be_emit_case_literal(self, arm.literal), ")", "");
+                if (i == 0) {
+                    cem_emit_if_header(self.emitter, cond);
+                } else {
+                    cem_emit_else(self.emitter);
+                    cem_emit_if_header(self.emitter, cond);
+                }
+                cem_emit_block_start(self.emitter);
+                let arm_scope = be_push_scope(self);
+                self.next_stmt_unreachable = false;
+                be_emit_stmt(self, arm.body);
+                if (!self.next_stmt_unreachable) {
+                    be_emit_cleanup_at_scope_exit(self, arm_scope);
+                } else {
+                    unreachable_arms = unreachable_arms + 1;
+                }
+                be_pop_scope(self);
+                cem_emit_block_end(self.emitter);
+            }
+            if (stmt.case_else != null) {
+                cem_emit_else(self.emitter);
+                cem_emit_block_start(self.emitter);
+                let else_scope = be_push_scope(self);
+                self.next_stmt_unreachable = false;
+                be_emit_stmt(self, (stmt.case_else as CaseElse*).body);
+                if (!self.next_stmt_unreachable) {
+                    be_emit_cleanup_at_scope_exit(self, else_scope);
+                } else {
+                    unreachable_arms = unreachable_arms + 1;
+                }
+                be_pop_scope(self);
+                cem_emit_block_end(self.emitter);
+            }
+        } else {
+            cem_emit_switch_start(self.emitter, "_scrutinee");
+            for (let i = 0; i < vec_size(arms); i = i + 1) {
+                let arm = ptr_vec_get(arms, i) as CaseArm*;
+                cem_emit_case_label(self.emitter, be_emit_case_literal(self, arm.literal));
+                cem_emit_block_start(self.emitter);
+                let arm_scope = be_push_scope(self);
+                self.next_stmt_unreachable = false;
+                be_emit_stmt(self, arm.body);
+                if (!self.next_stmt_unreachable) {
+                    be_emit_cleanup_at_scope_exit(self, arm_scope);
+                    cem_emit_exit_switch(self.emitter);
+                } else {
+                    unreachable_arms = unreachable_arms + 1;
+                }
+                be_pop_scope(self);
+                cem_emit_block_end(self.emitter);
+            }
+            if (stmt.case_else != null) {
+                cem_emit_default_label(self.emitter);
+                cem_emit_block_start(self.emitter);
+                let else_scope2 = be_push_scope(self);
+                self.next_stmt_unreachable = false;
+                be_emit_stmt(self, (stmt.case_else as CaseElse*).body);
+                if (!self.next_stmt_unreachable) {
+                    be_emit_cleanup_at_scope_exit(self, else_scope2);
+                    cem_emit_exit_switch(self.emitter);
+                } else {
+                    unreachable_arms = unreachable_arms + 1;
+                }
+                be_pop_scope(self);
+                cem_emit_block_end(self.emitter);
+            }
+            cem_emit_switch_end(self.emitter);
+        }
+
+        self.next_stmt_unreachable = stmt.case_else != null && unreachable_arms == total_arms;
+        if (!self.next_stmt_unreachable) {
+            be_emit_cleanup_at_scope_exit(self, outer_scope);
+        } else {
+            cem_emit_unreachable_marker(self.emitter, "'case'");
+        }
+        be_pop_scope(self);
+        cem_emit_block_end(self.emitter);
+    }
+}
+
+/**
+ * Emit a `with` statement.
+ *
+ * @param self Backend state to update.
+ * @param stmt Parsed with statement.
+ */
+func be_emit_with_stmt(self: Backend*, stmt: StmtNode*) {
+    cem_emit_block_start(self.emitter);
+    let with_scope = be_push_scope(self);
+    if (stmt.stmt_b >= 0) {
+        with_scope.with_cleanup_block = stmt.stmt_b;
+    }
+
+    let items = stmt.with_items as VectorBase*;
+    for (let i = 0; i < vec_size(items); i = i + 1) {
+        let item = ptr_vec_get(items, i) as WithItem*;
+        be_emit_stmt(self, item.init);
+        if (stmt.stmt_b < 0 && item.has_cleanup && item.cleanup_stmt >= 0) {
+            sc_push_inline_cleanup(with_scope, item.cleanup_stmt);
+        }
+    }
+
+    cem_emit_block_start(self.emitter);
+    let body_scope = be_push_scope(self);
+    be_emit_block_sequence(self, stmt.stmt_a);
+    let body_unreachable = self.next_stmt_unreachable;
+    if (!body_unreachable) {
+        be_emit_cleanup_at_scope_exit(self, body_scope);
+    }
+    be_pop_scope(self);
+    cem_emit_block_end(self.emitter);
+
+    if (!body_unreachable) {
+        be_emit_with_cleanup_from_scope(self, with_scope);
+        be_emit_cleanup_at_scope_exit(self, with_scope);
+    }
+    self.next_stmt_unreachable = body_unreachable;
+    be_pop_scope(self);
+    cem_emit_block_end(self.emitter);
 }
 
 /**
@@ -1209,7 +2206,12 @@ func be_emit_block_sequence(self: Backend*, block_id: StmtId) {
  */
 func be_emit_block_stmt(self: Backend*, stmt_id: StmtId) {
     cem_emit_block_start(self.emitter);
+    let block_scope = be_push_scope(self);
     be_emit_block_sequence(self, stmt_id);
+    if (!self.next_stmt_unreachable) {
+        be_emit_cleanup_at_scope_exit(self, block_scope);
+    }
+    be_pop_scope(self);
     cem_emit_block_end(self.emitter);
 }
 
@@ -1227,7 +2229,12 @@ func be_emit_if_branch(self: Backend*, stmt_id: StmtId) -> bool {
         be_emit_block_stmt(self, stmt_id);
     } else {
         cem_emit_block_start(self.emitter);
+        let branch_scope = be_push_scope(self);
         be_emit_stmt(self, stmt_id);
+        if (!self.next_stmt_unreachable) {
+            be_emit_cleanup_at_scope_exit(self, branch_scope);
+        }
+        be_pop_scope(self);
         cem_emit_block_end(self.emitter);
     }
     return self.next_stmt_unreachable;
@@ -1264,8 +2271,15 @@ func be_emit_stmt(self: Backend*, stmt_id: StmtId) {
             }
             let c_name = cem_mangle_identifier(stmt.name);
             let c_type = cem_emit_type(var_ty as Type*);
-            let c_init = be_emit_expr_with_expected_type(self, stmt.expr_a, var_ty as Type*);
+            let c_init = be_emit_owned_expr_with_expected_type(self, stmt.expr_a, var_ty as Type*);
             cem_emit_let_decl(self.emitter, c_type, c_name, c_init);
+            if (self.current_scope != null) {
+                if (analysis_has_arc_data(self.result, var_ty as Type*)) {
+                    sc_add_owned(self.current_scope as ScopeContext*, c_name, var_ty as Type*);
+                } else {
+                    sc_add_declared(self.current_scope as ScopeContext*, c_name, var_ty as Type*);
+                }
+            }
             self.next_stmt_unreachable = false;
             type_free(var_ty as Type*);
         }
@@ -1274,13 +2288,28 @@ func be_emit_stmt(self: Backend*, stmt_id: StmtId) {
                 if (dst_ty == null) {
                     be_ice("[ICE-1240] missing inferred type for assignment");
                 }
-                cem_emit_assignment(self.emitter, be_emit_lvalue(self, stmt.expr_a),
-                    be_emit_expr_with_expected_type(self, stmt.expr_b, dst_ty as Type*));
+                let c_target = be_emit_lvalue(self, stmt.expr_a);
+                let c_value = be_emit_owned_expr_with_expected_type(self, stmt.expr_b, dst_ty as Type*);
+                if (analysis_has_arc_data(self.result, dst_ty as Type*)) {
+                    let temp = cem_fresh_tmp(self.emitter, "tmp");
+                    cem_emit_temp_decl(self.emitter, cem_emit_type(dst_ty as Type*), temp, c_value);
+                    be_emit_value_cleanup(self, c_target, dst_ty as Type*);
+                    cem_emit_assignment(self.emitter, c_target, temp);
+                } else {
+                    cem_emit_assignment(self.emitter, c_target, c_value);
+                }
                 self.next_stmt_unreachable = false;
             }
         }
         ST_EXPR => {
-            cem_emit_expr_stmt(self.emitter, be_emit_expr(self, stmt.expr_a));
+            let c_expr = be_emit_expr(self, stmt.expr_a);
+            with (let expr_ty = be_expr_type(self, stmt.expr_a) => type_free_opt(expr_ty)) {
+                if (expr_ty != null && be_should_materialize_arc_temp(self, stmt.expr_a, expr_ty as Type*)) {
+                    be_materialize_arc_temp(self, c_expr, expr_ty as Type*);
+                } else {
+                    cem_emit_expr_stmt(self.emitter, c_expr);
+                }
+            }
             self.next_stmt_unreachable = false;
         }
         ST_IF => {
@@ -1299,18 +2328,29 @@ func be_emit_stmt(self: Backend*, stmt_id: StmtId) {
         ST_WHILE => {
             let break_label = be_fresh_label(self, "lbrk");
             let continue_label = be_fresh_label(self, "lcont");
+            be_push_loop_labels(self, break_label, continue_label);
             let c_cond = be_emit_expr(self, stmt.expr_a);
             cem_emit_while_header(self.emitter, c_cond);
             cem_emit_block_start(self.emitter);
+            let loop_scope = be_push_scope(self);
+            be_push_loop_cleanup_scopes(self, loop_scope, loop_scope);
             be_emit_block_sequence(self, stmt.stmt_a);
+            if (!self.next_stmt_unreachable) {
+                be_emit_cleanup_at_scope_exit(self, loop_scope);
+            }
             cem_emit_label(self.emitter, continue_label);
+            be_pop_loop_cleanup_scopes(self);
+            be_pop_scope(self);
             cem_emit_block_end(self.emitter);
             cem_emit_label(self.emitter, break_label);
+            be_pop_loop_labels(self);
             self.next_stmt_unreachable = false;
         }
         ST_FOR => {
             let break_label2 = be_fresh_label(self, "lbrk");
             let continue_label2 = be_fresh_label(self, "lcont");
+            be_push_loop_labels(self, break_label2, continue_label2);
+            let outer_scope = be_push_scope(self);
             cem_emit_for_loop_start(self.emitter);
             if (stmt.stmt_a >= 0) {
                 be_emit_stmt(self, stmt.stmt_a);
@@ -1324,7 +2364,15 @@ func be_emit_stmt(self: Backend*, stmt_id: StmtId) {
             cem_emit_while_header(self.emitter, c_cond2);
             cem_emit_block_start(self.emitter);
             cem_emit_block_start(self.emitter);
+            let loop_scope2 = be_push_scope(self);
+            be_push_loop_cleanup_scopes(self, loop_scope2, outer_scope);
             be_emit_block_sequence(self, stmt.stmt_c);
+            let body_falls_through = !self.next_stmt_unreachable;
+            if (body_falls_through) {
+                be_emit_cleanup_at_scope_exit(self, loop_scope2);
+            }
+            be_pop_loop_cleanup_scopes(self);
+            be_pop_scope(self);
             cem_emit_block_end(self.emitter);
             self.next_stmt_unreachable = false;
             cem_emit_label(self.emitter, continue_label2);
@@ -1332,8 +2380,11 @@ func be_emit_stmt(self: Backend*, stmt_id: StmtId) {
                 be_emit_stmt(self, stmt.stmt_b);
             }
             cem_emit_block_end(self.emitter);
+            be_emit_cleanup_at_scope_exit(self, outer_scope);
+            be_pop_scope(self);
             cem_emit_for_loop_end(self.emitter);
             cem_emit_label(self.emitter, break_label2);
+            be_pop_loop_labels(self);
             self.next_stmt_unreachable = false;
         }
         ST_RETURN => {
@@ -1341,30 +2392,50 @@ func be_emit_stmt(self: Backend*, stmt_id: StmtId) {
                 if (self.current_func_result == null) {
                     be_ice("[ICE-1293] backend missing current function result type");
                 }
-                cem_emit_return_stmt(self.emitter,
-                    be_emit_expr_with_expected_type(self, stmt.expr_a, self.current_func_result as Type*));
+                let c_value = be_emit_owned_expr_with_expected_type(self, stmt.expr_a, self.current_func_result as Type*);
+                if (be_scope_chain_has_cleanup(self)) {
+                    let ret_tmp = cem_fresh_tmp(self.emitter, "ret");
+                    cem_emit_temp_decl(self.emitter, cem_emit_type(self.current_func_result as Type*), ret_tmp, c_value);
+                    be_emit_cleanup_for_return(self, be_lookup_owned_local_name(self, stmt.expr_a));
+                    cem_emit_return_stmt(self.emitter, ret_tmp);
+                } else {
+                    cem_emit_return_stmt(self.emitter, c_value);
+                }
             } else {
+                if (be_scope_chain_has_cleanup(self)) {
+                    be_emit_cleanup_for_return(self, null);
+                }
                 cem_emit_return_void_stmt(self.emitter);
             }
             self.next_stmt_unreachable = true;
         }
         ST_DROP => {
-            be_ice("[ICE-2188] drop lowering belongs to backend phase 2");
+            be_emit_drop_stmt(self, stmt);
         }
         ST_MATCH => {
-            be_ice("[ICE-1803] match lowering belongs to backend phase 2");
+            be_emit_match_stmt(self, stmt);
         }
         ST_CASE => {
-            be_ice("[ICE-1886] case lowering belongs to backend phase 2");
+            be_emit_case_stmt(self, stmt);
         }
         ST_BREAK => {
-            be_ice("[ICE-1256] break lowering belongs to backend phase 2");
+            if (self.current_loop_labels == null) {
+                be_ice("[ICE-1020] break/continue outside of loop");
+            }
+            be_emit_cleanup_for_loop_exit(self, true);
+            cem_emit_goto(self.emitter, (self.current_loop_labels as LoopLabels*).break_label);
+            self.next_stmt_unreachable = true;
         }
         ST_CONTINUE => {
-            be_ice("[ICE-1264] continue lowering belongs to backend phase 2");
+            if (self.current_loop_labels == null) {
+                be_ice("[ICE-1020] break/continue outside of loop");
+            }
+            be_emit_cleanup_for_loop_exit(self, false);
+            cem_emit_goto(self.emitter, (self.current_loop_labels as LoopLabels*).continue_label);
+            self.next_stmt_unreachable = true;
         }
         ST_WITH => {
-            be_ice("[ICE-2108] with lowering belongs to backend phase 2");
+            be_emit_with_stmt(self, stmt);
         }
     }
 }
@@ -1410,7 +2481,17 @@ func be_emit_function_definitions(self: Backend*) {
             be_emit_line_directive(self, decl.span);
             cem_emit_function_definition_header(self.emitter, root.name, decl, func_type as Type*);
             self.current_func_result = (func_type as Type*).result as Type*;
+            let func_scope = be_push_scope(self);
+            for (let p = 0; p < vec_size(decl.params); p = p + 1) {
+                let param_decl = ptr_vec_get(decl.params, p) as Param*;
+                let param_ty = ptr_vec_get((func_type as Type*).params as VectorBase*, p) as Type*;
+                sc_add_declared(func_scope, cem_mangle_identifier(param_decl.name), param_ty);
+            }
             be_emit_block_sequence(self, decl.body);
+            if (!self.next_stmt_unreachable) {
+                be_emit_cleanup_at_scope_exit(self, func_scope);
+            }
+            be_pop_scope(self);
             self.current_func_result = null;
             cem_emit_function_definition_footer(self.emitter);
         }

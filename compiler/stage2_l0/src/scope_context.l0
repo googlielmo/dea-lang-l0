@@ -23,6 +23,7 @@ struct ScopeVar {
  * Represents backend cleanup state for a single lexical scope.
  */
 struct ScopeContext {
+    scope_id: int;
     parent: ScopeContext*?;
     owned_vars: VectorBase*;         // ScopeVar*
     declared_vars: VectorBase*;      // ScopeVar*
@@ -38,7 +39,7 @@ struct ScopeContext {
  * @return New scope context.
  */
 func sc_create(parent: ScopeContext*?) -> ScopeContext* {
-    return new ScopeContext(parent, ptr_vec_create(4), ptr_vec_create(8), null, invalid_stmt_id(), false);
+    return new ScopeContext(0, parent, ptr_vec_create(4), ptr_vec_create(8), null, invalid_stmt_id(), false);
 }
 
 /**
@@ -47,6 +48,7 @@ func sc_create(parent: ScopeContext*?) -> ScopeContext* {
  * @param self Record to free.
  */
 func sc_var_free(self: ScopeVar*) {
+    type_free(self.var_type);
     drop self;
 }
 
@@ -87,7 +89,7 @@ func sc_free(self: ScopeContext*) {
  * @param var_type Resolved L0 type.
  */
 func sc_add_declared(self: ScopeContext*, name: string, var_type: Type*) {
-    ptr_vec_push(self.declared_vars, new ScopeVar(name, var_type) as void*);
+    ptr_vec_push(self.declared_vars, new ScopeVar(name, type_clone(var_type)) as void*);
 }
 
 /**
@@ -98,8 +100,8 @@ func sc_add_declared(self: ScopeContext*, name: string, var_type: Type*) {
  * @param var_type Resolved L0 type.
  */
 func sc_add_owned(self: ScopeContext*, name: string, var_type: Type*) {
-    ptr_vec_push(self.owned_vars, new ScopeVar(name, var_type) as void*);
-    ptr_vec_push(self.declared_vars, new ScopeVar(name, var_type) as void*);
+    ptr_vec_push(self.owned_vars, new ScopeVar(name, type_clone(var_type)) as void*);
+    ptr_vec_push(self.declared_vars, new ScopeVar(name, type_clone(var_type)) as void*);
 }
 
 /**

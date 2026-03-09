@@ -150,6 +150,33 @@ func test_scope_context_inline_cleanup_tracking() {
 }
 
 /**
+ * Tests test_backend_scope_helpers_manage_cleanup_state.
+ */
+func test_backend_scope_helpers_manage_cleanup_state() {
+    with (let result = bt_empty_analysis_result() => analysis_result_free(result),
+          let opts = cg_options_create() => cg_options_free(opts),
+          let cfg = log_config_create(LL_ERROR, false) => drop cfg,
+          let self = be_create(result, opts, cfg) => be_free(self)) {
+        let root = be_push_scope(self);
+        sc_add_declared(root, "borrowed", type_builtin_int());
+        sc_add_owned(root, "owned_name", type_builtin_string());
+
+        assert(be_lookup_local_var_type(self, "borrowed") != null, "declared local lookup should succeed");
+        assert(be_scope_chain_has_cleanup(self), "owned ARC local should trigger cleanup detection");
+
+        let temp = be_materialize_arc_temp(self, "((l0_string)L0_STRING_CONST(\"x\", 1))", type_builtin_string());
+        assert(eq_s(temp, "l0_arc_1"), "ARC temp naming mismatch");
+        assert(vec_size(root.owned_vars) == 2, "materialized ARC temp should become owned");
+
+        let child = be_push_scope(self);
+        sc_push_inline_cleanup(child, 7);
+        assert(be_scope_chain_has_cleanup(self), "inline cleanup in child scope should be visible");
+        be_pop_scope(self);
+        be_pop_scope(self);
+    }
+}
+
+/**
  * Tests test_analysis_expr_lookup_helpers.
  */
 func test_analysis_expr_lookup_helpers() {
@@ -301,15 +328,215 @@ func test_backend_generate_basic_control_flow() {
 }
 
 /**
+ * Tests test_backend_generate_loop_exit_case_lowering.
+ */
+func test_backend_generate_loop_exit_case_lowering() {
+    with (let filenames = vs_create(1) => vs_free(filenames),
+          let sources = vs_create(1) => vs_free(sources),
+          let lines = vs_create(16) => vs_free(lines),
+          let cfg = log_config_create(LL_ERROR, false) => drop cfg,
+          let opts = cg_options_create() => cg_options_free(opts)) {
+        opts.emit_line_directives = false;
+        vs_push(filenames, "demo/main.l0");
+        vs_push(lines, "module demo.main;");
+        vs_push(lines, "func main() -> int {");
+        vs_push(lines, "    for (let i = 0; i < 3; i = i + 1) {");
+        vs_push(lines, "        case (i) {");
+        vs_push(lines, "            0 => {");
+        vs_push(lines, "                continue;");
+        vs_push(lines, "            }");
+        vs_push(lines, "            else {");
+        vs_push(lines, "                break;");
+        vs_push(lines, "            }");
+        vs_push(lines, "        }");
+        vs_push(lines, "    }");
+        vs_push(lines, "    return 0;");
+        vs_push(lines, "}");
+        vs_push(sources, bt_source(lines));
+
+        let result = bt_analyze_sources("demo.main", filenames, sources);
+        assert(!analysis_has_errors(result), "analysis should succeed for case/loop fixture");
+
+        let generated = backend_generate(result, opts, cfg);
+        assert(contains_s(generated, "switch (_scrutinee) {"), "case lowering should use switch for ints");
+        assert(contains_s(generated, "goto __lcont_"), "continue should lower to loop label goto");
+        assert(contains_s(generated, "goto __lbrk_"), "break should lower to loop label goto");
+
+        analysis_result_free(result);
+    }
+}
+
+/**
+ * Tests test_backend_generate_match_and_with_cleanup_block.
+ */
+func test_backend_generate_match_and_with_cleanup_block() {
+    with (let filenames = vs_create(1) => vs_free(filenames),
+          let sources = vs_create(1) => vs_free(sources),
+          let lines = vs_create(24) => vs_free(lines),
+          let cfg = log_config_create(LL_ERROR, false) => drop cfg,
+          let opts = cg_options_create() => cg_options_free(opts)) {
+        opts.emit_line_directives = false;
+        vs_push(filenames, "demo/main.l0");
+        vs_push(lines, "module demo.main;");
+        vs_push(lines, "enum MaybeInt {");
+        vs_push(lines, "    None;");
+        vs_push(lines, "    Some(value: int);");
+        vs_push(lines, "}");
+        vs_push(lines, "func make() -> MaybeInt {");
+        vs_push(lines, "    return Some(7);");
+        vs_push(lines, "}");
+        vs_push(lines, "func main() -> int {");
+        vs_push(lines, "    let total = 0;");
+        vs_push(lines, "    with (let x = 1) {");
+        vs_push(lines, "        total = x;");
+        vs_push(lines, "    } cleanup {");
+        vs_push(lines, "        total = x;");
+        vs_push(lines, "    }");
+        vs_push(lines, "    match (make()) {");
+        vs_push(lines, "        Some(v) => {");
+        vs_push(lines, "            return v;");
+        vs_push(lines, "        }");
+        vs_push(lines, "        None => {");
+        vs_push(lines, "            return total;");
+        vs_push(lines, "        }");
+        vs_push(lines, "    }");
+        vs_push(lines, "}");
+        vs_push(sources, bt_source(lines));
+
+        let result = bt_analyze_sources("demo.main", filenames, sources);
+        assert(!analysis_has_errors(result), "analysis should succeed for match/with fixture");
+
+        let generated = backend_generate(result, opts, cfg);
+        assert(contains_s(generated, "struct l0_demo_main_MaybeInt _scrutinee = l0_demo_main_make();"),
+            "match scrutinee temp mismatch");
+        assert(contains_s(generated, "switch (_scrutinee.tag) {"), "match lowering should switch on enum tag");
+        assert(contains_s(generated, "l0_int v = _scrutinee.data.Some.value;"), "pattern binding mismatch");
+        assert(contains_s(generated, "total = x;\n        }\n        {\n            total = x;"),
+            "with cleanup block should run after body in header scope");
+
+        analysis_result_free(result);
+    }
+}
+
+/**
+ * Tests test_backend_generate_drop_statement.
+ */
+func test_backend_generate_drop_statement() {
+    with (let filenames = vs_create(1) => vs_free(filenames),
+          let sources = vs_create(1) => vs_free(sources),
+          let lines = vs_create(8) => vs_free(lines),
+          let cfg = log_config_create(LL_ERROR, false) => drop cfg,
+          let opts = cg_options_create() => cg_options_free(opts)) {
+        opts.emit_line_directives = false;
+        vs_push(filenames, "demo/main.l0");
+        vs_push(lines, "module demo.main;");
+        vs_push(lines, "extern func alloc() -> int*;");
+        vs_push(lines, "func main() -> int {");
+        vs_push(lines, "    let p = alloc();");
+        vs_push(lines, "    drop p;");
+        vs_push(lines, "    return 0;");
+        vs_push(lines, "}");
+        vs_push(sources, bt_source(lines));
+
+        let result = bt_analyze_sources("demo.main", filenames, sources);
+        assert(!analysis_has_errors(result), "analysis should succeed for drop fixture");
+
+        let generated = backend_generate(result, opts, cfg);
+        assert(contains_s(generated, "_rt_drop((void*)p);"), "drop call mismatch");
+        assert(contains_s(generated, "p = NULL;"), "drop should null the pointer after release");
+
+        analysis_result_free(result);
+    }
+}
+
+/**
+ * Tests test_backend_generate_new_and_try_lowering.
+ */
+func test_backend_generate_new_and_try_lowering() {
+    with (let filenames = vs_create(1) => vs_free(filenames),
+          let sources = vs_create(1) => vs_free(sources),
+          let lines = vs_create(18) => vs_free(lines),
+          let cfg = log_config_create(LL_ERROR, false) => drop cfg,
+          let opts = cg_options_create() => cg_options_free(opts)) {
+        opts.emit_line_directives = false;
+        vs_push(filenames, "demo/main.l0");
+        vs_push(lines, "module demo.main;");
+        vs_push(lines, "struct Box {");
+        vs_push(lines, "    value: int;");
+        vs_push(lines, "}");
+        vs_push(lines, "func maybe(flag: bool) -> int? {");
+        vs_push(lines, "    if (flag) { return 7; }");
+        vs_push(lines, "    return null;");
+        vs_push(lines, "}");
+        vs_push(lines, "func main() -> int? {");
+        vs_push(lines, "    let p = new Box(7);");
+        vs_push(lines, "    let x = maybe(true)?;");
+        vs_push(lines, "    drop p;");
+        vs_push(lines, "    return x;");
+        vs_push(lines, "}");
+        vs_push(sources, bt_source(lines));
+
+        let result = bt_analyze_sources("demo.main", filenames, sources);
+        assert(!analysis_has_errors(result), "analysis should succeed for new/try fixture");
+
+        let generated = backend_generate(result, opts, cfg);
+        assert(contains_s(generated, "_rt_alloc_obj((l0_int)sizeof(struct l0_demo_main_Box));"),
+            "new expression should allocate heap storage");
+        assert(contains_s(generated, "*l0_new_"), "new expression should initialize the allocated object");
+        assert(contains_s(generated, "l0_opt_int l0_try_"), "try expression should materialize a temp");
+        assert(contains_s(generated, "if (!l0_try_"), "try expression should check has_value");
+
+        analysis_result_free(result);
+    }
+}
+
+/**
+ * Tests test_backend_generate_string_copy_retains.
+ */
+func test_backend_generate_string_copy_retains() {
+    with (let filenames = vs_create(1) => vs_free(filenames),
+          let sources = vs_create(1) => vs_free(sources),
+          let lines = vs_create(8) => vs_free(lines),
+          let cfg = log_config_create(LL_ERROR, false) => drop cfg,
+          let opts = cg_options_create() => cg_options_free(opts)) {
+        opts.emit_line_directives = false;
+        vs_push(filenames, "demo/main.l0");
+        vs_push(lines, "module demo.main;");
+        vs_push(lines, "func main() -> int {");
+        vs_push(lines, "    let s = \"hi\";");
+        vs_push(lines, "    let t = s;");
+        vs_push(lines, "    return 0;");
+        vs_push(lines, "}");
+        vs_push(sources, bt_source(lines));
+
+        let result = bt_analyze_sources("demo.main", filenames, sources);
+        assert(!analysis_has_errors(result), "analysis should succeed for ARC copy fixture");
+
+        let generated = backend_generate(result, opts, cfg);
+        assert(contains_s(generated, "rt_string_retain(l0_copy_"), "copying an owned string should retain");
+        assert(contains_s(generated, "rt_string_release(t);"), "owned local cleanup should release copied string");
+        assert(contains_s(generated, "rt_string_release(s);"), "owned local cleanup should release original string");
+
+        analysis_result_free(result);
+    }
+}
+
+/**
  * Main entry point for the module.
  */
 func main() {
     test_codegen_options_defaults();
     test_scope_context_tracks_declared_and_owned_variables();
     test_scope_context_inline_cleanup_tracking();
+    test_backend_scope_helpers_manage_cleanup_state();
     test_analysis_expr_lookup_helpers();
     test_analysis_has_arc_data_for_struct_and_nullable_pointer();
     test_backend_generate_types_and_top_level_lets();
     test_backend_generate_basic_control_flow();
+    test_backend_generate_loop_exit_case_lowering();
+    test_backend_generate_match_and_with_cleanup_block();
+    test_backend_generate_drop_statement();
+    test_backend_generate_new_and_try_lowering();
+    test_backend_generate_string_copy_retains();
     printl_s("backend_test: all tests passed");
 }

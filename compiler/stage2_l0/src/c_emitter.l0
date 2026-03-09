@@ -1671,3 +1671,461 @@ func cem_emit_assignment(self: CEmitter*, c_target: string, c_value: string) {
 func cem_emit_temp_decl(self: CEmitter*, c_type: string, c_temp_name: string, c_value: string) {
     ccb_emit(self.out, concat4_s(c_type, " ", c_temp_name, concat3_s(" = ", c_value, ";")));
 }
+
+/**
+ * Emit a block comment.
+ *
+ * @param self Emitter to update.
+ * @param comment Comment text.
+ */
+func cem_emit_comment(self: CEmitter*, comment: string) {
+    ccb_emit(self.out, concat4_s("/* ", comment, " */", ""));
+}
+
+/**
+ * Emit a switch-exit `break;`.
+ *
+ * @param self Emitter to update.
+ */
+func cem_emit_exit_switch(self: CEmitter*) {
+    ccb_emit(self.out, "break;");
+}
+
+/**
+ * Emit an assignment through a pointer.
+ *
+ * @param self Emitter to update.
+ * @param c_ptr_name C pointer expression.
+ * @param c_value Lowered value expression.
+ */
+func cem_emit_pointer_assignment(self: CEmitter*, c_ptr_name: string, c_value: string) {
+    ccb_emit(self.out, concat4_s("*", c_ptr_name, " = ", concat_s(c_value, ";")));
+}
+
+/**
+ * Emit an ARC string retain call.
+ *
+ * @param self Emitter to update.
+ * @param c_expr Lowered string expression.
+ */
+func cem_emit_string_retain(self: CEmitter*, c_expr: string) {
+    ccb_emit(self.out, concat4_s("rt_string_retain(", c_expr, ")", ";"));
+}
+
+/**
+ * Emit an ARC string release call.
+ *
+ * @param self Emitter to update.
+ * @param c_expr Lowered string expression.
+ */
+func cem_emit_string_release(self: CEmitter*, c_expr: string) {
+    ccb_emit(self.out, concat4_s("rt_string_release(", c_expr, ")", ";"));
+}
+
+/**
+ * Emit the temporary scrutinee declaration used by `match`/`case`.
+ *
+ * @param self Emitter to update.
+ * @param c_type Lowered scrutinee type.
+ * @param c_expr Lowered scrutinee expression.
+ */
+func cem_emit_match_scrutinee_decl(self: CEmitter*, c_type: string, c_expr: string) {
+    ccb_emit(self.out, concat4_s(c_type, " _scrutinee = ", c_expr, ";"));
+}
+
+/**
+ * Emit a `switch` header.
+ *
+ * @param self Emitter to update.
+ * @param c_expr Lowered switch expression.
+ */
+func cem_emit_switch_start(self: CEmitter*, c_expr: string) {
+    ccb_emit(self.out, concat4_s("switch (", c_expr, ")", " {"));
+}
+
+/**
+ * Emit the switch used for enum `match`.
+ *
+ * @param self Emitter to update.
+ * @param scrutinee_name Scrutinee variable name.
+ */
+func cem_emit_match_switch_start(self: CEmitter*, scrutinee_name: string) {
+    cem_emit_switch_start(self, concat3_s(scrutinee_name, ".", "tag"));
+}
+
+/**
+ * Emit the closing brace of a `switch`.
+ *
+ * @param self Emitter to update.
+ */
+func cem_emit_switch_end(self: CEmitter*) {
+    ccb_emit(self.out, "}");
+}
+
+/**
+ * Emit a `case` label.
+ *
+ * @param self Emitter to update.
+ * @param c_value Lowered tag or literal.
+ */
+func cem_emit_case_label(self: CEmitter*, c_value: string) {
+    ccb_emit(self.out, concat4_s("case ", c_value, ":", ""));
+}
+
+/**
+ * Emit a `default:` label.
+ *
+ * @param self Emitter to update.
+ */
+func cem_emit_default_label(self: CEmitter*) {
+    ccb_emit(self.out, "default:");
+}
+
+/**
+ * Emit a runtime drop call.
+ *
+ * @param self Emitter to update.
+ * @param c_ptr_expr Lowered pointer expression.
+ */
+func cem_emit_drop_call(self: CEmitter*, c_ptr_expr: string) {
+    ccb_emit(self.out, concat4_s("_rt_drop((void*)", c_ptr_expr, ")", ";"));
+}
+
+/**
+ * Emit a NULL assignment.
+ *
+ * @param self Emitter to update.
+ * @param c_var Lowered lvalue expression.
+ */
+func cem_emit_null_assignment(self: CEmitter*, c_var: string) {
+    ccb_emit(self.out, concat4_s(c_var, " = NULL", "", ";"));
+}
+
+/**
+ * Emit one heap-allocation temporary.
+ *
+ * @param self Emitter to update.
+ * @param c_ptr_type Lowered pointer type.
+ * @param c_base_type Lowered base type.
+ * @param c_temp_name Temporary variable name.
+ */
+func cem_emit_alloc_obj(self: CEmitter*, c_ptr_type: string, c_base_type: string, c_temp_name: string) {
+    ccb_emit(self.out, concat4_s(c_ptr_type, " ", c_temp_name,
+        concat_s(" = (", concat4_s(c_ptr_type, ")_rt_alloc_obj((l0_int)sizeof(", c_base_type, "));"))));
+}
+
+/**
+ * Emit one pointer-target aggregate initialization.
+ *
+ * @param self Emitter to update.
+ * @param c_temp_name Pointer temporary name.
+ * @param c_base_type Lowered base type.
+ * @param c_init_str Lowered initializer body without outer braces.
+ */
+func cem_emit_struct_init(self: CEmitter*, c_temp_name: string, c_base_type: string, c_init_str: string) {
+    ccb_emit(self.out, concat4_s("*", c_temp_name, " = (", concat4_s(c_base_type, "){ ", c_init_str, " };")));
+}
+
+/**
+ * Emit one pointer-target struct initialization from field pairs.
+ *
+ * @param self Emitter to update.
+ * @param c_temp_name Pointer temporary name.
+ * @param base_type Struct type being initialized.
+ * @param field_inits Vector of alternating field-name and field-value strings.
+ */
+func cem_emit_struct_init_from_fields(self: CEmitter*, c_temp_name: string, base_type: Type*, field_inits: VectorString*) {
+    with (let sb = sb_create() => sb_free(sb)) {
+        for (let i = 0; i < vs_size(field_inits); i = i + 2) {
+            if (i > 0) {
+                sb_append(sb, ", ");
+            }
+            sb_append(sb, ".");
+            sb_append(sb, vs_get(field_inits, i));
+            sb_append(sb, " = ");
+            sb_append(sb, vs_get(field_inits, i + 1));
+        }
+        cem_emit_struct_init(self, c_temp_name, cem_emit_type(base_type), sb_to_string(sb));
+    }
+}
+
+/**
+ * Emit one pointer-target enum-variant initialization.
+ *
+ * @param self Emitter to update.
+ * @param c_temp_name Pointer temporary name.
+ * @param enum_type Enum type being initialized.
+ * @param variant_name Active variant name.
+ * @param payload_inits Vector of alternating field-name and field-value strings.
+ */
+func cem_emit_enum_variant_init(self: CEmitter*, c_temp_name: string, enum_type: Type*, variant_name: string,
+                                payload_inits: VectorString*) {
+    let tag_value = cem_emit_enum_tag(enum_type, variant_name);
+    if (vs_size(payload_inits) == 0) {
+        cem_emit_struct_init(self, c_temp_name, cem_emit_type(enum_type), concat3_s(".tag = ", tag_value, ""));
+        return;
+    }
+
+    with (let sb = sb_create() => sb_free(sb)) {
+        sb_append(sb, ".tag = ");
+        sb_append(sb, tag_value);
+        sb_append(sb, ", .data = { .");
+        sb_append(sb, variant_name);
+        sb_append(sb, " = { ");
+        for (let i = 0; i < vs_size(payload_inits); i = i + 2) {
+            if (i > 0) {
+                sb_append(sb, ", ");
+            }
+            sb_append(sb, ".");
+            sb_append(sb, vs_get(payload_inits, i));
+            sb_append(sb, " = ");
+            sb_append(sb, vs_get(payload_inits, i + 1));
+        }
+        sb_append(sb, " } }");
+        cem_emit_struct_init(self, c_temp_name, cem_emit_type(enum_type), sb_to_string(sb));
+    }
+}
+
+/**
+ * Emit zero-initialization through a pointer.
+ *
+ * @param self Emitter to update.
+ * @param c_temp_name Pointer temporary name.
+ * @param c_base_type Lowered base type.
+ */
+func cem_emit_zero_init(self: CEmitter*, c_temp_name: string, c_base_type: string) {
+    ccb_emit(self.out, concat4_s("*", c_temp_name, " = (",
+        concat4_s(c_base_type, "){ 0", " }", ";")));
+}
+
+/**
+ * Emit the null-check used by `?` on niche optionals.
+ *
+ * @param self Emitter to update.
+ * @param c_tmp Temporary variable name.
+ * @param ret_none Lowered `none` return value.
+ */
+func cem_emit_try_check_niche(self: CEmitter*, c_tmp: string, ret_none: string) {
+    ccb_emit(self.out, concat4_s("if (", c_tmp, " == NULL)", concat_s(" return ", concat_s(ret_none, ";"))));
+}
+
+/**
+ * Emit the `has_value` check used by `?` on value optionals.
+ *
+ * @param self Emitter to update.
+ * @param c_tmp Temporary variable name.
+ * @param ret_none Lowered `none` return value.
+ */
+func cem_emit_try_check_value(self: CEmitter*, c_tmp: string, ret_none: string) {
+    ccb_emit(self.out, concat4_s("if (!", c_tmp, ".has_value)", concat_s(" return ", concat_s(ret_none, ";"))));
+}
+
+/**
+ * Emit the value extraction used by `?` on value optionals.
+ *
+ * @param c_tmp Temporary variable name.
+ * @return Lowered extraction expression.
+ */
+func cem_emit_try_extract_value(c_tmp: string) -> string {
+    return concat4_s("(", c_tmp, ".value", ")");
+}
+
+/**
+ * Emit one match-arm payload binding initializer.
+ *
+ * @param scrutinee Scrutinee variable name.
+ * @param variant Active variant name.
+ * @param field Payload field name.
+ * @return Lowered payload access.
+ */
+func cem_emit_pattern_binding_init(scrutinee: string, variant: string, field: string) -> string {
+    return concat4_s(scrutinee, ".data.", variant, concat_s(".", field));
+}
+
+/**
+ * Look up a loaded enum declaration by module and name.
+ *
+ * @param self Emitter to inspect.
+ * @param module_name Defining module name.
+ * @param enum_name Enum name.
+ * @return Matching declaration, or `null` if absent.
+ */
+func cem_find_enum_decl(self: CEmitter*, module_name: string, enum_name: string) -> EnumDecl*? {
+    let unit = driver_find_unit(cem_analysis(self).driver_state, module_name);
+    if (unit == null || (unit as DriverUnit*).parse_result.root_module == null) {
+        return null;
+    }
+    let root = ((unit as DriverUnit*).parse_result.root_module as Module*);
+    for (let i = 0; i < vec_size(root.decls); i = i + 1) {
+        let decl = ptr_vec_get(root.decls, i) as TopLevelDecl*;
+        if (ord(decl.kind) == ord(TD_ENUM)) {
+            let ed = decl.data as EnumDecl*;
+            if (eq_s(ed.name, enum_name)) {
+                return ed;
+            }
+        }
+    }
+    return null;
+}
+
+/**
+ * Emit cleanup for a by-value expression according to its type.
+ *
+ * @param self Emitter to update.
+ * @param c_expr Lowered value expression.
+ * @param ty Type of the value.
+ */
+func cem_emit_value_cleanup(self: CEmitter*, c_expr: string, ty: Type*) {
+    if (analysis_is_arc_type(ty)) {
+        cem_emit_string_release(self, c_expr);
+        return;
+    }
+
+    if (ord(ty.kind) == ord(TY_NULLABLE)) {
+        let inner = ty.inner as Type*;
+        if (ord(inner.kind) == ord(TY_POINTER) || !analysis_has_arc_data(cem_analysis(self), inner)) {
+            return;
+        }
+        cem_emit_if_header(self, concat4_s("((", c_expr, ").has_value", ")"));
+        cem_emit_block_start(self);
+        cem_emit_value_cleanup(self, concat4_s("(", c_expr, ").value", ""), inner);
+        cem_emit_block_end(self);
+        return;
+    }
+
+    if (ord(ty.kind) == ord(TY_STRUCT)) {
+        let info = sig_lookup_struct_info(cem_analysis(self).signatures as SignatureTables*, ty.module_name, ty.name);
+        if (info == null) {
+            return;
+        }
+        let fields = (info as StructInfo*).fields;
+        for (let i = 0; i < vec_size(fields); i = i + 1) {
+            let field = ptr_vec_get(fields, i) as StructFieldInfo*;
+            cem_emit_value_cleanup(self, concat4_s("(", c_expr, ").", field.name), field.field_type);
+        }
+        return;
+    }
+
+    if (ord(ty.kind) == ord(TY_ENUM)) {
+        let enum_info = sig_lookup_enum_info(cem_analysis(self).signatures as SignatureTables*, ty.module_name, ty.name);
+        if (enum_info == null) {
+            return;
+        }
+        let decl = cem_find_enum_decl(self, ty.module_name, ty.name);
+        if (decl == null) {
+            return;
+        }
+
+        cem_emit_switch_start(self, concat4_s("(", c_expr, ").tag", ""));
+        for (let i = 0; i < vec_size((decl as EnumDecl*).variants); i = i + 1) {
+            let variant = ptr_vec_get((decl as EnumDecl*).variants, i) as EnumVariant*;
+            let info2 = cem_find_enum_variant_info(enum_info as EnumInfo*, variant.name);
+            if (info2 == null) {
+                continue;
+            }
+
+            let has_arc = false;
+            for (let j = 0; j < vec_size((info2 as EnumVariantInfo*).field_types); j = j + 1) {
+                if (analysis_has_arc_data(cem_analysis(self), ptr_vec_get((info2 as EnumVariantInfo*).field_types, j) as Type*)) {
+                    has_arc = true;
+                    break;
+                }
+            }
+            if (!has_arc) {
+                continue;
+            }
+
+            cem_emit_case_label(self, cem_emit_enum_tag(ty, variant.name));
+            cem_emit_block_start(self);
+            for (let j = 0; j < vec_size((info2 as EnumVariantInfo*).field_types); j = j + 1) {
+                let field_decl = ptr_vec_get(variant.fields, j) as FieldDecl*;
+                let field_ty = ptr_vec_get((info2 as EnumVariantInfo*).field_types, j) as Type*;
+                cem_emit_value_cleanup(self,
+                    concat4_s(concat4_s("(", c_expr, ").data.", variant.name), ".", field_decl.name, ""),
+                    field_ty);
+            }
+            cem_emit_exit_switch(self);
+            cem_emit_block_end(self);
+        }
+        cem_emit_default_label(self);
+        cem_emit_exit_switch(self);
+        cem_emit_switch_end(self);
+    }
+}
+
+/**
+ * Emit cleanup for a pointer-to-struct value.
+ *
+ * @param self Emitter to update.
+ * @param c_ptr_expr Lowered pointer expression.
+ * @param struct_type Struct type to clean.
+ */
+func cem_emit_struct_cleanup(self: CEmitter*, c_ptr_expr: string, struct_type: Type*) {
+    let info = sig_lookup_struct_info(cem_analysis(self).signatures as SignatureTables*, struct_type.module_name, struct_type.name);
+    if (info == null) {
+        cem_ice(concat4_s("[ICE-1270] missing StructInfo for ", struct_type.module_name, ".", struct_type.name));
+    }
+
+    cem_emit_if_header(self, concat4_s(c_ptr_expr, " != NULL", "", ""));
+    cem_emit_block_start(self);
+    for (let i = 0; i < vec_size((info as StructInfo*).fields); i = i + 1) {
+        let field = ptr_vec_get((info as StructInfo*).fields, i) as StructFieldInfo*;
+        cem_emit_value_cleanup(self, concat4_s(c_ptr_expr, "->", field.name, ""), field.field_type);
+    }
+    cem_emit_block_end(self);
+}
+
+/**
+ * Emit cleanup for a pointer-to-enum value.
+ *
+ * @param self Emitter to update.
+ * @param c_ptr_expr Lowered pointer expression.
+ * @param enum_type Enum type to clean.
+ */
+func cem_emit_enum_cleanup(self: CEmitter*, c_ptr_expr: string, enum_type: Type*) {
+    let enum_info = sig_lookup_enum_info(cem_analysis(self).signatures as SignatureTables*, enum_type.module_name, enum_type.name);
+    if (enum_info == null) {
+        cem_ice(concat4_s("[ICE-1080] missing EnumInfo for ", enum_type.module_name, ".", enum_type.name));
+    }
+    let decl = cem_find_enum_decl(self, enum_type.module_name, enum_type.name);
+    if (decl == null) {
+        cem_ice(concat4_s("[ICE-1302] missing variant decl for ", enum_type.module_name, ".", enum_type.name));
+    }
+
+    cem_emit_if_header(self, concat4_s(c_ptr_expr, " != NULL", "", ""));
+    cem_emit_block_start(self);
+    cem_emit_switch_start(self, concat4_s(c_ptr_expr, "->tag", "", ""));
+    for (let i = 0; i < vec_size((decl as EnumDecl*).variants); i = i + 1) {
+        let variant = ptr_vec_get((decl as EnumDecl*).variants, i) as EnumVariant*;
+        let info2 = cem_find_enum_variant_info(enum_info as EnumInfo*, variant.name);
+        if (info2 == null) {
+            continue;
+        }
+
+        let has_arc = false;
+        for (let j = 0; j < vec_size((info2 as EnumVariantInfo*).field_types); j = j + 1) {
+            if (analysis_has_arc_data(cem_analysis(self), ptr_vec_get((info2 as EnumVariantInfo*).field_types, j) as Type*)) {
+                has_arc = true;
+                break;
+            }
+        }
+        if (!has_arc) {
+            continue;
+        }
+
+        cem_emit_case_label(self, cem_emit_enum_tag(enum_type, variant.name));
+        cem_emit_block_start(self);
+        for (let j = 0; j < vec_size((info2 as EnumVariantInfo*).field_types); j = j + 1) {
+            let field_decl = ptr_vec_get(variant.fields, j) as FieldDecl*;
+            let field_ty = ptr_vec_get((info2 as EnumVariantInfo*).field_types, j) as Type*;
+            cem_emit_value_cleanup(self, concat4_s(c_ptr_expr, "->data.", variant.name, concat_s(".", field_decl.name)),
+                field_ty);
+        }
+        cem_emit_exit_switch(self);
+        cem_emit_block_end(self);
+    }
+    cem_emit_default_label(self);
+    cem_emit_exit_switch(self);
+    cem_emit_switch_end(self);
+    cem_emit_block_end(self);
+}

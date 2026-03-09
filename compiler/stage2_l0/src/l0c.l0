@@ -19,9 +19,11 @@ import ast;
 import util.strings;
 import source_paths;
 import analysis;
+import backend;
 import sem_context;
 import driver;
 import cli_args;
+import codegen_options;
 import diag_print;
 import lexer;
 import tokens;
@@ -283,6 +285,55 @@ func l0c_cmd_tok(opts: CliOptions*, cfg: LogConfig*) -> int {
         let rc = l0c_dump_tokens_for_path(path, opts.include_eof, diags);
         dp_print_collector(diags);
         return rc;
+    }
+}
+
+/**
+ * Execute Stage 2 `--gen` mode.
+ *
+ * @param opts Parsed CLI options.
+ * @param cfg Logging configuration.
+ * @return Process-style status code.
+ */
+func l0c_cmd_gen(opts: CliOptions*, cfg: LogConfig*) -> int {
+    with (let diags = diag_create() => diag_free(diags)) {
+        let prepared = l0c_prepare_input(opts, diags);
+        if (prepared == null) {
+            dp_print_collector(diags);
+            return 1;
+        }
+        let prep = prepared as PreparedInput*;
+        let result = analysis_analyze_entry(prep.search_paths, prep.entry_module, cfg);
+        prepared_input_free(prep);
+        prepared = null;
+
+        if (analysis_has_errors(result)) {
+            dp_print_collector_with_sources(result.diags, analysis_source_names(result), analysis_source_texts(result));
+            analysis_result_free(result);
+            return 1;
+        }
+
+        with (let cg_opts = cg_options_create() => cg_options_free(cg_opts)) {
+            cg_opts.emit_line_directives = !opts.no_line_directives;
+            cg_opts.trace_arc = opts.trace_arc;
+            cg_opts.trace_memory = opts.trace_memory;
+
+            let c_code = backend_generate(result, cg_opts, cfg);
+            if (opts.output != null) {
+                if (write_file(opts.output as string, c_code) == null) {
+                    diag_error(diags, "l0c", "L0C-0041", concat_s("cannot write output file: ", opts.output as string),
+                        opts.output as string, 0, 0, 0, 0);
+                    dp_print_collector(diags);
+                    analysis_result_free(result);
+                    return 1;
+                }
+            } else {
+                print_s(c_code);
+            }
+
+            analysis_result_free(result);
+            return 0;
+        }
     }
 }
 
@@ -630,7 +681,7 @@ func run_with_argv(argv: VectorString*) -> int {
                 }
             }
             CM_GEN => {
-                rc = l0c_cmd_nyi(opts.mode, cfg);
+                rc = l0c_cmd_gen(opts, cfg);
             }
             CM_AST => {
                 rc = l0c_cmd_nyi(opts.mode, cfg);

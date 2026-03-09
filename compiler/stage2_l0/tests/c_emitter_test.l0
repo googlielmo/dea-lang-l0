@@ -248,6 +248,73 @@ func test_emitter_expression_and_statement_helpers() {
 }
 
 /**
+ * Tests test_emitter_cleanup_and_switch_helpers.
+ */
+func test_emitter_cleanup_and_switch_helpers() {
+    let result = cet_empty_analysis_result();
+    result.signatures = sig_make_tables();
+
+    let point_fields = ptr_vec_create(1);
+    ptr_vec_push(point_fields, new StructFieldInfo("name", type_builtin_string()) as void*);
+    spm_put((result.signatures as SignatureTables*).struct_infos, "demo.main::Point",
+        new StructInfo("demo.main::Point", "demo.main", "Point", "demo/main.l0", span_here(1, 1),
+            type_new_struct("demo.main", "Point"), point_fields) as void*);
+
+    let maybe_fields = ptr_vec_create(1);
+    ptr_vec_push(maybe_fields, type_builtin_string() as void*);
+    let maybe_variants = ptr_vec_create(1);
+    ptr_vec_push(maybe_variants, new EnumVariantInfo("Some", maybe_fields) as void*);
+    spm_put((result.signatures as SignatureTables*).enum_infos, "demo.main::Maybe",
+        new EnumInfo("demo.main::Maybe", "demo.main", "Maybe", "demo/main.l0", span_here(1, 1),
+            type_new_enum("demo.main", "Maybe"), maybe_variants) as void*);
+
+    let decls = ptr_vec_create(2);
+    let payload_fields = ptr_vec_create(1);
+    ptr_vec_push(payload_fields, new FieldDecl("value", cet_builtin_type_ref("string")) as void*);
+    ptr_vec_push(decls, cet_wrap_decl(TD_ENUM, new EnumDecl("Maybe",
+        ptr_vec_create(1), span_here(1, 1)) as void*) as void*);
+    let enum_decl = (ptr_vec_get(decls, 0) as TopLevelDecl*).data as EnumDecl*;
+    ptr_vec_push(enum_decl.variants, new EnumVariant("Some", payload_fields) as void*);
+    cet_push_module(result, cet_module("demo.main", "demo/main.l0", decls));
+
+    let emitter = cem_create();
+    cem_set_analysis(emitter, result);
+    cem_emit_comment(emitter, "phase2");
+    cem_emit_string_retain(emitter, "name");
+    cem_emit_string_release(emitter, "name");
+    cem_emit_match_scrutinee_decl(emitter, "struct l0_demo_main_Maybe", "value");
+    cem_emit_match_switch_start(emitter, "_scrutinee");
+    cem_emit_case_label(emitter, "l0_demo_main_Maybe_Some");
+    cem_emit_block_start(emitter);
+    cem_emit_exit_switch(emitter);
+    cem_emit_block_end(emitter);
+    cem_emit_default_label(emitter);
+    cem_emit_exit_switch(emitter);
+    cem_emit_switch_end(emitter);
+    cem_emit_value_cleanup(emitter, "pt", type_new_struct("demo.main", "Point"));
+    cem_emit_enum_cleanup(emitter, "mp", type_new_enum("demo.main", "Maybe"));
+    cem_emit_drop_call(emitter, "ptr");
+    cem_emit_null_assignment(emitter, "ptr");
+
+    let text = cem_get_output(emitter);
+    assert(contains_s(text, "/* phase2 */"), "comment helper mismatch");
+    assert(contains_s(text, "rt_string_retain(name);"), "string retain helper mismatch");
+    assert(contains_s(text, "rt_string_release(name);"), "string release helper mismatch");
+    assert(contains_s(text, "struct l0_demo_main_Maybe _scrutinee = value;"), "scrutinee decl mismatch");
+    assert(contains_s(text, "switch (_scrutinee.tag) {"), "match switch helper mismatch");
+    assert(contains_s(text, "case l0_demo_main_Maybe_Some:"), "case-label helper mismatch");
+    assert(contains_s(text, "default:\nbreak;\n}"), "default/exit-switch helper mismatch");
+    assert(contains_s(text, "rt_string_release((pt).name);"), "struct cleanup helper mismatch");
+    assert(contains_s(text, "if (mp != NULL)"), "enum cleanup null guard mismatch");
+    assert(contains_s(text, "rt_string_release(mp->data.Some.value);"), "enum cleanup field mismatch");
+    assert(contains_s(text, "_rt_drop((void*)ptr);"), "drop helper mismatch");
+    assert(contains_s(text, "ptr = NULL;"), "null assignment helper mismatch");
+
+    cem_free(emitter);
+    analysis_result_free(result);
+}
+
+/**
  * Tests test_emitter_forward_decls_follow_loaded_module_order.
  */
 func test_emitter_forward_decls_follow_loaded_module_order() {
@@ -462,6 +529,7 @@ func main() {
     test_emitter_header_honors_trace_flags();
     test_emitter_string_literals_use_l0_string_const();
     test_emitter_expression_and_statement_helpers();
+    test_emitter_cleanup_and_switch_helpers();
     test_emitter_forward_decls_follow_loaded_module_order();
     test_emitter_optional_wrappers_emit_early_then_late();
     test_emitter_top_level_forms_match_stage1_shape();
