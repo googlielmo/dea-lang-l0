@@ -9,15 +9,23 @@ import std.assert;
 import std.hashmap;
 import std.io;
 import std.string;
+import std.text;
 import std.vector;
 import util.diag;
 
 import ast;
+import backend;
 import codegen_options;
 import driver;
+import expr_types;
+import locals;
+import name_resolver;
+import parser;
 import scope_context;
 import sem_context;
+import signatures;
 import types;
+import util.log;
 
 /**
  * Create an empty driver state for isolated semantic helper tests.
@@ -35,6 +43,66 @@ func bt_empty_driver_state() -> DriverState* {
  */
 func bt_empty_analysis_result() -> AnalysisResult* {
     return new AnalysisResult(bt_empty_driver_state(), diag_create(), null, null, null, spm_create(), sim_create(), spm_create());
+}
+
+/**
+ * Parse and add one source module to a driver state.
+ *
+ * @param state Driver state to update.
+ * @param source Module source text.
+ * @param filename Source filename for diagnostics.
+ */
+func bt_push_source_unit(state: DriverState*, source: string, filename: string) {
+    let pr = parse_module_source(source, filename);
+    if (pr.root_module == null) {
+        ptr_vec_push(state.units, new DriverUnit("", filename, pr) as void*);
+        return;
+    }
+
+    let mod = pr.root_module as Module*;
+    vs_push(state.source_names, filename);
+    vs_push(state.source_texts, source);
+    ptr_vec_push(state.units, new DriverUnit(mod.name, filename, pr) as void*);
+}
+
+/**
+ * Build a full semantic analysis result from in-memory module sources.
+ *
+ * @param entry_module Entry-module name.
+ * @param filenames Source filenames aligned with `sources`.
+ * @param sources Module source texts aligned with `filenames`.
+ * @return Fully analyzed result.
+ */
+func bt_analyze_sources(entry_module: string, filenames: VectorString*, sources: VectorString*) -> AnalysisResult* {
+    let state = new DriverState(entry_module, ptr_vec_create(vs_size(sources)), vs_create(vs_size(sources)), diag_create(),
+        vs_create(vs_size(sources)), vs_create(vs_size(sources)));
+
+    for (let i = 0; i < vs_size(sources); i = i + 1) {
+        bt_push_source_unit(state, vs_get(sources, i), vs_get(filenames, i));
+    }
+
+    let result = new AnalysisResult(state, diag_create(), null, null, null, spm_create(), sim_create(), spm_create());
+    result.names = nr_resolve(state, result.diags);
+    result.signatures = sig_resolve(state, result.names as NameResolution*, result.diags);
+    result.locals_result = locals_resolve(state, result.diags);
+    expr_types_check(result);
+    return result;
+}
+
+/**
+ * Join newline-terminated source lines into one module source string.
+ *
+ * @param lines Source lines in order.
+ * @return Combined source text with trailing newlines.
+ */
+func bt_source(lines: VectorString*) -> string {
+    with (let sb = sb_create() => sb_free(sb)) {
+        for (let i = 0; i < vs_size(lines); i = i + 1) {
+            sb_append(sb, vs_get(lines, i));
+            sb_append(sb, "\n");
+        }
+        return sb_to_string(sb);
+    }
 }
 
 /**
@@ -141,6 +209,98 @@ func test_analysis_has_arc_data_for_struct_and_nullable_pointer() {
 }
 
 /**
+ * Tests test_backend_generate_types_and_top_level_lets.
+ */
+func test_backend_generate_types_and_top_level_lets() {
+    with (let filenames = vs_create(1) => vs_free(filenames),
+          let sources = vs_create(1) => vs_free(sources),
+          let lines = vs_create(12) => vs_free(lines),
+          let cfg = log_config_create(LL_ERROR, false) => drop cfg,
+          let opts = cg_options_create() => cg_options_free(opts)) {
+        opts.emit_line_directives = false;
+        vs_push(filenames, "demo/main.l0");
+        vs_push(lines, "module demo.main;");
+        vs_push(lines, "struct Point {");
+        vs_push(lines, "    x: int;");
+        vs_push(lines, "    y: int;");
+        vs_push(lines, "}");
+        vs_push(lines, "enum MaybePoint {");
+        vs_push(lines, "    None;");
+        vs_push(lines, "    Some(value: Point);");
+        vs_push(lines, "}");
+        vs_push(lines, "let origin = Point(0, 0);");
+        vs_push(lines, "func main() -> int {");
+        vs_push(lines, "    let p = origin;");
+        vs_push(lines, "    return p.x;");
+        vs_push(lines, "}");
+        vs_push(sources, bt_source(lines));
+
+        let result = bt_analyze_sources("demo.main", filenames, sources);
+        assert(!analysis_has_errors(result), "analysis should succeed for type-order fixture");
+
+        let generated = backend_generate(result, opts, cfg);
+        assert(contains_s(generated, "/* Type definitions (dependency-ordered) */"),
+            "type-definition section comment missing");
+        assert(contains_s(generated,
+            "struct l0_demo_main_Point {\n    l0_int x;\n    l0_int y;\n};\n#endif\n\n#ifndef L0_DEFINED_l0_demo_main_MaybePoint"),
+            "struct should be emitted before dependent enum");
+        assert(contains_s(generated, "static struct l0_demo_main_Point l0_demo_main_origin = (struct l0_demo_main_Point){ .x = 0, .y = 0 };"),
+            "top-level struct constructor let mismatch");
+        assert(contains_s(generated, "return (p).x;"), "field access lowering mismatch");
+
+        analysis_result_free(result);
+    }
+}
+
+/**
+ * Tests test_backend_generate_basic_control_flow.
+ */
+func test_backend_generate_basic_control_flow() {
+    with (let filenames = vs_create(1) => vs_free(filenames),
+          let sources = vs_create(1) => vs_free(sources),
+          let lines = vs_create(16) => vs_free(lines),
+          let cfg = log_config_create(LL_ERROR, false) => drop cfg,
+          let opts = cg_options_create() => cg_options_free(opts)) {
+        opts.emit_line_directives = false;
+        vs_push(filenames, "demo/main.l0");
+        vs_push(lines, "module demo.main;");
+        vs_push(lines, "func add(a: int, b: int) -> int {");
+        vs_push(lines, "    return a + b;");
+        vs_push(lines, "}");
+        vs_push(lines, "func main() -> int {");
+        vs_push(lines, "    let sum = 0;");
+        vs_push(lines, "    for (let i = 0; i < 3; i = i + 1) {");
+        vs_push(lines, "        if (i < 2) {");
+        vs_push(lines, "            sum = sum + add(i, 1);");
+        vs_push(lines, "        }");
+        vs_push(lines, "    }");
+        vs_push(lines, "    while (sum > 0) {");
+        vs_push(lines, "        return sum;");
+        vs_push(lines, "    }");
+        vs_push(lines, "    return 0;");
+        vs_push(lines, "}");
+        vs_push(sources, bt_source(lines));
+
+        let result = bt_analyze_sources("demo.main", filenames, sources);
+        assert(!analysis_has_errors(result), "analysis should succeed for control-flow fixture");
+
+        let generated = backend_generate(result, opts, cfg);
+        assert(contains_s(generated, "l0_int l0_demo_main_add(l0_int a, l0_int b);"),
+            "function declaration mismatch");
+        assert(contains_s(generated, "return (_rt_iadd(a, b));"), "checked integer add lowering mismatch");
+        assert(contains_s(generated, "// for loop"), "for-loop wrapper comment mismatch");
+        assert(contains_s(generated, "l0_int i = 0;\n        while ((i < 3))"),
+            "for-loop lowering mismatch");
+        assert(contains_s(generated, "if ((i < 2))"), "if lowering mismatch");
+        assert(contains_s(generated, "sum = (_rt_iadd(sum, l0_demo_main_add(i, 1)));"),
+            "assignment and call lowering mismatch");
+        assert(contains_s(generated, "while ((sum > 0))"), "while lowering mismatch");
+
+        analysis_result_free(result);
+    }
+}
+
+/**
  * Main entry point for the module.
  */
 func main() {
@@ -149,5 +309,7 @@ func main() {
     test_scope_context_inline_cleanup_tracking();
     test_analysis_expr_lookup_helpers();
     test_analysis_has_arc_data_for_struct_and_nullable_pointer();
+    test_backend_generate_types_and_top_level_lets();
+    test_backend_generate_basic_control_flow();
     printl_s("backend_test: all tests passed");
 }

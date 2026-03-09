@@ -202,6 +202,52 @@ func test_emitter_string_literals_use_l0_string_const() {
 }
 
 /**
+ * Tests test_emitter_expression_and_statement_helpers.
+ */
+func test_emitter_expression_and_statement_helpers() {
+    let emitter = cem_create();
+    let point_ty = type_new_struct("demo.main", "Point");
+    let maybe_point_ty = type_new_enum("demo.main", "MaybePoint");
+
+    with (let field_inits = vs_create(4) => vs_free(field_inits),
+          let payload_inits = vs_create(2) => vs_free(payload_inits)) {
+        vs_push(field_inits, "x");
+        vs_push(field_inits, "1");
+        vs_push(field_inits, "y");
+        vs_push(field_inits, "2");
+        vs_push(payload_inits, "value");
+        vs_push(payload_inits, "pt");
+
+        assert(eq_s(cem_emit_bool_literal(true), "1"), "expression bool literal mismatch");
+        assert(eq_s(cem_emit_const_bool_literal(false), "false"), "const bool literal mismatch");
+        assert(eq_s(cem_emit_binary_op("+", "a", "b"), "(a + b)"), "binary-op helper mismatch");
+        assert(eq_s(cem_emit_checked_int_add("a", "b"), "(_rt_iadd(a, b))"), "checked add helper mismatch");
+        assert(eq_s(cem_emit_function_call("fn", "x, y"), "fn(x, y)"), "function call helper mismatch");
+        assert(eq_s(cem_emit_field_access("obj", "x", false), "(obj).x"), "field access helper mismatch");
+        assert(eq_s(cem_emit_cast("l0_int", "b"), "((l0_int)(b))"), "cast helper mismatch");
+        assert(eq_s(cem_emit_struct_constructor_for_type(point_ty, field_inits),
+            "(struct l0_demo_main_Point){ .x = 1, .y = 2 }"), "struct constructor helper mismatch");
+        assert(eq_s(cem_emit_variant_constructor_for_type(maybe_point_ty, "Some", payload_inits),
+            "(struct l0_demo_main_MaybePoint){ .tag = l0_demo_main_MaybePoint_Some, .data = { .Some = { .value = pt } } }"),
+            "variant constructor helper mismatch");
+    }
+
+    cem_emit_let_decl(emitter, "l0_int", "tmp", "1");
+    cem_emit_assignment(emitter, "tmp", "2");
+    cem_emit_if_header(emitter, "cond");
+    cem_emit_block_start(emitter);
+    cem_emit_return_stmt(emitter, "tmp");
+    cem_emit_block_end(emitter);
+
+    let text = cem_get_output(emitter);
+    assert(eq_s(text, "l0_int tmp = 1;\ntmp = 2;\nif (cond)\n{\n    return tmp;\n}\n"), "statement helper output mismatch");
+
+    type_free(point_ty);
+    type_free(maybe_point_ty);
+    cem_free(emitter);
+}
+
+/**
  * Tests test_emitter_forward_decls_follow_loaded_module_order.
  */
 func test_emitter_forward_decls_follow_loaded_module_order() {
@@ -415,6 +461,7 @@ func main() {
     test_emitter_type_lowering_and_null_forms();
     test_emitter_header_honors_trace_flags();
     test_emitter_string_literals_use_l0_string_const();
+    test_emitter_expression_and_statement_helpers();
     test_emitter_forward_decls_follow_loaded_module_order();
     test_emitter_optional_wrappers_emit_early_then_late();
     test_emitter_top_level_forms_match_stage1_shape();

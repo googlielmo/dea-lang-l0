@@ -564,6 +564,25 @@ func cem_emit_null_literal(expected_type: Type*, for_initializer: bool) -> strin
 }
 
 /**
+ * Emit a widening cast for an implicit integer conversion.
+ *
+ * @param c_expr Source expression.
+ * @param src_type Source builtin type.
+ * @param dst_type Destination builtin type.
+ * @return Widened C expression.
+ */
+func cem_emit_widen_int(c_expr: string, src_type: Type*, dst_type: Type*) -> string {
+    if (eq_s(src_type.name, dst_type.name)) {
+        return c_expr;
+    }
+    if (type_is_builtin(src_type, "byte") && type_is_builtin(dst_type, "int")) {
+        return cem_emit_cast(cem_emit_type(dst_type), c_expr);
+    }
+    return cem_ice_string(concat4_s("[ICE-1293] unsupported widening cast ", type_format(src_type), " -> ",
+        type_format(dst_type)));
+}
+
+/**
  * Emit a section comment.
  *
  * @param self Emitter to update.
@@ -1110,6 +1129,19 @@ func cem_emit_int_literal(value: int) -> string {
  */
 func cem_emit_bool_literal(value: bool) -> string {
     if (value) {
+        return "1";
+    }
+    return "0";
+}
+
+/**
+ * Emit a boolean literal for static initialization.
+ *
+ * @param value Boolean value.
+ * @return C spelling for the static constant.
+ */
+func cem_emit_const_bool_literal(value: bool) -> string {
+    if (value) {
         return "true";
     }
     return "false";
@@ -1155,4 +1187,487 @@ func cem_emit_const_string_literal(value: string) -> string {
         "\", ",
         concat_s(int_to_string(len_s(value)), ")")
     );
+}
+
+/**
+ * Emit a variable reference expression.
+ *
+ * @param c_name C identifier to reference.
+ * @return The identifier text.
+ */
+func cem_emit_var_ref(c_name: string) -> string {
+    return c_name;
+}
+
+/**
+ * Emit a unary operation expression.
+ *
+ * @param op Unary operator token.
+ * @param c_operand Lowered operand expression.
+ * @return Parenthesized C unary expression.
+ */
+func cem_emit_unary_op(op: string, c_operand: string) -> string {
+    return concat4_s("(", op, c_operand, ")");
+}
+
+/**
+ * Emit a binary operation expression.
+ *
+ * @param op Binary operator token.
+ * @param c_left Lowered left operand.
+ * @param c_right Lowered right operand.
+ * @return Parenthesized C binary expression.
+ */
+func cem_emit_binary_op(op: string, c_left: string, c_right: string) -> string {
+    return concat4_s(concat4_s("(", c_left, " ", op), " ", c_right, ")");
+}
+
+/**
+ * Emit a checked integer division call.
+ *
+ * @param c_left Lowered left operand.
+ * @param c_right Lowered right operand.
+ * @return Runtime-call expression.
+ */
+func cem_emit_checked_int_div(c_left: string, c_right: string) -> string {
+    return concat4_s("(_rt_idiv(", c_left, ", ", concat_s(c_right, "))"));
+}
+
+/**
+ * Emit a checked integer modulo call.
+ *
+ * @param c_left Lowered left operand.
+ * @param c_right Lowered right operand.
+ * @return Runtime-call expression.
+ */
+func cem_emit_checked_int_mod(c_left: string, c_right: string) -> string {
+    return concat4_s("(_rt_imod(", c_left, ", ", concat_s(c_right, "))"));
+}
+
+/**
+ * Emit a checked integer multiplication call.
+ *
+ * @param c_left Lowered left operand.
+ * @param c_right Lowered right operand.
+ * @return Runtime-call expression.
+ */
+func cem_emit_checked_int_mul(c_left: string, c_right: string) -> string {
+    return concat4_s("(_rt_imul(", c_left, ", ", concat_s(c_right, "))"));
+}
+
+/**
+ * Emit a checked integer addition call.
+ *
+ * @param c_left Lowered left operand.
+ * @param c_right Lowered right operand.
+ * @return Runtime-call expression.
+ */
+func cem_emit_checked_int_add(c_left: string, c_right: string) -> string {
+    return concat4_s("(_rt_iadd(", c_left, ", ", concat_s(c_right, "))"));
+}
+
+/**
+ * Emit a checked integer subtraction call.
+ *
+ * @param c_left Lowered left operand.
+ * @param c_right Lowered right operand.
+ * @return Runtime-call expression.
+ */
+func cem_emit_checked_int_sub(c_left: string, c_right: string) -> string {
+    return concat4_s("(_rt_isub(", c_left, ", ", concat_s(c_right, "))"));
+}
+
+/**
+ * Emit a function-call expression.
+ *
+ * @param c_func_name Function expression.
+ * @param c_args Comma-separated lowered arguments.
+ * @return Function-call expression.
+ */
+func cem_emit_function_call(c_func_name: string, c_args: string) -> string {
+    return concat4_s(c_func_name, "(", c_args, ")");
+}
+
+/**
+ * Emit a field-access expression.
+ *
+ * @param c_obj Object expression.
+ * @param field_name Field identifier.
+ * @param is_pointer Whether the object is a pointer.
+ * @return Field-access expression using `.` or `->`.
+ */
+func cem_emit_field_access(c_obj: string, field_name: string, is_pointer: bool) -> string {
+    if (is_pointer) {
+        return concat4_s("(", c_obj, ")->", field_name);
+    }
+    return concat4_s("(", c_obj, ").", field_name);
+}
+
+/**
+ * Emit a parenthesized expression.
+ *
+ * @param c_inner Inner expression.
+ * @return Parenthesized expression.
+ */
+func cem_emit_paren_expr(c_inner: string) -> string {
+    return concat3_s("(", c_inner, ")");
+}
+
+/**
+ * Emit a C cast expression.
+ *
+ * @param c_type Destination C type.
+ * @param c_inner Inner expression.
+ * @return Cast expression.
+ */
+func cem_emit_cast(c_type: string, c_inner: string) -> string {
+    return concat4_s("((", c_type, ")(", concat_s(c_inner, "))"));
+}
+
+/**
+ * Emit a checked narrowing cast call.
+ *
+ * @param c_dst_type Destination C type name.
+ * @param c_inner Inner expression.
+ * @return Runtime-call expression.
+ */
+func cem_emit_checked_narrow_cast(c_dst_type: string, c_inner: string) -> string {
+    return concat4_s("(_rt_narrow_", c_dst_type, "(", concat_s(c_inner, "))"));
+}
+
+/**
+ * Emit an unwrap call for pointer-shaped nullable values.
+ *
+ * @param c_dst_type Destination C type.
+ * @param c_inner Inner nullable expression.
+ * @param type_str Human-readable source type.
+ * @return Unwrap expression.
+ */
+func cem_emit_unwrap_ptr(c_dst_type: string, c_inner: string, type_str: string) -> string {
+    return concat4_s("((", c_dst_type, ") _unwrap_ptr(", concat4_s(c_inner, ", \"", type_str, "\"))"));
+}
+
+/**
+ * Emit an unwrap call for wrapper-shaped nullable values.
+ *
+ * @param c_src_type Source wrapper type.
+ * @param c_inner Inner nullable expression.
+ * @param type_str Human-readable source type.
+ * @return Unwrap expression.
+ */
+func cem_emit_unwrap_opt(c_src_type: string, c_inner: string, type_str: string) -> string {
+    return concat4_s("(((", c_src_type, "*) _unwrap_opt(&(", concat4_s(c_inner, "), \"", type_str, "\"))->value)"));
+}
+
+/**
+ * Emit a null-equality check for wrapper-shaped nullable values.
+ *
+ * @param c_expr Wrapper expression.
+ * @return Equality-check expression.
+ */
+func cem_emit_null_check_eq(c_expr: string) -> string {
+    return concat4_s("(!((", c_expr, ").has_value", "))");
+}
+
+/**
+ * Emit a null-inequality check for wrapper-shaped nullable values.
+ *
+ * @param c_expr Wrapper expression.
+ * @return Inequality-check expression.
+ */
+func cem_emit_null_check_ne(c_expr: string) -> string {
+    return concat4_s("((", c_expr, ").has_value", ")");
+}
+
+/**
+ * Emit a pointer null comparison.
+ *
+ * @param c_expr Pointer expression.
+ * @param op Comparison operator.
+ * @return Comparison expression.
+ */
+func cem_emit_pointer_null_check(c_expr: string, op: string) -> string {
+    return concat4_s("(", c_expr, concat3_s(" ", op, " NULL"), ")");
+}
+
+/**
+ * Emit a dereference lvalue.
+ *
+ * @param ptr_expr Pointer expression.
+ * @return Dereference lvalue text.
+ */
+func cem_emit_deref_lvalue(ptr_expr: string) -> string {
+    return concat3_s("(*", ptr_expr, ")");
+}
+
+/**
+ * Emit a field lvalue.
+ *
+ * @param obj Object expression.
+ * @param field Field identifier.
+ * @param is_pointer Whether the object is a pointer.
+ * @return Lvalue field-access text.
+ */
+func cem_emit_field_lvalue(obj: string, field: string, is_pointer: bool) -> string {
+    if (is_pointer) {
+        return concat3_s(obj, "->", field);
+    }
+    return concat3_s(obj, ".", field);
+}
+
+/**
+ * Emit an index lvalue.
+ *
+ * @param base Base expression.
+ * @param index Index expression.
+ * @return Indexed lvalue text.
+ */
+func cem_emit_index_lvalue(base: string, index: string) -> string {
+    return concat4_s(base, "[", index, "]");
+}
+
+/**
+ * Emit a struct constructor literal.
+ *
+ * @param c_struct_name Mangled C struct name.
+ * @param field_inits Vector of alternating field-name and field-value strings.
+ * @return Compound-literal expression.
+ */
+func cem_emit_struct_constructor(c_struct_name: string, field_inits: VectorString*) -> string {
+    if (vs_size(field_inits) == 0) {
+        return concat4_s("(struct ", c_struct_name, "){ 0", " }");
+    }
+
+    with (let sb = sb_create() => sb_free(sb)) {
+        sb_append(sb, "(struct ");
+        sb_append(sb, c_struct_name);
+        sb_append(sb, "){ ");
+        for (let i = 0; i < vs_size(field_inits); i = i + 2) {
+            if (i > 0) {
+                sb_append(sb, ", ");
+            }
+            sb_append(sb, ".");
+            sb_append(sb, vs_get(field_inits, i));
+            sb_append(sb, " = ");
+            sb_append(sb, vs_get(field_inits, i + 1));
+        }
+        sb_append(sb, " }");
+        return sb_to_string(sb);
+    }
+}
+
+/**
+ * Emit a struct constructor for a resolved struct type.
+ *
+ * @param struct_type Struct type to construct.
+ * @param field_inits Vector of alternating field-name and field-value strings.
+ * @return Compound-literal expression.
+ */
+func cem_emit_struct_constructor_for_type(struct_type: Type*, field_inits: VectorString*) -> string {
+    return cem_emit_struct_constructor(cem_mangle_struct_name(struct_type.module_name, struct_type.name), field_inits);
+}
+
+/**
+ * Emit an enum-variant constructor literal.
+ *
+ * @param c_enum_name Mangled C enum name.
+ * @param variant_name Variant name.
+ * @param tag_value Mangled tag constant.
+ * @param payload_inits Vector of alternating field-name and field-value strings.
+ * @return Tagged-union literal expression.
+ */
+func cem_emit_variant_constructor(c_enum_name: string, variant_name: string, tag_value: string,
+                                  payload_inits: VectorString*) -> string {
+    if (vs_size(payload_inits) == 0) {
+        return concat4_s("(struct ", c_enum_name, "){ .tag = ", concat_s(tag_value, " }"));
+    }
+
+    with (let sb = sb_create() => sb_free(sb)) {
+        sb_append(sb, "(struct ");
+        sb_append(sb, c_enum_name);
+        sb_append(sb, "){ .tag = ");
+        sb_append(sb, tag_value);
+        sb_append(sb, ", .data = { .");
+        sb_append(sb, variant_name);
+        sb_append(sb, " = { ");
+        for (let i = 0; i < vs_size(payload_inits); i = i + 2) {
+            if (i > 0) {
+                sb_append(sb, ", ");
+            }
+            sb_append(sb, ".");
+            sb_append(sb, vs_get(payload_inits, i));
+            sb_append(sb, " = ");
+            sb_append(sb, vs_get(payload_inits, i + 1));
+        }
+        sb_append(sb, " } } }");
+        return sb_to_string(sb);
+    }
+}
+
+/**
+ * Emit an enum-variant constructor for a resolved enum type.
+ *
+ * @param enum_type Enum type to construct.
+ * @param variant_name Variant name.
+ * @param payload_inits Vector of alternating field-name and field-value strings.
+ * @return Tagged-union literal expression.
+ */
+func cem_emit_variant_constructor_for_type(enum_type: Type*, variant_name: string, payload_inits: VectorString*) -> string {
+    let c_enum_name = cem_mangle_enum_name(enum_type.module_name, enum_type.name);
+    let tag_value = cem_emit_enum_tag(enum_type, variant_name);
+    return cem_emit_variant_constructor(c_enum_name, variant_name, tag_value, payload_inits);
+}
+
+/**
+ * Emit an expression statement.
+ *
+ * @param self Emitter to update.
+ * @param c_expr Lowered expression.
+ */
+func cem_emit_expr_stmt(self: CEmitter*, c_expr: string) {
+    ccb_emit(self.out, concat_s(c_expr, ";"));
+}
+
+/**
+ * Emit a return statement.
+ *
+ * @param self Emitter to update.
+ * @param c_value Lowered return value.
+ */
+func cem_emit_return_stmt(self: CEmitter*, c_value: string) {
+    ccb_emit(self.out, concat3_s("return ", c_value, ";"));
+}
+
+/**
+ * Emit a `return;` statement.
+ *
+ * @param self Emitter to update.
+ */
+func cem_emit_return_void_stmt(self: CEmitter*) {
+    ccb_emit(self.out, "return;");
+}
+
+/**
+ * Emit a C label.
+ *
+ * @param self Emitter to update.
+ * @param label Label name.
+ */
+func cem_emit_label(self: CEmitter*, label: string) {
+    ccb_dedent(self.out);
+    ccb_emit(self.out, concat3_s(label, ":", ";"));
+    ccb_indent(self.out);
+}
+
+/**
+ * Emit a `goto` statement.
+ *
+ * @param self Emitter to update.
+ * @param label Target label.
+ */
+func cem_emit_goto(self: CEmitter*, label: string) {
+    ccb_emit(self.out, concat3_s("goto ", label, ";"));
+}
+
+/**
+ * Emit a block start.
+ *
+ * @param self Emitter to update.
+ */
+func cem_emit_block_start(self: CEmitter*) {
+    ccb_emit(self.out, "{");
+    ccb_indent(self.out);
+}
+
+/**
+ * Emit a block end.
+ *
+ * @param self Emitter to update.
+ */
+func cem_emit_block_end(self: CEmitter*) {
+    ccb_dedent(self.out);
+    ccb_emit(self.out, "}");
+}
+
+/**
+ * Emit a `while` header.
+ *
+ * @param self Emitter to update.
+ * @param c_cond Lowered condition expression.
+ */
+func cem_emit_while_header(self: CEmitter*, c_cond: string) {
+    ccb_emit(self.out, concat4_s("while (", c_cond, ")", ""));
+}
+
+/**
+ * Emit an `if` header.
+ *
+ * @param self Emitter to update.
+ * @param c_cond Lowered condition expression.
+ */
+func cem_emit_if_header(self: CEmitter*, c_cond: string) {
+    ccb_emit(self.out, concat4_s("if (", c_cond, ")", ""));
+}
+
+/**
+ * Emit an `else` keyword.
+ *
+ * @param self Emitter to update.
+ */
+func cem_emit_else(self: CEmitter*) {
+    ccb_emit(self.out, "else");
+}
+
+/**
+ * Emit the Stage 1-shaped for-loop wrapper start.
+ *
+ * @param self Emitter to update.
+ */
+func cem_emit_for_loop_start(self: CEmitter*) {
+    ccb_emit(self.out, "// for loop");
+    cem_emit_block_start(self);
+}
+
+/**
+ * Emit the Stage 1-shaped for-loop wrapper end.
+ *
+ * @param self Emitter to update.
+ */
+func cem_emit_for_loop_end(self: CEmitter*) {
+    cem_emit_block_end(self);
+}
+
+/**
+ * Emit a local variable declaration.
+ *
+ * @param self Emitter to update.
+ * @param c_type Lowered C type.
+ * @param c_var_name Lowered variable name.
+ * @param c_init Lowered initializer.
+ */
+func cem_emit_let_decl(self: CEmitter*, c_type: string, c_var_name: string, c_init: string) {
+    ccb_emit(self.out, concat4_s(c_type, " ", c_var_name, concat3_s(" = ", c_init, ";")));
+}
+
+/**
+ * Emit an assignment statement.
+ *
+ * @param self Emitter to update.
+ * @param c_target Lowered lvalue.
+ * @param c_value Lowered rvalue.
+ */
+func cem_emit_assignment(self: CEmitter*, c_target: string, c_value: string) {
+    ccb_emit(self.out, concat4_s(c_target, " = ", c_value, ";"));
+}
+
+/**
+ * Emit a temporary declaration.
+ *
+ * @param self Emitter to update.
+ * @param c_type Lowered C type.
+ * @param c_temp_name Temporary identifier.
+ * @param c_value Lowered initializer.
+ */
+func cem_emit_temp_decl(self: CEmitter*, c_type: string, c_temp_name: string, c_value: string) {
+    ccb_emit(self.out, concat4_s(c_type, " ", c_temp_name, concat3_s(" = ", c_value, ";")));
 }
