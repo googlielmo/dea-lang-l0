@@ -43,17 +43,18 @@ L0 is currently at a quite exciting phase: **The Stage 2 Bootstrap**.
 
 * Stage 1: complete and usable.
 
-* Stage 2: lexer, parser, AST, name resolution, top-level signature resolution, local scope construction, and
-  expression/statement type checking are implemented.
+* Stage 2: lexer, parser, AST, name resolution, top-level signature resolution, local scope construction,
+  expression/statement type checking, backend lowering, and C emission for `--gen` are implemented.
 
-* Stage 2 backend/codegen: still in progress.
+* Stage 2 `--gen`: implemented and parity-tested against Stage 1 on a committed golden corpus.
 
-Today, Stage 2 already has feature parity with Stage 1 for the diagnostic-oriented commands `--check`, `--type`, and
-`--sym`.
+Today, Stage 2 has feature parity with Stage 1 for the analysis-oriented commands `--check`, `--type`, and `--sym`,
+and now also for deterministic C emission through `--gen`.
 The next major milestone is supporting `--build` and `--run` in Stage 2.
 
 * **Built-in Observability:** Language developers need to know what memory is doing. L0 ships with native compiler flags
-  to trace ARC events and allocations directly to stderr:
+  to trace ARC events and allocations directly to stderr. Today these are fully usable through the Stage 1 driver and
+  are already wired through Stage 2 `--gen`:
 
 ```shell
 l0c --run --trace-arc --trace-memory app.l0
@@ -320,8 +321,10 @@ Stage 1 follows a conventional pipeline: lexer → parser → semantic analysis 
 
 The generated C includes a small, trusted, header-only C kernel that encapsulates all platform-specific behavior.
 
-Stage 2 follows a similar architecture but with a more modular design and better separation of concerns. The lexer,
-parser, AST, name resolution, type checking, and backend are all separate components with well-defined interfaces.
+Stage 2 follows the same high-level pipeline with a more modular implementation in L0 itself. The lexer, parser, AST,
+name resolution, type checking, backend, and C emitter are separate components with well-defined interfaces.
+Current Stage 2 reaches the C emission boundary (`--gen`); direct Stage 2 `--build` and `--run` are the remaining
+driver milestone.
 
 References:
 
@@ -331,6 +334,9 @@ References:
 - [Stage 1 contract](docs/specs/compiler/stage1-contract.md)
 
 ## CLI
+
+The command table below describes the main `l0c` interface exposed today by the Stage 1 wrapper/driver. Stage 2
+currently implements analysis/dump modes plus `--gen`; `--build` and `--run` remain NYI there.
 
 ```shell
 l0c [mode] [options] <target>

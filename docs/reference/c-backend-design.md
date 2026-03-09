@@ -1,8 +1,10 @@
 # L0 C Backend Design
 
-Version: 2026-03-01
+Version: 2026-03-09
 
-This is the canonical backend implementation document for Stage 1.
+This is the canonical backend implementation document for the current C backend.
+Stage 1 remains the behavioral oracle; Stage 2 is expected to emit the same C and reuse the same diagnostic/ICE codes
+for equivalent backend conditions.
 
 Related docs:
 
@@ -12,17 +14,22 @@ Related docs:
 
 ## Overview
 
-Stage 1 code generation is split into:
+Current code generation is split into a backend-orchestration layer plus a C emitter layer:
 
-- `compiler/stage1_py/l0_backend.py`: orchestration and lowering policy (`WHAT`/`WHEN`)
-- `compiler/stage1_py/l0_c_emitter.py`: C99 syntax emission (`HOW`)
-- `compiler/stage1_py/l0_string_escape.py`: shared literal escape decode/encode utilities
+- Stage 1 reference implementation:
+  - `compiler/stage1_py/l0_backend.py`
+  - `compiler/stage1_py/l0_c_emitter.py`
+  - `compiler/stage1_py/l0_string_escape.py`
+- Stage 2 implementation:
+  - `compiler/stage2_l0/src/backend.l0`
+  - `compiler/stage2_l0/src/c_emitter.l0`
+  - `compiler/stage2_l0/src/string_escape.l0`
 
 Input is a fully-typed `AnalysisResult`. Output is one C99 translation unit.
 
 ## Responsibilities Split
 
-### Backend (`l0_backend.py`)
+### Backend orchestration (`l0_backend.py`, `backend.l0`)
 
 - Validates generation preconditions (`CompilationUnit` exists, no semantic errors).
 - Orders type emission using a dependency graph + topological sort.
@@ -31,7 +38,7 @@ Input is a fully-typed `AnalysisResult`. Output is one C99 translation unit.
 - Handles retain-on-copy for ownership-sensitive assignments/initialization sites.
 - Emits function bodies and decides where cleanup runs on normal/early exits.
 
-### C emitter (`l0_c_emitter.py`)
+### C emitter (`l0_c_emitter.py`, `c_emitter.l0`)
 
 - Emits C includes, declarations, definitions, and formatting.
 - Implements name mangling and identifier hygiene for C keywords.
@@ -43,7 +50,7 @@ Input is a fully-typed `AnalysisResult`. Output is one C99 translation unit.
 
 ## Generated Unit Layout
 
-The generated C file is organized in this order:
+The generated C file is organized in this order in both stages:
 
 1. File header and includes (`stdint.h`, `stdbool.h`, `stddef.h`, `l0_siphash.h`, `l0_runtime.h`), with optional
    trace defines (`L0_TRACE_ARC`, `L0_TRACE_MEMORY`) emitted before `l0_runtime.h` when enabled via CLI
@@ -169,7 +176,7 @@ Tracing details and runtime log contract are specified in [specs/runtime/trace.m
 
 ## Testing Coverage
 
-Primary backend/codegen tests live under `compiler/stage1_py/tests/backend/`, including:
+Primary Stage 1 backend/codegen tests live under `compiler/stage1_py/tests/backend/`, including:
 
 - `test_codegen_basic.py`
 - `test_codegen_advanced.py`
@@ -181,3 +188,13 @@ Primary backend/codegen tests live under `compiler/stage1_py/tests/backend/`, in
 - `test_driver_cross_module_runtime.py`
 
 Golden expected C outputs are in `compiler/stage1_py/tests/backend/codegen/*.expected`.
+
+Primary Stage 2 backend/codegen parity checks live under `compiler/stage2_l0/tests/`, including:
+
+- `backend_test.l0`
+- `c_emitter_test.l0`
+- `l0c_test.l0`
+- `l0c_codegen_test.sh`
+
+Committed Stage 2 backend goldens are in `compiler/stage2_l0/tests/fixtures/backend_golden/` and are refreshed from
+Stage 1 via `scripts/refresh_stage2_backend_goldens.py`.

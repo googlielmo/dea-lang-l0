@@ -1,6 +1,6 @@
 # L0 Ownership and Memory Management Reference
 
-Version: 2026-03-01
+Version: 2026-03-09
 
 This document describes how ownership works in L0 today, covering:
 
@@ -11,8 +11,9 @@ This document describes how ownership works in L0 today, covering:
 
 ## Scope and Status
 
-- The ground truth is the **current implementation**: Stage 1 backend lowering and Stage 2 frontend
-  (lexer/parser/semantics) + stdlib.
+- The ground truth is the **current implementation**: Stage 1 backend lowering, Stage 2 backend lowering for `--gen`,
+  and the current stdlib/runtime.
+- When Stage 1 and Stage 2 wording diverge, treat Stage 1 as the oracle and Stage 2 parity failures as bugs.
 - If runtime or codegen behavior differs from this document, treat it as a bug and report it.
 
 ## 1. Ownership Model at a Glance
@@ -54,8 +55,8 @@ How it lowers at runtime:
 
 Before calling `_rt_drop`, the compiler may emit field cleanup automatically:
 
-- If the struct/enum has ARC fields (e.g. `string` members), Stage 1 inserts `rt_string_release` calls for those fields
-  before freeing the object.
+- If the struct/enum has ARC fields (e.g. `string` members), the current backends insert `rt_string_release` calls for
+  those fields before freeing the object.
 - Pointer fields that own **separate** heap objects are **not** cleaned up automatically — you must free or drop
   children explicitly before dropping the parent.
 
@@ -81,7 +82,7 @@ The key ownership question is: **does the unwrapped value need an extra retain?*
 
 **Short answer:** usually no.
 
-The compiler's Stage 1 lowering already handles this correctly. When you write:
+The current backend lowering already handles this correctly. When you write:
 
 ```
 let s: string = opt as string
@@ -213,12 +214,14 @@ Pass criteria:
 Primary source files:
 
 - `compiler/stage1_py/l0_backend.py`
+- `compiler/stage2_l0/src/backend.l0`
+- `compiler/stage2_l0/src/c_emitter.l0`
 - `compiler/shared/l0/stdlib/std/vector.l0`
 - `compiler/shared/l0/stdlib/std/hashmap.l0`
 - `compiler/shared/l0/stdlib/std/hashset.l0`
 - `compiler/shared/l0/stdlib/std/linear_map.l0`
 - `compiler/shared/l0/stdlib/std/io.l0`
-- `compiler/stage2_l0/src/{tokens,lexer,parser,ast}.l0`
+- `compiler/stage2_l0/src/{tokens,lexer,parser,ast,expr_types,scope_context}.l0`
 - `compiler/shared/runtime/l0_runtime.h`
 
 Repro-style checks:

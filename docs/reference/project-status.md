@@ -1,6 +1,6 @@
 # L0 Project Status
 
-Version: 2026-03-01
+Version: 2026-03-09
 
 This document summarizes what is implemented in this repository today and what remains open.
 
@@ -149,6 +149,11 @@ Current implemented assets:
     - `src/type_resolve.l0`
     - `src/locals.l0`
     - `src/expr_types.l0`
+    - `src/codegen_options.l0`
+    - `src/scope_context.l0`
+    - `src/string_escape.l0`
+    - `src/c_emitter.l0`
+    - `src/backend.l0`
     - `src/l0c.l0`
     - `src/main.l0`
 - Utility modules:
@@ -200,6 +205,17 @@ Stage 2 semantic status:
   including control-flow checks, assignment compatibility, and pattern variable typing.
 - Stage 2 `l0c --check`, `--type`, and `--sym` are implemented with Stage 1-aligned output.
 
+Stage 2 backend/codegen status:
+
+- Stage 2 `backend_generate()` is implemented and emits a single C99 translation unit from typed `AnalysisResult`.
+- Stage 2 `l0c --gen` is implemented, including `--output`, `--no-line-directives`, `--trace-arc`, and
+  `--trace-memory`.
+- Stage 2 backend lowering now covers the Stage 1 language surface, including ownership-sensitive lowering for
+  `new`, `drop`, `try`, `with`, `match`, `case`, `break`, `continue`, and ARC cleanup.
+- Exact-text parity for `--gen --no-line-directives` is enforced against a committed curated Stage 1 golden corpus via
+  `compiler/stage2_l0/tests/l0c_codegen_test.sh`.
+- Stage 2 trace validation is green for the current test suite via `compiler/stage2_l0/run_trace_tests.sh`.
+
 ## Known Limitations and Constraints
 
 These remain true in Stage 1:
@@ -212,15 +228,15 @@ These remain true in Stage 1:
 
 Current Stage 2 limitations:
 
-1. Stage 2 backend/codegen pipeline is not implemented yet.
-2. Some language constraints intentionally remain staged in parser diagnostics (for example, array types and
+1. Stage 2 `--build` and `--run` are still NYI; only `--gen`, analysis, and dump-style modes are implemented.
+2. Stage 2 still depends on the Stage 1 wrapper/compiler driver for external execution (`./l0c -P compiler/stage2_l0/src --run l0c -- ...`).
+3. Some language constraints intentionally remain staged in parser diagnostics (for example, array types and
    bitwise/shift operators).
 
 ## Short Roadmap
 
 Near-term project direction, consistent with current docs/code:
 
-1. Connect Stage 2 semantic outputs to backend/codegen milestones.
-2. Implement Stage 2 lowering passes.
-3. Add Stage 2 C emission and driver `--build`/`--run` support.
-4. Keep Stage 1 behavior deterministic and contract-documented while Stage 2 grows.
+1. Add Stage 2 driver `--build`/`--run` support on top of the now-implemented backend/`--gen` path.
+2. Keep Stage 1/Stage 2 backend behavior deterministic and parity-tested as the Stage 2 driver grows.
+3. Extend parity coverage beyond the current curated golden corpus as new backend-sensitive cases are added.

@@ -8,8 +8,9 @@ Dea/L0 is a small, safe, C-family systems language compiling to C99.
 
 - **Core principle:** No undefined behavior in the language itself.
 - **Stage 1:** Compiler pipeline in Python (lexer → parser → AST → semantic passes → C codegen).
-- **Stage 2:** Self-hosting compiler (L0-in-L0, under development).
-- **Subsystems:** Grammar/semantics, driver/build/module layout, and stdlib.
+- **Stage 2:** Self-hosting compiler (L0-in-L0) with frontend, backend, and `--gen` implemented; `--build`/`--run`
+  remain the next driver milestone.
+- **Subsystems:** Grammar/semantics, backend/codegen, driver/build/module layout, and stdlib.
 
 ## Documentation — Read On Demand
 
@@ -51,7 +52,8 @@ Also see: `CONTRIBUTING.md`, `SECURITY.md`.
 
 ## Commands
 
-All commands run from the repository root:
+All commands run from the repository root. The `l0c` commands below describe the main Stage 1 wrapper/driver
+interface exposed today:
 
 ```bash
 ./l0c -P examples --run hello     # build + run
@@ -73,6 +75,15 @@ C compiler selection: `-c <compiler>`. Auto-detection order (used by `l0c` and S
 `tcc`, `gcc`, `clang`, `cc` from PATH, then `$CC`.
 
 Trace toggles (codegen/build/run): `--trace-arc`, `--trace-memory`.
+
+For current Stage 2 CLI work, use:
+
+```bash
+./l0c -P compiler/stage2_l0/src --run l0c -- --gen -P examples hello
+./l0c -P compiler/stage2_l0/src --run l0c -- --check -P examples hello
+```
+
+Stage 2 currently implements analysis/dump modes plus `--gen`; `--build` and `--run` remain NYI there.
 
 Generated API documentation is written under `build/docs/` and is not part of the hand-authored `docs/` tree.
 Native Doxygen LaTeX output is generated under `build/docs/doxygen/latex/`; use `./scripts/gen-docs.sh --pdf`

@@ -1,8 +1,9 @@
-# L0 Compiler Architecture (Stage 1)
+# L0 Compiler Architecture
 
-Version: 2026-03-01
+Version: 2026-03-09
 
-This is the canonical architecture document for the Stage 1 compiler.
+This is the canonical architecture document for the current compiler pipeline.
+Stage 1 remains the reference implementation and Stage 2 mirrors the same pass structure through `--gen`.
 
 Related canonical docs:
 
@@ -11,6 +12,8 @@ Related canonical docs:
 - Compact contract/index: [specs/compiler/stage1-contract.md](../specs/compiler/stage1-contract.md)
 
 ## 1. High-Level Pipeline
+
+### 1.1 Stage 1 Reference Pipeline
 
 ```
 Source (.l0)
@@ -41,6 +44,37 @@ Host C compiler -> executable (run/build commands)
 ```
 
 Pass coordination entry point: `L0Driver.analyze()` in `compiler/stage1_py/l0_driver.py`.
+
+### 1.2 Stage 2 Current Pipeline
+
+```
+Source (.l0)
+  |
+  v
+lexer.l0 -> Token stream
+  |
+  v
+parser.l0 -> arena-backed AST
+  |
+  v
+name_resolver.l0 -> ModuleEnv per module
+  |
+  v
+signatures.l0 -> func/struct/enum/let type tables
+  |
+  v
+locals.l0 -> FunctionEnv per function
+  |
+  v
+expr_types.l0 -> expression types + semantic diagnostics
+  |
+  v
+backend.l0 + c_emitter.l0 -> single C99 translation unit (`--gen`)
+```
+
+Current Stage 2 CLI entry point: `compiler/stage2_l0/src/l0c.l0`.
+Current execution path: `./l0c -P compiler/stage2_l0/src --run l0c -- ...`.
+`--build` and `--run` remain NYI in Stage 2; only analysis/dump modes plus `--gen` are implemented.
 
 ## 2. Pass Responsibilities
 
@@ -87,7 +121,7 @@ Pass coordination entry point: `L0Driver.analyze()` in `compiler/stage1_py/l0_dr
 - Records variable-resolution origin in `AnalysisResult.var_ref_resolution`.
 - Appends semantic diagnostics.
 
-### 2.7 Backend (`l0_backend.py`, `l0_c_emitter.py`)
+### 2.7 Backend (`l0_backend.py`, `l0_c_emitter.py`, `backend.l0`, `c_emitter.l0`)
 
 - Consumes a typed `AnalysisResult` and emits C99.
 - Canonical backend details are maintained only in [reference/c-backend-design.md](c-backend-design.md).
@@ -120,7 +154,8 @@ Compilation closure container: `CompilationUnit` (`l0_compilation.py`), containi
 2. Import closure is explicit and cycle-checked in the driver.
 3. Source locations are propagated for diagnostics.
 4. Semantic errors accumulate as diagnostics; they do not crash the compiler.
-5. Generated output target for Stage 1 is one C99 translation unit.
+5. Generated output target for both stages is one C99 translation unit.
+6. Stage 1 remains the oracle for exact Stage 2 backend behavior, diagnostics, and emitted text on equivalent paths.
 
 ## 5. File/Module Layout
 
