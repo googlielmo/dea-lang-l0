@@ -150,11 +150,12 @@ func test_emitter_name_mangling() {
  * Tests test_emitter_type_lowering_and_null_forms.
  */
 func test_emitter_type_lowering_and_null_forms() {
+    let builtin_int_ty = type_builtin_int();
     let point_ty = type_new_struct("demo.main", "Point");
     let point_ptr_ty = type_new_pointer(type_clone(point_ty));
     let point_opt_ty = type_new_nullable(type_clone(point_ty));
 
-    assert(eq_s(cem_emit_type(type_builtin_int()), "l0_int"), "builtin int type mismatch");
+    assert(eq_s(cem_emit_type(builtin_int_ty), "l0_int"), "builtin int type mismatch");
     assert(eq_s(cem_emit_type(point_ty), "struct l0_demo_main_Point"), "struct type mismatch");
     assert(eq_s(cem_emit_type(point_ptr_ty), "struct l0_demo_main_Point*"), "pointer type mismatch");
     assert(eq_s(cem_emit_type(point_opt_ty), "l0_opt_s_l0_demo_main_Point"), "nullable struct type mismatch");
@@ -165,6 +166,7 @@ func test_emitter_type_lowering_and_null_forms() {
     assert(eq_s(cem_emit_null_literal(point_opt_ty, true), "{0}"), "nullable initializer null mismatch");
     assert(eq_s(cem_emit_null_literal(point_ptr_ty, false), "NULL"), "pointer null mismatch");
 
+    type_free(builtin_int_ty);
     type_free(point_ty);
     type_free(point_ptr_ty);
     type_free(point_opt_ty);
@@ -291,8 +293,10 @@ func test_emitter_cleanup_and_switch_helpers() {
     cem_emit_default_label(emitter);
     cem_emit_exit_switch(emitter);
     cem_emit_switch_end(emitter);
-    cem_emit_value_cleanup(emitter, "pt", type_new_struct("demo.main", "Point"));
-    cem_emit_enum_cleanup(emitter, "mp", type_new_enum("demo.main", "Maybe"));
+    let cleanup_point_ty = type_new_struct("demo.main", "Point");
+    let cleanup_maybe_ty = type_new_enum("demo.main", "Maybe");
+    cem_emit_value_cleanup(emitter, "pt", cleanup_point_ty);
+    cem_emit_enum_cleanup(emitter, "mp", cleanup_maybe_ty);
     cem_emit_drop_call(emitter, "ptr");
     cem_emit_null_assignment(emitter, "ptr");
 
@@ -310,6 +314,8 @@ func test_emitter_cleanup_and_switch_helpers() {
     assert(contains_s(text, "_rt_drop((void*)ptr);"), "drop helper mismatch");
     assert(contains_s(text, "ptr = NULL;"), "null assignment helper mismatch");
 
+    type_free(cleanup_point_ty);
+    type_free(cleanup_maybe_ty);
     cem_free(emitter);
     analysis_result_free(result);
 }

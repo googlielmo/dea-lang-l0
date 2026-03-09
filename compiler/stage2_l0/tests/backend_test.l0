@@ -157,14 +157,17 @@ func test_backend_scope_helpers_manage_cleanup_state() {
           let opts = cg_options_create() => cg_options_free(opts),
           let cfg = log_config_create(LL_ERROR, false) => drop cfg,
           let self = be_create(result, opts, cfg) => be_free(self)) {
+        let borrowed_ty = type_builtin_int();
+        let owned_ty = type_builtin_string();
+        let temp_ty = type_builtin_string();
         let root = be_push_scope(self);
-        sc_add_declared(root, "borrowed", type_builtin_int());
-        sc_add_owned(root, "owned_name", type_builtin_string());
+        sc_add_declared(root, "borrowed", borrowed_ty);
+        sc_add_owned(root, "owned_name", owned_ty);
 
         assert(be_lookup_local_var_type(self, "borrowed") != null, "declared local lookup should succeed");
         assert(be_scope_chain_has_cleanup(self), "owned ARC local should trigger cleanup detection");
 
-        let temp = be_materialize_arc_temp(self, "((l0_string)L0_STRING_CONST(\"x\", 1))", type_builtin_string());
+        let temp = be_materialize_arc_temp(self, "((l0_string)L0_STRING_CONST(\"x\", 1))", temp_ty);
         assert(eq_s(temp, "l0_arc_1"), "ARC temp naming mismatch");
         assert(vec_size(root.owned_vars) == 2, "materialized ARC temp should become owned");
 
@@ -173,6 +176,9 @@ func test_backend_scope_helpers_manage_cleanup_state() {
         assert(be_scope_chain_has_cleanup(self), "inline cleanup in child scope should be visible");
         be_pop_scope(self);
         be_pop_scope(self);
+        type_free(borrowed_ty);
+        type_free(owned_ty);
+        type_free(temp_ty);
     }
 }
 
