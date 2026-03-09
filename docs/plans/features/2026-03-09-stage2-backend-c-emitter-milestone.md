@@ -28,7 +28,8 @@
 ## Summary
 
 Implement the Stage 2 backend and C emitter with Stage 1 feature parity for emitted C, and make exact Stage 1 C output
-the oracle for Stage 2 through committed golden fixtures.
+plus exact Stage 1 diagnostic and ICE code reuse for equivalent failures the oracle for Stage 2 through committed
+golden fixtures and parity tests.
 
 This milestone is intentionally centered on `AnalysisResult -> C99 translation unit` and Stage 2 `--gen`. Exact-text
 parity is measured with deterministic Stage 1 output generated via `./l0c --gen --no-line-directives`. Stage 2
@@ -46,7 +47,8 @@ stable Stage 1 rules without changing emitted text.
    `--gen --no-line-directives` output.
 3. Implement Stage 2 CLI `--gen` with Stage 1-aligned behavior for stdout/file output and codegen-affecting flags.
 4. Add a curated, committed golden-C corpus generated from Stage 1 and diff Stage 2 output against it exactly.
-5. Keep the work chunked so each chunk has a narrow parity target and a clear acceptance gate.
+5. Preserve Stage 1 diagnostic and `ICE-xxxx` code numbers for equivalent backend, emitter, and `--gen` failure paths.
+6. Keep the work chunked so each chunk has a narrow parity target and a clear acceptance gate.
 
 ## Non-Goals
 
@@ -74,14 +76,16 @@ stable Stage 1 rules without changing emitted text.
 ### 1. Codegen substrate
 
 Add `CodegenOptions`, extract shared semantic lookup helpers from `expr_types.l0` into `sem_context.l0`, add
-`analysis_has_arc_data` and related queries, and add `scope_context.l0` plus a minimal backend ICE helper that aborts
-with stable `[ICE-xxxx]` messages.
+`analysis_has_arc_data` and related queries, and add `scope_context.l0` plus a minimal backend ICE helper. Before
+adding new backend/emitter ICEs, audit existing Stage 2 `ICE-*` usage and renumber any collisions so Stage 1 numbers
+are reused only for equivalent invariants.
 
 Acceptance for this chunk:
 
 1. `expr_types` still passes unchanged.
 2. Backend code can query typed analysis without duplicating `expr_types` internals.
 3. Pure helper tests compile and pass.
+4. No Stage 2 `ICE-*` code already used by Stage 1 is repurposed with a different meaning.
 
 ### 2. C emitter skeleton and exact-text rules
 
@@ -96,6 +100,7 @@ Acceptance for this chunk:
 
 1. Focused emitter tests cover headers, typedef guards, mangled names, string escaping, and type-ordering snippets.
 2. Stage 2 text for the covered sections matches Stage 1 exactly.
+3. Emitter helper ICEs either reuse the Stage 1 number for the equivalent invariant or use a new Stage 2-only number.
 
 ### 3. Backend lowering phase 1
 
@@ -132,6 +137,8 @@ Acceptance for this chunk:
 
 1. Stage 2 `l0c` can be invoked externally through `./l0c -P compiler/stage2_l0/src --run l0c -- --gen ...`.
 2. Output and failure behavior match Stage 1 for the implemented mode.
+3. Equivalent codegen/CLI failure paths reuse the same Stage 1 diagnostic codes; Stage 2-only NYI paths remain on
+   `L0C-9510`.
 
 ### 6. Golden C fixture system
 
@@ -186,7 +193,8 @@ Acceptance for this chunk:
 4. `l0c_codegen_test.sh` compiles and runs any fixture that carries an `.expected.out` oracle.
 5. `l0c_test.l0` verifies `--gen` success and preserves existing CLI parse/NYI behavior for `--build` and `--run`.
 6. Focused unit tests, not full-file goldens, verify `#line` emission and trace-flag variants.
-7. Final verification commands for the milestone are:
+7. Focused unit tests and parity fixtures verify exact Stage 1 code reuse for equivalent emitter/backend/CLI failures.
+8. Final verification commands for the milestone are:
 
 ```bash
 python3 scripts/refresh_stage2_backend_goldens.py --check
@@ -201,7 +209,9 @@ python3 scripts/refresh_stage2_backend_goldens.py --check
 2. Update `docs/reference/architecture.md` so the Stage 2 pipeline includes backend generation for `--gen`.
 3. Update `docs/reference/c-backend-design.md` so it becomes the shared canonical C-backend behavior document for both
    stages, while still naming Stage 1 as the reference implementation source.
-4. Update `docs/reference/ownership.md` only if the Stage 2 backend port reveals wording that currently mentions
+4. Update `docs/specs/compiler/diagnostic-code-policy.md` and `CLAUDE.md` so exact Stage 1 code reuse, including
+   `ICE-xxxx`, is a shared project rule.
+5. Update `docs/reference/ownership.md` only if the Stage 2 backend port reveals wording that currently mentions
    Stage 1-only behavior where the rule is now shared.
 
 ## Assumptions and Defaults
@@ -213,3 +223,5 @@ python3 scripts/refresh_stage2_backend_goldens.py --check
 4. `--build` and `--run` stay out of scope until exact `--gen` parity is green across the curated corpus.
 5. New helper modules are acceptable when they reduce duplication or encode stable Stage 1 output rules, but
    “equivalent” alternative formatting or lowering is not acceptable in this milestone.
+6. Equivalent diagnostic parity means exact `XXX-NNNN` reuse, including `ICE-xxxx`; new codes are allowed only for
+   genuinely Stage 2-only conditions with no Stage 1 counterpart.

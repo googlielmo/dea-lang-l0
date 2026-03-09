@@ -1,8 +1,13 @@
 # Diagnostic Output Format Spec
 
-Version: 2026-02-27
+Version: 2026-03-09
 
 Normative specification for compiler diagnostic output in both Stage 1 and Stage 2.
+
+## Related Docs
+
+- [diagnostic-code-policy.md](diagnostic-code-policy.md): cross-stage code assignment and parity rules.
+- [stage1-contract.md](stage1-contract.md): compact Stage 1 contract and routing index.
 
 ## Header Line
 

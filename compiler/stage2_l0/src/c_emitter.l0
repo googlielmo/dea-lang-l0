@@ -5,14 +5,21 @@
 
 module c_emitter;
 
+import std.assert;
+import std.hashmap;
+import std.hashset;
 import std.string;
 import std.text;
 import std.vector;
 
+import ast;
 import codegen_options;
+import driver;
 import sem_context;
+import signatures;
 import string_escape;
 import types;
+import util.strings;
 
 /**
  * Represents a line-oriented C source builder with indentation tracking.
@@ -31,6 +38,62 @@ struct CEmitter {
     current_module: string?;
     out: CCodeBuilder*;
     tmp_counter: int;
+    opt_wrappers: StringPtrMap*; // wrapper name -> Type*
+    opt_emitted: StringSet*;
+}
+
+/**
+ * Abort on an internal code-emission error.
+ *
+ * @param message ICE message to report.
+ */
+func cem_ice(message: string) {
+    assert(false, message);
+}
+
+/**
+ * Abort on an internal code-emission error from a string-returning helper.
+ *
+ * @param message ICE message to report.
+ * @return Dummy return used only to satisfy control-flow typing.
+ */
+func cem_ice_string(message: string) -> string {
+    assert(false, message);
+    return "";
+}
+
+/**
+ * Build an all-uppercase ASCII variant of an identifier-like string.
+ *
+ * @param text Input text.
+ * @return Uppercased ASCII text.
+ */
+func cem_upper_ascii(text: string) -> string {
+    with (let cb = cb_create() => cb_free(cb)) {
+        for (let i = 0; i < len_s(text); i = i + 1) {
+            let c = char_at_s(text, i);
+            if (c >= 'a' && c <= 'z') {
+                cb_append(cb, (c - 'a' + 'A') as byte);
+            } else {
+                cb_append(cb, c);
+            }
+        }
+        return cb_to_string(cb);
+    }
+}
+
+/**
+ * Free every collected optional-wrapper inner type.
+ *
+ * @param items Wrapper map to free.
+ */
+func cem_opt_wrapper_map_free(items: StringPtrMap*) {
+    for (let i = 0; i < spm_capacity(items); i = i + 1) {
+        if (spm_slot_occupied(items, i)) {
+            type_free(spm_slot_value(items, i) as Type*);
+        }
+    }
+    spm_free(items);
 }
 
 /**
@@ -133,7 +196,19 @@ func ccb_to_string(self: CCodeBuilder*) -> string {
  * @return New emitter.
  */
 func cem_create() -> CEmitter* {
-    return new CEmitter(null, null, ccb_create(), 0);
+    return new CEmitter(null, null, ccb_create(), 0, spm_create(), ss_create());
+}
+
+/**
+ * Clear every collected optional-wrapper entry.
+ *
+ * @param self Emitter to update.
+ */
+func cem_reset_optional_wrappers(self: CEmitter*) {
+    cem_opt_wrapper_map_free(self.opt_wrappers);
+    ss_free(self.opt_emitted);
+    self.opt_wrappers = spm_create();
+    self.opt_emitted = ss_create();
 }
 
 /**
@@ -142,6 +217,8 @@ func cem_create() -> CEmitter* {
  * @param self Emitter to free.
  */
 func cem_free(self: CEmitter*) {
+    cem_opt_wrapper_map_free(self.opt_wrappers);
+    ss_free(self.opt_emitted);
     ccb_free(self.out);
     drop self;
 }
@@ -154,6 +231,19 @@ func cem_free(self: CEmitter*) {
  */
 func cem_set_analysis(self: CEmitter*, analysis: AnalysisResult*) {
     self.analysis = analysis;
+}
+
+/**
+ * Return the borrowed analysis result.
+ *
+ * @param self Emitter to inspect.
+ * @return Borrowed analysis result.
+ */
+func cem_analysis(self: CEmitter*) -> AnalysisResult* {
+    if (self.analysis == null) {
+        cem_ice("[ICE-9300] C emitter requires attached analysis");
+    }
+    return self.analysis as AnalysisResult*;
 }
 
 /**
@@ -262,7 +352,8 @@ func cem_mangle_let_name(module_name: string, let_name: string) -> string {
  * @return Original or suffixed identifier.
  */
 func cem_mangle_identifier(name: string) -> string {
-    if (cem_is_c_keyword(name) || starts_with_s(name, "_") || starts_with_s(name, "l0_") || starts_with_s(name, "L0_")) {
+    if (cem_is_c_keyword(name) || ends_with_s(name, "__v") || starts_with_s(name, "l0_") || starts_with_s(name, "L0_") ||
+        starts_with_s(name, "_")) {
         return concat_s(name, "__v");
     }
     return name;
@@ -277,7 +368,49 @@ func cem_mangle_identifier(name: string) -> string {
  */
 func cem_fresh_tmp(self: CEmitter*, kind: string) -> string {
     self.tmp_counter = self.tmp_counter + 1;
-    return concat4_s("_", kind, "_", int_to_string(self.tmp_counter));
+    return concat4_s("l0_", kind, "_", int_to_string(self.tmp_counter));
+}
+
+/**
+ * Emit C code for `sizeof(<type>)`.
+ *
+ * @param typ Type to measure.
+ * @return Casted `sizeof` expression.
+ */
+func cem_emit_sizeof_type(typ: Type*) -> string {
+    return concat3_s("((l0_int)sizeof(", cem_emit_type(typ), "))");
+}
+
+/**
+ * Emit C code for `ord(enum_expr)`.
+ *
+ * @param c_enum_expr C expression producing an enum value.
+ * @return Casted tag extraction expression.
+ */
+func cem_emit_ord(c_enum_expr: string) -> string {
+    return concat3_s("((l0_int)((", c_enum_expr, ").tag))");
+}
+
+/**
+ * Emit a pointer type from a base type.
+ *
+ * @param base_type Base type to wrap.
+ * @return Pointer type spelling.
+ */
+func cem_emit_pointer_type(base_type: Type*) -> string {
+    return concat_s(cem_emit_type(base_type), "*");
+}
+
+/**
+ * Emit the C tag constant for an enum variant.
+ *
+ * @param enum_type Enum type to inspect.
+ * @param variant_name Variant name.
+ * @return Mangled enum-tag identifier.
+ */
+func cem_emit_enum_tag(enum_type: Type*, variant_name: string) -> string {
+    let c_enum_name = cem_mangle_enum_name(enum_type.module_name, enum_type.name);
+    return concat3_s(c_enum_name, "_", variant_name);
 }
 
 /**
@@ -291,31 +424,41 @@ func cem_is_niche_nullable(t: Type*) -> bool {
 }
 
 /**
+ * Produce the stable wrapper-key suffix for an optional inner type.
+ *
+ * @param t Inner type to encode.
+ * @return Stable wrapper-key suffix.
+ */
+func cem_opt_key_for_type(t: Type*) -> string {
+    if (ord(t.kind) == ord(TY_BUILTIN)) {
+        return t.name;
+    }
+    if (ord(t.kind) == ord(TY_STRUCT)) {
+        return concat_s("s_", cem_mangle_struct_name(t.module_name, t.name));
+    }
+    if (ord(t.kind) == ord(TY_ENUM)) {
+        return concat_s("e_", cem_mangle_enum_name(t.module_name, t.name));
+    }
+    if (ord(t.kind) == ord(TY_POINTER)) {
+        return concat_s("p_", cem_opt_key_for_type(t.inner as Type*));
+    }
+    if (ord(t.kind) == ord(TY_NULLABLE)) {
+        return concat_s("n_", cem_opt_key_for_type(t.inner as Type*));
+    }
+    if (ord(t.kind) == ord(TY_FUNC)) {
+        return "fn";
+    }
+    return "unk";
+}
+
+/**
  * Return the wrapper typedef name used for a non-pointer nullable type.
  *
  * @param inner Inner type of the nullable wrapper.
  * @return Wrapper typedef name.
  */
 func cem_opt_wrapper_name_for_inner(inner: Type*) -> string {
-    if (type_is_builtin(inner, "bool")) {
-        return "l0_opt_bool";
-    }
-    if (type_is_builtin(inner, "int")) {
-        return "l0_opt_int";
-    }
-    if (type_is_builtin(inner, "string")) {
-        return "l0_opt_string";
-    }
-    if (type_is_builtin(inner, "byte")) {
-        return "l0_opt_byte";
-    }
-    if (ord(inner.kind) == ord(TY_STRUCT)) {
-        return concat_s("l0_opt_s_", cem_mangle_struct_name(inner.module_name, inner.name));
-    }
-    if (ord(inner.kind) == ord(TY_ENUM)) {
-        return concat_s("l0_opt_s_", cem_mangle_enum_name(inner.module_name, inner.name));
-    }
-    return "l0_opt_unknown";
+    return concat_s("l0_opt_", cem_opt_key_for_type(inner));
 }
 
 /**
@@ -356,8 +499,14 @@ func cem_emit_type(typ: Type*) -> string {
         }
         return cem_opt_wrapper_name_for_inner(typ.inner as Type*);
     }
+    if (ord(typ.kind) == ord(TY_FUNC)) {
+        return cem_ice_string("[ICE-1291] function pointer type emission not implemented");
+    }
+    if (ord(typ.kind) == ord(TY_BUILTIN)) {
+        return cem_ice_string(concat3_s("[ICE-1290] unknown builtin type '", type_format(typ), "'"));
+    }
 
-    return "void*";
+    return cem_ice_string(concat_s("[ICE-9299] unknown type kind for type emission: ", type_format(typ)));
 }
 
 /**
@@ -368,7 +517,30 @@ func cem_emit_type(typ: Type*) -> string {
  */
 func cem_emit_none_value_for_nullable(t: Type*) -> string {
     let inner = t.inner as Type*;
-    return concat3_s("(", cem_opt_wrapper_name_for_inner(inner), "){ .has_value = false, .value = {0} }");
+    if (ord(inner.kind) == ord(TY_POINTER)) {
+        return "NULL";
+    }
+    return concat4_s("((", cem_opt_wrapper_name_for_inner(inner), "){.has_value = 0", "})");
+}
+
+/**
+ * Emit a wrapped `some` value for a non-pointer nullable type.
+ *
+ * @param t Nullable type to lower.
+ * @param c_inner_expr C expression for the inner value.
+ * @return Wrapper construction expression.
+ */
+func cem_emit_some_value_for_nullable(t: Type*, c_inner_expr: string) -> string {
+    let inner = t.inner as Type*;
+    if (ord(inner.kind) == ord(TY_POINTER)) {
+        return c_inner_expr;
+    }
+    return concat4_s(
+        "((",
+        cem_opt_wrapper_name_for_inner(inner),
+        "){.has_value = 1, .value = ",
+        concat_s(c_inner_expr, "})")
+    );
 }
 
 /**
@@ -379,16 +551,16 @@ func cem_emit_none_value_for_nullable(t: Type*) -> string {
  * @return C spelling for the literal.
  */
 func cem_emit_null_literal(expected_type: Type*, for_initializer: bool) -> string {
-    if (ord(expected_type.kind) == ord(TY_POINTER) || cem_is_niche_nullable(expected_type)) {
-        return "NULL";
-    }
-    if (ord(expected_type.kind) == ord(TY_NULLABLE)) {
+    if (ord(expected_type.kind) == ord(TY_POINTER) || ord(expected_type.kind) == ord(TY_NULLABLE)) {
+        if (ord(expected_type.kind) == ord(TY_POINTER) || cem_is_niche_nullable(expected_type)) {
+            return "NULL";
+        }
+        if (for_initializer) {
+            return "{0}";
+        }
         return cem_emit_none_value_for_nullable(expected_type);
     }
-    if (for_initializer) {
-        return "{0}";
-    }
-    return "NULL";
+    return cem_ice_string(concat3_s("[ICE-1292] invalid expected type for null literal: '", type_format(expected_type), "'"));
 }
 
 /**
@@ -399,6 +571,48 @@ func cem_emit_null_literal(expected_type: Type*, for_initializer: bool) -> strin
  */
 func cem_emit_section_comment(self: CEmitter*, text: string) {
     ccb_emit(self.out, concat3_s("/* ", text, " */"));
+}
+
+/**
+ * Emit a module comment.
+ *
+ * @param self Emitter to update.
+ * @param module_name Module name to report.
+ */
+func cem_emit_module_comment(self: CEmitter*, module_name: string) {
+    ccb_emit(self.out, concat3_s("/* Module: ", module_name, " */"));
+}
+
+/**
+ * Emit a decorative module separator.
+ *
+ * @param self Emitter to update.
+ * @param module_name Module name to report.
+ */
+func cem_emit_module_separator(self: CEmitter*, module_name: string) {
+    ccb_emit(self.out, "/* -------------------------------- */");
+    cem_emit_module_comment(self, module_name);
+    ccb_emit(self.out, "/* -------------------------------- */");
+}
+
+/**
+ * Emit an unreachable-code comment.
+ *
+ * @param self Emitter to update.
+ */
+func cem_emit_unreachable_comment(self: CEmitter*) {
+    ccb_emit(self.out, "/* unreachable code here */");
+}
+
+/**
+ * Emit an unreachable runtime marker.
+ *
+ * @param self Emitter to update.
+ * @param reason Marker reason string.
+ */
+func cem_emit_unreachable_marker(self: CEmitter*, reason: string) {
+    let c_reason = se_encode_c_string_bytes(reason);
+    ccb_emit(self.out, concat4_s("L0_UNREACHABLE(\"", c_reason, "\"", ");"));
 }
 
 /**
@@ -427,6 +641,455 @@ func cem_emit_header(self: CEmitter*, opts: CodegenOptions*) {
     }
     ccb_emit(self.out, "#include \"l0_runtime.h\"");
     ccb_emit(self.out, "");
+}
+
+/**
+ * Return the source filename for a loaded module.
+ *
+ * @param self Emitter to inspect.
+ * @param module_name Loaded module name.
+ * @return Source filename when available.
+ */
+func cem_module_filename(self: CEmitter*, module_name: string) -> string {
+    let unit = driver_find_unit(cem_analysis(self).driver_state, module_name);
+    if (unit == null) {
+        return concat_s(module_name, ".l0");
+    }
+    return (unit as DriverUnit*).path;
+}
+
+/**
+ * Emit a `#line` directive when enabled.
+ *
+ * @param self Emitter to update.
+ * @param line One-based source line.
+ * @param current_module Current source module.
+ * @param opts Codegen options controlling line directives.
+ */
+func cem_emit_line_directive(self: CEmitter*, line: int, current_module: string, opts: CodegenOptions*) {
+    if (!opts.emit_line_directives || line <= 0) {
+        return;
+    }
+    ccb_emit(self.out, concat4_s("#line ", int_to_string(line), " \"", concat_s(cem_module_filename(self, current_module), "\"")));
+}
+
+/**
+ * Emit forward declarations for all structs and enums in compilation order.
+ *
+ * @param self Emitter to update.
+ */
+func cem_emit_forward_decls(self: CEmitter*) {
+    let state = cem_analysis(self).driver_state;
+    ccb_emit(self.out, "/* Forward declarations */");
+
+    for (let i = 0; i < vec_size(state.units); i = i + 1) {
+        let unit = ptr_vec_get(state.units, i) as DriverUnit*;
+        let root_opt = unit.parse_result.root_module;
+        if (root_opt == null) {
+            continue;
+        }
+
+        let root = root_opt as Module*;
+        for (let j = 0; j < vec_size(root.decls); j = j + 1) {
+            let decl = ptr_vec_get(root.decls, j) as TopLevelDecl*;
+            if (ord(decl.kind) == ord(TD_STRUCT)) {
+                let sd = decl.data as StructDecl*;
+                ccb_emit(self.out, concat_s("struct ", concat_s(cem_mangle_struct_name(root.name, sd.name), ";")));
+            } else if (ord(decl.kind) == ord(TD_ENUM)) {
+                let ed = decl.data as EnumDecl*;
+                ccb_emit(self.out, concat_s("struct ", concat_s(cem_mangle_enum_name(root.name, ed.name), ";")));
+            }
+        }
+    }
+
+    ccb_emit(self.out, "");
+}
+
+/**
+ * Look up enum payload metadata by variant name.
+ *
+ * @param enum_info Enum metadata to inspect.
+ * @param variant_name Variant name to search for.
+ * @return Matching variant metadata, or `null` if missing.
+ */
+func cem_find_enum_variant_info(enum_info: EnumInfo*, variant_name: string) -> EnumVariantInfo*? {
+    for (let i = 0; i < vec_size(enum_info.variants); i = i + 1) {
+        let info = ptr_vec_get(enum_info.variants, i) as EnumVariantInfo*;
+        if (eq_s(info.name, variant_name)) {
+            return info;
+        }
+    }
+    return null;
+}
+
+/**
+ * Emit a complete C struct definition.
+ *
+ * @param self Emitter to update.
+ * @param module_name Name of the defining module.
+ * @param decl Struct declaration node.
+ * @param struct_info Resolved struct metadata.
+ */
+func cem_emit_struct(self: CEmitter*, module_name: string, decl: StructDecl*, struct_info: StructInfo*) {
+    let c_name = cem_mangle_struct_name(module_name, decl.name);
+    let guard = concat_s("L0_DEFINED_", c_name);
+    ccb_emit(self.out, concat_s("#ifndef ", guard));
+    ccb_emit(self.out, concat_s("#define ", guard));
+    ccb_emit(self.out, concat_s("struct ", concat_s(c_name, " {")));
+    ccb_indent(self.out);
+
+    for (let i = 0; i < vec_size(struct_info.fields); i = i + 1) {
+        let field_info = ptr_vec_get(struct_info.fields, i) as StructFieldInfo*;
+        ccb_emit(self.out, concat3_s(cem_emit_type(field_info.field_type), " ", concat_s(field_info.name, ";")));
+    }
+
+    if (vec_size(struct_info.fields) == 0) {
+        ccb_emit(self.out, "char __dummy__;");
+    }
+
+    ccb_dedent(self.out);
+    ccb_emit(self.out, "};");
+    ccb_emit(self.out, "#endif");
+    ccb_emit(self.out, "");
+}
+
+/**
+ * Emit an enum as a C tagged-union struct.
+ *
+ * @param self Emitter to update.
+ * @param module_name Name of the defining module.
+ * @param decl Enum declaration node.
+ * @param enum_info Resolved enum metadata.
+ */
+func cem_emit_enum(self: CEmitter*, module_name: string, decl: EnumDecl*, enum_info: EnumInfo*) {
+    let c_name = cem_mangle_enum_name(module_name, decl.name);
+    let guard = concat_s("L0_DEFINED_", c_name);
+    let tag_enum_name = concat_s(c_name, "_tag");
+
+    ccb_emit(self.out, concat_s("#ifndef ", guard));
+    ccb_emit(self.out, concat_s("#define ", guard));
+    ccb_emit(self.out, concat_s("enum ", concat_s(tag_enum_name, " {")));
+    ccb_indent(self.out);
+
+    for (let i = 0; i < vec_size(decl.variants); i = i + 1) {
+        let variant = ptr_vec_get(decl.variants, i) as EnumVariant*;
+        ccb_emit(self.out, concat3_s(c_name, "_", concat_s(variant.name, ",")));
+    }
+
+    ccb_dedent(self.out);
+    ccb_emit(self.out, "};");
+    ccb_emit(self.out, "");
+    ccb_emit(self.out, concat_s("struct ", concat_s(c_name, " {")));
+    ccb_indent(self.out);
+    ccb_emit(self.out, concat_s("enum ", concat_s(tag_enum_name, " tag;")));
+    ccb_emit(self.out, "union {");
+    ccb_indent(self.out);
+
+    for (let i = 0; i < vec_size(decl.variants); i = i + 1) {
+        let variant2 = ptr_vec_get(decl.variants, i) as EnumVariant*;
+        let info = cem_find_enum_variant_info(enum_info, variant2.name);
+        if (info == null) {
+            cem_ice(concat4_s("[ICE-1271] missing VariantInfo for ", module_name, ".", concat3_s(decl.name, ".", variant2.name)));
+        }
+
+        let variant_info = info as EnumVariantInfo*;
+        if (vec_size(variant_info.field_types) == 0) {
+            ccb_emit(self.out, concat3_s("struct { char __dummy__; } ", variant2.name, ";"));
+            continue;
+        }
+
+        with (let sb = sb_create() => sb_free(sb)) {
+            sb_append(sb, "struct { ");
+            for (let j = 0; j < vec_size(variant_info.field_types); j = j + 1) {
+                if (j > 0) {
+                    sb_append(sb, "; ");
+                }
+                let field_decl = ptr_vec_get(variant2.fields, j) as FieldDecl*;
+                let field_type = ptr_vec_get(variant_info.field_types, j) as Type*;
+                sb_append(sb, cem_emit_type(field_type));
+                sb_append(sb, " ");
+                sb_append(sb, field_decl.name);
+            }
+            sb_append(sb, "; } ");
+            sb_append(sb, variant2.name);
+            sb_append(sb, ";");
+            ccb_emit(self.out, sb_to_string(sb));
+        }
+    }
+
+    ccb_dedent(self.out);
+    ccb_emit(self.out, "} data;");
+    ccb_dedent(self.out);
+    ccb_emit(self.out, "};");
+    ccb_emit(self.out, "#endif");
+    ccb_emit(self.out, "");
+}
+
+/**
+ * Emit one top-level `let` declaration as a static C variable.
+ *
+ * @param self Emitter to update.
+ * @param module_name Name of the defining module.
+ * @param decl Let declaration node.
+ * @param let_type Resolved let type.
+ * @param c_init C initializer expression.
+ */
+func cem_emit_let_declaration(self: CEmitter*, module_name: string, decl: LetDecl*, let_type: Type*, c_init: string) {
+    let c_type = cem_emit_type(let_type);
+    let c_name = cem_mangle_let_name(module_name, decl.name);
+    ccb_emit(self.out, concat4_s("static ", c_type, " ", concat3_s(c_name, " = ", concat_s(c_init, ";"))));
+}
+
+/**
+ * Build a function parameter list.
+ *
+ * @param decl Function declaration node.
+ * @param func_type Resolved function type.
+ * @return Parameter-list text without surrounding parentheses.
+ */
+func cem_function_params(decl: FuncDecl*, func_type: Type*) -> string {
+    let params = func_type.params as VectorBase*;
+    if (vec_size(params) == 0) {
+        return "void";
+    }
+
+    with (let sb = sb_create() => sb_free(sb)) {
+        for (let i = 0; i < vec_size(params); i = i + 1) {
+            if (i > 0) {
+                sb_append(sb, ", ");
+            }
+            let param_decl = ptr_vec_get(decl.params, i) as Param*;
+            let param_type = ptr_vec_get(params, i) as Type*;
+            sb_append(sb, cem_emit_type(param_type));
+            sb_append(sb, " ");
+            sb_append(sb, cem_mangle_identifier(param_decl.name));
+        }
+        return sb_to_string(sb);
+    }
+}
+
+/**
+ * Emit a function declaration.
+ *
+ * @param self Emitter to update.
+ * @param module_name Name of the defining module.
+ * @param decl Function declaration node.
+ * @param func_type Resolved function type.
+ */
+func cem_emit_function_declaration(self: CEmitter*, module_name: string, decl: FuncDecl*, func_type: Type*) {
+    let c_name = "";
+    if (decl.is_extern) {
+        c_name = concat3_s("(", decl.name, ")");
+    } else {
+        c_name = cem_mangle_function_name(module_name, decl.name);
+    }
+
+    let c_return_type = cem_emit_type(func_type.result as Type*);
+    let params_str = cem_function_params(decl, func_type);
+    ccb_emit(self.out, concat4_s(c_return_type, " ", c_name, concat3_s("(", params_str, ");")));
+}
+
+/**
+ * Emit a function definition header.
+ *
+ * @param self Emitter to update.
+ * @param module_name Name of the defining module.
+ * @param decl Function declaration node.
+ * @param func_type Resolved function type.
+ */
+func cem_emit_function_definition_header(self: CEmitter*, module_name: string, decl: FuncDecl*, func_type: Type*) {
+    let c_name = cem_mangle_function_name(module_name, decl.name);
+    let c_return_type = cem_emit_type(func_type.result as Type*);
+    let params_str = cem_function_params(decl, func_type);
+    ccb_emit(self.out, concat4_s(c_return_type, " ", c_name, concat3_s("(", params_str, ")")));
+    ccb_emit(self.out, "{");
+    ccb_indent(self.out);
+}
+
+/**
+ * Emit a function definition footer.
+ *
+ * @param self Emitter to update.
+ */
+func cem_emit_function_definition_footer(self: CEmitter*) {
+    ccb_dedent(self.out);
+    ccb_emit(self.out, "}");
+    ccb_emit(self.out, "");
+}
+
+/**
+ * Emit the C `main()` wrapper for the entry module.
+ *
+ * @param self Emitter to update.
+ * @param entry_module Entry-module name.
+ * @param func_type Resolved entry-function type.
+ */
+func cem_emit_main_wrapper(self: CEmitter*, entry_module: string, func_type: Type*) {
+    let mangled_name = cem_mangle_function_name(entry_module, "main");
+    let c_return_type = cem_emit_type(func_type.result as Type*);
+
+    ccb_emit(self.out, "/* C entry point wrapper */");
+    ccb_emit(self.out, "int main(int argc, char **argv)");
+    ccb_emit(self.out, "{");
+    ccb_indent(self.out);
+    ccb_emit(self.out, "_rt_init_args(argc, argv);");
+
+    if (eq_s(c_return_type, "l0_int")) {
+        ccb_emit(self.out, concat3_s("return (int) ", mangled_name, "();"));
+    } else if (eq_s(c_return_type, "bool")) {
+        ccb_emit(self.out, concat4_s("bool result = ", mangled_name, "(", ");"));
+        ccb_emit(self.out, "return result ? 0 : 1;");
+    } else {
+        ccb_emit(self.out, concat3_s(mangled_name, "(", ");"));
+        ccb_emit(self.out, "return 0;");
+    }
+
+    ccb_dedent(self.out);
+    ccb_emit(self.out, "}");
+    ccb_emit(self.out, "");
+}
+
+/**
+ * Record one optional-wrapper inner type if it was not already collected.
+ *
+ * @param self Emitter to update.
+ * @param inner Inner type to store.
+ */
+func cem_note_opt_wrapper(self: CEmitter*, inner: Type*) {
+    let name = cem_opt_wrapper_name_for_inner(inner);
+    if (spm_get(self.opt_wrappers, name) == null) {
+        spm_put(self.opt_wrappers, name, type_clone(inner) as void*);
+    }
+}
+
+/**
+ * Recursively collect optional-wrapper types reachable from one type.
+ *
+ * @param self Emitter to update.
+ * @param t Type to scan.
+ */
+func cem_collect_opt_wrappers_from_type(self: CEmitter*, t: Type*) {
+    if (ord(t.kind) == ord(TY_NULLABLE)) {
+        if (!cem_is_niche_nullable(t)) {
+            cem_note_opt_wrapper(self, t.inner as Type*);
+            cem_collect_opt_wrappers_from_type(self, t.inner as Type*);
+        } else {
+            cem_collect_opt_wrappers_from_type(self, t.inner as Type*);
+        }
+        return;
+    }
+
+    if (ord(t.kind) == ord(TY_POINTER)) {
+        cem_collect_opt_wrappers_from_type(self, t.inner as Type*);
+        return;
+    }
+
+    if (ord(t.kind) == ord(TY_FUNC)) {
+        let params = t.params as VectorBase*;
+        for (let i = 0; i < vec_size(params); i = i + 1) {
+            cem_collect_opt_wrappers_from_type(self, ptr_vec_get(params, i) as Type*);
+        }
+        cem_collect_opt_wrappers_from_type(self, t.result as Type*);
+    }
+}
+
+/**
+ * Return whether a wrapper inner type can be emitted before user type definitions.
+ *
+ * @param inner Inner wrapped type.
+ * @return `true` for builtin-only wrapper dependencies.
+ */
+func cem_is_early_inner(inner: Type*) -> bool {
+    if (ord(inner.kind) == ord(TY_BUILTIN)) {
+        return true;
+    }
+    if (ord(inner.kind) == ord(TY_NULLABLE) && !cem_is_niche_nullable(inner)) {
+        return cem_is_early_inner(inner.inner as Type*);
+    }
+    return false;
+}
+
+/**
+ * Scan analysis metadata and collect every needed optional wrapper.
+ *
+ * @param self Emitter to update.
+ */
+func cem_prepare_optional_wrappers(self: CEmitter*) {
+    cem_reset_optional_wrappers(self);
+    let analysis = cem_analysis(self);
+    if (analysis.signatures == null) {
+        return;
+    }
+
+    let tables = analysis.signatures as SignatureTables*;
+
+    for (let i = 0; i < spm_capacity(tables.func_types); i = i + 1) {
+        if (spm_slot_occupied(tables.func_types, i)) {
+            cem_collect_opt_wrappers_from_type(self, spm_slot_value(tables.func_types, i) as Type*);
+        }
+    }
+
+    for (let i = 0; i < spm_capacity(tables.struct_infos); i = i + 1) {
+        if (!spm_slot_occupied(tables.struct_infos, i)) {
+            continue;
+        }
+        let info = spm_slot_value(tables.struct_infos, i) as StructInfo*;
+        for (let j = 0; j < vec_size(info.fields); j = j + 1) {
+            let field_info = ptr_vec_get(info.fields, j) as StructFieldInfo*;
+            cem_collect_opt_wrappers_from_type(self, field_info.field_type);
+        }
+    }
+
+    for (let i = 0; i < spm_capacity(tables.enum_infos); i = i + 1) {
+        if (!spm_slot_occupied(tables.enum_infos, i)) {
+            continue;
+        }
+        let enum_info = spm_slot_value(tables.enum_infos, i) as EnumInfo*;
+        for (let j = 0; j < vec_size(enum_info.variants); j = j + 1) {
+            let variant_info = ptr_vec_get(enum_info.variants, j) as EnumVariantInfo*;
+            for (let k = 0; k < vec_size(variant_info.field_types); k = k + 1) {
+                cem_collect_opt_wrappers_from_type(self, ptr_vec_get(variant_info.field_types, k) as Type*);
+            }
+        }
+    }
+
+    for (let i = 0; i < spm_capacity(analysis.expr_types); i = i + 1) {
+        if (spm_slot_occupied(analysis.expr_types, i)) {
+            cem_collect_opt_wrappers_from_type(self, spm_slot_value(analysis.expr_types, i) as Type*);
+        }
+    }
+}
+
+/**
+ * Emit collected optional-wrapper typedefs for one phase.
+ *
+ * @param self Emitter to update.
+ * @param early `true` for builtin-only wrappers, `false` for user-defined wrappers.
+ */
+func cem_emit_optional_wrappers(self: CEmitter*, early: bool) {
+    with (let names = spm_keys(self.opt_wrappers) => vs_free(names)) {
+        vs_sort(names);
+        for (let i = 0; i < vs_size(names); i = i + 1) {
+            let name = vs_get(names, i);
+            if (ss_has(self.opt_emitted, name)) {
+                continue;
+            }
+
+            let inner = spm_get(self.opt_wrappers, name) as Type*;
+            if (cem_is_early_inner(inner) != early) {
+                continue;
+            }
+
+            let guard = concat_s(cem_upper_ascii(name), "_DEFINED");
+            let c_inner = cem_emit_type(inner);
+            ccb_emit(self.out, concat_s("#ifndef ", guard));
+            ccb_emit(self.out, concat_s("#define ", guard));
+            ccb_emit(self.out, concat4_s("typedef struct { l0_bool has_value; ", c_inner, " value; } ", concat_s(name, ";")));
+            ccb_emit(self.out, concat3_s("#endif /* ", guard, " */"));
+            ccb_emit(self.out, "");
+            ss_add(self.opt_emitted, us_clone_s(name));
+        }
+    }
 }
 
 /**

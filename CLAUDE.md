@@ -138,8 +138,15 @@ Compiler auto-detection follows the logic defined in the Commands section.
 Format: `[XXX-NNNN]` (e.g., `[TYP-0158]`). Before adding a new code, confirm it is unused:
 
 ```bash
-grep -r 'XXX-NNNN' --include='*.py' compiler/stage1_py/
+rg -n 'XXX-NNNN' compiler/stage1_py compiler/stage2_l0 docs
 ```
+
+- Equivalent Stage 2 conditions MUST reuse the exact Stage 1 code, not just the same family. This includes
+  user-facing diagnostics and `ICE-xxxx`.
+- Never reuse a Stage 1 code with a different meaning in Stage 2.
+- New codes are allowed only for Stage 2-only conditions with no Stage 1 equivalent.
+- When porting Stage 1 behavior, treat Stage 1 code meaning as the oracle and preserve the same numeric code for the
+  equivalent condition.
 
 ## Git Conventions
 
@@ -165,6 +172,7 @@ grep -r 'XXX-NNNN' --include='*.py' compiler/stage1_py/
 3. **English Only:** All code names and comments MUST be in English.
 4. **Tests Updated:** All relevant tests must be added/updated in the same PR.
 5. **Documentation Updated:** If behavior changes, corresponding `.md` in `docs/`
-6. **Diagnostic Codes:** New diagnostics must have unique codes, verified by search.
+6. **Diagnostic Codes:** Equivalent Stage 2 conditions reuse Stage 1 codes exactly, including `ICE-xxxx`; new codes are
+   globally unique and verified by search.
 7. **Plans Documented:** For non-trivial changes or bug fixes a plan must be documented in `docs/plans/` with a clear
    execution path and expected outcomes. See `docs/README.md` for naming and placement rules.

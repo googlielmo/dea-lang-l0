@@ -6,13 +6,105 @@
 module c_emitter_test;
 
 import std.assert;
-import std.string;
+import std.hashmap;
 import std.io;
+import std.string;
+import std.text;
+import std.vector;
 
+import ast;
 import c_emitter;
 import codegen_options;
+import driver;
+import parser;
+import sem_context;
+import signatures;
 import string_escape;
 import types;
+import util.diag;
+
+/**
+ * Create an empty analysis result for emitter tests.
+ *
+ * @return New empty analysis result.
+ */
+func cet_empty_analysis_result() -> AnalysisResult* {
+    return new AnalysisResult(
+        new DriverState("", ptr_vec_create(0), vs_create(0), diag_create(), vs_create(0), vs_create(0)),
+        diag_create(),
+        null,
+        null,
+        null,
+        spm_create(),
+        sim_create(),
+        spm_create()
+    );
+}
+
+/**
+ * Create a simple builtin type reference.
+ *
+ * @param name Builtin name.
+ * @return New type-ref node.
+ */
+func cet_builtin_type_ref(name: string) -> TypeRef* {
+    return new TypeRef(name, 0, false, null, null, span_here(1, 1));
+}
+
+/**
+ * Wrap one top-level declaration payload.
+ *
+ * @param kind Decl kind.
+ * @param data Owned decl payload.
+ * @return New wrapped top-level declaration.
+ */
+func cet_wrap_decl(kind: TopLevelDeclKind, data: void*) -> TopLevelDecl* {
+    return new TopLevelDecl(kind, data);
+}
+
+/**
+ * Create a parsed module with no imports.
+ *
+ * @param name Module name.
+ * @param filename Source filename.
+ * @param decls Owned declaration vector.
+ * @return New module node.
+ */
+func cet_module(name: string, filename: string, decls: VectorBase*) -> Module* {
+    return new Module(name, ptr_vec_create(0), decls, span_here(1, 1), filename);
+}
+
+/**
+ * Add one module to an analysis driver's loaded units.
+ *
+ * @param result Analysis result to update.
+ * @param mod Parsed module to move into a parse result.
+ */
+func cet_push_module(result: AnalysisResult*, mod: Module*) {
+    let module_name = mod.name;
+    let pr = new ParseResult(mod, expr_arena_create(0), stmt_arena_create(0), pattern_arena_create(0), diag_create());
+    ptr_vec_push(result.driver_state.units, new DriverUnit(module_name, mod.filename, pr) as void*);
+}
+
+/**
+ * Create a struct declaration with no fields.
+ *
+ * @param name Struct name.
+ * @return New struct declaration.
+ */
+func cet_empty_struct_decl(name: string) -> StructDecl* {
+    return new StructDecl(name, ptr_vec_create(0), span_here(1, 1));
+}
+
+/**
+ * Create an enum declaration with no variants.
+ *
+ * @param name Enum name.
+ * @return New enum declaration.
+ */
+func cet_empty_enum_decl(name: string) -> EnumDecl* {
+    return new EnumDecl(name, ptr_vec_create(0), span_here(1, 1));
+}
 
 /**
  * Tests test_string_escape_encodes_control_and_quote_bytes.
@@ -42,16 +134,22 @@ func test_code_builder_tracks_indentation() {
  * Tests test_emitter_name_mangling.
  */
 func test_emitter_name_mangling() {
+    let emitter = cem_create();
+
     assert(eq_s(cem_mangle_struct_name("demo.main", "Point"), "l0_demo_main_Point"), "struct name mismatch");
     assert(eq_s(cem_mangle_function_name("demo.main", "main"), "l0_demo_main_main"), "function name mismatch");
     assert(eq_s(cem_mangle_let_name("demo.main", "static"), "l0_demo_main_l0_kw_static"), "let name mismatch");
     assert(eq_s(cem_mangle_identifier("return"), "return__v"), "identifier keyword mangling mismatch");
+    assert(eq_s(cem_mangle_identifier("tmp__v"), "tmp__v__v"), "identifier suffix mangling mismatch");
+    assert(eq_s(cem_fresh_tmp(emitter, "tmp"), "l0_tmp_1"), "fresh temp name mismatch");
+
+    cem_free(emitter);
 }
 
 /**
- * Tests test_emitter_type_lowering.
+ * Tests test_emitter_type_lowering_and_null_forms.
  */
-func test_emitter_type_lowering() {
+func test_emitter_type_lowering_and_null_forms() {
     let point_ty = type_new_struct("demo.main", "Point");
     let point_ptr_ty = type_new_pointer(type_clone(point_ty));
     let point_opt_ty = type_new_nullable(type_clone(point_ty));
@@ -60,6 +158,12 @@ func test_emitter_type_lowering() {
     assert(eq_s(cem_emit_type(point_ty), "struct l0_demo_main_Point"), "struct type mismatch");
     assert(eq_s(cem_emit_type(point_ptr_ty), "struct l0_demo_main_Point*"), "pointer type mismatch");
     assert(eq_s(cem_emit_type(point_opt_ty), "l0_opt_s_l0_demo_main_Point"), "nullable struct type mismatch");
+    assert(eq_s(cem_emit_none_value_for_nullable(point_opt_ty), "((l0_opt_s_l0_demo_main_Point){.has_value = 0})"),
+        "nullable none mismatch");
+    assert(eq_s(cem_emit_null_literal(point_opt_ty, false), "((l0_opt_s_l0_demo_main_Point){.has_value = 0})"),
+        "nullable expression null mismatch");
+    assert(eq_s(cem_emit_null_literal(point_opt_ty, true), "{0}"), "nullable initializer null mismatch");
+    assert(eq_s(cem_emit_null_literal(point_ptr_ty, false), "NULL"), "pointer null mismatch");
 
     type_free(point_ty);
     type_free(point_ptr_ty);
@@ -98,14 +202,221 @@ func test_emitter_string_literals_use_l0_string_const() {
 }
 
 /**
+ * Tests test_emitter_forward_decls_follow_loaded_module_order.
+ */
+func test_emitter_forward_decls_follow_loaded_module_order() {
+    let result = cet_empty_analysis_result();
+    let decls_a = ptr_vec_create(2);
+    let decls_b = ptr_vec_create(1);
+    ptr_vec_push(decls_a, cet_wrap_decl(TD_STRUCT, cet_empty_struct_decl("Point") as void*) as void*);
+    ptr_vec_push(decls_a, cet_wrap_decl(TD_ENUM, cet_empty_enum_decl("Color") as void*) as void*);
+    ptr_vec_push(decls_b, cet_wrap_decl(TD_STRUCT, cet_empty_struct_decl("Box") as void*) as void*);
+
+    cet_push_module(result, cet_module("demo.main", "demo/main.l0", decls_a));
+    cet_push_module(result, cet_module("demo.math", "demo/math.l0", decls_b));
+
+    let emitter = cem_create();
+    cem_set_analysis(emitter, result);
+    cem_emit_forward_decls(emitter);
+
+    with (let expected = sb_create() => sb_free(expected)) {
+        sb_append(expected, "/* Forward declarations */\n");
+        sb_append(expected, "struct l0_demo_main_Point;\n");
+        sb_append(expected, "struct l0_demo_main_Color;\n");
+        sb_append(expected, "struct l0_demo_math_Box;\n");
+        sb_append(expected, "\n");
+        assert(eq_s(cem_get_output(emitter), sb_to_string(expected)), "forward declarations output mismatch");
+    }
+
+    cem_free(emitter);
+
+    analysis_result_free(result);
+}
+
+/**
+ * Tests test_emitter_optional_wrappers_emit_early_then_late.
+ */
+func test_emitter_optional_wrappers_emit_early_then_late() {
+    let result = cet_empty_analysis_result();
+    result.signatures = sig_make_tables();
+    let params = ptr_vec_create(2);
+    ptr_vec_push(params, type_new_nullable(type_builtin_int()) as void*);
+    ptr_vec_push(params, type_new_nullable(type_new_enum("demo.main", "Color")) as void*);
+    let func_ty = type_new_func(params, type_new_nullable(type_new_struct("demo.main", "Point")));
+    spm_put((result.signatures as SignatureTables*).func_types, "demo.main::make", func_ty as void*);
+
+    let emitter = cem_create();
+    cem_set_analysis(emitter, result);
+    cem_prepare_optional_wrappers(emitter);
+    cem_emit_optional_wrappers(emitter, true);
+    cem_emit_optional_wrappers(emitter, false);
+
+    with (let expected = sb_create() => sb_free(expected)) {
+        sb_append(expected, "#ifndef L0_OPT_INT_DEFINED\n");
+        sb_append(expected, "#define L0_OPT_INT_DEFINED\n");
+        sb_append(expected, "typedef struct { l0_bool has_value; l0_int value; } l0_opt_int;\n");
+        sb_append(expected, "#endif /* L0_OPT_INT_DEFINED */\n");
+        sb_append(expected, "\n");
+        sb_append(expected, "#ifndef L0_OPT_E_L0_DEMO_MAIN_COLOR_DEFINED\n");
+        sb_append(expected, "#define L0_OPT_E_L0_DEMO_MAIN_COLOR_DEFINED\n");
+        sb_append(expected,
+            "typedef struct { l0_bool has_value; struct l0_demo_main_Color value; } l0_opt_e_l0_demo_main_Color;\n");
+        sb_append(expected, "#endif /* L0_OPT_E_L0_DEMO_MAIN_COLOR_DEFINED */\n");
+        sb_append(expected, "\n");
+        sb_append(expected, "#ifndef L0_OPT_S_L0_DEMO_MAIN_POINT_DEFINED\n");
+        sb_append(expected, "#define L0_OPT_S_L0_DEMO_MAIN_POINT_DEFINED\n");
+        sb_append(expected,
+            "typedef struct { l0_bool has_value; struct l0_demo_main_Point value; } l0_opt_s_l0_demo_main_Point;\n");
+        sb_append(expected, "#endif /* L0_OPT_S_L0_DEMO_MAIN_POINT_DEFINED */\n");
+        sb_append(expected, "\n");
+        assert(eq_s(cem_get_output(emitter), sb_to_string(expected)), "optional wrapper emission mismatch");
+    }
+
+    cem_free(emitter);
+    analysis_result_free(result);
+}
+
+/**
+ * Tests test_emitter_top_level_forms_match_stage1_shape.
+ */
+func test_emitter_top_level_forms_match_stage1_shape() {
+    let emitter = cem_create();
+    let point_fields = ptr_vec_create(2);
+    let variant_infos = ptr_vec_create(2);
+    let variant_none_fields = ptr_vec_create(0);
+    let variant_rgb_fields = ptr_vec_create(3);
+    let decl_fields = ptr_vec_create(2);
+    let enum_variants = ptr_vec_create(2);
+    let rgb_decl_fields = ptr_vec_create(3);
+    let func_params = ptr_vec_create(2);
+    let func_param_types = ptr_vec_create(2);
+    let extern_params = ptr_vec_create(0);
+    let extern_param_types = ptr_vec_create(0);
+
+    ptr_vec_push(point_fields, new StructFieldInfo("x", type_builtin_int()) as void*);
+    ptr_vec_push(point_fields, new StructFieldInfo("y", type_builtin_int()) as void*);
+    let point_info = new StructInfo(
+        "demo.main::Point",
+        "demo.main",
+        "Point",
+        "demo/main.l0",
+        span_here(1, 1),
+        type_new_struct("demo.main", "Point"),
+        point_fields
+    );
+
+    ptr_vec_push(variant_infos, new EnumVariantInfo("None", variant_none_fields) as void*);
+    ptr_vec_push(variant_rgb_fields, type_builtin_byte() as void*);
+    ptr_vec_push(variant_rgb_fields, type_builtin_byte() as void*);
+    ptr_vec_push(variant_rgb_fields, type_builtin_byte() as void*);
+    ptr_vec_push(variant_infos, new EnumVariantInfo("Rgb", variant_rgb_fields) as void*);
+    let color_info = new EnumInfo(
+        "demo.main::Color",
+        "demo.main",
+        "Color",
+        "demo/main.l0",
+        span_here(1, 1),
+        type_new_enum("demo.main", "Color"),
+        variant_infos
+    );
+
+    ptr_vec_push(decl_fields, new FieldDecl("x", cet_builtin_type_ref("int")) as void*);
+    ptr_vec_push(decl_fields, new FieldDecl("y", cet_builtin_type_ref("int")) as void*);
+    let point_decl = new StructDecl("Point", decl_fields, span_here(1, 1));
+
+    ptr_vec_push(enum_variants, new EnumVariant("None", ptr_vec_create(0)) as void*);
+    ptr_vec_push(rgb_decl_fields, new FieldDecl("r", cet_builtin_type_ref("byte")) as void*);
+    ptr_vec_push(rgb_decl_fields, new FieldDecl("g", cet_builtin_type_ref("byte")) as void*);
+    ptr_vec_push(rgb_decl_fields, new FieldDecl("b", cet_builtin_type_ref("byte")) as void*);
+    ptr_vec_push(enum_variants, new EnumVariant("Rgb", rgb_decl_fields) as void*);
+    let color_decl = new EnumDecl("Color", enum_variants, span_here(1, 1));
+
+    ptr_vec_push(func_params, new Param("a", cet_builtin_type_ref("int")) as void*);
+    ptr_vec_push(func_params, new Param("b", cet_builtin_type_ref("int")) as void*);
+    ptr_vec_push(func_param_types, type_builtin_int() as void*);
+    ptr_vec_push(func_param_types, type_builtin_int() as void*);
+    let sum_decl = new FuncDecl("sum", func_params, cet_builtin_type_ref("int"), invalid_stmt_id(), false, span_here(1, 1));
+    let sum_type = type_new_func(func_param_types, type_builtin_int());
+
+    let extern_decl = new FuncDecl("puts", extern_params, cet_builtin_type_ref("void"), invalid_stmt_id(), true, span_here(1,
+        1));
+    let extern_type = type_new_func(extern_param_types, type_builtin_void());
+    let let_decl = new LetDecl("answer", cet_builtin_type_ref("int"), invalid_expr_id(), span_here(1, 1));
+    let let_type = type_builtin_int();
+
+    cem_emit_struct(emitter, "demo.main", point_decl, point_info);
+    cem_emit_enum(emitter, "demo.main", color_decl, color_info);
+    cem_emit_let_declaration(emitter, "demo.main", let_decl, let_type, "42");
+    cem_emit_function_declaration(emitter, "demo.main", sum_decl, sum_type);
+    cem_emit_function_declaration(emitter, "demo.main", extern_decl, extern_type);
+    cem_emit_function_definition_header(emitter, "demo.main", sum_decl, sum_type);
+    ccb_emit(emitter.out, "return a + b;");
+    cem_emit_function_definition_footer(emitter);
+    cem_emit_main_wrapper(emitter, "demo.main", sum_type);
+
+    let text = cem_get_output(emitter);
+    assert(contains_s(text, "#ifndef L0_DEFINED_l0_demo_main_Point"), "struct guard missing");
+    assert(contains_s(text, "struct l0_demo_main_Point {\n    l0_int x;\n    l0_int y;\n};\n#endif\n"),
+        "struct definition mismatch");
+    assert(contains_s(text, "enum l0_demo_main_Color_tag {\n    l0_demo_main_Color_None,\n    l0_demo_main_Color_Rgb,\n};\n"),
+        "enum tag definition mismatch");
+    assert(contains_s(text,
+        "struct { char __dummy__; } None;\n        struct { l0_byte r; l0_byte g; l0_byte b; } Rgb;\n    } data;\n};\n#endif\n"),
+        "enum payload layout mismatch");
+    assert(contains_s(text, "static l0_int l0_demo_main_answer = 42;"), "top-level let mismatch");
+    assert(contains_s(text, "l0_int l0_demo_main_sum(l0_int a, l0_int b);"), "function declaration mismatch");
+    assert(contains_s(text, "void (puts)(void);"), "extern declaration mismatch");
+    assert(contains_s(text, "l0_int l0_demo_main_sum(l0_int a, l0_int b)\n{\n    return a + b;\n}\n"),
+        "function definition mismatch");
+    assert(contains_s(text,
+        "/* C entry point wrapper */\nint main(int argc, char **argv)\n{\n    _rt_init_args(argc, argv);\n    return (int) l0_demo_main_main();\n}\n"),
+        "main wrapper mismatch");
+
+    type_free(let_type);
+    type_free(sum_type);
+    type_free(extern_type);
+    type_free(point_info.struct_type);
+    for (let i = 0; i < vec_size(point_info.fields); i = i + 1) {
+        let field = ptr_vec_get(point_info.fields, i) as StructFieldInfo*;
+        type_free(field.field_type);
+        drop field;
+    }
+    vec_free(point_info.fields);
+    drop point_info;
+
+    type_free(color_info.enum_type);
+    for (let i = 0; i < vec_size(color_info.variants); i = i + 1) {
+        let variant = ptr_vec_get(color_info.variants, i) as EnumVariantInfo*;
+        for (let j = 0; j < vec_size(variant.field_types); j = j + 1) {
+            type_free(ptr_vec_get(variant.field_types, j) as Type*);
+        }
+        vec_free(variant.field_types);
+        drop variant;
+    }
+    vec_free(color_info.variants);
+    drop color_info;
+
+    struct_decl_free(point_decl);
+    enum_decl_free(color_decl);
+    let_decl_free(let_decl);
+    func_decl_free(sum_decl);
+    func_decl_free(extern_decl);
+
+    cem_free(emitter);
+}
+
+/**
  * Main entry point for the module.
  */
 func main() {
     test_string_escape_encodes_control_and_quote_bytes();
     test_code_builder_tracks_indentation();
     test_emitter_name_mangling();
-    test_emitter_type_lowering();
+    test_emitter_type_lowering_and_null_forms();
     test_emitter_header_honors_trace_flags();
     test_emitter_string_literals_use_l0_string_const();
+    test_emitter_forward_decls_follow_loaded_module_order();
+    test_emitter_optional_wrappers_emit_early_then_late();
+    test_emitter_top_level_forms_match_stage1_shape();
     printl_s("c_emitter_test: all tests passed");
 }
