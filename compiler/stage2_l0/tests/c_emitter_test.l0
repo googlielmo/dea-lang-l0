@@ -1,0 +1,111 @@
+/*
+ * SPDX-License-Identifier: MIT OR Apache-2.0
+ * Copyright (c) 2026 gwz
+ */
+
+module c_emitter_test;
+
+import std.assert;
+import std.string;
+import std.io;
+
+import c_emitter;
+import codegen_options;
+import string_escape;
+import types;
+
+/**
+ * Tests test_string_escape_encodes_control_and_quote_bytes.
+ */
+func test_string_escape_encodes_control_and_quote_bytes() {
+    let escaped = se_encode_c_string_bytes("A\n\"\\B");
+    assert(eq_s(escaped, "A\\n\\\"\\\\B"), "escaped string mismatch");
+}
+
+/**
+ * Tests test_code_builder_tracks_indentation.
+ */
+func test_code_builder_tracks_indentation() {
+    let out = ccb_create();
+    ccb_emit(out, "if (true) {");
+    ccb_indent(out);
+    ccb_emit(out, "return 0;");
+    ccb_dedent(out);
+    ccb_emit(out, "}");
+
+    let text = ccb_to_string(out);
+    assert(eq_s(text, "if (true) {\n    return 0;\n}\n"), "builder output mismatch");
+    ccb_free(out);
+}
+
+/**
+ * Tests test_emitter_name_mangling.
+ */
+func test_emitter_name_mangling() {
+    assert(eq_s(cem_mangle_struct_name("demo.main", "Point"), "l0_demo_main_Point"), "struct name mismatch");
+    assert(eq_s(cem_mangle_function_name("demo.main", "main"), "l0_demo_main_main"), "function name mismatch");
+    assert(eq_s(cem_mangle_let_name("demo.main", "static"), "l0_demo_main_l0_kw_static"), "let name mismatch");
+    assert(eq_s(cem_mangle_identifier("return"), "return__v"), "identifier keyword mangling mismatch");
+}
+
+/**
+ * Tests test_emitter_type_lowering.
+ */
+func test_emitter_type_lowering() {
+    let point_ty = type_new_struct("demo.main", "Point");
+    let point_ptr_ty = type_new_pointer(type_clone(point_ty));
+    let point_opt_ty = type_new_nullable(type_clone(point_ty));
+
+    assert(eq_s(cem_emit_type(type_builtin_int()), "l0_int"), "builtin int type mismatch");
+    assert(eq_s(cem_emit_type(point_ty), "struct l0_demo_main_Point"), "struct type mismatch");
+    assert(eq_s(cem_emit_type(point_ptr_ty), "struct l0_demo_main_Point*"), "pointer type mismatch");
+    assert(eq_s(cem_emit_type(point_opt_ty), "l0_opt_s_l0_demo_main_Point"), "nullable struct type mismatch");
+
+    type_free(point_ty);
+    type_free(point_ptr_ty);
+    type_free(point_opt_ty);
+}
+
+/**
+ * Tests test_emitter_header_honors_trace_flags.
+ */
+func test_emitter_header_honors_trace_flags() {
+    let emitter = cem_create();
+    let opts = cg_options_create();
+    opts.trace_arc = true;
+    opts.trace_memory = true;
+
+    cem_emit_header(emitter, opts);
+    let text = cem_get_output(emitter);
+
+    assert(contains_s(text, "#define L0_TRACE_ARC 1"), "trace arc define missing");
+    assert(contains_s(text, "#define L0_TRACE_MEMORY 1"), "trace memory define missing");
+    assert(contains_s(text, "#include \"l0_runtime.h\""), "runtime include missing");
+
+    cg_options_free(opts);
+    cem_free(emitter);
+}
+
+/**
+ * Tests test_emitter_string_literals_use_l0_string_const.
+ */
+func test_emitter_string_literals_use_l0_string_const() {
+    let expr_literal = cem_emit_string_literal("A\nB");
+    let const_literal = cem_emit_const_string_literal("A\nB");
+
+    assert(eq_s(expr_literal, "((l0_string)L0_STRING_CONST(\"A\\nB\", 3))"), "expression literal mismatch");
+    assert(eq_s(const_literal, "L0_STRING_CONST(\"A\\nB\", 3)"), "const literal mismatch");
+}
+
+/**
+ * Main entry point for the module.
+ */
+func main() {
+    test_string_escape_encodes_control_and_quote_bytes();
+    test_code_builder_tracks_indentation();
+    test_emitter_name_mangling();
+    test_emitter_type_lowering();
+    test_emitter_header_honors_trace_flags();
+    test_emitter_string_literals_use_l0_string_const();
+    printl_s("c_emitter_test: all tests passed");
+}

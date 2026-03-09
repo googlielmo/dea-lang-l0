@@ -1,0 +1,33 @@
+/*
+ * SPDX-License-Identifier: MIT OR Apache-2.0
+ * Copyright (c) 2026 gwz
+ */
+
+module codegen_options;
+
+/**
+ * Represents backend and emitter options that affect generated C text.
+ */
+struct CodegenOptions {
+    emit_line_directives: bool;
+    trace_arc: bool;
+    trace_memory: bool;
+}
+
+/**
+ * Create codegen options with Stage 1-aligned defaults.
+ *
+ * @return New codegen options object.
+ */
+func cg_options_create() -> CodegenOptions* {
+    return new CodegenOptions(true, false, false);
+}
+
+/**
+ * Free a codegen-options object.
+ *
+ * @param self Options object to free.
+ */
+func cg_options_free(self: CodegenOptions*) {
+    drop self;
+}

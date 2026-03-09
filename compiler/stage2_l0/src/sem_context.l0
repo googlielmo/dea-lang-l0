@@ -6,9 +6,11 @@
 module sem_context;
 
 import std.hashmap;
+import std.text;
 import std.vector;
 import util.diag;
 
+import ast;
 import driver;
 import locals;
 import name_resolver;
@@ -153,4 +155,138 @@ func analysis_signature_tables(self: AnalysisResult*) -> SignatureTables*? {
  */
 func analysis_locals(self: AnalysisResult*) -> LocalsResult*? {
     return self.locals_result;
+}
+
+/**
+ * Build the storage key used for per-expression analysis tables.
+ *
+ * @param module_name Owning module name.
+ * @param expr_id Expression id.
+ * @return Key in `module::id` form.
+ */
+func analysis_expr_key(module_name: string, expr_id: ExprId) -> string {
+    return concat3_s(module_name, "::", int_to_string(expr_id));
+}
+
+/**
+ * Return a cloned resolved expression type when present.
+ *
+ * @param self Analysis result to inspect.
+ * @param module_name Owning module name.
+ * @param expr_id Expression id.
+ * @return Cloned expression type, or `null` when absent.
+ */
+func analysis_get_expr_type(self: AnalysisResult*, module_name: string, expr_id: ExprId) -> Type*? {
+    let value = spm_get(self.expr_types, analysis_expr_key(module_name, expr_id));
+    if (value == null) {
+        return null;
+    }
+    return type_clone(value as Type*);
+}
+
+/**
+ * Return a cloned intrinsic target type when present.
+ *
+ * @param self Analysis result to inspect.
+ * @param module_name Owning module name.
+ * @param expr_id Expression id.
+ * @return Cloned target type, or `null` when absent.
+ */
+func analysis_get_intrinsic_target(self: AnalysisResult*, module_name: string, expr_id: ExprId) -> Type*? {
+    let value = spm_get(self.intrinsic_targets, analysis_expr_key(module_name, expr_id));
+    if (value == null) {
+        return null;
+    }
+    return type_clone(value as Type*);
+}
+
+/**
+ * Return the stored variable-resolution kind when present.
+ *
+ * @param self Analysis result to inspect.
+ * @param module_name Owning module name.
+ * @param expr_id Expression id.
+ * @return Stored resolution kind as an `int`, or `null` when absent.
+ */
+func analysis_get_var_ref_resolution(self: AnalysisResult*, module_name: string, expr_id: ExprId) -> int? {
+    let value = sim_get(self.var_ref_resolution, analysis_expr_key(module_name, expr_id));
+    if (value == null) {
+        return null;
+    }
+    return value;
+}
+
+/**
+ * Report whether a type is directly ARC-managed.
+ *
+ * @param ty Type to inspect.
+ * @return `true` when `ty` is a `string`.
+ */
+func analysis_is_arc_type(ty: Type*) -> bool {
+    return type_is_builtin(ty, "string");
+}
+
+/**
+ * Report whether a type transitively contains ARC-managed data.
+ *
+ * @param self Analysis result providing resolved struct/enum metadata.
+ * @param ty Type to inspect.
+ * @return `true` when values of `ty` need ARC cleanup.
+ */
+func analysis_has_arc_data(self: AnalysisResult*, ty: Type*) -> bool {
+    if (analysis_is_arc_type(ty)) {
+        return true;
+    }
+
+    if (ord(ty.kind) == ord(TY_STRUCT)) {
+        if (self.signatures == null) {
+            return false;
+        }
+        let key = concat3_s(ty.module_name, "::", ty.name);
+        let info_value = spm_get((self.signatures as SignatureTables*).struct_infos, key);
+        if (info_value == null) {
+            return false;
+        }
+
+        let info = info_value as StructInfo*;
+        for (let i = 0; i < vec_size(info.fields); i = i + 1) {
+            let field = ptr_vec_get(info.fields, i) as StructFieldInfo*;
+            if (analysis_has_arc_data(self, field.field_type)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    if (ord(ty.kind) == ord(TY_ENUM)) {
+        if (self.signatures == null) {
+            return false;
+        }
+        let key2 = concat3_s(ty.module_name, "::", ty.name);
+        let info_value2 = spm_get((self.signatures as SignatureTables*).enum_infos, key2);
+        if (info_value2 == null) {
+            return false;
+        }
+
+        let info2 = info_value2 as EnumInfo*;
+        for (let i = 0; i < vec_size(info2.variants); i = i + 1) {
+            let variant = ptr_vec_get(info2.variants, i) as EnumVariantInfo*;
+            for (let j = 0; j < vec_size(variant.field_types); j = j + 1) {
+                if (analysis_has_arc_data(self, ptr_vec_get(variant.field_types, j) as Type*)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    if (ord(ty.kind) == ord(TY_NULLABLE)) {
+        let inner = ty.inner as Type*;
+        if (ord(inner.kind) == ord(TY_POINTER)) {
+            return false;
+        }
+        return analysis_has_arc_data(self, inner);
+    }
+
+    return false;
 }

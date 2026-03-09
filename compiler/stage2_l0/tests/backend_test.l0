@@ -1,0 +1,153 @@
+/*
+ * SPDX-License-Identifier: MIT OR Apache-2.0
+ * Copyright (c) 2026 gwz
+ */
+
+module backend_test;
+
+import std.assert;
+import std.hashmap;
+import std.io;
+import std.string;
+import std.vector;
+import util.diag;
+
+import ast;
+import codegen_options;
+import driver;
+import scope_context;
+import sem_context;
+import types;
+
+/**
+ * Create an empty driver state for isolated semantic helper tests.
+ *
+ * @return New empty driver state.
+ */
+func bt_empty_driver_state() -> DriverState* {
+    return new DriverState("", ptr_vec_create(0), vs_create(0), diag_create(), vs_create(0), vs_create(0));
+}
+
+/**
+ * Create an empty analysis result for isolated helper tests.
+ *
+ * @return New empty analysis result.
+ */
+func bt_empty_analysis_result() -> AnalysisResult* {
+    return new AnalysisResult(bt_empty_driver_state(), diag_create(), null, null, null, spm_create(), sim_create(), spm_create());
+}
+
+/**
+ * Tests test_codegen_options_defaults.
+ */
+func test_codegen_options_defaults() {
+    let opts = cg_options_create();
+    assert(opts.emit_line_directives, "line directives should default to enabled");
+    assert(!opts.trace_arc, "trace_arc should default to false");
+    assert(!opts.trace_memory, "trace_memory should default to false");
+    cg_options_free(opts);
+}
+
+/**
+ * Tests test_scope_context_tracks_declared_and_owned_variables.
+ */
+func test_scope_context_tracks_declared_and_owned_variables() {
+    let scope = sc_create(null);
+    let ty = type_builtin_int();
+    sc_add_declared(scope, "plain", ty);
+    sc_add_owned(scope, "owned", ty);
+
+    assert(sc_lookup_declared_type(scope, "plain") != null, "declared variable should be found");
+    assert(sc_lookup_declared_type(scope, "owned") != null, "owned variable should be found");
+    assert(vec_size(scope.owned_vars) == 1, "expected one owned variable");
+
+    sc_remove_owned(scope, "owned");
+    assert(vec_size(scope.owned_vars) == 0, "owned variable should be removed");
+
+    type_free(ty);
+    sc_free(scope);
+}
+
+/**
+ * Tests test_scope_context_inline_cleanup_tracking.
+ */
+func test_scope_context_inline_cleanup_tracking() {
+    let scope = sc_create(null);
+    assert(!sc_has_inline_cleanup(scope), "inline cleanup should start empty");
+    sc_push_inline_cleanup(scope, 3);
+    sc_push_inline_cleanup(scope, 9);
+    assert(sc_has_inline_cleanup(scope), "inline cleanup should be present");
+    assert(vec_size(scope.with_cleanup_inline as VectorBase*) == 2, "expected two cleanup items");
+    sc_free(scope);
+}
+
+/**
+ * Tests test_analysis_expr_lookup_helpers.
+ */
+func test_analysis_expr_lookup_helpers() {
+    let result = bt_empty_analysis_result();
+    let expr_key = analysis_expr_key("demo.main", 7);
+    assert(eq_s(expr_key, "demo.main::7"), "expression key mismatch");
+
+    spm_put(result.expr_types, analysis_expr_key("demo.main", 7), type_builtin_bool() as void*);
+    spm_put(result.intrinsic_targets, analysis_expr_key("demo.main", 8), type_builtin_int() as void*);
+    sim_put(result.var_ref_resolution, analysis_expr_key("demo.main", 9), ord(VAR_RES_LOCAL));
+
+    let expr_ty = analysis_get_expr_type(result, "demo.main", 7);
+    let intrinsic_ty = analysis_get_intrinsic_target(result, "demo.main", 8);
+    let var_res = analysis_get_var_ref_resolution(result, "demo.main", 9);
+
+    assert(expr_ty != null, "expression type lookup should succeed");
+    assert(type_is_builtin(expr_ty as Type*, "bool"), "expression type should be bool");
+    assert(intrinsic_ty != null, "intrinsic target lookup should succeed");
+    assert(type_is_builtin(intrinsic_ty as Type*, "int"), "intrinsic target should be int");
+    assert(var_res != null && (var_res as int) == ord(VAR_RES_LOCAL), "var-ref resolution mismatch");
+
+    type_free(expr_ty as Type*);
+    type_free(intrinsic_ty as Type*);
+    analysis_result_free(result);
+}
+
+/**
+ * Tests test_analysis_has_arc_data_for_struct_and_nullable_pointer.
+ */
+func test_analysis_has_arc_data_for_struct_and_nullable_pointer() {
+    let result = bt_empty_analysis_result();
+
+    let struct_fields = ptr_vec_create(1);
+    ptr_vec_push(struct_fields, new StructFieldInfo("name", type_builtin_string()) as void*);
+    let struct_info = new StructInfo(
+        "demo.main::Thing",
+        "demo.main",
+        "Thing",
+        "",
+        span_here(1, 1),
+        type_new_struct("demo.main", "Thing"),
+        struct_fields
+    );
+
+    result.signatures = new SignatureTables(spm_create(), spm_create(), spm_create(), spm_create());
+    spm_put((result.signatures as SignatureTables*).struct_infos, "demo.main::Thing", struct_info as void*);
+
+    let query_struct = type_new_struct("demo.main", "Thing");
+    let query_nullable_ptr = type_new_nullable(type_new_pointer(type_builtin_int()));
+
+    assert(analysis_has_arc_data(result, query_struct), "struct with string field should have ARC data");
+    assert(!analysis_has_arc_data(result, query_nullable_ptr), "nullable pointer should use niche encoding without ARC");
+
+    type_free(query_struct);
+    type_free(query_nullable_ptr);
+    analysis_result_free(result);
+}
+
+/**
+ * Main entry point for the module.
+ */
+func main() {
+    test_codegen_options_defaults();
+    test_scope_context_tracks_declared_and_owned_variables();
+    test_scope_context_inline_cleanup_tracking();
+    test_analysis_expr_lookup_helpers();
+    test_analysis_has_arc_data_for_struct_and_nullable_pointer();
+    printl_s("backend_test: all tests passed");
+}

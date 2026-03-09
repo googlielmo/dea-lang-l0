@@ -73,10 +73,7 @@ func etc_diag_warn(self: ExpressionTypeChecker*, code: string, message: string, 
  * @return Key in `module::id` form.
  */
 func etc_key(module_name: string, id: int) -> string {
-    let id_s = int_to_string(id);
-    let res = concat3_s(module_name, "::", id_s);
-    // drop id_s; // string is ARC, no drop
-    return res;
+    return analysis_expr_key(module_name, id);
 }
 
 /**
