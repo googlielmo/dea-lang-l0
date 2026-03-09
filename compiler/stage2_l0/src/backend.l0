@@ -928,6 +928,7 @@ func be_type_dependencies_ready(self: Backend*, type_key: string, emitted: Strin
  */
 func be_collect_type_keys(self: Backend*) -> VectorString* {
     let out = vs_create(8);
+
     for (let i = 0; i < driver_unit_count(self.result.driver_state); i = i + 1) {
         let unit = driver_unit_get(self.result.driver_state, i);
         if (unit.parse_result.root_module == null) {
@@ -940,7 +941,20 @@ func be_collect_type_keys(self: Backend*) -> VectorString* {
             if (ord(top.kind) == ord(TD_STRUCT)) {
                 let decl = top.data as StructDecl*;
                 vs_push(out, be_type_key(root.name, decl.name));
-            } else if (ord(top.kind) == ord(TD_ENUM)) {
+            }
+        }
+    }
+
+    for (let i = 0; i < driver_unit_count(self.result.driver_state); i = i + 1) {
+        let unit = driver_unit_get(self.result.driver_state, i);
+        if (unit.parse_result.root_module == null) {
+            continue;
+        }
+
+        let root = unit.parse_result.root_module as Module*;
+        for (let j = 0; j < vec_size(root.decls); j = j + 1) {
+            let top = ptr_vec_get(root.decls, j) as TopLevelDecl*;
+            if (ord(top.kind) == ord(TD_ENUM)) {
                 let decl2 = top.data as EnumDecl*;
                 vs_push(out, be_type_key(root.name, decl2.name));
             }
@@ -1185,7 +1199,6 @@ func be_emit_let_declarations(self: Backend*) {
             cem_emit_let_declaration(self.emitter, root.name, decl, let_type as Type*, c_init);
         }
     }
-    ccb_emit(self.emitter.out, "");
 }
 
 /**
@@ -1220,7 +1233,6 @@ func be_emit_function_declarations(self: Backend*) {
             cem_emit_function_declaration(self.emitter, root.name, decl, func_type as Type*);
         }
     }
-    ccb_emit(self.emitter.out, "");
 }
 
 /**
@@ -1399,6 +1411,13 @@ func be_emit_call(self: Backend*, expr_id: ExprId) -> string {
                     }
                     return cem_emit_sizeof_type(target_ty as Type*);
                 }
+            }
+            with (let target_ty2 = analysis_get_intrinsic_target(self.result, self.current_module as string, expr_id)
+                    => type_free_opt(target_ty2)) {
+                if (target_ty2 == null) {
+                    return be_ice_string("[ICE-2268] failed to resolve sizeof target type");
+                }
+                return cem_emit_sizeof_type(target_ty2 as Type*);
             }
         }
 

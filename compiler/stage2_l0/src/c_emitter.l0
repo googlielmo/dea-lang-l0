@@ -965,7 +965,6 @@ func cem_emit_main_wrapper(self: CEmitter*, entry_module: string, func_type: Typ
 
     ccb_dedent(self.out);
     ccb_emit(self.out, "}");
-    ccb_emit(self.out, "");
 }
 
 /**

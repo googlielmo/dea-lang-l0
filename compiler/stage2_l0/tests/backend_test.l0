@@ -491,6 +491,45 @@ func test_backend_generate_new_and_try_lowering() {
 }
 
 /**
+ * Tests test_backend_generate_intrinsics_use_analyzed_target_types.
+ */
+func test_backend_generate_intrinsics_use_analyzed_target_types() {
+    with (let filenames = vs_create(1) => vs_free(filenames),
+          let sources = vs_create(1) => vs_free(sources),
+          let lines = vs_create(16) => vs_free(lines),
+          let cfg = log_config_create(LL_ERROR, false) => drop cfg,
+          let opts = cg_options_create() => cg_options_free(opts)) {
+        opts.emit_line_directives = false;
+        vs_push(filenames, "demo/main.l0");
+        vs_push(lines, "module demo.main;");
+        vs_push(lines, "enum Flag {");
+        vs_push(lines, "    Off;");
+        vs_push(lines, "    On;");
+        vs_push(lines, "}");
+        vs_push(lines, "struct Pair {");
+        vs_push(lines, "    left: int;");
+        vs_push(lines, "    right: int;");
+        vs_push(lines, "}");
+        vs_push(lines, "func main() -> int {");
+        vs_push(lines, "    let p = Pair(1, sizeof(Pair));");
+        vs_push(lines, "    let f = On;");
+        vs_push(lines, "    return p.right + ord(f);");
+        vs_push(lines, "}");
+        vs_push(sources, bt_source(lines));
+
+        let result = bt_analyze_sources("demo.main", filenames, sources);
+        assert(!analysis_has_errors(result), "analysis should succeed for sizeof/ord fixture");
+
+        let generated = backend_generate(result, opts, cfg);
+        assert(contains_s(generated, "((l0_int)sizeof(struct l0_demo_main_Pair))"),
+            "sizeof should lower through the analyzed target type");
+        assert(contains_s(generated, "((l0_int)((f).tag))"), "ord should lower to the enum tag");
+
+        analysis_result_free(result);
+    }
+}
+
+/**
  * Tests test_backend_generate_string_copy_retains.
  */
 func test_backend_generate_string_copy_retains() {
@@ -537,6 +576,7 @@ func main() {
     test_backend_generate_match_and_with_cleanup_block();
     test_backend_generate_drop_statement();
     test_backend_generate_new_and_try_lowering();
+    test_backend_generate_intrinsics_use_analyzed_target_types();
     test_backend_generate_string_copy_retains();
     printl_s("backend_test: all tests passed");
 }

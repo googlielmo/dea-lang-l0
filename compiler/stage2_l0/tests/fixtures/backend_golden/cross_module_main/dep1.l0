@@ -1,0 +1,7 @@
+module dep1;
+
+import leaf;
+
+func f() -> int {
+    return h();
+}

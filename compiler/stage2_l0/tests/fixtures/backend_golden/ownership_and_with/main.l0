@@ -1,0 +1,12 @@
+module main;
+
+func main() -> int {
+    let s = "hi";
+    let t = s;
+    with (let x = t) {
+        let y = x;
+    } cleanup {
+        let z = x;
+    }
+    return 0;
+}

@@ -190,6 +190,190 @@ func etc_lookup_symbol(self: ExpressionTypeChecker*, name: string, module_path: 
 }
 
 /**
+ * Check whether a type is `void`.
+ *
+ * @param ty Type to inspect.
+ * @return `true` if `ty` is `void`.
+ */
+func etc_is_void(ty: Type*?) -> bool {
+    if (ty == null) return false;
+    return type_is_builtin(ty as Type*, "void");
+}
+
+/**
+ * Resolve a visible symbol as a type usable by `sizeof`.
+ *
+ * @param self Expression checker state.
+ * @param sym Symbol to interpret as a type.
+ * @return Resolved type, or `null` when the symbol is not a type name.
+ */
+func etc_symbol_as_type(self: ExpressionTypeChecker*, sym: Symbol*) -> Type*? {
+    match (sym.kind) {
+        SYM_STRUCT => { return type_new_struct(sym.module_name, sym.name); }
+        SYM_ENUM => { return type_new_enum(sym.module_name, sym.name); }
+        SYM_TYPE_ALIAS => {
+            if (sym.resolved_type != null) {
+                return type_clone(sym.resolved_type as Type*);
+            }
+            with (let seen = ss_create() => ss_free(seen)) {
+                return tr_resolve_alias(self.result.signatures as SignatureTables*, self.result.names as NameResolution*,
+                    self.current_env as ModuleEnv*, sym, self.result.diags, seen);
+            }
+        }
+        _ => { return null; }
+    }
+}
+
+/**
+ * Try to resolve one identifier expression as a type name for intrinsics.
+ *
+ * @param self Expression checker state.
+ * @param expr Identifier expression to interpret as a type.
+ * @return Resolved type, or `null` when the identifier should be treated as a value expression.
+ */
+func etc_try_resolve_type_name(self: ExpressionTypeChecker*, expr: ExprNode*) -> Type*? {
+    if (expr.module_path == null) {
+        if (eq_s(expr.text_value, "int")) return type_builtin_int();
+        if (eq_s(expr.text_value, "byte")) return type_builtin_byte();
+        if (eq_s(expr.text_value, "bool")) return type_builtin_bool();
+        if (eq_s(expr.text_value, "string")) return type_builtin_string();
+        if (eq_s(expr.text_value, "void")) return type_builtin_void();
+
+        if (nr_module_env_is_ambiguous(self.current_env as ModuleEnv*, expr.text_value)) {
+            etc_diag_error(self, "TYP-0303",
+                concat4_s("ambiguous identifier '", expr.text_value, "'; use a module-qualified name", ""),
+                (self.current_unit as DriverUnit*).path, expr.span);
+            return null;
+        }
+
+        let sym = nr_module_env_all(self.current_env as ModuleEnv*, expr.text_value);
+        if (sym == null) {
+            return null;
+        }
+        return etc_symbol_as_type(self, sym as Symbol*);
+    }
+
+    let target_module = tr_module_from_path(expr.module_path as VectorString*);
+    if (!eq_s(target_module, (self.current_env as ModuleEnv*).module_name) &&
+        !nr_module_env_imports_module(self.current_env as ModuleEnv*, target_module)) {
+        etc_diag_error(self, "TYP-0301",
+            concat4_s("unknown type '", concat3_s(target_module, "::", expr.text_value),
+                "' (module '", concat_s(target_module, "' not imported)")),
+            (self.current_unit as DriverUnit*).path, expr.span);
+        return null;
+    }
+
+    let target_env = nr_env_find(self.result.names as NameResolution*, target_module);
+    if (target_env == null) {
+        etc_diag_error(self, "TYP-0300",
+            concat4_s("unknown type '", concat3_s(target_module, "::", expr.text_value),
+                "' (unknown module '", concat_s(target_module, "')")),
+            (self.current_unit as DriverUnit*).path, expr.span);
+        return null;
+    }
+
+    let sym2 = nr_module_env_local(target_env as ModuleEnv*, expr.text_value);
+    if (sym2 == null) {
+        return null;
+    }
+    return etc_symbol_as_type(self, sym2 as Symbol*);
+}
+
+/**
+ * Infer the type of one `sizeof` intrinsic call.
+ *
+ * @param self Expression checker state.
+ * @param expr_id Call expression id.
+ * @param expr Call expression node.
+ * @return `int`, with the target type recorded for backend use.
+ */
+func etc_infer_sizeof_intrinsic(self: ExpressionTypeChecker*, expr_id: ExprId, expr: ExprNode*) -> Type* {
+    let args = expr.ids as VectorBase*;
+    let arg_count = 0;
+    if (args != null) arg_count = vec_size(args);
+    if (arg_count != 1) {
+        etc_diag_error(self, "TYP-0241", "sizeof expects exactly 1 argument",
+            (self.current_unit as DriverUnit*).path, expr.span);
+        return type_builtin_int();
+    }
+
+    let arg_id = id_vec_get(args, 0);
+    let arg = expr_arena_get((self.current_unit as DriverUnit*).parse_result.expr_arena, arg_id);
+
+    if (ord(arg.kind) == ord(EX_TYPE) && arg.type_ref != null) {
+        with (let seen = ss_create() => ss_free(seen)) {
+            let target_ty = tr_resolve_type_ref(self.result.signatures as SignatureTables*,
+                self.result.names as NameResolution*, self.current_env as ModuleEnv*, arg.type_ref as TypeRef*,
+                self.result.diags, seen);
+            if (target_ty == null) {
+                return type_builtin_int();
+            }
+            if (etc_is_void(target_ty as Type*)) {
+                etc_diag_error(self, "TYP-0240", "cannot take sizeof(void)",
+                    (self.current_unit as DriverUnit*).path, expr.span);
+            }
+            etc_set_intrinsic_target(self, expr_id, target_ty as Type*);
+            type_free(target_ty as Type*);
+            return type_builtin_int();
+        }
+    }
+
+    if (ord(arg.kind) == ord(EX_VAR_REF)) {
+        let type_name_ty = etc_try_resolve_type_name(self, arg);
+        if (type_name_ty != null) {
+            if (etc_is_void(type_name_ty as Type*)) {
+                etc_diag_error(self, "TYP-0240", "cannot take sizeof(void)",
+                    (self.current_unit as DriverUnit*).path, expr.span);
+            }
+            etc_set_intrinsic_target(self, expr_id, type_name_ty as Type*);
+            type_free(type_name_ty as Type*);
+            return type_builtin_int();
+        }
+    }
+
+    let arg_ty2 = etc_infer_expr(self, arg_id);
+    if (arg_ty2 == null) {
+        return type_builtin_int();
+    }
+    if (etc_is_void(arg_ty2 as Type*)) {
+        etc_diag_error(self, "TYP-0240", "cannot take sizeof(void)",
+            (self.current_unit as DriverUnit*).path, expr.span);
+    }
+    etc_set_intrinsic_target(self, expr_id, arg_ty2 as Type*);
+    type_free(arg_ty2 as Type*);
+    return type_builtin_int();
+}
+
+/**
+ * Infer the type of one `ord` intrinsic call.
+ *
+ * @param self Expression checker state.
+ * @param expr Call expression node.
+ * @return `int`, or `int` after reporting an error.
+ */
+func etc_infer_ord_intrinsic(self: ExpressionTypeChecker*, expr: ExprNode*) -> Type* {
+    let args = expr.ids as VectorBase*;
+    let arg_count = 0;
+    if (args != null) arg_count = vec_size(args);
+    if (arg_count != 1) {
+        etc_diag_error(self, "TYP-0242", "ord expects exactly 1 argument",
+            (self.current_unit as DriverUnit*).path, expr.span);
+        return type_builtin_int();
+    }
+
+    let arg_ty = etc_infer_expr(self, id_vec_get(args, 0));
+    if (arg_ty == null) {
+        return type_builtin_int();
+    }
+    if (ord((arg_ty as Type*).kind) != ord(TY_ENUM)) {
+        etc_diag_error(self, "TYP-0243", concat_s("ord expects an enum value, got '", concat_s(type_format(arg_ty as Type*), "'")),
+            (self.current_unit as DriverUnit*).path, expr.span);
+    }
+    type_free(arg_ty as Type*);
+    return type_builtin_int();
+}
+
+/**
  * Bind enum payload types for variables introduced by a match pattern.
  *
  * @param self Expression checker state.
@@ -578,6 +762,16 @@ func etc_infer_binary(self: ExpressionTypeChecker*, expr_id: ExprId, expr: ExprN
  * @return The inferred or resolved type, or null on error.
  */
 func etc_infer_call(self: ExpressionTypeChecker*, expr_id: ExprId, expr: ExprNode*) -> Type*? {
+    let callee = expr_arena_get((self.current_unit as DriverUnit*).parse_result.expr_arena, expr.expr_a);
+    if (ord(callee.kind) == ord(EX_VAR_REF)) {
+        if (eq_s(callee.text_value, "sizeof")) {
+            return etc_infer_sizeof_intrinsic(self, expr_id, expr);
+        }
+        if (eq_s(callee.text_value, "ord")) {
+            return etc_infer_ord_intrinsic(self, expr);
+        }
+    }
+
     let callee_ty = etc_infer_expr(self, expr.expr_a);
     if (callee_ty == null) return null;
     let c_ty = callee_ty as Type*;
@@ -640,9 +834,9 @@ func etc_infer_call(self: ExpressionTypeChecker*, expr_id: ExprId, expr: ExprNod
     }
 
     if (ord(c_ty.kind) == ord(TY_ENUM)) {
-        let callee = expr_arena_get((self.current_unit as DriverUnit*).parse_result.expr_arena, expr.expr_a);
-        if (ord(callee.kind) == ord(EX_VAR_REF)) {
-            let sym = etc_lookup_symbol(self, callee.text_value, callee.module_path, callee.name_qualifier);
+        let callee_expr = expr_arena_get((self.current_unit as DriverUnit*).parse_result.expr_arena, expr.expr_a);
+        if (ord(callee_expr.kind) == ord(EX_VAR_REF)) {
+            let sym = etc_lookup_symbol(self, callee_expr.text_value, callee_expr.module_path, callee_expr.name_qualifier);
             if (sym != null && ord((sym as Symbol*).kind) == ord(SYM_ENUM_VARIANT)) {
                 let s = sym as Symbol*;
                 let info2 = sig_lookup_enum_info(self.result.signatures as SignatureTables*, s.module_name, s.owner_name);

@@ -1,0 +1,34 @@
+module main;
+
+enum MaybeInt {
+    None;
+    Some(value: int);
+}
+
+func make(flag: bool) -> MaybeInt {
+    if (flag) {
+        return Some(7);
+    }
+    return None;
+}
+
+func main() -> int {
+    let total = 0;
+    case (1) {
+        0 => {
+            total = 1;
+        }
+        else {
+            total = 2;
+        }
+    }
+    match (make(true)) {
+        Some(v) => {
+            total = total + v;
+        }
+        None => {
+            total = 0;
+        }
+    }
+    return total;
+}

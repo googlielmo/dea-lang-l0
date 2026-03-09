@@ -1,0 +1,8 @@
+module main;
+
+import dep1;
+import dep2;
+
+func main() -> int {
+    return f() + g();
+}

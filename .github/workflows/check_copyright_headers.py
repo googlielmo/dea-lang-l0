@@ -14,7 +14,10 @@ COPYRIGHT_RE = re.compile(r"Copyright\s*\(c\)\s*\d{4}(?:-\d{4})?\b")
 SHELL_SHEBANG_RE = re.compile(r"^#!.*\b(?:bash|sh|zsh)\b")
 TARGET_SUFFIXES = {".c", ".h", ".l0", ".py", ".sh"}
 MAX_SCAN_LINES = 80
-EXCLUDED_PREFIXES = ("tools/",)
+EXCLUDED_PREFIXES = (
+    "tools/",
+    "compiler/stage2_l0/tests/fixtures/backend_golden/",
+)
 
 
 def _tracked_files(repo_root: Path) -> list[Path]:
