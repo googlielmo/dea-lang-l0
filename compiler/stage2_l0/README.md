@@ -28,11 +28,12 @@ itself and sets `L0_HOME` automatically when unset.
 Run Stage 2 L0 tests:
 
 ```bash
-./compiler/stage2_l0/run_tests.sh
+./compiler/stage2_l0/run_tests.py
 ```
 
-This runner executes both `*.l0` test modules and `*_test.sh` regression scripts under
+This runner executes `*.l0` test modules plus `*_test.sh` and `*_test.py` regression scripts under
 `compiler/stage2_l0/tests/`.
+It uses a bounded auto-detected worker count by default; override with `L0_TEST_JOBS=<n>`.
 
 Options:
 
@@ -46,8 +47,10 @@ Output:
 Run Stage 2 L0 trace checks (runtime + leak triage on every test):
 
 ```bash
-./compiler/stage2_l0/run_trace_tests.sh
+./compiler/stage2_l0/run_trace_tests.py
 ```
+
+This runner also uses a bounded auto-detected worker count by default; override with `L0_TEST_JOBS=<n>`.
 
 Options:
 
@@ -66,7 +69,7 @@ Output:
 Capture Stage 2 trace logs (both ARC and memory) for a Stage 2 test:
 
 ```bash
-./compiler/stage2_l0/run_test_trace.sh parser_test
+./compiler/stage2_l0/run_test_trace.py parser_test
 ```
 
 The test argument accepts either `parser_test` or `parser_test.l0`.
@@ -86,7 +89,7 @@ By default, output files are written under `/tmp` and printed at the end:
 Custom output paths:
 
 ```bash
-./compiler/stage2_l0/run_test_trace.sh \
+./compiler/stage2_l0/run_test_trace.py \
   parser_test \
   --out /tmp/parser.stderr.log \
   --stdout /tmp/parser.stdout.log

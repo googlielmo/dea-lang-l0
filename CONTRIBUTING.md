@@ -28,11 +28,11 @@ pytest -k "test_name"           # run tests matching a pattern
 For Stage 2 (`compiler/stage2_l0`) changes, run:
 
 ```bash
-./compiler/stage2_l0/run_tests.sh
-./compiler/stage2_l0/run_trace_tests.sh
+./compiler/stage2_l0/run_tests.py
+./compiler/stage2_l0/run_trace_tests.py
 ```
 
-`run_trace_tests.sh` is an important finalization gate for Stage 2 changes because it checks runtime trace health
+`run_trace_tests.py` is an important finalization gate for Stage 2 changes because it checks runtime trace health
 (including leak triage) across the full Stage 2 test suite.
 
 ### Smoke test

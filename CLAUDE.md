@@ -108,11 +108,11 @@ pytest -k "test_name"             # pattern match
 For Stage 2 (`compiler/stage2_l0`) changes, finalization checks should include:
 
 ```bash
-./compiler/stage2_l0/run_tests.sh
-./compiler/stage2_l0/run_trace_tests.sh
+./compiler/stage2_l0/run_tests.py
+./compiler/stage2_l0/run_trace_tests.py
 ```
 
-`run_trace_tests.sh` is an important finalization gate because it validates ARC/memory traces and leak triage across
+`run_trace_tests.py` is an important finalization gate because it validates ARC/memory traces and leak triage across
 all Stage 2 tests.
 
 For Stage 1 ownership-sensitive changes (ARC lowering, `drop` behavior, container ownership paths), run targeted ARC
@@ -180,7 +180,7 @@ rg -n 'XXX-NNNN' compiler/stage1_py compiler/stage2_l0 docs
 ### Definition of Done
 
 1. **No UB:** Emitted C99 must be memory-safe and UB-free.
-2. **Trace Validated:** `run_trace_tests.sh` must pass with zero leaks.
+2. **Trace Validated:** `run_trace_tests.py` must pass with zero leaks.
 3. **English Only:** All code names and comments MUST be in English.
 4. **Tests Updated:** All relevant tests must be added/updated in the same PR.
 5. **Documentation Updated:** If behavior changes, corresponding `.md` in `docs/`

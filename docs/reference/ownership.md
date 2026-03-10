@@ -190,15 +190,15 @@ Recommended commands:
 
 ```bash
 ./l0c ... --gen ...
-./compiler/stage2_l0/run_test_trace.sh <test-or-reproducer>
+./compiler/stage2_l0/run_test_trace.py <test-or-reproducer>
 ./compiler/stage2_l0/check_trace_log.py <stderr.log> --triage
 ```
 
 For ownership-related Stage 2 changes, run the full finalization checks:
 
 ```bash
-./compiler/stage2_l0/run_trace_tests.sh
-./compiler/stage2_l0/run_test_trace.sh <test_name>
+./compiler/stage2_l0/run_trace_tests.py
+./compiler/stage2_l0/run_test_trace.py <test_name>
 ./compiler/stage2_l0/check_trace_log.py <stderr.log> --triage
 ```
 

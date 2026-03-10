@@ -161,7 +161,7 @@ Current implemented assets:
     - `src/util/vector.l0` (includes `vi_sort` for int vectors and `vs_sort` for string vectors)
     - `src/util/linear_map.l0`
     - `src/util/text.l0`
-- Test suite under `compiler/stage2_l0/tests` plus `run_tests.sh` and `run_trace_tests.sh`.
+- Test suite under `compiler/stage2_l0/tests` plus `run_tests.py` and `run_trace_tests.py`.
 
 Stage 2 parser status:
 
@@ -216,7 +216,7 @@ Stage 2 backend/codegen status:
   `new`, `drop`, `try`, `with`, `match`, `case`, `break`, `continue`, and ARC cleanup.
 - Exact-text parity for `--gen --no-line-directives` is enforced against a committed curated Stage 1 golden corpus via
   `compiler/stage2_l0/tests/l0c_codegen_test.sh`.
-- Stage 2 trace validation is green for the current test suite via `compiler/stage2_l0/run_trace_tests.sh`.
+- Stage 2 trace validation is green for the current test suite via `compiler/stage2_l0/run_trace_tests.py`.
 
 ## Known Limitations and Constraints
 
