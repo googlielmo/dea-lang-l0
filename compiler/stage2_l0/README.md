@@ -13,6 +13,8 @@ Build a repo-local Stage 2 compiler artifact:
 ./scripts/build-stage2-l0c.sh
 ./build/stage2/bin/l0c-stage2 --check -P examples hello
 ./build/stage2/bin/l0c-stage2 --gen -P examples hello
+./build/stage2/bin/l0c-stage2 --build -P examples hello
+./build/stage2/bin/l0c-stage2 --run -P examples hello
 ```
 
 Optional builder environment variables:

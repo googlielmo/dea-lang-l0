@@ -17,6 +17,18 @@ struct RtTimeParts {
 }
 
 /**
+ * Represents basic file metadata used by bootstrap tooling.
+ */
+struct RtFileInfo {
+    exists: bool;
+    is_file: bool;
+    is_dir: bool;
+    size: int?;
+    mtime_sec: int?;
+    mtime_nsec: int?;
+}
+
+/**
  * Return the character at the given index in the string as a byte (0-255).
  *
  * @param s The string.
@@ -295,12 +307,20 @@ extern func rt_time_local_offset_sec(unix_sec: int) -> int?;
 extern func rt_time_local_is_dst(unix_sec: int) -> bool?;
 
 /**
- * Execute a system command and return its exit code.
+ * Execute a system command and return its normalized status code.
  *
  * @param cmd The command string to execute.
- * @return The exit status code.
+ * @return The command exit code, or a normalized signal-style status.
  */
 extern func rt_system(cmd: string) -> int;
+
+/**
+ * Return basic metadata for a path.
+ *
+ * @param path The file-system path.
+ * @return File metadata with nullable size and timestamp fields.
+ */
+extern func rt_file_info(path: string) -> RtFileInfo;
 
 /**
  * Check if a file exists at the given path.

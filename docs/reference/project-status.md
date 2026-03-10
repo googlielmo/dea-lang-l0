@@ -154,8 +154,9 @@ Current implemented assets:
     - `src/string_escape.l0`
     - `src/c_emitter.l0`
     - `src/backend.l0`
+    - `src/build_driver.l0`
+    - `src/l0c_lib.l0`
     - `src/l0c.l0`
-    - `src/main.l0`
 - Utility modules:
     - `src/util/array.l0`
     - `src/util/vector.l0` (includes `vi_sort` for int vectors and `vs_sort` for string vectors)
@@ -210,6 +211,8 @@ Stage 2 backend/codegen status:
 - Stage 2 `backend_generate()` is implemented and emits a single C99 translation unit from typed `AnalysisResult`.
 - Stage 2 `l0c --gen` is implemented, including `--output`, `--no-line-directives`, `--trace-arc`, and
   `--trace-memory`.
+- Stage 2 `l0c --build` and `--run` are implemented on top of the same analysis plus backend path, using
+  `std.system.system()` for host compiler and program execution.
 - Stage 2 can now be bootstrapped into a repo-local artifact via `./scripts/build-stage2-l0c.sh`, producing
   `build/stage2/bin/l0c-stage2` and `l0c-stage2.native` by default.
 - Stage 2 backend lowering now covers the Stage 1 language surface, including ownership-sensitive lowering for
@@ -230,16 +233,16 @@ These remain true in Stage 1:
 
 Current Stage 2 limitations:
 
-1. Stage 2 `--build` and `--run` are still NYI; only `--gen`, analysis, and dump-style modes are implemented.
-2. Source-tree execution of Stage 2 still depends on the Stage 1 wrapper/compiler driver
+1. Source-tree execution of Stage 2 still depends on the Stage 1 wrapper/compiler driver
    (`./l0c -P compiler/stage2_l0/src --run l0c -- ...`), even though Phase 1 now provides a repo-local built artifact.
-3. Some language constraints intentionally remain staged in parser diagnostics (for example, array types and
+2. Some language constraints intentionally remain staged in parser diagnostics (for example, array types and
    bitwise/shift operators).
 
 ## Short Roadmap
 
 Near-term project direction, consistent with current docs/code:
 
-1. Add Stage 2 driver `--build`/`--run` support on top of the now-implemented backend/`--gen` path.
-2. Keep Stage 1/Stage 2 backend behavior deterministic and parity-tested as the Stage 2 driver grows.
-3. Extend parity coverage beyond the current curated golden corpus as new backend-sensitive cases are added.
+1. Keep Stage 1/Stage 2 backend and driver behavior deterministic and parity-tested as Stage 2 takes on more direct use.
+2. Extend parity coverage beyond the current curated golden corpus as new backend-sensitive cases are added.
+3. Continue the shared-runtime bootstrap plan, including the later general subprocess API deferred in
+   `docs/plans/features/2026-03-09-stdlib-runtime-fs-path-raw-io-bootstrap-noref.md`.

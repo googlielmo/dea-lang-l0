@@ -3,7 +3,8 @@
 Version: 2026-03-10
 
 This is the canonical architecture document for the current compiler pipeline.
-Stage 1 remains the reference implementation and Stage 2 mirrors the same pass structure through `--gen`.
+Stage 1 remains the reference implementation and Stage 2 mirrors the same pass structure through code generation and
+driver execution.
 
 Related canonical docs:
 
@@ -69,13 +70,19 @@ locals.l0 -> FunctionEnv per function
 expr_types.l0 -> expression types + semantic diagnostics
   |
   v
-backend.l0 + c_emitter.l0 -> single C99 translation unit (`--gen`)
+backend.l0 + c_emitter.l0 -> single C99 translation unit
+  |
+  v
+build_driver.l0 -> host C compiler invocation (`--build` / `--run`)
+  |
+  v
+Executable launch (`--run`)
 ```
 
 Current Stage 2 CLI entry point: `compiler/stage2_l0/src/l0c.l0`.
 Source-tree execution path: `./l0c -P compiler/stage2_l0/src --run l0c -- ...`.
 Repo-local bootstrap artifact path: `./scripts/build-stage2-l0c.sh`, then `./build/stage2/bin/l0c-stage2 ...`.
-`--build` and `--run` remain NYI in Stage 2; only analysis/dump modes plus `--gen` are implemented.
+Stage 2 now implements `--build`, `--run`, `--gen`, and the existing analysis/dump modes.
 
 ## 2. Pass Responsibilities
 

@@ -32,6 +32,12 @@ assert_no_file() {
     [ ! -e "$path" ] || fail "did not expect path: $path"
 }
 
+assert_contains() {
+    local path="$1"
+    local needle="$2"
+    grep -F "$needle" "$path" >/dev/null || fail "expected '$needle' in $path"
+}
+
 cd "$REPO_ROOT"
 
 ./scripts/build-stage2-l0c.sh
@@ -43,6 +49,14 @@ assert_no_file "$DEFAULT_DIST/bin/l0c-stage2.c"
 env -i PATH="$PATH" "$DEFAULT_DIST/bin/l0c-stage2" --check -P examples hello >/dev/null
 env -i PATH="$PATH" "$DEFAULT_DIST/bin/l0c-stage2" --gen --no-line-directives -P examples hello > /tmp/l0_stage2_bootstrap_gen_$$.c
 rm -f /tmp/l0_stage2_bootstrap_gen_$$.c
+env -i PATH="$PATH" "$DEFAULT_DIST/bin/l0c-stage2" --build --keep-c -P examples -o /tmp/l0_stage2_bootstrap_hello_$$ hello >/dev/null
+assert_file "/tmp/l0_stage2_bootstrap_hello_$$"
+assert_file "/tmp/l0_stage2_bootstrap_hello_$$.c"
+"/tmp/l0_stage2_bootstrap_hello_$$" > /tmp/l0_stage2_bootstrap_hello_$$.out
+assert_contains "/tmp/l0_stage2_bootstrap_hello_$$.out" "Hello, World!"
+env -i PATH="$PATH" "$DEFAULT_DIST/bin/l0c-stage2" --run -P examples hello > /tmp/l0_stage2_bootstrap_run_$$.out
+assert_contains "/tmp/l0_stage2_bootstrap_run_$$.out" "Hello, World!"
+rm -f /tmp/l0_stage2_bootstrap_hello_$$ /tmp/l0_stage2_bootstrap_hello_$$.c /tmp/l0_stage2_bootstrap_hello_$$.out /tmp/l0_stage2_bootstrap_run_$$.out
 
 DIST_DIR=build/stage2-alt KEEP_C=1 ./scripts/build-stage2-l0c.sh
 

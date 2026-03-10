@@ -3,7 +3,7 @@
  * Copyright (c) 2026 gwz
  */
 
-module l0c_test;
+module l0c_lib_test;
 
 import sys.rt;
 
@@ -12,7 +12,7 @@ import std.assert;
 import std.string;
 import std.vector;
 
-import l0c;
+import l0c_lib;
 
 /**
  * Returns the root directory for test fixtures.
@@ -39,6 +39,42 @@ func semantics_fixture_root() -> string {
  */
 func gen_output_path() -> string {
     return "compiler/stage2_l0/tests/.tmp-ok_main.c";
+}
+
+/**
+ * Returns the temporary output path used by `--build` tests.
+ *
+ * @return Output executable path for build tests.
+ */
+func build_output_path() -> string {
+    return "compiler/stage2_l0/tests/.tmp-build-ok_main";
+}
+
+/**
+ * Returns the kept-C path used by `--build` tests.
+ *
+ * @return Output C path for build tests.
+ */
+func build_c_output_path() -> string {
+    return "compiler/stage2_l0/tests/.tmp-build-ok_main.c";
+}
+
+/**
+ * Returns the base output path used by `--run --keep-c` tests.
+ *
+ * @return Requested output base path for run tests.
+ */
+func run_keep_c_output_path() -> string {
+    return "compiler/stage2_l0/tests/.tmp-run-kept";
+}
+
+/**
+ * Returns the kept-C path used by `--run --keep-c` tests.
+ *
+ * @return Output C path for run tests.
+ */
+func run_keep_c_c_path() -> string {
+    return "compiler/stage2_l0/tests/.tmp-run-kept.c";
 }
 
 /**
@@ -191,15 +227,74 @@ func test_parse_error_exit_code() {
 }
 
 /**
- * Tests test_nyi_mode_exit_code.
+ * Tests test_default_build_mode_succeeds.
  */
-func test_nyi_mode_exit_code() {
-    with (let argv = vs_create(8) => vs_free(argv)) {
+func test_default_build_mode_succeeds() {
+    let out_path = build_output_path();
+    let c_path = build_c_output_path();
+    rt_delete_file(out_path);
+    rt_delete_file(c_path);
+
+    with (let argv = vs_create(12) => vs_free(argv)) {
+        vs_push(argv, "-P");
+        vs_push(argv, fixture_root());
+        vs_push(argv, "--output");
+        vs_push(argv, out_path);
+        vs_push(argv, "--keep-c");
         vs_push(argv, "ok_main");
 
         let rc = run_with_argv(argv);
-        assert(rc == 1, "default --build mode is NYI and should return 1");
+        assert(rc == 0, "default build mode should succeed for ok_main");
     }
+
+    assert(file_exists(out_path), "built executable should exist");
+    assert(file_exists(c_path), "kept generated C should exist for build");
+
+    rt_delete_file(out_path);
+    rt_delete_file(c_path);
+}
+
+/**
+ * Tests test_run_exit_code_passthrough.
+ */
+func test_run_exit_code_passthrough() {
+    with (let argv = vs_create(8) => vs_free(argv)) {
+        vs_push(argv, "--run");
+        vs_push(argv, "-P");
+        vs_push(argv, fixture_root());
+        vs_push(argv, "exit_seven");
+
+        let rc = run_with_argv(argv);
+        assert(rc == 7, "--run should return the child program exit code");
+    }
+}
+
+/**
+ * Tests test_run_keep_c_output_file.
+ */
+func test_run_keep_c_output_file() {
+    let out_path = run_keep_c_output_path();
+    let c_path = run_keep_c_c_path();
+    rt_delete_file(out_path);
+    rt_delete_file(c_path);
+
+    with (let argv = vs_create(12) => vs_free(argv)) {
+        vs_push(argv, "--run");
+        vs_push(argv, "--keep-c");
+        vs_push(argv, "-P");
+        vs_push(argv, fixture_root());
+        vs_push(argv, "--output");
+        vs_push(argv, out_path);
+        vs_push(argv, "ok_main");
+
+        let rc = run_with_argv(argv);
+        assert(rc == 0, "--run --keep-c should succeed for ok_main");
+    }
+
+    assert(file_exists(c_path), "--run --keep-c should retain the generated C file");
+
+    rt_delete_file(out_path);
+    rt_delete_file(c_path);
 }
 
 /**
@@ -271,10 +366,12 @@ func main() {
     test_gen_ok_output_file();
     test_gen_trace_defines();
     test_parse_error_exit_code();
-    test_nyi_mode_exit_code();
+    test_default_build_mode_succeeds();
+    test_run_exit_code_passthrough();
+    test_run_keep_c_output_file();
     test_merge_c_option_words_cli_last();
     test_merge_c_option_words_ignores_empty_inputs();
     test_type_ok();
     test_sym_ok();
-    printl_s("l0c_test: all tests passed");
+    printl_s("l0c_lib_test: all tests passed");
 }

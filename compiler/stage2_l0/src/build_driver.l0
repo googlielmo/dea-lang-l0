@@ -1,0 +1,898 @@
+/*
+ * SPDX-License-Identifier: MIT OR Apache-2.0
+ * Copyright (c) 2026 gwz
+ */
+
+module build_driver;
+
+import sys.rt;
+
+import std.hashmap;
+import std.io;
+import std.string;
+import std.system;
+import std.text;
+import std.time;
+import std.vector;
+import util.diag;
+import util.log;
+
+import util.path;
+import util.strings;
+import source_paths;
+import analysis;
+import backend;
+import sem_context;
+import name_resolver;
+import signatures;
+import symbols;
+import types;
+import cli_args;
+import codegen_options;
+import diag_print;
+
+/**
+ * Prepared input bundle for build/run commands.
+ */
+struct BuildPreparedInput {
+    entry_module: string;
+    search_paths: SourceSearchPaths*;
+}
+
+/**
+ * Free a prepared input bundle.
+ *
+ * @param self Prepared input to free.
+ */
+func bd_prepared_input_free(self: BuildPreparedInput*) {
+    sp_free(self.search_paths);
+    drop self;
+}
+
+/**
+ * Free an optional prepared input bundle.
+ *
+ * @param self Optional prepared input.
+ */
+func bd_prepared_input_free_opt(self: BuildPreparedInput*?) {
+    if (self != null) {
+        bd_prepared_input_free(self as BuildPreparedInput*);
+    }
+}
+
+/**
+ * Normalize CLI target input into an entry module and source search paths.
+ *
+ * @param opts Parsed CLI options.
+ * @param diags Diagnostic collector for normalization failures.
+ * @return Prepared input bundle, or `null` on failure.
+ */
+func bd_prepare_input(opts: CliOptions*, diags: DiagCollector*) -> BuildPreparedInput*? {
+    with (
+        let project_roots = us_vs_clone(opts.project_roots) => vs_free(project_roots),
+        let sys_roots = us_vs_clone(opts.sys_roots) => vs_free(sys_roots)
+    ) {
+        sp_apply_default_project_roots(project_roots);
+        sp_apply_default_sys_roots(sys_roots);
+
+        let entry_target = opts.entry_target as string;
+        let entry_opt = sp_normalize_entry_target(entry_target, project_roots, diags);
+        if (entry_opt == null) {
+            return null;
+        }
+
+        let entry_module = entry_opt as string;
+        let sp = sp_build_from_roots(project_roots, sys_roots);
+        return new BuildPreparedInput(entry_module, sp);
+    }
+}
+
+/**
+ * Append whitespace-delimited C option words from one source string.
+ *
+ * @param dst Destination vector for parsed option words.
+ * @param raw Raw options string, or `null`.
+ */
+func bd_append_c_option_words(dst: VectorString*, raw: string?) {
+    if (raw == null) {
+        return;
+    }
+
+    with (let parts = us_split_is_space_non_empty(raw as string) => vs_free(parts)) {
+        for (let i = 0; i < vs_size(parts); i = i + 1) {
+            vs_push(dst, vs_get(parts, i));
+        }
+    }
+}
+
+/**
+ * Merge C option words from environment and CLI with CLI-last precedence.
+ *
+ * @param env_opts Options from `L0_CFLAGS`.
+ * @param cli_opts Options from `--c-options`.
+ * @return Parsed option words in final order.
+ */
+func bd_merge_c_option_words(env_opts: string?, cli_opts: string?) -> VectorString* {
+    let out = vs_create(4);
+    bd_append_c_option_words(out, env_opts);
+    bd_append_c_option_words(out, cli_opts);
+    return out;
+}
+
+/**
+ * Resolve merged C option words from `L0_CFLAGS` and parsed CLI options.
+ *
+ * @param opts Parsed CLI options.
+ * @return Parsed option words in final order.
+ */
+func bd_collect_c_option_words(opts: CliOptions*) -> VectorString* {
+    return bd_merge_c_option_words(env_get("L0_CFLAGS"), opts.c_options);
+}
+
+/**
+ * Replace or add a `.c` suffix on a path string.
+ *
+ * @param path Path to rewrite.
+ * @return Path with `.c` suffix.
+ */
+func bd_with_c_suffix(path: string) -> string {
+    let last_sep = up_find_last_sep(path);
+    let last_dot = find_last_s(path, ".");
+    if (last_dot > last_sep + 1) {
+        return concat_s(slice_s(path, 0, last_dot), ".c");
+    }
+    return concat_s(path, ".c");
+}
+
+/**
+ * Return whether a path exists and is a directory.
+ *
+ * @param path Candidate directory path.
+ * @return `true` when the path exists and is a directory.
+ */
+func bd_is_dir(path: string) -> bool {
+    let info = rt_file_info(path);
+    return info.exists && info.is_dir;
+}
+
+/**
+ * Return the first usable temp root from environment variables or fallbacks.
+ *
+ * @return Existing directory path for temporary files.
+ */
+func bd_temp_root() -> string {
+    let tmpdir = env_get("TMPDIR");
+    if (tmpdir != null && bd_is_dir(tmpdir as string)) {
+        return tmpdir as string;
+    }
+
+    let temp = env_get("TEMP");
+    if (temp != null && bd_is_dir(temp as string)) {
+        return temp as string;
+    }
+
+    let tmp = env_get("TMP");
+    if (tmp != null && bd_is_dir(tmp as string)) {
+        return tmp as string;
+    }
+
+    if (bd_is_dir("/tmp")) {
+        return "/tmp";
+    }
+    return ".";
+}
+
+/**
+ * Build one temporary-file stem under the configured temp root.
+ *
+ * @param tag Small tag describing the temp-artifact family.
+ * @return Unique stem path without extension.
+ */
+func bd_temp_stem(tag: string) -> string {
+    let root = bd_temp_root();
+    let sec = 0;
+    let nsec = 0;
+    let now_opt = wall_now();
+    if (now_opt != null) {
+        let now = now_opt as WallTime;
+        sec = now.sec;
+        nsec = now.nsec;
+    }
+
+    for (let attempt = 0; attempt < 100; attempt = attempt + 1) {
+        with (let sb = sb_create() => sb_free(sb)) {
+            sb_append(sb, "l0c-stage2-");
+            sb_append(sb, tag);
+            sb_append(sb, "-");
+            sb_append_int(sb, sec);
+            sb_append(sb, "-");
+            sb_append_int(sb, nsec);
+            sb_append(sb, "-");
+            sb_append_int(sb, attempt);
+            let stem = up_join(root, sb_to_string(sb));
+            if (!file_exists(stem) &&
+                !file_exists(concat_s(stem, ".c")) &&
+                !file_exists(concat_s(stem, ".out")) &&
+                !file_exists(concat_s(stem, ".stdout")) &&
+                !file_exists(concat_s(stem, ".stderr")))
+            {
+                return stem;
+            }
+        }
+    }
+
+    return up_join(root, concat4_s("l0c-stage2-", tag, "-fallback", ""));
+}
+
+/**
+ * Delete a file when it exists, ignoring failures.
+ *
+ * @param path File path to remove.
+ */
+func bd_delete_if_present(path: string) {
+    if (file_exists(path)) {
+        delete_file(path);
+    }
+}
+
+/**
+ * Quote one shell token for POSIX `system()` execution.
+ *
+ * @param arg Raw token.
+ * @return Safely single-quoted token.
+ */
+func bd_shell_quote_posix(arg: string) -> string {
+    with (let sb = sb_create() => sb_free(sb)) {
+        sb_append(sb, "'");
+        for (let i = 0; i < len_s(arg); i = i + 1) {
+            let c = char_at_s(arg, i);
+            if (c == '\'') {
+                sb_append(sb, "'");
+                sb_append(sb, "\\");
+                sb_append(sb, "'");
+                sb_append(sb, "'");
+            } else {
+                sb_append_byte(sb, c);
+            }
+        }
+        sb_append(sb, "'");
+        return sb_to_string(sb);
+    }
+}
+
+/**
+ * Join command words into one shell command line.
+ *
+ * @param words Command words to quote and join.
+ * @return One shell command line.
+ */
+func bd_join_shell_words(words: VectorString*) -> string {
+    with (let sb = sb_create() => sb_free(sb)) {
+        for (let i = 0; i < vs_size(words); i = i + 1) {
+            if (i > 0) {
+                sb_append(sb, " ");
+            }
+            sb_append(sb, bd_shell_quote_posix(vs_get(words, i)));
+        }
+        return sb_to_string(sb);
+    }
+}
+
+/**
+ * Return the compiler flag-family name used by Stage 1.
+ *
+ * @param compiler Compiler command string.
+ * @return Flag-family tag.
+ */
+func bd_compiler_flag_family(compiler: string) -> string {
+    let base = up_basename(compiler);
+    if (eq_s(base, "tcc") || eq_s(base, "tcc.exe") || starts_with_s(base, "tcc-")) {
+        return "tcc";
+    }
+    if (eq_s(base, "gcc") || eq_s(base, "gcc.exe") || starts_with_s(base, "gcc-") ||
+        eq_s(base, "clang") || eq_s(base, "clang.exe") || starts_with_s(base, "clang-"))
+    {
+        return "gcc";
+    }
+    if (eq_s(base, "cc") || eq_s(base, "cc.exe")) {
+        return "cc";
+    }
+    if (eq_s(base, "cl") || eq_s(base, "cl.exe")) {
+        return "msvc";
+    }
+    return "unknown";
+}
+
+/**
+ * Return whether the user already supplied an optimization flag.
+ *
+ * @param extra_opts Collected extra C compiler options.
+ * @return `true` when an explicit optimization flag is present.
+ */
+func bd_has_explicit_opt_flag(extra_opts: VectorString*) -> bool {
+    for (let i = 0; i < vs_size(extra_opts); i = i + 1) {
+        let opt = vs_get(extra_opts, i);
+        if (starts_with_s(opt, "-O") || starts_with_s(opt, "/O")) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
+ * Return whether the user supplied a debug flag.
+ *
+ * @param extra_opts Collected extra C compiler options.
+ * @return `true` when a debug flag is present.
+ */
+func bd_has_debug_flag(extra_opts: VectorString*) -> bool {
+    for (let i = 0; i < vs_size(extra_opts); i = i + 1) {
+        let opt = vs_get(extra_opts, i);
+        if (eq_s(opt, "-g") || eq_s(opt, "/Zi") || eq_s(opt, "/Z7")) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
+ * Return the default optimization flag for a compiler family.
+ *
+ * @param family Compiler flag-family name.
+ * @param extra_opts Collected extra C compiler options.
+ * @return Optimization flag, or `null`.
+ */
+func bd_get_optimize_flag(family: string, extra_opts: VectorString*) -> string? {
+    if (bd_has_explicit_opt_flag(extra_opts)) {
+        return null;
+    }
+
+    if (bd_has_debug_flag(extra_opts)) {
+        if (eq_s(family, "tcc")) {
+            return "-O0";
+        }
+        if (eq_s(family, "gcc")) {
+            return "-Og";
+        }
+        if (eq_s(family, "msvc")) {
+            return "/Od";
+        }
+        return null;
+    }
+
+    if (eq_s(family, "gcc") || eq_s(family, "tcc")) {
+        return "-O1";
+    }
+    if (eq_s(family, "msvc")) {
+        return "/O1";
+    }
+    return null;
+}
+
+/**
+ * Return the best available C compiler command or `null`.
+ *
+ * @return Compiler command string, or `null`.
+ */
+func bd_find_c_compiler() -> string? {
+    let from_env = env_get("L0_CC");
+    if (from_env != null) {
+        return from_env as string;
+    }
+
+    with (let candidates = vs_create(4) => vs_free(candidates)) {
+        vs_push(candidates, "tcc");
+        vs_push(candidates, "gcc");
+        vs_push(candidates, "clang");
+        vs_push(candidates, "cc");
+        for (let i = 0; i < vs_size(candidates); i = i + 1) {
+            let candidate = vs_get(candidates, i);
+            let probe = concat4_s("command -v ", bd_shell_quote_posix(candidate), " >/dev/null 2>&1", "");
+            if (system(probe) == 0) {
+                return candidate;
+            }
+        }
+    }
+
+    let from_cc = env_get("CC");
+    if (from_cc != null) {
+        return from_cc as string;
+    }
+    return null;
+}
+
+/**
+ * Resolve the runtime include directory for build/run.
+ *
+ * @param opts Parsed CLI options.
+ * @return Runtime include directory, or `null`.
+ */
+func bd_runtime_include_dir(opts: CliOptions*) -> string? {
+    if (opts.runtime_include != null) {
+        return opts.runtime_include as string;
+    }
+
+    let from_env = env_get("L0_RUNTIME_INCLUDE");
+    if (from_env != null) {
+        return from_env as string;
+    }
+
+    let home = env_get("L0_HOME");
+    if (home != null) {
+        return up_join(home as string, "shared/runtime");
+    }
+    return null;
+}
+
+/**
+ * Resolve the runtime library directory for build/run.
+ *
+ * @param opts Parsed CLI options.
+ * @return Runtime library directory, or `null`.
+ */
+func bd_runtime_lib_dir(opts: CliOptions*) -> string? {
+    if (opts.runtime_lib != null) {
+        return opts.runtime_lib as string;
+    }
+    return env_get("L0_RUNTIME_LIB");
+}
+
+/**
+ * Validate that a runtime library directory exists and contains an L0 runtime library.
+ *
+ * @param runtime_lib_path Path to validate.
+ * @param diags Diagnostic collector for failures.
+ * @return `true` on success.
+ */
+func bd_validate_runtime_lib(runtime_lib_path: string, diags: DiagCollector*) -> bool {
+    let info = rt_file_info(runtime_lib_path);
+    if (!info.exists || !info.is_dir) {
+        diag_error(
+            diags,
+            "l0c",
+            "L0C-0014",
+            concat3_s("runtime library path '", runtime_lib_path, "' does not exist or is not a directory"),
+            "",
+            0,
+            0,
+            0,
+            0
+        );
+        return false;
+    }
+
+    let has_runtime = file_exists(up_join(runtime_lib_path, "libl0runtime.a")) ||
+        file_exists(up_join(runtime_lib_path, "libl0runtime.so")) ||
+        file_exists(up_join(runtime_lib_path, "libl0runtime.dylib")) ||
+        file_exists(up_join(runtime_lib_path, "l0runtime.lib"));
+    if (!has_runtime) {
+        diag_error(
+            diags,
+            "l0c",
+            "L0C-0015",
+            concat4_s(
+                "no l0runtime library found in '",
+                runtime_lib_path,
+                "' (expected one of: libl0runtime.a, libl0runtime.dylib, libl0runtime.so, l0runtime.lib)",
+                ""
+            ),
+            "",
+            0,
+            0,
+            0,
+            0
+        );
+        return false;
+    }
+    return true;
+}
+
+/**
+ * Validate the entry module `main` function for build/run.
+ *
+ * @param result Analysis result to inspect.
+ * @param entry_module Entry module name.
+ * @param diags Diagnostic collector for failures and warnings.
+ * @return `true` when the entry `main` is acceptable.
+ */
+func bd_validate_entry_main(result: AnalysisResult*, entry_module: string, diags: DiagCollector*) -> bool {
+    if (result.names == null) {
+        diag_error(
+            diags,
+            "l0c",
+            "L0C-0012",
+            concat4_s("entry module '", entry_module, "' must define a 'main' function for build/run", ""),
+            "",
+            0,
+            0,
+            0,
+            0
+        );
+        return false;
+    }
+
+    let entry_env = nr_env_find(result.names as NameResolution*, entry_module);
+    if (entry_env == null) {
+        diag_error(diags, "l0c", "L0C-0012", concat4_s("entry module '", entry_module, "' not found in analysis result", ""),
+            "", 0, 0, 0, 0);
+        return false;
+    }
+
+    let main_symbol = spm_get((entry_env as ModuleEnv*).locals, "main");
+    if (main_symbol == null || ord((main_symbol as Symbol*).kind) != ord(SYM_FUNC)) {
+        diag_error(
+            diags,
+            "l0c",
+            "L0C-0012",
+            concat4_s("entry module '", entry_module, "' must define a 'main' function for build/run", ""),
+            "",
+            0,
+            0,
+            0,
+            0
+        );
+        return false;
+    }
+
+    if (result.signatures == null) {
+        diag_error(
+            diags,
+            "l0c",
+            "L0C-0016",
+            concat4_s("missing type information for entry function '", concat3_s(entry_module, "::", "main"), "'", ""),
+            "",
+            0,
+            0,
+            0,
+            0
+        );
+        return false;
+    }
+
+    let main_type = sig_lookup_func_type(result.signatures as SignatureTables*, entry_module, "main");
+    if (main_type == null) {
+        diag_error(
+            diags,
+            "l0c",
+            "L0C-0016",
+            concat4_s("missing type information for entry function '", concat3_s(entry_module, "::", "main"), "'", ""),
+            "",
+            0,
+            0,
+            0,
+            0
+        );
+        return false;
+    }
+
+    let ret_name = type_format((main_type as Type*).result as Type*);
+    if (!eq_s(ret_name, "void") && !eq_s(ret_name, "int") && !eq_s(ret_name, "bool")) {
+        diag_warn(
+            diags,
+            "l0c",
+            "L0C-0013",
+            concat4_s(
+                "entry 'main' returns '",
+                ret_name,
+                "' (preferred: void/int/bool); generated C entry wrapper will ignore the return value",
+                ""
+            ),
+            "",
+            0,
+            0,
+            0,
+            0
+        );
+    }
+    return true;
+}
+
+/**
+ * Push compiler-family standard flags into a command-word vector.
+ *
+ * @param words Command words to extend.
+ * @param family Compiler flag-family name.
+ */
+func bd_push_standard_flags(words: VectorString*, family: string) {
+    if (eq_s(family, "tcc")) {
+        vs_push(words, "-std=c99");
+        vs_push(words, "-Wall");
+        vs_push(words, "-pedantic");
+        return;
+    }
+    if (eq_s(family, "gcc")) {
+        vs_push(words, "-std=c99");
+        vs_push(words, "-Wall");
+        vs_push(words, "-Wextra");
+        vs_push(words, "-Wno-unused");
+        vs_push(words, "-Wno-unused-parameter");
+        vs_push(words, "-Wno-parentheses");
+        vs_push(words, "-pedantic-errors");
+        return;
+    }
+    if (eq_s(family, "msvc")) {
+        vs_push(words, "/std:c11");
+        vs_push(words, "/W4");
+    }
+}
+
+/**
+ * Replay compiler output captured into temp files.
+ *
+ * @param cfg Logging configuration.
+ * @param stdout_path Captured stdout path.
+ * @param stderr_path Captured stderr path.
+ * @param failed Whether compilation failed.
+ */
+func bd_replay_compile_output(cfg: LogConfig*, stdout_path: string, stderr_path: string, failed: bool) {
+    let stderr_text = read_file(stderr_path);
+    let stdout_text = read_file(stdout_path);
+
+    if (failed) {
+        if (stderr_text != null && !is_empty_s(stderr_text as string)) {
+            log_error(cfg, stderr_text as string);
+        }
+        if (stdout_text != null && !is_empty_s(stdout_text as string)) {
+            log_error(cfg, stdout_text as string);
+        }
+        return;
+    }
+
+    if (stderr_text != null && !is_empty_s(stderr_text as string)) {
+        log_error(cfg, stderr_text as string);
+    }
+}
+
+/**
+ * Emit one Stage 2-only write-file diagnostic.
+ *
+ * @param diags Diagnostic collector.
+ * @param path Path that could not be written.
+ */
+func bd_emit_write_error(diags: DiagCollector*, path: string) {
+    diag_error(diags, "l0c", "L0C-9511", concat_s("cannot write output file: ", path), path, 0, 0, 0, 0);
+}
+
+/**
+ * Build an executable at the requested path.
+ *
+ * @param opts Parsed CLI options.
+ * @param cfg Logging configuration.
+ * @param exe_path Output executable path.
+ * @param keep_c_path Optional kept-C output path.
+ * @return Process-style status code.
+ */
+func bd_build_to_exe(opts: CliOptions*, cfg: LogConfig*, exe_path: string, keep_c_path: string?) -> int {
+    with (
+        let validate_diags = diag_create() => diag_free(validate_diags),
+        let cmd_diags = diag_create() => diag_free(cmd_diags)
+    ) {
+        let prepared = bd_prepare_input(opts, cmd_diags);
+        if (prepared == null) {
+            dp_print_collector(cmd_diags);
+            return 1;
+        }
+
+        let prep = prepared as BuildPreparedInput*;
+        let result = analysis_analyze_entry(prep.search_paths, prep.entry_module, cfg);
+        bd_prepared_input_free(prep);
+        prepared = null;
+
+        if (analysis_has_errors(result)) {
+            dp_print_collector_with_sources(result.diags, analysis_source_names(result), analysis_source_texts(result));
+            analysis_result_free(result);
+            return 1;
+        }
+
+        if (!bd_validate_entry_main(result, result.driver_state.entry_module, validate_diags)) {
+            dp_print_collector(validate_diags);
+            analysis_result_free(result);
+            return 1;
+        }
+        if (diag_count(validate_diags) > 0) {
+            dp_print_collector(validate_diags);
+        }
+
+        with (
+            let cg_opts = cg_options_create() => cg_options_free(cg_opts),
+            let extra_opts = bd_collect_c_option_words(opts) => vs_free(extra_opts),
+            let command_words = vs_create(16) => vs_free(command_words)
+        ) {
+            cg_opts.emit_line_directives = !opts.no_line_directives;
+            cg_opts.trace_arc = opts.trace_arc;
+            cg_opts.trace_memory = opts.trace_memory;
+
+            let c_code = backend_generate(result, cg_opts, cfg);
+            let temp_stem = bd_temp_stem("build");
+            let c_path = keep_c_path;
+            if (c_path == null) {
+                c_path = concat_s(temp_stem, ".c");
+            }
+            let stdout_path = concat_s(temp_stem, ".stdout");
+            let stderr_path = concat_s(temp_stem, ".stderr");
+
+            if (write_file(c_path as string, c_code) == null) {
+                bd_emit_write_error(cmd_diags, c_path as string);
+                dp_print_collector(cmd_diags);
+                analysis_result_free(result);
+                bd_delete_if_present(stdout_path);
+                bd_delete_if_present(stderr_path);
+                if (keep_c_path == null) {
+                    bd_delete_if_present(c_path as string);
+                }
+                return 1;
+            }
+
+            let compiler = opts.c_compiler;
+            if (compiler == null) {
+                compiler = bd_find_c_compiler();
+            }
+            if (compiler == null) {
+                diag_error(
+                    cmd_diags,
+                    "l0c",
+                    "L0C-0009",
+                    "no C compiler found: use '--c-compiler' to specify one or set the L0_CC environment variable",
+                    "",
+                    0,
+                    0,
+                    0,
+                    0
+                );
+                dp_print_collector(cmd_diags);
+                analysis_result_free(result);
+                bd_delete_if_present(stdout_path);
+                bd_delete_if_present(stderr_path);
+                if (keep_c_path == null) {
+                    bd_delete_if_present(c_path as string);
+                }
+                return 1;
+            }
+
+            let family = bd_compiler_flag_family(compiler as string);
+            let runtime_lib = bd_runtime_lib_dir(opts);
+            if (runtime_lib != null && !bd_validate_runtime_lib(runtime_lib as string, cmd_diags)) {
+                dp_print_collector(cmd_diags);
+                analysis_result_free(result);
+                bd_delete_if_present(stdout_path);
+                bd_delete_if_present(stderr_path);
+                if (keep_c_path == null) {
+                    bd_delete_if_present(c_path as string);
+                }
+                return 1;
+            }
+
+            vs_push(command_words, compiler as string);
+            vs_push(command_words, c_path as string);
+            vs_push(command_words, "-o");
+            vs_push(command_words, exe_path);
+
+            for (let i = 0; i < vs_size(extra_opts); i = i + 1) {
+                vs_push(command_words, vs_get(extra_opts, i));
+            }
+            bd_push_standard_flags(command_words, family);
+
+            let optimize = bd_get_optimize_flag(family, extra_opts);
+            if (optimize != null) {
+                vs_push(command_words, optimize as string);
+            }
+
+            let runtime_include = bd_runtime_include_dir(opts);
+            if (runtime_include != null) {
+                vs_push(command_words, "-I");
+                vs_push(command_words, runtime_include as string);
+            }
+
+            if (runtime_lib != null) {
+                vs_push(command_words, "-L");
+                vs_push(command_words, runtime_lib as string);
+                vs_push(command_words, "-ll0runtime");
+            }
+
+            let compile_cmd = concat4_s(
+                bd_join_shell_words(command_words),
+                " > ",
+                bd_shell_quote_posix(stdout_path),
+                concat4_s(" 2> ", bd_shell_quote_posix(stderr_path), "", "")
+            );
+            let compile_rc = system(compile_cmd);
+            let compile_failed = compile_rc != 0;
+            if (compile_failed) {
+                diag_error(cmd_diags, "l0c", "L0C-0010", "C compilation failed:", "", 0, 0, 0, 0);
+                dp_print_collector(cmd_diags);
+            }
+            bd_replay_compile_output(cfg, stdout_path, stderr_path, compile_failed);
+
+            analysis_result_free(result);
+            bd_delete_if_present(stdout_path);
+            bd_delete_if_present(stderr_path);
+            if (keep_c_path == null) {
+                bd_delete_if_present(c_path as string);
+            }
+
+            if (compile_failed) {
+                return 1;
+            }
+            return 0;
+        }
+    }
+}
+
+/**
+ * Execute Stage 2 `--build`.
+ *
+ * @param opts Parsed CLI options.
+ * @param cfg Logging configuration.
+ * @return Process-style status code.
+ */
+func bd_cmd_build(opts: CliOptions*, cfg: LogConfig*) -> int {
+    let exe_path = "a.out";
+    if (opts.output != null) {
+        exe_path = opts.output as string;
+    }
+
+    let keep_c_path: string? = null;
+    if (opts.keep_c) {
+        keep_c_path = bd_with_c_suffix(exe_path);
+    }
+    return bd_build_to_exe(opts, cfg, exe_path, keep_c_path);
+}
+
+/**
+ * Execute Stage 2 `--run`.
+ *
+ * @param opts Parsed CLI options.
+ * @param cfg Logging configuration.
+ * @return Process-style status code.
+ */
+func bd_cmd_run(opts: CliOptions*, cfg: LogConfig*) -> int {
+    with (let run_diags = diag_create() => diag_free(run_diags)) {
+        let temp_stem = bd_temp_stem("run");
+        let temp_exe = concat_s(temp_stem, ".out");
+
+        if (opts.output != null && !opts.keep_c) {
+            diag_warn(
+                run_diags,
+                "l0c",
+                "L0C-0017",
+                "'--output' is ignored in '--run' mode unless '--keep-c' is set; the executable path remains temporary",
+                "",
+                0,
+                0,
+                0,
+                0
+            );
+            dp_print_collector(run_diags);
+        }
+
+        let keep_c_path: string? = null;
+        if (opts.keep_c) {
+            if (opts.output != null) {
+                keep_c_path = bd_with_c_suffix(opts.output as string);
+            } else {
+                keep_c_path = "a.c";
+            }
+        }
+
+        let rc = bd_build_to_exe(opts, cfg, temp_exe, keep_c_path);
+        if (rc != 0) {
+            bd_delete_if_present(temp_exe);
+            return rc;
+        }
+
+        with (let words = vs_create(vs_size(opts.program_args) + 1) => vs_free(words)) {
+            vs_push(words, temp_exe);
+            for (let i = 0; i < vs_size(opts.program_args); i = i + 1) {
+                vs_push(words, vs_get(opts.program_args, i));
+            }
+
+            let run_cmd = bd_join_shell_words(words);
+            let run_rc = system(run_cmd);
+            bd_delete_if_present(temp_exe);
+            if (run_rc < 0) {
+                return 1;
+            }
+            return run_rc;
+        }
+    }
+}

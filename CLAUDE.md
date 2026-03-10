@@ -8,8 +8,8 @@ Dea/L0 is a small, safe, C-family systems language compiling to C99.
 
 - **Core principle:** No undefined behavior in the language itself.
 - **Stage 1:** Compiler pipeline in Python (lexer → parser → AST → semantic passes → C codegen).
-- **Stage 2:** Self-hosting compiler (L0-in-L0) with frontend, backend, and `--gen` implemented; `--build`/`--run`
-  remain the next driver milestone.
+- **Stage 2:** Self-hosting compiler (L0-in-L0) with frontend, backend, `--gen`, `--build`, and `--run`
+  implemented.
 - **Subsystems:** Grammar/semantics, backend/codegen, driver/build/module layout, and stdlib.
 
 ## Documentation — Read On Demand
@@ -79,12 +79,14 @@ Trace toggles (codegen/build/run): `--trace-arc`, `--trace-memory`.
 For current Stage 2 CLI work, use:
 
 ```bash
-./l0c -P compiler/stage2_l0/src --run l0c -- --gen -P examples hello # build a throwaway stage 2 compiler and run it
+./l0c -P compiler/stage2_l0/src --run l0c -- --gen -P examples hello # build a throwaway stage 2 compiler and use it
 ./scripts/build-stage2-l0c.sh # build the stage 2 compiler and place it under build/stage2/bin/l0c-stage2
 ./build/stage2/bin/l0c-stage2 --check -P examples hello # run the stage 2 compiler directly
+./build/stage2/bin/l0c-stage2 --build -P examples hello # build directly with the stage 2 compiler
+./build/stage2/bin/l0c-stage2 --run -P examples hello # build and run directly with the stage 2 compiler
 ```
 
-Stage 2 currently implements analysis/dump modes plus `--gen`; `--build` and `--run` remain NYI there.
+Stage 2 currently implements analysis/dump modes plus `--gen`, `--build`, and `--run`.
 
 Generated API documentation is written under `build/docs/` and is not part of the hand-authored `docs/` tree.
 Native Doxygen LaTeX output is generated under `build/docs/doxygen/latex/`; use `./scripts/gen-docs.sh --pdf`

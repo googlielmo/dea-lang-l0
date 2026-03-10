@@ -334,6 +334,8 @@ You can also bootstrap a repo-local Stage 2 compiler artifact directly:
 ./scripts/build-stage2-l0c.sh
 ./build/stage2/bin/l0c-stage2 --check -P examples hello
 ./build/stage2/bin/l0c-stage2 --gen -P examples hello
+./build/stage2/bin/l0c-stage2 --build -P examples hello
+./build/stage2/bin/l0c-stage2 --run -P examples hello
 ```
 
 References:
@@ -346,13 +348,15 @@ References:
 ## CLI
 
 The command table below describes the main `l0c` interface exposed today by the Stage 1 wrapper/driver. Stage 2
-currently implements analysis/dump modes plus `--gen`; `--build` and `--run` remain NYI there.
+currently implements analysis/dump modes plus `--gen`, `--build`, and `--run`.
 
 For direct Stage 2 artifact usage from a repo checkout:
 
 ```shell
 ./scripts/build-stage2-l0c.sh
 ./build/stage2/bin/l0c-stage2 --check -P examples hello
+./build/stage2/bin/l0c-stage2 --build -P examples hello
+./build/stage2/bin/l0c-stage2 --run -P examples hello
 ```
 
 ```shell

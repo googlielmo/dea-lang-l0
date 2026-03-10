@@ -1,0 +1,94 @@
+/*
+ * SPDX-License-Identifier: MIT OR Apache-2.0
+ * Copyright (c) 2026 gwz
+ */
+
+module build_driver_test;
+
+import std.assert;
+import std.io;
+import std.string;
+import std.vector;
+
+import build_driver;
+
+/**
+ * Tests test_with_c_suffix_rewrites_existing_extension.
+ */
+func test_with_c_suffix_rewrites_existing_extension() {
+    assert(eq_s(bd_with_c_suffix("build/out.exe"), "build/out.c"), "existing extension should be replaced");
+    assert(eq_s(bd_with_c_suffix("plain-output"), "plain-output.c"), "missing extension should add .c");
+}
+
+/**
+ * Tests test_shell_quote_posix_handles_spaces_and_quotes.
+ */
+func test_shell_quote_posix_handles_spaces_and_quotes() {
+    assert(eq_s(bd_shell_quote_posix("two words"), "'two words'"), "space quoting mismatch");
+    assert(eq_s(bd_shell_quote_posix("rock'n'roll"), "'rock'\\''n'\\''roll'"), "single-quote escaping mismatch");
+    assert(eq_s(bd_shell_quote_posix(""), "''"), "empty string should still be quoted");
+}
+
+/**
+ * Tests test_join_shell_words_quotes_every_token.
+ */
+func test_join_shell_words_quotes_every_token() {
+    with (let words = vs_create(3) => vs_free(words)) {
+        vs_push(words, "alpha");
+        vs_push(words, "two words");
+        vs_push(words, "rock'n'roll");
+
+        let joined = bd_join_shell_words(words);
+        assert(eq_s(joined, "'alpha' 'two words' 'rock'\\''n'\\''roll'"), "joined shell command mismatch");
+    }
+}
+
+/**
+ * Tests test_compiler_flag_family_detection.
+ */
+func test_compiler_flag_family_detection() {
+    assert(eq_s(bd_compiler_flag_family("gcc"), "gcc"), "gcc family mismatch");
+    assert(eq_s(bd_compiler_flag_family("/usr/bin/clang-18"), "gcc"), "clang family mismatch");
+    assert(eq_s(bd_compiler_flag_family("cc"), "cc"), "cc family mismatch");
+    assert(eq_s(bd_compiler_flag_family("cl.exe"), "msvc"), "msvc family mismatch");
+    assert(eq_s(bd_compiler_flag_family("custom-cc"), "unknown"), "unknown family mismatch");
+}
+
+/**
+ * Tests test_get_optimize_flag_defaults_and_overrides.
+ */
+func test_get_optimize_flag_defaults_and_overrides() {
+    with (let empty = vs_create(1) => vs_free(empty)) {
+        let gcc_opt = bd_get_optimize_flag("gcc", empty);
+        assert(gcc_opt != null && eq_s(gcc_opt as string, "-O1"), "gcc default optimize flag mismatch");
+    }
+
+    with (let debug_words = vs_create(1) => vs_free(debug_words)) {
+        vs_push(debug_words, "-g");
+        let gcc_debug = bd_get_optimize_flag("gcc", debug_words);
+        assert(gcc_debug != null && eq_s(gcc_debug as string, "-Og"), "gcc debug optimize flag mismatch");
+    }
+
+    with (let msvc_debug_words = vs_create(1) => vs_free(msvc_debug_words)) {
+        vs_push(msvc_debug_words, "/Zi");
+        let msvc_debug = bd_get_optimize_flag("msvc", msvc_debug_words);
+        assert(msvc_debug != null && eq_s(msvc_debug as string, "/Od"), "msvc debug optimize flag mismatch");
+    }
+
+    with (let explicit_opt = vs_create(1) => vs_free(explicit_opt)) {
+        vs_push(explicit_opt, "-O2");
+        assert(bd_get_optimize_flag("gcc", explicit_opt) == null, "explicit optimize flag should suppress defaults");
+    }
+}
+
+/**
+ * Main entry point for the module.
+ */
+func main() {
+    test_with_c_suffix_rewrites_existing_extension();
+    test_shell_quote_posix_handles_spaces_and_quotes();
+    test_join_shell_words_quotes_every_token();
+    test_compiler_flag_family_detection();
+    test_get_optimize_flag_defaults_and_overrides();
+    printl_s("build_driver_test: all tests passed");
+}

@@ -39,6 +39,11 @@
 #include <stdarg.h>
 #include <errno.h>
 #include <time.h>
+#include <sys/stat.h>
+
+#if !defined(_WIN32)
+#include <sys/wait.h>
+#endif
 
 #include "l0_siphash.h"
 
@@ -228,6 +233,22 @@ static l0_opt_string L0_OPT_STRING_EMPTY = { .has_value = 1, .value = { 0 } };
 struct l0_sys_rt_RtTimeParts {
     l0_int sec;
     l0_int nsec;
+};
+#endif
+
+/**
+ * @struct l0_sys_rt_RtFileInfo
+ * Definition for `sys.rt::RtFileInfo`.
+ */
+#ifndef L0_DEFINED_l0_sys_rt_RtFileInfo
+#define L0_DEFINED_l0_sys_rt_RtFileInfo
+struct l0_sys_rt_RtFileInfo {
+    l0_bool exists;
+    l0_bool is_file;
+    l0_bool is_dir;
+    l0_opt_int size;
+    l0_opt_int mtime_sec;
+    l0_opt_int mtime_nsec;
 };
 #endif
 
@@ -1168,17 +1189,32 @@ static void rt_string_release(l0_string s) {
  * ========================================================================= */
 
 /**
- * Execute a system command and return its exit code.
- * Returns the exit code of the command, or a negative value on error.
+ * Execute a system command and return its normalized status.
+ * Returns the command exit code, `128 + signal` when terminated by a signal,
+ * or a negative value on error launching the shell.
  * 
  * @param cmd Command string.
- * @return Exit code.
+ * @return Normalized status.
  *
  * L0 signature: `extern func rt_system(cmd: string) -> int;` 
  */
 static l0_int rt_system(l0_string cmd) {
     char *c = _rt_string_bytes(cmd);
-    return (l0_int)system(c);
+    int status = system(c);
+#if defined(_WIN32)
+    return (l0_int)status;
+#else
+    if (status < 0) {
+        return (l0_int)status;
+    }
+    if (WIFEXITED(status)) {
+        return (l0_int)WEXITSTATUS(status);
+    }
+    if (WIFSIGNALED(status)) {
+        return (l0_int)(128 + WTERMSIG(status));
+    }
+    return (l0_int)status;
+#endif
 }
 
 /**
@@ -1553,6 +1589,53 @@ static l0_bool rt_file_exists(l0_string path) {
         return 1;
     }
     return 0;
+}
+
+/**
+ * Return basic metadata for a path.
+ * 
+ * @param path File path.
+ * @return Metadata record with nullable size and mtime fields.
+ *
+ * L0 signature: `extern func rt_file_info(path: string) -> RtFileInfo;`
+ */
+static struct l0_sys_rt_RtFileInfo rt_file_info(l0_string path) {
+    struct l0_sys_rt_RtFileInfo out = {
+        .exists = 0,
+        .is_file = 0,
+        .is_dir = 0,
+        .size = { .has_value = 0 },
+        .mtime_sec = { .has_value = 0 },
+        .mtime_nsec = { .has_value = 0 },
+    };
+    char *c = _rt_string_bytes(path);
+    struct stat st;
+    if (stat(c, &st) != 0) {
+        return out;
+    }
+
+    out.exists = 1;
+    out.is_file = S_ISREG(st.st_mode) ? 1 : 0;
+    out.is_dir = S_ISDIR(st.st_mode) ? 1 : 0;
+
+    if (st.st_size >= 0 && (off_t)(l0_int)st.st_size == st.st_size) {
+        out.size = (l0_opt_int){ .has_value = 1, .value = (l0_int)st.st_size };
+    }
+    if ((time_t)(l0_int)st.st_mtime == st.st_mtime) {
+        out.mtime_sec = (l0_opt_int){ .has_value = 1, .value = (l0_int)st.st_mtime };
+#if defined(__APPLE__)
+        if ((long)(l0_int)st.st_mtimespec.tv_nsec == st.st_mtimespec.tv_nsec) {
+            out.mtime_nsec = (l0_opt_int){ .has_value = 1, .value = (l0_int)st.st_mtimespec.tv_nsec };
+        }
+#elif defined(_POSIX_C_SOURCE) || defined(__linux__) || defined(__unix__) || defined(__unix)
+        if ((long)(l0_int)st.st_mtim.tv_nsec == st.st_mtim.tv_nsec) {
+            out.mtime_nsec = (l0_opt_int){ .has_value = 1, .value = (l0_int)st.st_mtim.tv_nsec };
+        }
+#else
+        out.mtime_nsec = (l0_opt_int){ .has_value = 1, .value = 0 };
+#endif
+    }
+    return out;
 }
 
 /**

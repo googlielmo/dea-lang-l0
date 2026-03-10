@@ -193,7 +193,7 @@ Primary Stage 2 backend/codegen parity checks live under `compiler/stage2_l0/tes
 
 - `backend_test.l0`
 - `c_emitter_test.l0`
-- `l0c_test.l0`
+- `l0c_lib_test.l0`
 - `l0c_codegen_test.sh`
 
 Committed Stage 2 backend goldens are in `compiler/stage2_l0/tests/fixtures/backend_golden/` and are refreshed from

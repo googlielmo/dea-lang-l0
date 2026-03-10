@@ -1,6 +1,6 @@
 # The L0 Standard Library
 
-Version: 2026-03-01
+Version: 2026-03-10
 
 The standard library provides ergonomic L0 modules (`std.*`) and low-level runtime bindings (`sys.*`).
 
@@ -262,7 +262,7 @@ For canonical ownership behavior around `new`/`drop`, ARC strings, and container
 | `argv`    | `(index: int) -> string`        | Returns command-line argument string at index.   |
 | `abort`   | `(message: string) -> void`     | Aborts program with message.                     |
 | `errno`   | `() -> int`                     | Returns runtime error number.                    |
-| `system`  | `(cmd: string) -> int`          | Executes command in shell and returns exit code. |
+| `system`  | `(cmd: string) -> int`          | Executes command in shell and returns normalized child exit status. |
 
 ### `std.text`
 
