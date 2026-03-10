@@ -22,6 +22,7 @@
 - Test modules:
     - `compiler/stage2_l0/tests/source_paths_test.l0`
     - `compiler/stage2_l0/tests/l0c_test.l0`
+    - `compiler/stage2_l0/tests/l0c_codegen_test.sh`
     - `compiler/stage2_l0/tests/l0c_stage2_bootstrap_test.sh`
     - `tests/test_make_dist_workflow.sh`
 
@@ -92,9 +93,16 @@ Phase 1 output is meant to be directly usable from a normal repo checkout:
 
 Phase 1 also adds one forward-compatibility hook for later phases:
 
-1. the builder supports an output-root override such as `OUT_ROOT=<path>` or `DIST_DIR=<path>`
+1. the builder supports a repo-local output-root override via `DIST_DIR=<path>`
 
-That override exists so Phase 2 and Phase 3 can reuse the same build logic instead of reimplementing it.
+Phase 1 `DIST_DIR` must resolve inside the repository so the generated launcher can compute the repo root relative to
+itself. That override exists so Phase 2 and Phase 3 can reuse the same build logic instead of reimplementing it.
+
+Phase 1 also enables a more efficient Stage 2 codegen golden-test path:
+
+1. `compiler/stage2_l0/tests/l0c_codegen_test.sh` should build a fresh Stage 2 compiler once before iterating fixtures,
+2. it should use a dedicated repo-local test output root under `build/tests/...`, not the default `build/stage2`,
+3. it should reuse that built `l0c-stage2` wrapper for all fixture `--gen` invocations in the same script run.
 
 ### Phase 2: repo-local top-level Make workflow
 
@@ -202,14 +210,18 @@ Phase 3 does not require `l0c-stage1` to be installed into the final prefix.
 ## Key Implementation Changes
 
 1. Keep `scripts/build-stage2-l0c.sh` as the single low-level builder for Stage 2, and make it reusable by later
-   phases through an output-root override.
+   phases through the repo-local `DIST_DIR` override.
 2. Keep Stage 2 default-root behavior aligned with Stage 1: explicit `-S/--sys-root` wins, `L0_SYSTEM` is
    authoritative, and `L0_HOME/shared/l0/stdlib` is the fallback.
-3. Add the top-level `Makefile` only in Phase 2; it is the developer UX layer, not a second compiler driver.
-4. Structure wrapper and env-script generation so there are two modes:
+3. Make `compiler/stage2_l0/tests/l0c_codegen_test.sh` consume a freshly built Phase 1 artifact once per script run
+   instead of rebuilding Stage 2 through Stage 1 for every golden fixture.
+4. Keep codegen-test bootstrap artifacts isolated under `build/tests/...` so the regression harness does not interfere
+   with a developer-managed `build/stage2` checkout artifact.
+5. Add the top-level `Makefile` only in Phase 2; it is the developer UX layer, not a second compiler driver.
+6. Structure wrapper and env-script generation so there are two modes:
    1. repo-relative mode for Phase 2
    2. prefix-relative mode for Phase 3
-5. Keep Phase 3 Stage-2-first: copied shared assets and installed Stage 2 are mandatory; Stage 1 packaging is deferred
+7. Keep Phase 3 Stage-2-first: copied shared assets and installed Stage 2 are mandatory; Stage 1 packaging is deferred
    and not required by this plan.
 
 ## Test Plan
@@ -225,6 +237,8 @@ Phase 3 does not require `l0c-stage1` to be installed into the final prefix.
    2. `L0_SYSTEM` precedence,
    3. `L0_HOME` fallback,
    4. explicit sys-root suppression of defaults.
+6. `compiler/stage2_l0/tests/l0c_codegen_test.sh` bootstraps Stage 2 once into a dedicated repo-local
+   `build/tests/...` root and reuses that built wrapper across all golden fixtures in the same run.
 
 ### Phase 2
 

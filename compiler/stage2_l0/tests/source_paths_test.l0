@@ -1,0 +1,69 @@
+/*
+ * SPDX-License-Identifier: MIT OR Apache-2.0
+ * Copyright (c) 2026 gwz
+ */
+
+module source_paths_test;
+
+import std.assert;
+import std.io;
+import std.string;
+import std.vector;
+
+import source_paths;
+
+/**
+ * Tests test_default_sys_roots_no_env_values.
+ */
+func test_default_sys_roots_no_env_values() {
+    with (let sys_roots = vs_create(2) => vs_free(sys_roots)) {
+        sp_apply_default_sys_roots_env(sys_roots, null, null);
+        assert(vs_size(sys_roots) == 0, "expected no default sys roots without env values");
+    }
+}
+
+/**
+ * Tests test_default_sys_roots_l0_system_precedence.
+ */
+func test_default_sys_roots_l0_system_precedence() {
+    with (let sys_roots = vs_create(2) => vs_free(sys_roots)) {
+        sp_apply_default_sys_roots_env(sys_roots, "/sys/a:/sys/b", "/repo/compiler");
+        assert(vs_size(sys_roots) == 2, "expected two sys roots from L0_SYSTEM");
+        assert(eq_s(vs_get(sys_roots, 0), "/sys/a"), "expected first L0_SYSTEM root");
+        assert(eq_s(vs_get(sys_roots, 1), "/sys/b"), "expected second L0_SYSTEM root");
+    }
+}
+
+/**
+ * Tests test_default_sys_roots_l0_home_fallback.
+ */
+func test_default_sys_roots_l0_home_fallback() {
+    with (let sys_roots = vs_create(2) => vs_free(sys_roots)) {
+        sp_apply_default_sys_roots_env(sys_roots, null, "/repo/compiler");
+        assert(vs_size(sys_roots) == 1, "expected one fallback sys root from L0_HOME");
+        assert(eq_s(vs_get(sys_roots, 0), "/repo/compiler/shared/l0/stdlib"), "expected L0_HOME fallback root");
+    }
+}
+
+/**
+ * Tests test_explicit_sys_root_suppresses_defaults.
+ */
+func test_explicit_sys_root_suppresses_defaults() {
+    with (let sys_roots = vs_create(2) => vs_free(sys_roots)) {
+        vs_push(sys_roots, "/explicit/sys");
+        sp_apply_default_sys_roots_env(sys_roots, "/sys/a:/sys/b", "/repo/compiler");
+        assert(vs_size(sys_roots) == 1, "explicit sys roots must suppress defaults");
+        assert(eq_s(vs_get(sys_roots, 0), "/explicit/sys"), "explicit sys root should be preserved");
+    }
+}
+
+/**
+ * Main entry point for the module.
+ */
+func main() {
+    test_default_sys_roots_no_env_values();
+    test_default_sys_roots_l0_system_precedence();
+    test_default_sys_roots_l0_home_fallback();
+    test_explicit_sys_root_suppresses_defaults();
+    printl_s("source_paths_test: all tests passed");
+}

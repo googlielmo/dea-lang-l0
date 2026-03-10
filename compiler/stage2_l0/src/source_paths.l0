@@ -215,27 +215,48 @@ func sp_apply_default_project_roots(project_roots: VectorString*) {
 }
 
 /**
- * Populate default system roots from `L0_SYSTEM` when needed.
+ * Append system roots from a split environment-style path string.
  *
  * @param sys_roots System-root vector to update.
+ * @param env_value Colon- or semicolon-separated root list.
  */
-func sp_apply_default_sys_roots(sys_roots: VectorString*) {
-    if (vs_size(sys_roots) > 0) {
-        return;
-    }
-
-    let env_opt = env_get("L0_SYSTEM");
-    if (env_opt == null) {
-        return;
-    }
-
-    let env_value = env_opt as string;
-
+func sp_append_env_sys_roots(sys_roots: VectorString*, env_value: string) {
     with (let roots = us_split_chars2_non_empty(env_value, ':', ';') => vs_free(roots)) {
         for (let i = 0; i < vs_size(roots); i = i + 1) {
             vs_push(sys_roots, vs_get(roots, i));
         }
     }
+}
+
+/**
+ * Populate default system roots from effective environment values when needed.
+ *
+ * @param sys_roots System-root vector to update.
+ * @param l0_system Effective `L0_SYSTEM` value, if any.
+ * @param l0_home Effective `L0_HOME` value, if any.
+ */
+func sp_apply_default_sys_roots_env(sys_roots: VectorString*, l0_system: string?, l0_home: string?) {
+    if (vs_size(sys_roots) > 0) {
+        return;
+    }
+
+    if (l0_system != null && !is_empty_s(l0_system as string)) {
+        sp_append_env_sys_roots(sys_roots, l0_system as string);
+        return;
+    }
+
+    if (l0_home != null && !is_empty_s(l0_home as string)) {
+        vs_push(sys_roots, up_join(l0_home as string, "shared/l0/stdlib"));
+    }
+}
+
+/**
+ * Populate default system roots from `L0_SYSTEM` when needed.
+ *
+ * @param sys_roots System-root vector to update.
+ */
+func sp_apply_default_sys_roots(sys_roots: VectorString*) {
+    sp_apply_default_sys_roots_env(sys_roots, env_get("L0_SYSTEM"), env_get("L0_HOME"));
 }
 
 /**

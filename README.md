@@ -48,6 +48,8 @@ L0 is currently at a quite exciting phase: **The Stage 2 Bootstrap**.
 
 * Stage 2 `--gen`: implemented and parity-tested against Stage 1 on a committed golden corpus.
 
+* Stage 2 bootstrap artifact: buildable today under `build/stage2/bin` via `./scripts/build-stage2-l0c.sh`.
+
 Today, Stage 2 has feature parity with Stage 1 for the analysis-oriented commands `--check`, `--type`, and `--sym`,
 and now also for deterministic C emission through `--gen`.
 The next major milestone is supporting `--build` and `--run` in Stage 2.
@@ -326,6 +328,14 @@ name resolution, type checking, backend, and C emitter are separate components w
 Current Stage 2 reaches the C emission boundary (`--gen`); direct Stage 2 `--build` and `--run` are the remaining
 driver milestone.
 
+You can also bootstrap a repo-local Stage 2 compiler artifact directly:
+
+```shell
+./scripts/build-stage2-l0c.sh
+./build/stage2/bin/l0c-stage2 --check -P examples hello
+./build/stage2/bin/l0c-stage2 --gen -P examples hello
+```
+
 References:
 
 - [Architecture and data flow](docs/reference/architecture.md)
@@ -337,6 +347,13 @@ References:
 
 The command table below describes the main `l0c` interface exposed today by the Stage 1 wrapper/driver. Stage 2
 currently implements analysis/dump modes plus `--gen`; `--build` and `--run` remain NYI there.
+
+For direct Stage 2 artifact usage from a repo checkout:
+
+```shell
+./scripts/build-stage2-l0c.sh
+./build/stage2/bin/l0c-stage2 --check -P examples hello
+```
 
 ```shell
 l0c [mode] [options] <target>

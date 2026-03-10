@@ -11,11 +11,30 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 FIXTURE_ROOT="$SCRIPT_DIR/fixtures/backend_golden"
 REFRESH_SCRIPT="$REPO_ROOT/scripts/refresh_stage2_backend_goldens.py"
 ARTIFACT_DIR="$(mktemp -d /tmp/l0_stage2_codegen_tests.XXXXXX)"
+BOOTSTRAP_PARENT="$REPO_ROOT/build/tests"
+BOOTSTRAP_DIR=""
+KEEP_ARTIFACTS="${KEEP_ARTIFACTS:-0}"
 
 cleanup() {
-    rm -rf "$ARTIFACT_DIR"
+    if [ "$KEEP_ARTIFACTS" -eq 0 ]; then
+        rm -rf "$ARTIFACT_DIR"
+        if [ -n "$BOOTSTRAP_DIR" ]; then
+            rm -rf "$BOOTSTRAP_DIR"
+        fi
+    fi
 }
 trap cleanup EXIT
+
+fail() {
+    local message="$1"
+    echo "l0c_codegen_test: FAIL: $message" >&2
+    echo "l0c_codegen_test: artifacts=$ARTIFACT_DIR" >&2
+    if [ -n "$BOOTSTRAP_DIR" ]; then
+        echo "l0c_codegen_test: bootstrap=$BOOTSTRAP_DIR" >&2
+    fi
+    KEEP_ARTIFACTS=1
+    exit 1
+}
 
 detect_cc() {
     if [ -n "${CC:-}" ] && command -v "$CC" >/dev/null 2>&1; then
@@ -51,12 +70,16 @@ compile_generated_c() {
 cd "$REPO_ROOT"
 python3 "$REFRESH_SCRIPT" --check "$@"
 
+mkdir -p "$BOOTSTRAP_PARENT"
+BOOTSTRAP_DIR="$(mktemp -d "$BOOTSTRAP_PARENT/l0_stage2_codegen.XXXXXX")"
+DIST_DIR="${BOOTSTRAP_DIR#$REPO_ROOT/}" ./scripts/build-stage2-l0c.sh >/dev/null
+STAGE2_L0C="$BOOTSTRAP_DIR/bin/l0c-stage2"
+
 compiler=""
 if find "$FIXTURE_ROOT" -name '*.expected.out' -print -quit | grep -q .; then
     compiler="$(detect_cc || true)"
     if [ -z "$compiler" ]; then
-        echo "no C compiler found for runtime parity checks" >&2
-        exit 1
+        fail "no C compiler found for runtime parity checks"
     fi
 fi
 
@@ -80,7 +103,7 @@ for entry_file in "$FIXTURE_ROOT"/*/entry_module.txt; do
     generated="$ARTIFACT_DIR/${case_name}.generated.c"
     expected="$case_dir/${case_name}.golden.c"
 
-    if ! ./l0c -P compiler/stage2_l0/src --run l0c -- --gen --no-line-directives -P "$case_dir" "$entry_module" > "$generated"; then
+    if ! "$STAGE2_L0C" --gen --no-line-directives -P "$case_dir" "$entry_module" > "$generated"; then
         echo "$case_name: GEN_FAIL" >&2
         status=1
         continue
@@ -109,5 +132,11 @@ for entry_file in "$FIXTURE_ROOT"/*/entry_module.txt; do
 
     echo "$case_name: OK"
 done
+
+if [ "$status" -ne 0 ]; then
+    echo "l0c_codegen_test: artifacts=$ARTIFACT_DIR" >&2
+    echo "l0c_codegen_test: bootstrap=$BOOTSTRAP_DIR" >&2
+    KEEP_ARTIFACTS=1
+fi
 
 exit "$status"

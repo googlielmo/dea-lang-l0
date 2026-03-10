@@ -1,6 +1,6 @@
 # L0 Project Status
 
-Version: 2026-03-09
+Version: 2026-03-10
 
 This document summarizes what is implemented in this repository today and what remains open.
 
@@ -210,6 +210,8 @@ Stage 2 backend/codegen status:
 - Stage 2 `backend_generate()` is implemented and emits a single C99 translation unit from typed `AnalysisResult`.
 - Stage 2 `l0c --gen` is implemented, including `--output`, `--no-line-directives`, `--trace-arc`, and
   `--trace-memory`.
+- Stage 2 can now be bootstrapped into a repo-local artifact via `./scripts/build-stage2-l0c.sh`, producing
+  `build/stage2/bin/l0c-stage2` and `l0c-stage2.native` by default.
 - Stage 2 backend lowering now covers the Stage 1 language surface, including ownership-sensitive lowering for
   `new`, `drop`, `try`, `with`, `match`, `case`, `break`, `continue`, and ARC cleanup.
 - Exact-text parity for `--gen --no-line-directives` is enforced against a committed curated Stage 1 golden corpus via
@@ -229,7 +231,8 @@ These remain true in Stage 1:
 Current Stage 2 limitations:
 
 1. Stage 2 `--build` and `--run` are still NYI; only `--gen`, analysis, and dump-style modes are implemented.
-2. Stage 2 still depends on the Stage 1 wrapper/compiler driver for external execution (`./l0c -P compiler/stage2_l0/src --run l0c -- ...`).
+2. Source-tree execution of Stage 2 still depends on the Stage 1 wrapper/compiler driver
+   (`./l0c -P compiler/stage2_l0/src --run l0c -- ...`), even though Phase 1 now provides a repo-local built artifact.
 3. Some language constraints intentionally remain staged in parser diagnostics (for example, array types and
    bitwise/shift operators).
 

@@ -5,6 +5,24 @@ It includes source code, tests, and utilities for the compiler and its runtime t
 
 Like the Stage 1 compiler, it compiles L0 source code to C99, but is itself implemented in L0.
 
+## Bootstrap artifact
+
+Build a repo-local Stage 2 compiler artifact:
+
+```bash
+./scripts/build-stage2-l0c.sh
+./build/stage2/bin/l0c-stage2 --check -P examples hello
+./build/stage2/bin/l0c-stage2 --gen -P examples hello
+```
+
+Optional builder environment variables:
+
+- `DIST_DIR=build/stage2-alt` writes the same artifact layout under a different repo-local output root.
+- `KEEP_C=1` retains `l0c-stage2.c` alongside the wrapper and native binary.
+
+Phase 1 `DIST_DIR` values must resolve inside the repository. The generated launcher derives the repo root relative to
+itself and sets `L0_HOME` automatically when unset.
+
 ## Running tests
 
 Run Stage 2 L0 tests:
