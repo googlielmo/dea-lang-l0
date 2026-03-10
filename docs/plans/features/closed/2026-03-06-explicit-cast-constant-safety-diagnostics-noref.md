@@ -3,7 +3,7 @@
 ## Explicit cast constant-safety diagnostics in Stage 1
 
 - Date: 2026-03-06
-- Status: Draft
+- Status: Closed (implemented)
 - Title: Add compile-time diagnostics for provably-invalid explicit casts (`int -> byte` overflow and constant-null pointer unwrap)
 - Kind: Feature
 - Severity: Medium

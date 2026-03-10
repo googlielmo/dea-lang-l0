@@ -189,4 +189,6 @@ rg -n 'XXX-NNNN' compiler/stage1_py compiler/stage2_l0 docs
 6. **Diagnostic Codes:** Equivalent Stage 2 conditions reuse Stage 1 codes exactly, including `ICE-xxxx`; new codes are
    globally unique and verified by search.
 7. **Plans Documented:** For non-trivial changes or bug fixes a plan must be documented in `docs/plans/` with a clear
-   execution path and expected outcomes. See `docs/README.md` for naming and placement rules.
+   execution path and expected outcomes. Active plans live at the category root (e.g., `docs/plans/features/`); closed
+   plans are `git mv`-ed into `<category>/closed/` with cross-references updated. See `docs/README.md` for naming,
+   placement, and closing workflow rules.

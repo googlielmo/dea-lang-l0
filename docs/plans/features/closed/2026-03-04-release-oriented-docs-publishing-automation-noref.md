@@ -74,7 +74,7 @@ publication plus manual trigger.
   lists stay readable.
 
 Detailed rendering and syntax-normalization rules remain documented in
-`docs/plans/features/2026-03-02-doxygen-mcss-docs-system.md`.
+`docs/plans/features/closed/2026-03-02-doxygen-mcss-docs-system.md`.
 
 ### Ownership model
 

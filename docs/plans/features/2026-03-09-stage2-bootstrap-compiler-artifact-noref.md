@@ -3,7 +3,7 @@
 ## Bootstrap, Make workflow, and installable Stage 2 toolchain
 
 - Date: 2026-03-10
-- Status: Draft
+- Status: In Progress (Phase 1 complete, Phases 2–3 pending)
 - Title: Bootstrap, Make workflow, and installable Stage 2 toolchain
 - Kind: Feature
 - Severity: High
@@ -58,7 +58,7 @@ repo-local `l0c-stage1` wrapper. Phase 3 does not require Stage 1 to be installe
 
 ## Public Interface and Deliverables
 
-### Phase 1: built Stage 2 compiler artifact
+### Phase 1: built Stage 2 compiler artifact — COMPLETE
 
 Phase 1 introduces a low-level builder:
 
@@ -272,11 +272,10 @@ Phase 3 does not require `l0c-stage1` to be installed into the final prefix.
 
 ## Assumptions and Defaults
 
-1. This document must be readable on its own and does not rely on any earlier version of the plan.
-2. Phase 1 is the concrete first deliverable: a built Stage 2 compiler artifact under `build/stage2/bin`.
-3. Phase 2 is repo-local developer tooling under `dist/`; it is not yet a real install story.
-4. Phase 3 is the first phase that promises a relocatable, repo-independent install prefix.
-5. `DIST_DIR` is reserved for Phase 2 repo-local workflow; `PREFIX` is the install root for Phase 3.
-6. Alias switching for `l0c` remains explicit and is never an implicit side effect of install targets.
-7. New utility helpers are acceptable where they reduce duplication or isolate path-generation policy.
-8. All new L0 code added while implementing this feature should use Doxygen Javadoc-style comments with autobrief.
+1. Phase 1 is the concrete first deliverable: a built Stage 2 compiler artifact under `build/stage2/bin`.
+2. Phase 2 is repo-local developer tooling under `dist/`; it is not yet a real install story.
+3. Phase 3 is the first phase that promises a relocatable, repo-independent install prefix.
+4. `DIST_DIR` is reserved for Phase 2 repo-local workflow; `PREFIX` is the install root for Phase 3.
+5. Alias switching for `l0c` remains explicit and is never an implicit side effect of install targets.
+6. New utility helpers are acceptable where they reduce duplication or isolate path-generation policy.
+7. All new L0 code added while implementing this feature should use Doxygen Javadoc-style comments with autobrief.

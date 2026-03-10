@@ -59,6 +59,13 @@ Version: YYYY-MM-DD
 
 Plans for bug fixes, features, or refactors follow a more detailed metadata block.
 
+**Layout:** Each category (`features/`, `bug-fixes/`, `refactors/`, `tools/`) has a `closed/` subdirectory.
+Active plans (`Draft`, `In Progress`) remain at the category root. Plans with status `Closed` or `Implemented` are
+moved into `<category>/closed/`.
+
+**Closing workflow:** When closing a plan, `git mv` it into the corresponding `closed/` subdirectory, then grep for its
+filename across `docs/` and update any cross-references to reflect the new path.
+
 **Template:**
 
 ```markdown
