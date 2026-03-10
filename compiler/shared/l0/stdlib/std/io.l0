@@ -20,6 +20,26 @@ import std.unit;
    --------------------------------- */
 
 /**
+ * Check if a file exists at the given path.
+ *
+ * @param path The file path.
+ * @return True if it exists, false otherwise.
+ */
+func file_exists(path: string) -> bool {
+    return rt_file_exists(path);
+}
+
+/**
+ * Delete the file at the given path, returning true on success.
+ *
+ * @param path The file path.
+ * @return True if deleted, false otherwise.
+ */
+func delete_file(path: string) -> bool {
+    return rt_delete_file(path);
+}
+
+/**
  * Read the entire content of a file as a string optional.
  *
  * @param path The path to the file.

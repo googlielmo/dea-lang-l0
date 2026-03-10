@@ -68,3 +68,13 @@ func abort(message: string) -> void {
 func errno() -> int {
     return rt_errno();
 }
+
+/**
+ * Execute a system command and return its exit code.
+ *
+ * @param cmd The command string to execute.
+ * @return The exit status code.
+ */
+func system(cmd: string) -> int {
+    return rt_system(cmd);
+}

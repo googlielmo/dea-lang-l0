@@ -126,24 +126,6 @@ For canonical ownership behavior around `new`/`drop`, ARC strings, and container
 | `LinearMapIntString`    | `struct`                                                  | `int -> string` specialization.             |
 | `lmis_*`                | `create/free/len/set/get/contains/remove/key_at/value_at` | ARC-aware int/string map API.               |
 
-### `sys.hash`
-
-This module exposes runtime hash functions directly via `extern func` declarations.
-
-| Function             | Signature                         | Description                      |
-|----------------------|-----------------------------------|----------------------------------|
-| `rt_hash_bool`       | `(value: bool) -> int`            | Hashes `bool`.                   |
-| `rt_hash_byte`       | `(value: byte) -> int`            | Hashes `byte`.                   |
-| `rt_hash_int`        | `(value: int) -> int`             | Hashes `int`.                    |
-| `rt_hash_string`     | `(value: string) -> int`          | Hashes `string`.                 |
-| `rt_hash_data`       | `(data: void*, size: int) -> int` | Hashes raw bytes at pointer.     |
-| `rt_hash_opt_bool`   | `(opt: bool?) -> int`             | Hashes optional `bool`.          |
-| `rt_hash_opt_byte`   | `(opt: byte?) -> int`             | Hashes optional `byte`.          |
-| `rt_hash_opt_int`    | `(opt: int?) -> int`              | Hashes optional `int`.           |
-| `rt_hash_opt_string` | `(opt: string?) -> int`           | Hashes optional `string`.        |
-| `rt_hash_ptr`        | `(ptr: void*) -> int`             | Hashes pointer address.          |
-| `rt_hash_opt_ptr`    | `(opt: void*?) -> int`            | Hashes optional pointer address. |
-
 ### `std.io`
 
 **Imports:** `sys.rt`, `std.unit`
@@ -152,6 +134,8 @@ This module exposes runtime hash functions directly via `extern func` declaratio
 
 | Function           | Signature                               | Description                                 |
 |--------------------|-----------------------------------------|---------------------------------------------|
+| `file_exists`      | `(path: string) -> bool`                | Checks if a file exists at the given path.  |
+| `delete_file`      | `(path: string) -> bool`                | Deletes a file.                             |
 | `read_file`        | `(path: string) -> string?`             | Reads entire file; `null` on error.         |
 | `write_file`       | `(path: string, data: string) -> Unit?` | Writes entire file; `null` on error.        |
 | `read_line`        | `() -> string?`                         | Reads line from stdin; `null` on EOF/error. |
@@ -266,6 +250,20 @@ This module exposes runtime hash functions directly via `extern func` declaratio
 | `to_lower`      | `(c: byte) -> byte`                                   | Lowercases ASCII letter; returns input otherwise.                        |
 | `trim_s`        | `(s: string) -> string`                               | Trims leading/trailing ASCII whitespace (`' '`, `'\n'`, `'\t'`, `'\r'`). |
 
+### `std.system`
+
+**Imports:** `sys.rt`
+
+| Function  | Signature                       | Description                                      |
+|-----------|---------------------------------|--------------------------------------------------|
+| `exit`    | `(code: int) -> void`           | Exits program with status code.                  |
+| `env_get` | `(var_name: string) -> string?` | Returns environment variable or `null`.          |
+| `argc`    | `() -> int`                     | Returns command-line argument count.             |
+| `argv`    | `(index: int) -> string`        | Returns command-line argument string at index.   |
+| `abort`   | `(message: string) -> void`     | Aborts program with message.                     |
+| `errno`   | `() -> int`                     | Returns runtime error number.                    |
+| `system`  | `(cmd: string) -> int`          | Executes command in shell and returns exit code. |
+
 ### `std.text`
 
 **Imports:** `std.string`, `std.math`, `std.assert`, `std.vector`
@@ -290,19 +288,6 @@ This module exposes runtime hash functions directly via `extern func` declaratio
 | `string_to_int`                                     | `(s: string) -> int?`                                                                               | Parses decimal signed integer text; returns `null` on invalid input or 32-bit overflow/underflow.         |
 | `string_to_int_base`                                | `(s: string, base: int) -> int?`                                                                    | Parses signed integer text in base `2..16`; returns `null` on invalid input or 32-bit overflow/underflow. |
 | `string_to_byte/string_to_byte_base`                | `(s: string) -> byte?`, `(s: string, base: int) -> byte?`                                           | Parses numeric byte text; returns `null` on invalid input or out-of-range values (`0..255`).              |
-
-### `std.system`
-
-**Imports:** `sys.rt`
-
-| Function  | Signature                       | Description                                    |
-|-----------|---------------------------------|------------------------------------------------|
-| `exit`    | `(code: int) -> void`           | Exits program with status code.                |
-| `env_get` | `(var_name: string) -> string?` | Returns environment variable or `null`.        |
-| `argc`    | `() -> int`                     | Returns command-line argument count.           |
-| `argv`    | `(index: int) -> string`        | Returns command-line argument string at index. |
-| `abort`   | `(message: string) -> void`     | Aborts program with message.                   |
-| `errno`   | `() -> int`                     | Returns runtime error number.                  |
 
 ### `std.time`
 
@@ -330,6 +315,11 @@ This module exposes runtime hash functions directly via `extern func` declaratio
 | `Unit`        | `struct Unit {}` | Unit type.                      |
 | `unit`        | `() -> Unit`     | Returns unit value.             |
 | `present`     | `() -> Unit?`    | Returns non-null optional unit. |
+
+### `sys.hash`
+
+Low-level runtime FFI for hashing raw values and pointers. Uses the siphash-1-3 algorithm.
+Used by `std.hashmap` and `std.hashset` for hash calculations.
 
 ### `sys.rt`
 
