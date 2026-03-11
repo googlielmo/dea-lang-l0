@@ -3,7 +3,7 @@
 ## Bootstrap, Make workflow, and installable Stage 2 toolchain
 
 - Date: 2026-03-10
-- Status: In Progress (Phase 1 complete, Phases 2–3 pending)
+- Status: In Progress (Phases 1–2 complete, Phase 3 pending)
 - Title: Bootstrap, Make workflow, and installable Stage 2 toolchain
 - Kind: Feature
 - Severity: High
@@ -11,9 +11,10 @@
 - Subsystem: Bootstrap/build workflow / top-level Make UX / install layout
 - Modules:
     - `scripts/build-stage2-l0c.sh`
+    - `scripts/build_stage2_l0c.py`
+    - `scripts/dist_tools_lib.py`
+    - `scripts/gen_dist_tools.py`
     - `Makefile`
-    - `l0-env.sh`
-    - `compiler/stage2_l0/src/source_paths.l0`
     - `README.md`
     - `compiler/stage2_l0/README.md`
     - `docs/reference/project-status.md`
@@ -21,15 +22,19 @@
     - `CLAUDE.md`
 - Test modules:
     - `compiler/stage2_l0/tests/source_paths_test.l0`
-    - `compiler/stage2_l0/tests/l0c_test.l0`
     - `compiler/stage2_l0/tests/l0c_codegen_test.sh`
+    - `compiler/stage2_l0/tests/l0c_stage2_default_dist_test.sh`
     - `compiler/stage2_l0/tests/l0c_stage2_bootstrap_test.sh`
-    - `tests/test_make_dist_workflow.sh`
+    - `tests/test_make_dist_workflow.py`
 
 ## Summary
 
 This feature defines a staged path from today’s repo-only Stage 2 execution model to a user-facing Stage 2 compiler
 artifact and, later, to a real installable toolchain.
+
+Triple-bootstrap self-hosting validation and the strict triple-compilation test are tracked separately in
+`docs/plans/features/2026-03-11-triple-bootstrap-self-hosting-noref.md`. That follow-on work depends on
+this plan’s Phase 1 and Phase 2 deliverables, but it does not replace this plan’s Phase 3 install-prefix scope.
 
 The plan has three phases:
 
@@ -51,7 +56,8 @@ repo-local `l0c-stage1` wrapper. Phase 3 does not require Stage 1 to be installe
 ## Non-Goals
 
 1. Replacing the top-level `./l0c` wrapper with Stage 2 in this feature.
-2. Requiring Stage 2 self-hosting.
+2. Requiring Stage 2 self-hosting in this feature; that work is tracked in
+   `docs/plans/features/2026-03-11-triple-bootstrap-self-hosting-noref.md`.
 3. Making Stage 1 independently installable under the final Phase 3 prefix.
 4. Defining system package-manager integration.
 5. Introducing multiple competing developer entrypoints once the `Makefile` exists.
@@ -95,8 +101,9 @@ Phase 1 also adds one forward-compatibility hook for later phases:
 
 1. the builder supports a repo-local output-root override via `DIST_DIR=<path>`
 
-Phase 1 `DIST_DIR` must resolve inside the repository so the generated launcher can compute the repo root relative to
-itself. That override exists so Phase 2 and Phase 3 can reuse the same build logic instead of reimplementing it.
+Phase 1 `DIST_DIR` must resolve to a strict subdirectory inside the repository so the generated launcher can compute
+the repo root relative to itself. That override exists so Phase 2 and Phase 3 can reuse the same build logic instead
+of reimplementing it.
 
 Phase 1 also enables a more efficient Stage 2 codegen golden-test path:
 
@@ -111,7 +118,7 @@ Phase 2 adds a top-level `Makefile` as the canonical repo-local developer entryp
 Repo-local dist root:
 
 1. default: `DIST_DIR=dist`
-2. override: `make DIST_DIR=/tmp/l0-dev ...`
+2. override: `make DIST_DIR=build/dev-dist ...`
 
 Phase 2 layout:
 
@@ -123,10 +130,11 @@ Phase 2 layout:
 
 Phase 2 is intentionally repo-centric:
 
-1. wrappers may compute the repo root relative to themselves,
+1. wrappers compute the repo root relative to themselves,
 2. `l0-env.sh` may set `L0_HOME` to the repo `compiler/`,
 3. Phase 2 does not copy `compiler/shared/...` into `dist/`,
 4. Phase 2 does not try to make `dist/` relocatable outside the repo.
+5. new implementation helpers may be written in Python even though the generated launchers remain shell scripts.
 
 Public Make targets:
 
@@ -136,15 +144,13 @@ Public Make targets:
 4. `install-all`
 5. `use-stage1`
 6. `use-stage2`
-7. `env-stage1`
-8. `env-stage2`
-9. `test-stage1`
-10. `test-stage2`
-11. `test-stage2-trace`
-12. `test-all`
-13. `docs`
-14. `docs-pdf`
-15. `clean-dist`
+7. `test-stage1`
+8. `test-stage2`
+9. `test-stage2-trace`
+10. `test-all`
+11. `docs`
+12. `docs-pdf`
+13. `clean-dist`
 
 Target behavior:
 
@@ -152,10 +158,10 @@ Target behavior:
 2. `install-stage2` builds and installs the Phase 1 artifact into `<DIST_DIR>/bin`.
 3. `install-all` installs both stage-specific commands and does not rewrite `<DIST_DIR>/bin/l0c`.
 4. `use-stage1` and `use-stage2` are the only targets that switch `<DIST_DIR>/bin/l0c`.
-5. `env-stage1` and `env-stage2` switch the alias and refresh `<DIST_DIR>/bin/l0-env.sh`.
+5. `use-stage1` and `use-stage2` print the exact `source <DIST_DIR>/bin/l0-env.sh` command to run next.
 6. `test-stage1` runs `pytest -n auto`.
-7. `test-stage2` runs `./compiler/stage2_l0/run_tests.sh`.
-8. `test-stage2-trace` runs `./compiler/stage2_l0/run_trace_tests.sh`.
+7. `test-stage2` runs `./compiler/stage2_l0/run_tests.py`.
+8. `test-stage2-trace` runs `./compiler/stage2_l0/run_trace_tests.py`.
 9. `test-all` runs the three test targets above.
 10. `docs` runs `./scripts/gen-docs.sh`.
 11. `docs-pdf` runs `./scripts/gen-docs.sh --pdf`.
@@ -237,7 +243,11 @@ Phase 3 does not require `l0c-stage1` to be installed into the final prefix.
    2. `L0_SYSTEM` precedence,
    3. `L0_HOME` fallback,
    4. explicit sys-root suppression of defaults.
-6. `compiler/stage2_l0/tests/l0c_codegen_test.sh` bootstraps Stage 2 once into a dedicated repo-local
+6. `compiler/stage2_l0/tests/l0c_stage2_bootstrap_test.sh` bootstraps Stage 2 under a dedicated repo-local
+   `build/tests/...` root and validates the built wrapper end to end.
+7. `compiler/stage2_l0/tests/l0c_stage2_default_dist_test.sh` keeps coverage of the builder default
+   `build/stage2/bin` destination without leaving `build/stage2` behind after cleanup.
+8. `compiler/stage2_l0/tests/l0c_codegen_test.sh` bootstraps Stage 2 once into a dedicated repo-local
    `build/tests/...` root and reuses that built wrapper across all golden fixtures in the same run.
 
 ### Phase 2
@@ -247,18 +257,16 @@ Phase 3 does not require `l0c-stage1` to be installed into the final prefix.
 3. `make install-all`
 4. `make use-stage1`
 5. `make use-stage2`
-6. `make env-stage1`
-7. `make env-stage2`
-8. `make DIST_DIR=/tmp/l0-dev install-all`
-9. `make DIST_DIR=/tmp/l0-dev env-stage2`
-10. after sourcing `<DIST_DIR>/bin/l0-env.sh`, `l0c --check -P examples hello` succeeds with Stage 1 selected
-11. after sourcing `<DIST_DIR>/bin/l0-env.sh`, `l0c --check -P examples hello` succeeds with Stage 2 selected
-12. `make test-stage1`
-13. `make test-stage2`
-14. `make test-stage2-trace`
-15. `make test-all`
-16. `make docs`
-17. `make docs-pdf`
+6. `make DIST_DIR=build/dev-dist install-all`
+7. `make DIST_DIR=build/dev-dist use-stage2`
+8. after sourcing `<DIST_DIR>/bin/l0-env.sh`, `l0c --check -P examples hello` succeeds with Stage 1 selected
+9. after sourcing `<DIST_DIR>/bin/l0-env.sh`, `l0c --check -P examples hello` succeeds with Stage 2 selected
+10. `make test-stage1`
+11. `make test-stage2`
+12. `make test-stage2-trace`
+13. `make test-all`
+14. `make docs`
+15. `make docs-pdf`
 
 ### Phase 3
 
@@ -278,4 +286,5 @@ Phase 3 does not require `l0c-stage1` to be installed into the final prefix.
 4. `DIST_DIR` is reserved for Phase 2 repo-local workflow; `PREFIX` is the install root for Phase 3.
 5. Alias switching for `l0c` remains explicit and is never an implicit side effect of install targets.
 6. New utility helpers are acceptable where they reduce duplication or isolate path-generation policy.
-7. All new L0 code added while implementing this feature should use Doxygen Javadoc-style comments with autobrief.
+7. Phase 2 `DIST_DIR` values must stay inside the repository; outside-repo install roots are deferred to Phase 3.
+8. All new L0 code added while implementing this feature should use Doxygen Javadoc-style comments with autobrief.
