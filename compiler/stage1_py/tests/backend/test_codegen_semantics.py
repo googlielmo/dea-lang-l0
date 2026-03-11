@@ -606,6 +606,98 @@ def test_codegen_runtime_while_condition_re_evaluates_arc_rhs(
     assert stdout.strip().splitlines() == ["0", "1"]
 
 
+def test_codegen_runtime_logical_value_short_circuits_arc_rhs(
+    codegen_single, compile_and_run, tmp_path
+):
+    c_code, _ = codegen_single(
+        "main",
+        """
+        module main;
+
+        import std.string;
+
+        extern func rt_print_int(x: int) -> void;
+        extern func rt_println() -> void;
+
+        func tick(n: int) -> string {
+            rt_print_int(n);
+            rt_println();
+            return concat_s("x", "");
+        }
+
+        func main() -> int {
+            let a: bool = false && len_s(tick(7)) > 0;
+            let b: bool = true || len_s(tick(8)) > 0;
+            let c: bool = false || len_s(tick(9)) > 0;
+            let d: bool = true && len_s(tick(10)) > 0;
+
+            if (a) { rt_print_int(1); rt_println(); }
+            if (b && c && d) {
+                rt_print_int(2);
+                rt_println();
+            }
+            return 0;
+        }
+        """,
+    )
+
+    if c_code is None:
+        return
+
+    ok, stdout, stderr = compile_and_run(c_code, tmp_path)
+    assert ok, stderr
+    assert stdout.strip().splitlines() == ["9", "10", "2"]
+
+
+def test_codegen_runtime_logical_return_short_circuits_arc_rhs(
+    codegen_single, compile_and_run, tmp_path
+):
+    c_code, _ = codegen_single(
+        "main",
+        """
+        module main;
+
+        import std.string;
+
+        extern func rt_print_int(x: int) -> void;
+        extern func rt_println() -> void;
+
+        func tick(n: int) -> string {
+            rt_print_int(n);
+            rt_println();
+            return concat_s("x", "");
+        }
+
+        func ret_and() -> bool {
+            return false && len_s(tick(7)) > 0;
+        }
+
+        func ret_or() -> bool {
+            return true || len_s(tick(8)) > 0;
+        }
+
+        func main() -> int {
+            if (ret_and()) {
+                rt_print_int(1);
+                rt_println();
+            }
+            if (ret_or()) {
+                rt_print_int(2);
+                rt_println();
+            }
+            return 0;
+        }
+        """,
+    )
+
+    if c_code is None:
+        return
+
+    ok, stdout, stderr = compile_and_run(c_code, tmp_path)
+    assert ok, stderr
+    assert stdout.strip() == "2"
+
+
 def test_codegen_runtime_integer_overflow_panics(codegen_single, compile_and_run, tmp_path):
     c_code, _ = codegen_single(
         "main",

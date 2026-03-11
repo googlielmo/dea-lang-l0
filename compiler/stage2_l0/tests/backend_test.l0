@@ -322,12 +322,12 @@ func test_backend_generate_basic_control_flow() {
             "function declaration mismatch");
         assert(contains_s(generated, "return (_rt_iadd(a, b));"), "checked integer add lowering mismatch");
         assert(contains_s(generated, "// for loop"), "for-loop wrapper comment mismatch");
-        assert(contains_s(generated, "l0_int i = 0;\n        while ((i < 3))"),
+        assert(contains_s(generated, "l0_int i = 0;\n        while (1)"),
             "for-loop lowering mismatch");
         assert(contains_s(generated, "if ((i < 2))"), "if lowering mismatch");
         assert(contains_s(generated, "sum = (_rt_iadd(sum, l0_demo_main_add(i, 1)));"),
             "assignment and call lowering mismatch");
-        assert(contains_s(generated, "while ((sum > 0))"), "while lowering mismatch");
+        assert(contains_s(generated, "while (1)"), "while lowering mismatch");
 
         analysis_result_free(result);
     }

@@ -887,7 +887,65 @@ def test_trace_arc_control_flow_condition_temp_cleanup(
 
 
 # ---------------------------------------------------------------------------
-# L – Leak-freedom balance (comprehensive)
+# L – Logical-expression short-circuit temps
+# ---------------------------------------------------------------------------
+
+
+def test_trace_arc_logical_expression_temp_cleanup(
+    analyze_single, compile_and_run, tmp_path
+):
+    """Value-context logical expressions must short-circuit and free only taken RHS temps."""
+    ok, stdout, _stderr, arc = _compile_with_trace_arc(
+        analyze_single,
+        compile_and_run,
+        tmp_path,
+        """
+        module main;
+        import std.string;
+
+        extern func rt_print_int(x: int) -> void;
+        extern func rt_println() -> void;
+
+        func tick(flag: bool) -> string {
+            if (flag) {
+                return concat_s("x", "");
+            }
+            return concat_s("", "");
+        }
+
+        func main() -> int {
+            let a: bool = false && len_s(tick(true)) > 0;
+            let b: bool = true || len_s(tick(true)) > 0;
+            let c: bool = false || len_s(tick(true)) > 0;
+            let d: bool = true && len_s(tick(true)) > 0;
+
+            let total: int = 0;
+            if (a) { total = total + 1; }
+            if (b) { total = total + 1; }
+            if (c) { total = total + 1; }
+            if (d) { total = total + 1; }
+
+            rt_print_int(total);
+            rt_println();
+            return 0;
+        }
+        """,
+    )
+    assert ok, _stderr
+    assert stdout.strip() == "3"
+
+    heap = [e for e in arc if e["kind"] == "heap"]
+    frees = [e for e in heap if e["op"] == "release" and e["action"] == "free"]
+    assert len(frees) == 2, f"expected frees only for taken RHS logical branches: {heap}"
+
+    rc_values = _heap_rc_values(arc)
+    assert rc_values, "expected heap ARC events for logical-expression temps"
+    assert min(rc_values) >= 0, f"unexpected negative heap refcount values: {heap}"
+    assert max(rc_values) <= 2, f"unexpected heap refcount growth in logical-expression temps: {heap}"
+
+
+# ---------------------------------------------------------------------------
+# M – Leak-freedom balance (comprehensive)
 # ---------------------------------------------------------------------------
 
 

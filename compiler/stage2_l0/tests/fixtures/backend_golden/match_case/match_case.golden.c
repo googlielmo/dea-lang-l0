@@ -43,7 +43,22 @@ l0_int l0_main_main(void);
 /* -------------------------------- */
 struct l0_main_MaybeInt l0_main_make(l0_bool flag)
 {
-    if (flag)
+    l0_bool l0_cond_1 = 0;
+    {
+        {
+            if (flag)
+            {
+                goto __cond_true_1;
+            }
+        }
+        goto __cond_false_2;
+    __cond_true_1:;
+        l0_cond_1 = 1;
+        goto __cond_end_3;
+    __cond_false_2:;
+    __cond_end_3:;
+    }
+    if (l0_cond_1)
     {
         return (struct l0_main_MaybeInt){ .tag = l0_main_MaybeInt_Some, .data = { .Some = { .value = 7 } } };
     }

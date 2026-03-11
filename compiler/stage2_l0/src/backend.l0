@@ -1292,6 +1292,10 @@ func be_emit_binary_op(self: Backend*, expr_id: ExprId) -> string {
     let left = expr_arena_get(be_current_expr_arena(self), expr.expr_a);
     let right = expr_arena_get(be_current_expr_arena(self), expr.expr_b);
 
+    if (eq_s(expr.text_value, "&&") || eq_s(expr.text_value, "||")) {
+        return be_emit_condition_value(self, expr_id);
+    }
+
     if ((eq_s(expr.text_value, "==") || eq_s(expr.text_value, "!=")) &&
         (ord(left.kind) == ord(EX_NULL) || ord(right.kind) == ord(EX_NULL))) {
         let other_id = expr.expr_a;
@@ -2270,10 +2274,16 @@ func be_emit_condition_branch(self: Backend*, expr_id: ExprId, true_label: strin
         return;
     }
 
+    cem_emit_block_start(self.emitter);
+    let leaf_scope = be_push_scope(self);
     let c_cond = be_emit_expr(self, expr_id);
     cem_emit_if_header(self.emitter, c_cond);
     cem_emit_block_start(self.emitter);
+    be_emit_cleanup_at_scope_exit(self, leaf_scope);
     cem_emit_goto(self.emitter, true_label);
+    cem_emit_block_end(self.emitter);
+    be_emit_cleanup_at_scope_exit(self, leaf_scope);
+    be_pop_scope(self);
     cem_emit_block_end(self.emitter);
     cem_emit_goto(self.emitter, false_label);
 }
@@ -2300,15 +2310,12 @@ func be_emit_condition_value(self: Backend*, expr_id: ExprId) -> string {
     let end_label = be_fresh_label(self, "cond_end");
 
     cem_emit_block_start(self.emitter);
-    let cond_scope = be_push_scope(self);
     be_emit_condition_branch(self, expr_id, true_label, false_label);
     cem_emit_label(self.emitter, true_label);
     cem_emit_assignment(self.emitter, cond_tmp, cem_emit_bool_literal(true));
     cem_emit_goto(self.emitter, end_label);
     cem_emit_label(self.emitter, false_label);
     cem_emit_label(self.emitter, end_label);
-    be_emit_cleanup_at_scope_exit(self, cond_scope);
-    be_pop_scope(self);
     cem_emit_block_end(self.emitter);
     return cond_tmp;
 }

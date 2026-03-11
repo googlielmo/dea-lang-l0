@@ -342,8 +342,9 @@ def test_codegen_logical_expressions(codegen_single):
     if c_code is None:
         return
 
-    assert "(a && b)" in c_code
-    assert "(a || b)" in c_code
+    assert "l0_bool l0_cond_" in c_code
+    assert "__cond_true_" in c_code
+    assert "__cond_false_" in c_code
     assert "(!a)" in c_code
 
 
@@ -513,7 +514,8 @@ def test_codegen_while_statement(codegen_single):
     if c_code is None:
         return
 
-    assert "while ((i < n))" in c_code
+    assert "while (1)" in c_code
+    assert "__cond_true_" in c_code
     assert " = (_rt_iadd(i, 1));" in c_code
 
 

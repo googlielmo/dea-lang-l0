@@ -115,12 +115,53 @@ func main() -> int {
     return 0;
 }
 EOF
+cat > "$PROBE_ROOT/logical_expr.l0" <<'EOF'
+module logical_expr;
+
+import std.string;
+
+extern func rt_print_int(x: int) -> void;
+extern func rt_println() -> void;
+
+func tick(n: int) -> string {
+    rt_print_int(n);
+    rt_println();
+    return concat_s("x", "");
+}
+
+func main() -> int {
+    let a: bool = false && len_s(tick(7)) > 0;
+    let b: bool = true || len_s(tick(8)) > 0;
+    let c: bool = false || len_s(tick(9)) > 0;
+    let d: bool = true && len_s(tick(10)) > 0;
+
+    if (a) {
+        rt_print_int(1);
+        rt_println();
+    }
+    if (b && c && d) {
+        rt_print_int(2);
+        rt_println();
+    }
+    return 0;
+}
+EOF
 env -i PATH="$PATH" "$BOOTSTRAP_DIR/bin/l0c-stage2" --check -P "$PROBE_ROOT" qualified_expr >/dev/null
 env -i PATH="$PATH" "$BOOTSTRAP_DIR/bin/l0c-stage2" --run -P "$PROBE_ROOT" control_flow_cond > /tmp/l0_stage2_bootstrap_cond_$$.out
 assert_contains "/tmp/l0_stage2_bootstrap_cond_$$.out" "0"
 assert_contains "/tmp/l0_stage2_bootstrap_cond_$$.out" "1"
 if grep -x "2" /tmp/l0_stage2_bootstrap_cond_$$.out >/dev/null; then
     fail "expected control_flow_cond loop to stop after i=1"
+fi
+env -i PATH="$PATH" "$BOOTSTRAP_DIR/bin/l0c-stage2" --run -P "$PROBE_ROOT" logical_expr > /tmp/l0_stage2_bootstrap_logic_$$.out
+assert_contains "/tmp/l0_stage2_bootstrap_logic_$$.out" "9"
+assert_contains "/tmp/l0_stage2_bootstrap_logic_$$.out" "10"
+assert_contains "/tmp/l0_stage2_bootstrap_logic_$$.out" "2"
+if grep -x "7" /tmp/l0_stage2_bootstrap_logic_$$.out >/dev/null; then
+    fail "expected logical_expr to short-circuit false && RHS"
+fi
+if grep -x "8" /tmp/l0_stage2_bootstrap_logic_$$.out >/dev/null; then
+    fail "expected logical_expr to short-circuit true || RHS"
 fi
 env -i PATH="$PATH" "$BOOTSTRAP_DIR/bin/l0c-stage2" --gen --no-line-directives -P examples hello > /tmp/l0_stage2_bootstrap_gen_$$.c
 rm -f /tmp/l0_stage2_bootstrap_gen_$$.c
@@ -131,7 +172,7 @@ assert_file "/tmp/l0_stage2_bootstrap_hello_$$.c"
 assert_contains "/tmp/l0_stage2_bootstrap_hello_$$.out" "Hello, World!"
 env -i PATH="$PATH" "$BOOTSTRAP_DIR/bin/l0c-stage2" --run -P examples hello > /tmp/l0_stage2_bootstrap_run_$$.out
 assert_contains "/tmp/l0_stage2_bootstrap_run_$$.out" "Hello, World!"
-rm -f /tmp/l0_stage2_bootstrap_cond_$$.out /tmp/l0_stage2_bootstrap_hello_$$ /tmp/l0_stage2_bootstrap_hello_$$.c /tmp/l0_stage2_bootstrap_hello_$$.out /tmp/l0_stage2_bootstrap_run_$$.out
+rm -f /tmp/l0_stage2_bootstrap_cond_$$.out /tmp/l0_stage2_bootstrap_logic_$$.out /tmp/l0_stage2_bootstrap_hello_$$ /tmp/l0_stage2_bootstrap_hello_$$.c /tmp/l0_stage2_bootstrap_hello_$$.out /tmp/l0_stage2_bootstrap_run_$$.out
 
 ALT_DIST="$(mktemp -d "$BOOTSTRAP_PARENT/l0_stage2_bootstrap_keepc.XXXXXX")"
 DIST_DIR="${ALT_DIST#$REPO_ROOT/}" KEEP_C=1 ./scripts/build-stage2-l0c.sh >/dev/null

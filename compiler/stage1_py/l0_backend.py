@@ -1363,10 +1363,16 @@ class Backend:
             self._emit_condition_branch(expr.right, true_label, false_label)
             return
 
+        self.emitter.emit_block_start()
+        leaf_scope = self._push_scope()
         c_cond = self._emit_expr(expr)
         self.emitter.emit_if_header(c_cond)
         self.emitter.emit_block_start()
+        self._emit_cleanup_at_scope_exit(leaf_scope)
         self.emitter.emit_goto(true_label)
+        self.emitter.emit_block_end()
+        self._emit_cleanup_at_scope_exit(leaf_scope)
+        self._pop_scope()
         self.emitter.emit_block_end()
         self.emitter.emit_goto(false_label)
 
@@ -1395,15 +1401,12 @@ class Backend:
         end_label = self._fresh_label("cond_end")
 
         self.emitter.emit_block_start()
-        cond_scope = self._push_scope()
         self._emit_condition_branch(expr, true_label, false_label)
         self.emitter.emit_label(true_label)
         self.emitter.emit_assignment(cond_tmp, self.emitter.emit_bool_literal(True))
         self.emitter.emit_goto(end_label)
         self.emitter.emit_label(false_label)
         self.emitter.emit_label(end_label)
-        self._emit_cleanup_at_scope_exit(cond_scope)
-        self._pop_scope()
         self.emitter.emit_block_end()
         return cond_tmp
 
@@ -2999,6 +3002,9 @@ class Backend:
         Raises:
             InternalCompilerError: If types are missing, mismatch, or operation is unsupported.
         """
+        if expr_op in ("&&", "||"):
+            return self._emit_condition_value(expr_node)
+
         # Special-case: nullable wrapper compared with null
         if expr_op in ("==", "!=") and (isinstance(expr_left, NullLiteral) or isinstance(expr_right, NullLiteral)):
             other = expr_right if isinstance(expr_left, NullLiteral) else expr_left

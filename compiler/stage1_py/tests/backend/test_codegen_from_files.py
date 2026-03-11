@@ -333,8 +333,9 @@ class TestCodeGen:
         assert "(-" in c_code or "- " in c_code  # unary minus
         assert "_rt_iadd(10, 20)" in c_code or "10 + 20" in c_code  # binary
         assert "(10 < 20)" in c_code or "10 < 20" in c_code  # comparison
-        assert "&&" in c_code  # logical and
-        assert "||" in c_code  # logical or
+        assert "l0_bool l0_cond_" in c_code  # structured logical short-circuit lowering
+        assert "__cond_true_" in c_code
+        assert "__cond_false_" in c_code
 
         # Compile and run
         success, stdout, stderr = self.compile_and_run(c_code)

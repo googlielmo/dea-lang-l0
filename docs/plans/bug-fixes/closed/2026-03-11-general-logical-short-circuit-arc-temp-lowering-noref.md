@@ -3,7 +3,7 @@
 ## General `&&` / `||` expression lowering still hoists ARC temps ahead of short-circuit evaluation
 
 - Date: 2026-03-11
-- Status: Draft
+- Status: Closed (fixed)
 - Title: Fix general non-control-flow `&&` / `||` lowering that evaluates ARC-producing operands eagerly
 - Kind: Bug Fix
 - Severity: Critical (valid programs compile with incorrect boolean semantics)
@@ -55,7 +55,7 @@ This is the same defect class as the already-fixed control-flow issue, but in ge
    inventing a separate boolean-lowering path.
 4. Add direct regressions for runtime semantics and ARC cleanup.
 
-## Planned implementation
+## Fix implemented
 
 ### A. Add value-producing short-circuit lowering for logical binary ops
 
@@ -90,7 +90,7 @@ Files:
 - `compiler/stage1_py/tests/backend/test_trace_arc.py`
 - `compiler/stage2_l0/tests/l0c_stage2_bootstrap_test.sh`
 
-Planned coverage:
+Added coverage:
 
 1. Stage 1 runtime regression for:
    - `let a = false && len_s(tick(7)) > 0`
@@ -104,21 +104,22 @@ Planned coverage:
    - no corrupted refcount transitions
 4. Built Stage 2 bootstrap regression using the same runtime repro through `l0c-stage2`
 
-## Verification plan
+## Verification
 
 Run:
 
 ```bash
-pytest -q compiler/stage1_py/tests/backend/test_codegen_semantics.py -k "logical.*short|short_circuit"
-pytest -q compiler/stage1_py/tests/backend/test_trace_arc.py -k "logical.*condition|short_circuit"
+pytest -q compiler/stage1_py/tests/backend/test_codegen_semantics.py -k "logical_value_short_circuits_arc_rhs or logical_return_short_circuits_arc_rhs or if_condition_short_circuits_arc_rhs or while_condition_re_evaluates_arc_rhs"
+pytest -q compiler/stage1_py/tests/backend/test_trace_arc.py -k "logical_expression_temp_cleanup or control_flow_condition_temp_cleanup"
 bash compiler/stage2_l0/tests/l0c_stage2_bootstrap_test.sh
 ```
 
-Expected outcomes:
+Observed:
 
-1. no RHS side-effect output appears for skipped `&&` / `||` branches,
-2. generated code no longer hoists ARC temps ahead of the logical operator,
-3. built Stage 2 shows the same corrected short-circuit behavior as Stage 1.
+1. skipped `&&` / `||` RHS branches no longer execute side-effecting ARC-producing calls,
+2. value-context logical expressions now use the same structured short-circuit lowering as control-flow conditions,
+3. per-leaf condition cleanup avoids the uninitialized ARC cleanup issue seen in the first helper revision,
+4. the built Stage 2 artifact shows the same corrected short-circuit behavior as Stage 1.
 
 ## Assumptions
 

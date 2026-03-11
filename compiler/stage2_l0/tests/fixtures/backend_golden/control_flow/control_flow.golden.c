@@ -35,10 +35,44 @@ l0_int l0_main_main(void)
     // for loop
     {
         l0_int i = 0;
-        while ((i < 3))
+        while (1)
         {
+            l0_bool l0_cond_1 = 0;
             {
-                if ((i < 2))
+                {
+                    if ((i < 3))
+                    {
+                        goto __cond_true_3;
+                    }
+                }
+                goto __cond_false_4;
+            __cond_true_3:;
+                l0_cond_1 = 1;
+                goto __cond_end_5;
+            __cond_false_4:;
+            __cond_end_5:;
+            }
+            if (!(l0_cond_1))
+            {
+                goto __lbrk_1;
+            }
+            {
+                l0_bool l0_cond_2 = 0;
+                {
+                    {
+                        if ((i < 2))
+                        {
+                            goto __cond_true_6;
+                        }
+                    }
+                    goto __cond_false_7;
+                __cond_true_6:;
+                    l0_cond_2 = 1;
+                    goto __cond_end_8;
+                __cond_false_7:;
+                __cond_end_8:;
+                }
+                if (l0_cond_2)
                 {
                     sum = (_rt_iadd(sum, l0_main_add(i, 1)));
                 }
@@ -48,12 +82,31 @@ l0_int l0_main_main(void)
         }
     }
 __lbrk_1:;
-    while ((sum > 0))
+    while (1)
     {
+        l0_bool l0_cond_3 = 0;
+        {
+            {
+                if ((sum > 0))
+                {
+                    goto __cond_true_11;
+                }
+            }
+            goto __cond_false_12;
+        __cond_true_11:;
+            l0_cond_3 = 1;
+            goto __cond_end_13;
+        __cond_false_12:;
+        __cond_end_13:;
+        }
+        if (!(l0_cond_3))
+        {
+            goto __lbrk_9;
+        }
         return sum;
-    __lcont_4:;
+    __lcont_10:;
     }
-__lbrk_3:;
+__lbrk_9:;
     return 0;
 }
 

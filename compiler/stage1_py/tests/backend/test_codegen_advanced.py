@@ -462,7 +462,8 @@ def test_codegen_early_return_in_loop(codegen_single):
     assert c_code is not None
 
     # Should have return inside if inside while
-    assert "while ((i < len))" in c_code
+    assert "while (1)" in c_code
+    assert "__cond_true_" in c_code
     assert "if ((i >= 42))" in c_code
     assert "return i;" in c_code
     assert "return -1;" in c_code
@@ -491,9 +492,10 @@ def test_codegen_complex_boolean_expression(codegen_single):
     )
     assert c_code is not None
 
-    # Should preserve boolean structure
-    assert "&&" in c_code
-    assert "||" in c_code
+    # Logical expressions now lower through structured short-circuit branching.
+    assert "l0_bool l0_cond_" in c_code
+    assert "__cond_true_" in c_code
+    assert "__cond_false_" in c_code
     assert ">=" in c_code
     assert "<=" in c_code
 
