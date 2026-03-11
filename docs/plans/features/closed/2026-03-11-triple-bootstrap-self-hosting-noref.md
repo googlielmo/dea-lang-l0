@@ -3,7 +3,7 @@
 ## Triple-bootstrap / triple-compilation test and Stage 2 self-hosting prerequisites
 
 - Date: 2026-03-11
-- Status: Draft
+- Status: Closed (implemented)
 - Title: Triple-bootstrap / triple-compilation test and Stage 2 self-hosting prerequisites
 - Kind: Feature
 - Severity: High
@@ -26,14 +26,13 @@
 ## Summary
 
 Phases 1 and 2 of the bootstrap plan produced a runnable Stage 2 compiler artifact and a repo-local Make workflow.
-The next milestone is stricter: a correct compiler, compiling itself, should produce a compiler that compiles itself
-identically.
+This follow-on milestone is now implemented: the built Stage 2 compiler can self-host on the current checkout and the
+strict triple-bootstrap / triple-compilation regression is part of the Stage 2 test surface.
 
-That triple-bootstrap / triple-compilation test cannot be added as a pure harness today, because the built
-`l0c-stage2` artifact still cannot self-host on the current checkout. A direct `--check` or `--build` of
-`compiler/stage2_l0/src/l0c.l0` through a built Stage 2 artifact currently fails with clusters of Stage 2 semantic
-errors. The visible failures span parser, lexer, and shared stdlib modules, but the likely root work is in Stage 2
-semantic/type-checking logic, centered on `expr_types.l0` and directly related helpers.
+The original blocker was that a built `l0c-stage2` artifact could not yet self-host cleanly on the Stage 2 compiler
+sources. A direct `--check` or `--build` of `compiler/stage2_l0/src/l0c.l0` through a built Stage 2 artifact exposed a
+cluster of semantic-analysis, literal-decoding, and retained-C parity bugs. Those prerequisites were fixed first, then
+the strict stage2/stage3 fixed-point regression was added on top.
 
 This plan therefore covers both:
 
@@ -52,8 +51,8 @@ install-prefix scope.
 2. Make a built `l0c-stage2` artifact able to `--build --keep-c` the Stage 2 compiler source tree into a second
    self-built compiler artifact.
 3. Add an automated triple-bootstrap / triple-compilation regression under the Stage 2 test suite.
-4. Require byte-for-byte identity for both retained C and native compiler binaries, using deterministic toolchain
-   settings.
+4. Require byte-for-byte identity for retained C on every supported host compiler, and for native compiler binaries on
+   toolchains that can produce stable binaries with deterministic settings.
 5. Keep all bootstrap-comparison artifacts under isolated `build/tests/...` directories.
 
 ## Non-Goals
@@ -104,8 +103,8 @@ The third self-built compiler must also pass a direct smoke check after the iden
    -P compiler/stage2_l0/src -o <triple_dir>/l0c-stage2-second.native l0c`.
 4. Build the third self-built compiler artifact by invoking the second self-built compiler directly with `--build
    --keep-c -P compiler/stage2_l0/src -o <triple_dir>/l0c-stage2-third.native l0c`.
-5. Compare `l0c-stage2-second.c` against `l0c-stage2-third.c` and `l0c-stage2-second.native` against
-   `l0c-stage2-third.native`.
+5. Compare `l0c-stage2-second.c` against `l0c-stage2-third.c`, and compare `l0c-stage2-second.native` against
+   `l0c-stage2-third.native` when the host compiler can produce stable binaries.
 6. On mismatch, report which artifacts differ and include compact hashes/sizes; include a short unified diff only for
    retained-C mismatches.
 7. After a successful comparison, run a direct smoke check through the third self-built compiler with `L0_HOME` set
@@ -117,8 +116,10 @@ The third self-built compiler must also pass a direct smoke check after the iden
 2. Preserve existing user-provided `L0_CFLAGS`, but append deterministic linker flags by platform:
     1. Darwin: `-Wl,-no_uuid`
     2. ELF gcc/clang toolchains: `-Wl,--build-id=none`
-3. If the host toolchain still does not produce stable binaries after that deterministic-flags probe, fail the test
-   early with a clear unsupported-toolchain diagnostic instead of silently relaxing the native-binary comparison.
+3. If the host compiler is `tcc`, keep the retained-C comparison but skip the native-binary stability probe and the
+   native-binary identity check.
+4. If some other host toolchain still does not produce stable binaries after that deterministic-flags probe, fail the
+   test early with a clear unsupported-toolchain diagnostic instead of silently relaxing the native-binary comparison.
 
 ### D. Keep the existing Stage 2 bootstrap regression focused
 
@@ -136,7 +137,8 @@ The third self-built compiler must also pass a direct smoke check after the iden
 4. Verify that the second self-built compiler can `--build --keep-c -P compiler/stage2_l0/src -o <tmp>/l0c-stage2-third.native l0c`.
 5. Run `compiler/stage2_l0/tests/l0c_triple_bootstrap_test.py` and require:
    1. the second-build retained C artifact matches the third-build retained C artifact exactly
-   2. the second-build native compiler binary matches the third-build native compiler binary exactly
+   2. the second-build native compiler binary matches the third-build native compiler binary exactly on stable host
+      toolchains, and is skipped for `tcc`
    3. the third self-built compiler passes a direct smoke check
    4. all artifacts stay under `build/tests/...`
 6. Run `./compiler/stage2_l0/run_tests.py` to confirm the new triple-bootstrap regression integrates cleanly with the
@@ -145,9 +147,10 @@ The third self-built compiler must also pass a direct smoke check after the iden
 ## Assumptions and Defaults
 
 1. The triple-bootstrap plan is a separate feature plan, not a rewrite of the existing bootstrap/install plan.
-2. The final comparison is intentionally strict: retained C and native compiler binaries must both match byte-for-byte.
+2. The final comparison is intentionally strict: retained C must match byte-for-byte on every supported host compiler,
+   and native compiler binaries must also match byte-for-byte on stable host toolchains.
 3. Wrapper scripts are not part of the identity comparison.
 4. The preferred new test implementation language is Python, not shell, to keep the comparison/reporting logic
    structured and portable.
-5. Deterministic linker flags are required for native comparison; unsupported host toolchains should fail explicitly
-   rather than silently downgrade the test.
+5. Deterministic linker flags are required for native comparison; `tcc` is a documented exception that currently skips
+   native-binary identity while still requiring retained-C identity.

@@ -20,7 +20,7 @@
   - `compiler/stage2_l0/src/parser/stmt.l0`
   - `compiler/stage2_l0/tests/expr_types_test.l0`
   - `compiler/stage2_l0/tests/l0c_triple_bootstrap_test.py`
-  - `docs/plans/features/2026-03-11-triple-bootstrap-self-hosting-noref.md`
+  - `docs/plans/features/closed/2026-03-11-triple-bootstrap-self-hosting-noref.md`
 - Test modules:
   - `compiler/stage2_l0/tests/expr_types_test.l0`
   - `compiler/stage2_l0/tests/l0c_triple_bootstrap_test.py`

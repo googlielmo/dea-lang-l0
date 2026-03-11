@@ -66,6 +66,7 @@ Output:
 Run the strict triple-bootstrap / triple-compilation regression directly from the repo root:
 
 ```bash
+make triple-test
 python3 compiler/stage2_l0/tests/l0c_triple_bootstrap_test.py
 ```
 
@@ -75,6 +76,8 @@ Useful environment overrides:
 - `L0_CC=<compiler>` pins the exact host C compiler used for all self-builds.
 - `L0_CFLAGS="..."` appends extra C compiler flags; the test still adds deterministic linker flags required for native
   identity checks.
+- When `L0_CC` resolves to `tcc`, the test still compares retained C outputs but skips the native-binary identity check
+  because `tcc` does not currently guarantee stable binaries across identical builds.
 
 Examples:
 
@@ -90,7 +93,7 @@ The test performs, in order:
 3. first Stage 2 compiler -> second self-built Stage 2 compiler
 4. second self-built Stage 2 compiler -> third self-built Stage 2 compiler
 5. byte-for-byte comparison of second-build vs third-build retained C
-6. byte-for-byte comparison of second-build vs third-build native compiler binaries
+6. byte-for-byte comparison of second-build vs third-build native compiler binaries, unless the host compiler is `tcc`
 7. smoke run through the third self-built compiler
 
 If you want to run the same flow manually step by step, keep one compiler and one flag set for both builds:
@@ -108,6 +111,8 @@ cmp build/tests/triple-manual/l0c-stage2-second.c build/tests/triple-manual/l0c-
 cmp build/tests/triple-manual/l0c-stage2-second.native build/tests/triple-manual/l0c-stage2-third.native
 L0_HOME="$PWD/compiler" ./build/tests/triple-manual/l0c-stage2-third.native --run -P examples hello
 ```
+
+When the host compiler is `tcc`, keep the retained-C comparison but skip the native-binary `cmp` step above.
 
 Expected smoke output:
 

@@ -25,6 +25,7 @@
     - `compiler/stage2_l0/tests/l0c_codegen_test.sh`
     - `compiler/stage2_l0/tests/l0c_stage2_default_dist_test.sh`
     - `compiler/stage2_l0/tests/l0c_stage2_bootstrap_test.sh`
+    - `compiler/stage2_l0/tests/l0c_triple_bootstrap_test.py`
     - `tests/test_make_dist_workflow.py`
 
 ## Summary
@@ -33,7 +34,7 @@ This feature defines a staged path from today’s repo-only Stage 2 execution mo
 artifact and, later, to a real installable toolchain.
 
 Triple-bootstrap self-hosting validation and the strict triple-compilation test are tracked separately in
-`docs/plans/features/2026-03-11-triple-bootstrap-self-hosting-noref.md`. That follow-on work depends on
+`docs/plans/features/closed/2026-03-11-triple-bootstrap-self-hosting-noref.md`. That follow-on work depends on
 this plan’s Phase 1 and Phase 2 deliverables, but it does not replace this plan’s Phase 3 install-prefix scope.
 
 The plan has three phases:
@@ -57,7 +58,7 @@ repo-local `l0c-stage1` wrapper. Phase 3 does not require Stage 1 to be installe
 
 1. Replacing the top-level `./l0c` wrapper with Stage 2 in this feature.
 2. Requiring Stage 2 self-hosting in this feature; that work is tracked in
-   `docs/plans/features/2026-03-11-triple-bootstrap-self-hosting-noref.md`.
+   `docs/plans/features/closed/2026-03-11-triple-bootstrap-self-hosting-noref.md`.
 3. Making Stage 1 independently installable under the final Phase 3 prefix.
 4. Defining system package-manager integration.
 5. Introducing multiple competing developer entrypoints once the `Makefile` exists.
@@ -147,10 +148,12 @@ Public Make targets:
 7. `test-stage1`
 8. `test-stage2`
 9. `test-stage2-trace`
-10. `test-all`
-11. `docs`
-12. `docs-pdf`
-13. `clean-dist`
+10. `triple-test`
+11. `test-all`
+12. `docs`
+13. `docs-pdf`
+14. `clean`
+15. `clean-dist`
 
 Target behavior:
 
@@ -163,8 +166,10 @@ Target behavior:
 7. `test-stage2` runs `./compiler/stage2_l0/run_tests.py`.
 8. `test-stage2-trace` runs `./compiler/stage2_l0/run_trace_tests.py`.
 9. `test-all` runs the three test targets above.
-10. `docs` runs `./scripts/gen-docs.sh`.
-11. `docs-pdf` runs `./scripts/gen-docs.sh --pdf`.
+10. `triple-test` runs `./compiler/stage2_l0/tests/l0c_triple_bootstrap_test.py` only as a convenience entrypoint for
+    the separately tracked strict bootstrap fixed-point regression.
+11. `docs` runs `./scripts/gen-docs.sh`.
+12. `docs-pdf` runs `./scripts/gen-docs.sh --pdf`.
 
 Phase 2 `l0-env.sh` behavior:
 
@@ -225,8 +230,8 @@ Phase 3 does not require `l0c-stage1` to be installed into the final prefix.
    with a developer-managed `build/stage2` checkout artifact.
 5. Add the top-level `Makefile` only in Phase 2; it is the developer UX layer, not a second compiler driver.
 6. Structure wrapper and env-script generation so there are two modes:
-   1. repo-relative mode for Phase 2
-   2. prefix-relative mode for Phase 3
+    1. repo-relative mode for Phase 2
+    2. prefix-relative mode for Phase 3
 7. Keep Phase 3 Stage-2-first: copied shared assets and installed Stage 2 are mandatory; Stage 1 packaging is deferred
    and not required by this plan.
 
@@ -239,10 +244,10 @@ Phase 3 does not require `l0c-stage1` to be installed into the final prefix.
 3. `./build/stage2/bin/l0c-stage2 --check -P examples hello` succeeds.
 4. `./build/stage2/bin/l0c-stage2 --gen -P examples hello` succeeds if `--gen` is implemented at execution time.
 5. `source_paths` unit tests cover:
-   1. no env values,
-   2. `L0_SYSTEM` precedence,
-   3. `L0_HOME` fallback,
-   4. explicit sys-root suppression of defaults.
+    1. no env values,
+    2. `L0_SYSTEM` precedence,
+    3. `L0_HOME` fallback,
+    4. explicit sys-root suppression of defaults.
 6. `compiler/stage2_l0/tests/l0c_stage2_bootstrap_test.sh` bootstraps Stage 2 under a dedicated repo-local
    `build/tests/...` root and validates the built wrapper end to end.
 7. `compiler/stage2_l0/tests/l0c_stage2_default_dist_test.sh` keeps coverage of the builder default
@@ -264,9 +269,10 @@ Phase 3 does not require `l0c-stage1` to be installed into the final prefix.
 10. `make test-stage1`
 11. `make test-stage2`
 12. `make test-stage2-trace`
-13. `make test-all`
-14. `make docs`
-15. `make docs-pdf`
+13. `make triple-test`
+14. `make test-all`
+15. `make docs`
+16. `make docs-pdf`
 
 ### Phase 3
 

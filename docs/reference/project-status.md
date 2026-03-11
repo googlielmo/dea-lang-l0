@@ -1,6 +1,6 @@
 # L0 Project Status
 
-Version: 2026-03-10
+Version: 2026-03-11
 
 This document summarizes what is implemented in this repository today and what remains open.
 
@@ -215,6 +215,9 @@ Stage 2 backend/codegen status:
   `std.system.system()` for host compiler and program execution.
 - Stage 2 can now be bootstrapped into a repo-local artifact via `./scripts/build-stage2-l0c.sh`, producing
   `build/stage2/bin/l0c-stage2` and `l0c-stage2.native` by default.
+- Phase 2 now adds a repo-local `dist/bin` workflow via `make install-all`, explicit `make use-stage1` /
+  `make use-stage2` alias switching, and `source dist/bin/l0-env.sh`.
+- The strict stage2/stage3 fixed-point bootstrap regression is available directly via `make triple-test`.
 - Stage 2 backend lowering now covers the Stage 1 language surface, including ownership-sensitive lowering for
   `new`, `drop`, `try`, `with`, `match`, `case`, `break`, `continue`, and ARC cleanup.
 - Exact-text parity for `--gen --no-line-directives` is enforced against a committed curated Stage 1 golden corpus via
@@ -233,9 +236,7 @@ These remain true in Stage 1:
 
 Current Stage 2 limitations:
 
-1. Source-tree execution of Stage 2 still depends on the Stage 1 wrapper/compiler driver
-   (`./l0c -P compiler/stage2_l0/src --run l0c -- ...`), even though Phase 1 now provides a repo-local built artifact.
-2. Some language constraints intentionally remain staged in parser diagnostics (for example, array types and
+1. Some language constraints intentionally remain staged in parser diagnostics (for example, array types and
    bitwise/shift operators).
 
 ## Short Roadmap

@@ -44,19 +44,25 @@ L0 is currently at a quite exciting phase: **The Stage 2 Bootstrap**.
 * Stage 1: complete and usable.
 
 * Stage 2: lexer, parser, AST, name resolution, top-level signature resolution, local scope construction,
-  expression/statement type checking, backend lowering, and C emission for `--gen` are implemented.
+  expression/statement type checking, backend lowering, C emission, and direct `--build` / `--run` execution are
+  implemented.
 
 * Stage 2 `--gen`: implemented and parity-tested against Stage 1 on a committed golden corpus.
 
 * Stage 2 bootstrap artifact: buildable today under `build/stage2/bin` via `./scripts/build-stage2-l0c.sh`.
 
+* Stage 2 repo-local dist workflow: available under `dist/bin` via `make install-all`; `make use-stage2` prints the
+  exact `source dist/bin/l0-env.sh` command after switching the alias.
+
+* Stage 2 triple-bootstrap regression: available directly via `make triple-test`.
+
 Today, Stage 2 has feature parity with Stage 1 for the analysis-oriented commands `--check`, `--type`, and `--sym`,
-and now also for deterministic C emission through `--gen`.
-The next major milestone is supporting `--build` and `--run` in Stage 2.
+and also implements deterministic `--gen` plus direct `--build` / `--run`.
+The next major milestone is Phase 3: turning the repo-local workflow into a repo-independent installable toolchain.
 
 * **Built-in Observability:** Language developers need to know what memory is doing. L0 ships with native compiler flags
   to trace ARC events and allocations directly to stderr. Today these are fully usable through the Stage 1 driver and
-  are already wired through Stage 2 `--gen`:
+  are already wired through Stage 2 `--gen`, `--build`, and `--run`:
 
 ```shell
 l0c --run --trace-arc --trace-memory app.l0
@@ -119,6 +125,15 @@ Clone this repository and `cd` into it. Then create a virtual environment and in
 ```shell
 uv sync                  # create local venv from pyproject.toml
 source ./l0-env.sh       # sets L0_HOME, activates venv if present
+l0c --help
+```
+
+For a repo-local switchable Stage 1/Stage 2 toolchain alias:
+
+```shell
+make install-all
+make use-stage2
+source dist/bin/l0-env.sh
 l0c --help
 ```
 
@@ -325,8 +340,7 @@ The generated C includes a small, trusted, header-only C kernel that encapsulate
 
 Stage 2 follows the same high-level pipeline with a more modular implementation in L0 itself. The lexer, parser, AST,
 name resolution, type checking, backend, and C emitter are separate components with well-defined interfaces.
-Current Stage 2 reaches the C emission boundary (`--gen`); direct Stage 2 `--build` and `--run` are the remaining
-driver milestone.
+Current Stage 2 implements the analysis/dump modes, deterministic `--gen`, and direct `--build` / `--run`.
 
 You can also bootstrap a repo-local Stage 2 compiler artifact directly:
 
@@ -336,6 +350,29 @@ You can also bootstrap a repo-local Stage 2 compiler artifact directly:
 ./build/stage2/bin/l0c-stage2 --gen -P examples hello
 ./build/stage2/bin/l0c-stage2 --build -P examples hello
 ./build/stage2/bin/l0c-stage2 --run -P examples hello
+```
+
+For the strict Stage 2 triple-bootstrap regression:
+
+```shell
+make triple-test
+```
+
+For a repo-local developer workflow with a switchable `l0c` alias:
+
+```shell
+make install-all
+make use-stage1          # or `make use-stage2`
+source dist/bin/l0-env.sh
+l0c --check -P examples hello
+```
+
+`DIST_DIR` may be overridden, but it must stay inside the repository. For example:
+
+```shell
+make DIST_DIR=build/dev-dist install-all
+make DIST_DIR=build/dev-dist use-stage2
+source build/dev-dist/bin/l0-env.sh
 ```
 
 References:

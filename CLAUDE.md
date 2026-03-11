@@ -79,11 +79,14 @@ Trace toggles (codegen/build/run): `--trace-arc`, `--trace-memory`.
 For current Stage 2 CLI work, use:
 
 ```bash
-./l0c -P compiler/stage2_l0/src --run l0c -- --gen -P examples hello # build a throwaway stage 2 compiler and use it
 ./scripts/build-stage2-l0c.sh # build the stage 2 compiler and place it under build/stage2/bin/l0c-stage2
 ./build/stage2/bin/l0c-stage2 --check -P examples hello # run the stage 2 compiler directly
 ./build/stage2/bin/l0c-stage2 --build -P examples hello # build directly with the stage 2 compiler
 ./build/stage2/bin/l0c-stage2 --run -P examples hello # build and run directly with the stage 2 compiler
+make install-all # install repo-local stage-specific launchers under dist/bin
+make use-stage2 # point dist/bin/l0c at the Stage 2 launcher and print the source command
+source dist/bin/l0-env.sh # activate the repo-local dist workflow in your shell
+make triple-test # run the strict stage2/stage3 triple-bootstrap regression
 ```
 
 Stage 2 currently implements analysis/dump modes plus `--gen`, `--build`, and `--run`.

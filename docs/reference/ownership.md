@@ -1,6 +1,6 @@
 # L0 Ownership and Memory Management Reference
 
-Version: 2026-03-09
+Version: 2026-03-11
 
 This document describes how ownership works in L0 today, covering:
 
@@ -11,8 +11,8 @@ This document describes how ownership works in L0 today, covering:
 
 ## Scope and Status
 
-- The ground truth is the **current implementation**: Stage 1 backend lowering, Stage 2 backend lowering for `--gen`,
-  and the current stdlib/runtime.
+- The ground truth is the **current implementation**: Stage 1 backend lowering, Stage 2 backend lowering and driver
+  paths for `--gen`, `--build`, and `--run`, and the current stdlib/runtime.
 - When Stage 1 and Stage 2 wording diverge, treat Stage 1 as the oracle and Stage 2 parity failures as bugs.
 - If runtime or codegen behavior differs from this document, treat it as a bug and report it.
 

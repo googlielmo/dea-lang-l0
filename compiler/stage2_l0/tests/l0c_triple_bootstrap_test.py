@@ -1,0 +1,436 @@
+#!/usr/bin/env python3
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+# Copyright (c) 2026 gwz
+#
+
+"""Strict triple-bootstrap regression for the Stage 2 compiler artifact."""
+
+from __future__ import annotations
+
+import difflib
+import hashlib
+import os
+import shlex
+import shutil
+import subprocess
+import sys
+import tempfile
+import time
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
+BUILD_TESTS_DIR = REPO_ROOT / "build" / "tests"
+
+
+class TripleBootstrapFailure(RuntimeError):
+    """Raised when one triple-bootstrap assertion fails."""
+
+
+def fail(message: str, artifact_dir: Path) -> None:
+    """Abort the test and keep artifacts."""
+
+    raise TripleBootstrapFailure(f"{message}\nartifacts={artifact_dir}")
+
+
+def read_text(path: Path) -> str:
+    """Read UTF-8 text with replacement for invalid bytes."""
+
+    return path.read_text(encoding="utf-8", errors="replace")
+
+
+def read_bytes(path: Path) -> bytes:
+    """Read one binary file."""
+
+    return path.read_bytes()
+
+
+def shell_join(command: list[str]) -> str:
+    """Render one command for failure messages."""
+
+    return " ".join(shlex.quote(part) for part in command)
+
+
+def first_lines(text: str, limit: int) -> str:
+    """Return at most `limit` lines from `text`."""
+
+    lines = text.splitlines()
+    if len(lines) <= limit:
+        return text
+    return "\n".join(lines[:limit]) + "\n..."
+
+
+def format_duration(seconds: float) -> str:
+    """Render one wall-clock duration for human-readable progress output."""
+
+    return f"{seconds:.2f}s"
+
+
+def notice(message: str) -> None:
+    """Print one progress line with the test prefix."""
+
+    print(f"l0c_triple_bootstrap_test: {message}", flush=True)
+
+
+def run_logged(
+    name: str,
+    command: list[str],
+    *,
+    env: dict[str, str],
+    artifact_dir: Path,
+    cwd: Path = REPO_ROOT,
+    expected_returncode: int = 0,
+) -> tuple[Path, float]:
+    """Run one subprocess, capture combined output, and return wall time."""
+
+    log_path = artifact_dir / f"{name}.log"
+    start = time.monotonic()
+    completed = subprocess.run(
+        command,
+        cwd=cwd,
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        check=False,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    elapsed = time.monotonic() - start
+    log_path.write_text(completed.stdout, encoding="utf-8")
+    if completed.returncode != expected_returncode:
+        fail(
+            "\n".join(
+                [
+                    f"{name} failed (rc={completed.returncode})",
+                    f"command={shell_join(command)}",
+                    f"log={log_path}",
+                    first_lines(completed.stdout, 80),
+                ]
+            ).rstrip(),
+            artifact_dir,
+        )
+    return log_path, elapsed
+
+
+def resolve_host_c_compiler(env: dict[str, str]) -> str:
+    """Resolve the exact host C compiler command used for all self-builds."""
+
+    from_env = env.get("L0_CC", "").strip()
+    if from_env:
+        return from_env
+
+    for candidate in ("tcc", "gcc", "clang", "cc"):
+        if shutil.which(candidate):
+            return candidate
+
+    from_cc = env.get("CC", "").strip()
+    if from_cc:
+        return from_cc
+
+    raise TripleBootstrapFailure("no host C compiler found; set L0_CC or CC")
+
+
+def deterministic_linker_flags(compiler_text: str) -> list[str]:
+    """Return the deterministic linker flags required for native comparison."""
+
+    if uses_tcc(compiler_text):
+        return []
+    if sys.platform == "darwin":
+        return ["-Wl,-no_uuid"]
+    if sys.platform.startswith("linux"):
+        return ["-Wl,--build-id=none"]
+    raise TripleBootstrapFailure(f"unsupported host platform for native identity check: {sys.platform}")
+
+
+def merge_cflags(existing: str, extra_flags: list[str]) -> str:
+    """Preserve user flags while appending deterministic linker flags once."""
+
+    words = existing.split()
+    for flag in extra_flags:
+        if flag not in words:
+            words.append(flag)
+    return " ".join(words)
+
+
+def compiler_command_words(command_text: str) -> list[str]:
+    """Split one compiler command string into argv words."""
+
+    words = shlex.split(command_text)
+    if not words:
+        raise TripleBootstrapFailure("resolved host C compiler command is empty")
+    return words
+
+
+def uses_tcc(command_text: str) -> bool:
+    """Return whether the resolved compiler command ultimately invokes `tcc`."""
+
+    for word in compiler_command_words(command_text):
+        if Path(word).name in {"tcc", "tcc.exe"}:
+            return True
+    return False
+
+
+def assert_stable_native_toolchain(compiler_text: str, cflags_text: str, artifact_dir: Path) -> None:
+    """Fail early when the selected compiler still emits unstable binaries."""
+
+    if uses_tcc(compiler_text):
+        notice("skipping native stability probe for tcc (no stable binary guarantee)")
+        return
+
+    probe_source = artifact_dir / "native_stability_probe.c"
+    probe_a = artifact_dir / "native_stability_probe_a"
+    probe_b = artifact_dir / "native_stability_probe_b"
+    probe_log = artifact_dir / "native_stability_probe.log"
+    probe_source.write_text(
+        "int main(void) {\n"
+        "    return 0;\n"
+        "}\n",
+        encoding="utf-8",
+    )
+
+    compiler = compiler_command_words(compiler_text)
+    cflags = cflags_text.split()
+    outputs: list[Path] = []
+    with probe_log.open("w", encoding="utf-8") as log_file:
+        for output in (probe_a, probe_b):
+            command = [*compiler, *cflags, str(probe_source), "-o", str(output)]
+            log_file.write(f"$ {shell_join(command)}\n")
+            completed = subprocess.run(
+                command,
+                cwd=REPO_ROOT,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                check=False,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+            )
+            log_file.write(completed.stdout)
+            if completed.returncode != 0:
+                fail(
+                    "\n".join(
+                        [
+                            "deterministic native toolchain probe failed",
+                            f"compiler={compiler_text}",
+                            f"cflags={cflags_text}",
+                            f"log={probe_log}",
+                        ]
+                    ),
+                    artifact_dir,
+                )
+            outputs.append(output)
+
+    if read_bytes(outputs[0]) != read_bytes(outputs[1]):
+        fail(
+            "\n".join(
+                [
+                    "host toolchain does not produce stable binaries even with deterministic linker flags",
+                    f"compiler={compiler_text}",
+                    f"cflags={cflags_text}",
+                    f"log={probe_log}",
+                ]
+            ),
+            artifact_dir,
+        )
+
+
+def sha256_hex(path: Path) -> str:
+    """Return the SHA-256 digest for one file."""
+
+    return hashlib.sha256(read_bytes(path)).hexdigest()
+
+
+def artifact_summary(path: Path) -> str:
+    """Return a compact summary for one artifact."""
+
+    return f"{path} size={path.stat().st_size} sha256={sha256_hex(path)[:16]}"
+
+
+def short_unified_diff(left: Path, right: Path, artifact_dir: Path) -> str:
+    """Write and return a short unified diff for retained-C mismatches."""
+
+    diff_lines = list(
+        difflib.unified_diff(
+            read_text(left).splitlines(),
+            read_text(right).splitlines(),
+            fromfile=str(left),
+            tofile=str(right),
+            n=3,
+            lineterm="",
+        )
+    )
+    diff_path = artifact_dir / "retained_c.diff"
+    diff_text = "\n".join(diff_lines)
+    diff_path.write_text(diff_text, encoding="utf-8")
+    if not diff_lines:
+        return f"diff={diff_path} (files differ but no text diff was produced)"
+    if len(diff_lines) > 80:
+        return f"diff={diff_path}\n" + "\n".join(diff_lines[:80]) + "\n..."
+    return f"diff={diff_path}\n" + diff_text
+
+
+def assert_same_bytes(label: str, left: Path, right: Path, artifact_dir: Path, *, include_diff: bool) -> None:
+    """Compare two artifacts byte-for-byte and fail with a compact summary."""
+
+    if read_bytes(left) == read_bytes(right):
+        return
+
+    lines = [
+        f"{label} mismatch",
+        artifact_summary(left),
+        artifact_summary(right),
+    ]
+    if include_diff:
+        lines.append(short_unified_diff(left, right, artifact_dir))
+    fail("\n".join(lines), artifact_dir)
+
+
+def main() -> int:
+    """Program entrypoint."""
+
+    BUILD_TESTS_DIR.mkdir(parents=True, exist_ok=True)
+    artifact_dir = Path(tempfile.mkdtemp(prefix="l0_stage2_triple_bootstrap.", dir=BUILD_TESTS_DIR))
+    keep_artifacts = os.environ.get("KEEP_ARTIFACTS", "0") == "1"
+    total_start = time.monotonic()
+
+    try:
+        compiler_text = resolve_host_c_compiler(os.environ)
+        merged_cflags = merge_cflags(os.environ.get("L0_CFLAGS", ""), deterministic_linker_flags(compiler_text))
+        notice(f"using host C compiler: {compiler_text}")
+        notice(f"using host C flags: {merged_cflags or '(none)'}")
+        assert_stable_native_toolchain(compiler_text, merged_cflags, artifact_dir)
+
+        build_env = os.environ.copy()
+        build_env["L0_CC"] = compiler_text
+        build_env["L0_CFLAGS"] = merged_cflags
+        self_build_env = build_env.copy()
+        self_build_env["L0_HOME"] = str(REPO_ROOT / "compiler")
+
+        first_dist = artifact_dir / "stage1-dist"
+        first_dist_rel = os.path.relpath(first_dist, REPO_ROOT)
+        stage2_wrapper = first_dist / "bin" / "l0c-stage2"
+        stage2_native = first_dist / "bin" / "l0c-stage2.native"
+        stage2_c = first_dist / "bin" / "l0c-stage2.c"
+
+        first_build_env = build_env.copy()
+        first_build_env["DIST_DIR"] = first_dist_rel
+        first_build_env["KEEP_C"] = "1"
+        notice("building compiler 1/3: trusted Stage 1 -> first Stage 2 compiler")
+        _, first_build_elapsed = run_logged(
+            "first_build",
+            ["./scripts/build-stage2-l0c.sh"],
+            env=first_build_env,
+            artifact_dir=artifact_dir,
+        )
+        notice(
+            f"built compiler 1/3 in {format_duration(first_build_elapsed)}: {stage2_native}"
+        )
+
+        if not stage2_wrapper.is_file() or not stage2_native.is_file() or not stage2_c.is_file():
+            fail("first build did not produce the expected Stage 2 artifact layout", artifact_dir)
+
+        notice("checking compiler 1/3 self-host readiness against compiler/stage2_l0/src")
+        _, self_host_probe_elapsed = run_logged(
+            "self_host_probe",
+            [str(stage2_wrapper), "--check", "-P", "compiler/stage2_l0/src", "l0c"],
+            env=build_env,
+            artifact_dir=artifact_dir,
+        )
+        notice(f"self-host probe passed in {format_duration(self_host_probe_elapsed)}")
+
+        second_native = artifact_dir / "l0c-stage2-second.native"
+        second_c = second_native.with_suffix(".c")
+        notice("building compiler 2/3: first Stage 2 compiler -> second self-hosted Stage 2 compiler")
+        _, second_build_elapsed = run_logged(
+            "second_build",
+            [
+                str(stage2_wrapper),
+                "--build",
+                "--keep-c",
+                "-P",
+                "compiler/stage2_l0/src",
+                "-o",
+                str(second_native),
+                "l0c",
+            ],
+            env=self_build_env,
+            artifact_dir=artifact_dir,
+        )
+        notice(
+            f"built compiler 2/3 in {format_duration(second_build_elapsed)}: {second_native}"
+        )
+
+        if not second_native.is_file() or not second_c.is_file():
+            fail("second self-build did not retain both native and C artifacts", artifact_dir)
+
+        third_native = artifact_dir / "l0c-stage2-third.native"
+        third_c = third_native.with_suffix(".c")
+        notice("building compiler 3/3: second self-hosted Stage 2 compiler -> third self-hosted Stage 2 compiler")
+        _, third_build_elapsed = run_logged(
+            "third_build",
+            [
+                str(second_native),
+                "--build",
+                "--keep-c",
+                "-P",
+                "compiler/stage2_l0/src",
+                "-o",
+                str(third_native),
+                "l0c",
+            ],
+            env=self_build_env,
+            artifact_dir=artifact_dir,
+        )
+        notice(
+            f"built compiler 3/3 in {format_duration(third_build_elapsed)}: {third_native}"
+        )
+
+        if not third_native.is_file() or not third_c.is_file():
+            fail("third self-build did not retain both native and C artifacts", artifact_dir)
+
+        notice("comparing second and third self-built retained C artifacts")
+        assert_same_bytes("retained C (stage2 vs stage3)", second_c, third_c, artifact_dir, include_diff=True)
+        if uses_tcc(compiler_text):
+            notice("skipping native binary comparison for tcc (no stable binary guarantee)")
+        else:
+            notice("comparing second and third self-built native compiler binaries")
+            assert_same_bytes(
+                "native binary (stage2 vs stage3)",
+                second_native,
+                third_native,
+                artifact_dir,
+                include_diff=False,
+            )
+
+        notice("running final smoke check through the third self-built compiler")
+        smoke_log, smoke_elapsed = run_logged(
+            "third_self_smoke",
+            [str(third_native), "--run", "-P", "examples", "hello"],
+            env=self_build_env,
+            artifact_dir=artifact_dir,
+        )
+        if "Hello, World!" not in read_text(smoke_log):
+            fail(f"third self-built compiler smoke check output mismatch: log={smoke_log}", artifact_dir)
+        notice(f"final smoke passed in {format_duration(smoke_elapsed)}")
+
+        total_elapsed = time.monotonic() - total_start
+        notice(f"PASS (total wall time: {format_duration(total_elapsed)})")
+        if keep_artifacts:
+            notice(f"artifacts={artifact_dir}")
+        return 0
+    except TripleBootstrapFailure as exc:
+        keep_artifacts = True
+        lines = str(exc).splitlines()
+        if lines:
+            print(f"l0c_triple_bootstrap_test: FAIL: {lines[0]}")
+        for line in lines[1:]:
+            print(f"l0c_triple_bootstrap_test: {line}")
+        return 1
+    finally:
+        if not keep_artifacts:
+            shutil.rmtree(artifact_dir, ignore_errors=True)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

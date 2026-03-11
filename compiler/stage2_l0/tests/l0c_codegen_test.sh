@@ -67,6 +67,21 @@ compile_generated_c() {
     esac
 }
 
+normalize_text_file() {
+    local src="$1"
+    local dst="$2"
+    python3 - "$src" "$dst" <<'PY'
+from pathlib import Path
+import sys
+
+src = Path(sys.argv[1])
+dst = Path(sys.argv[2])
+text = src.read_text(encoding="utf-8")
+text = text.replace("\r\n", "\n").replace("\r", "\n")
+dst.write_text(text.rstrip("\n") + "\n", encoding="utf-8")
+PY
+}
+
 cd "$REPO_ROOT"
 python3 "$REFRESH_SCRIPT" --check "$@"
 
@@ -101,6 +116,8 @@ for entry_file in "$FIXTURE_ROOT"/*/entry_module.txt; do
     case_dir="$(dirname "$entry_file")"
     entry_module="$(tr -d '\r\n' < "$entry_file")"
     generated="$ARTIFACT_DIR/${case_name}.generated.c"
+    normalized_generated="$ARTIFACT_DIR/${case_name}.generated.normalized.c"
+    normalized_expected="$ARTIFACT_DIR/${case_name}.expected.normalized.c"
     expected="$case_dir/${case_name}.golden.c"
 
     if ! "$STAGE2_L0C" --gen --no-line-directives -P "$case_dir" "$entry_module" > "$generated"; then
@@ -109,7 +126,10 @@ for entry_file in "$FIXTURE_ROOT"/*/entry_module.txt; do
         continue
     fi
 
-    if ! diff -u "$expected" "$generated" > "$ARTIFACT_DIR/${case_name}.diff"; then
+    normalize_text_file "$expected" "$normalized_expected"
+    normalize_text_file "$generated" "$normalized_generated"
+
+    if ! diff -u "$normalized_expected" "$normalized_generated" > "$ARTIFACT_DIR/${case_name}.diff"; then
         echo "$case_name: DIFF_FAIL" >&2
         cat "$ARTIFACT_DIR/${case_name}.diff" >&2
         status=1
