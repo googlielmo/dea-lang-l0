@@ -2235,6 +2235,85 @@ func be_emit_block_stmt(self: Backend*, stmt_id: StmtId) {
 }
 
 /**
+ * Emit control flow for one statement condition with short-circuit semantics.
+ *
+ * ARC temps produced while lowering condition leaves stay inside the emitted
+ * condition block instead of being hoisted into an enclosing control-flow
+ * header.
+ *
+ * @param self Backend state to update.
+ * @param expr_id Condition expression to lower.
+ * @param true_label Jump target when the condition is true.
+ * @param false_label Jump target when the condition is false.
+ */
+func be_emit_condition_branch(self: Backend*, expr_id: ExprId, true_label: string, false_label: string) {
+    let expr = expr_arena_get(be_current_expr_arena(self), expr_id);
+
+    if (ord(expr.kind) == ord(EX_PAREN)) {
+        be_emit_condition_branch(self, expr.expr_a, true_label, false_label);
+        return;
+    }
+
+    if (ord(expr.kind) == ord(EX_BINARY) && eq_s(expr.text_value, "&&")) {
+        let rhs_label = be_fresh_label(self, "cond_rhs");
+        be_emit_condition_branch(self, expr.expr_a, rhs_label, false_label);
+        cem_emit_label(self.emitter, rhs_label);
+        be_emit_condition_branch(self, expr.expr_b, true_label, false_label);
+        return;
+    }
+
+    if (ord(expr.kind) == ord(EX_BINARY) && eq_s(expr.text_value, "||")) {
+        let rhs_label2 = be_fresh_label(self, "cond_rhs");
+        be_emit_condition_branch(self, expr.expr_a, true_label, rhs_label2);
+        cem_emit_label(self.emitter, rhs_label2);
+        be_emit_condition_branch(self, expr.expr_b, true_label, false_label);
+        return;
+    }
+
+    let c_cond = be_emit_expr(self, expr_id);
+    cem_emit_if_header(self.emitter, c_cond);
+    cem_emit_block_start(self.emitter);
+    cem_emit_goto(self.emitter, true_label);
+    cem_emit_block_end(self.emitter);
+    cem_emit_goto(self.emitter, false_label);
+}
+
+/**
+ * Evaluate one statement condition into a stable boolean temp.
+ *
+ * The returned temp is safe to reference from an `if`/`while` header because
+ * condition ARC temps are scoped to the emitted condition block and cleaned
+ * before control continues.
+ *
+ * @param self Backend state to update.
+ * @param expr_id Condition expression to lower.
+ * @return Name of the generated boolean temp.
+ */
+func be_emit_condition_value(self: Backend*, expr_id: ExprId) -> string {
+    let cond_tmp = cem_fresh_tmp(self.emitter, "cond");
+    with (let bool_ty = type_builtin_bool() => type_free(bool_ty)) {
+        cem_emit_temp_decl(self.emitter, cem_emit_type(bool_ty), cond_tmp, cem_emit_bool_literal(false));
+    }
+
+    let true_label = be_fresh_label(self, "cond_true");
+    let false_label = be_fresh_label(self, "cond_false");
+    let end_label = be_fresh_label(self, "cond_end");
+
+    cem_emit_block_start(self.emitter);
+    let cond_scope = be_push_scope(self);
+    be_emit_condition_branch(self, expr_id, true_label, false_label);
+    cem_emit_label(self.emitter, true_label);
+    cem_emit_assignment(self.emitter, cond_tmp, cem_emit_bool_literal(true));
+    cem_emit_goto(self.emitter, end_label);
+    cem_emit_label(self.emitter, false_label);
+    cem_emit_label(self.emitter, end_label);
+    be_emit_cleanup_at_scope_exit(self, cond_scope);
+    be_pop_scope(self);
+    cem_emit_block_end(self.emitter);
+    return cond_tmp;
+}
+
+/**
  * Emit one `if` branch and report whether it ends unreachable.
  *
  * @param self Backend state to update.
@@ -2332,7 +2411,7 @@ func be_emit_stmt(self: Backend*, stmt_id: StmtId) {
             self.next_stmt_unreachable = false;
         }
         ST_IF => {
-            let c_cond = be_emit_expr(self, stmt.expr_a);
+            let c_cond = be_emit_condition_value(self, stmt.expr_a);
             cem_emit_if_header(self.emitter, c_cond);
             let then_unreachable = be_emit_if_branch(self, stmt.stmt_a);
 
@@ -2348,9 +2427,13 @@ func be_emit_stmt(self: Backend*, stmt_id: StmtId) {
             let break_label = be_fresh_label(self, "lbrk");
             let continue_label = be_fresh_label(self, "lcont");
             be_push_loop_labels(self, break_label, continue_label);
-            let c_cond = be_emit_expr(self, stmt.expr_a);
-            cem_emit_while_header(self.emitter, c_cond);
+            cem_emit_while_header(self.emitter, cem_emit_bool_literal(true));
             cem_emit_block_start(self.emitter);
+            let c_cond = be_emit_condition_value(self, stmt.expr_a);
+            cem_emit_if_header(self.emitter, concat4_s("!(", c_cond, ")", ""));
+            cem_emit_block_start(self.emitter);
+            cem_emit_goto(self.emitter, break_label);
+            cem_emit_block_end(self.emitter);
             let loop_scope = be_push_scope(self);
             be_push_loop_cleanup_scopes(self, loop_scope, loop_scope);
             be_emit_block_sequence(self, stmt.stmt_a);
@@ -2375,13 +2458,15 @@ func be_emit_stmt(self: Backend*, stmt_id: StmtId) {
                 be_emit_stmt(self, stmt.stmt_a);
             }
 
-            let c_cond2 = "1";
-            if (stmt.expr_a >= 0) {
-                c_cond2 = be_emit_expr(self, stmt.expr_a);
-            }
-
-            cem_emit_while_header(self.emitter, c_cond2);
+            cem_emit_while_header(self.emitter, cem_emit_bool_literal(true));
             cem_emit_block_start(self.emitter);
+            if (stmt.expr_a >= 0) {
+                let c_cond2 = be_emit_condition_value(self, stmt.expr_a);
+                cem_emit_if_header(self.emitter, concat4_s("!(", c_cond2, ")", ""));
+                cem_emit_block_start(self.emitter);
+                cem_emit_goto(self.emitter, break_label2);
+                cem_emit_block_end(self.emitter);
+            }
             cem_emit_block_start(self.emitter);
             let loop_scope2 = be_push_scope(self);
             be_push_loop_cleanup_scopes(self, loop_scope2, outer_scope);

@@ -830,7 +830,64 @@ def test_trace_arc_return_borrowed_param_retains(
 
 
 # ---------------------------------------------------------------------------
-# K – Leak-freedom balance (comprehensive)
+# K – Condition temps in control-flow headers
+# ---------------------------------------------------------------------------
+
+
+def test_trace_arc_control_flow_condition_temp_cleanup(
+    analyze_single, compile_and_run, tmp_path
+):
+    """Dynamic-string condition temps in `if`/`while` headers must stay leak-free."""
+    ok, stdout, _stderr, arc = _compile_with_trace_arc(
+        analyze_single,
+        compile_and_run,
+        tmp_path,
+        """
+        module main;
+        import std.string;
+
+        extern func rt_print_int(x: int) -> void;
+        extern func rt_println() -> void;
+
+        func tick(flag: bool) -> string {
+            if (flag) {
+                return concat_s("x", "");
+            }
+            return concat_s("", "");
+        }
+
+        func main() -> int {
+            if (false && len_s(tick(true)) > 0) {
+                rt_print_int(9);
+                rt_println();
+            }
+
+            let i: int = 0;
+            while (i < 3 && len_s(tick(i == 0)) > 0) {
+                i = i + 1;
+            }
+
+            rt_print_int(i);
+            rt_println();
+            return 0;
+        }
+        """,
+    )
+    assert ok, _stderr
+    assert stdout.strip() == "1"
+
+    heap = [e for e in arc if e["kind"] == "heap"]
+    frees = [e for e in heap if e["op"] == "release" and e["action"] == "free"]
+    assert len(frees) >= 1, f"expected condition heap values to be freed: {heap}"
+
+    rc_values = _heap_rc_values(arc)
+    assert rc_values, "expected heap ARC events for dynamic-string condition temps"
+    assert min(rc_values) >= 0, f"unexpected negative heap refcount values: {heap}"
+    assert max(rc_values) <= 2, f"unexpected heap refcount growth in condition temps: {heap}"
+
+
+# ---------------------------------------------------------------------------
+# L – Leak-freedom balance (comprehensive)
 # ---------------------------------------------------------------------------
 
 

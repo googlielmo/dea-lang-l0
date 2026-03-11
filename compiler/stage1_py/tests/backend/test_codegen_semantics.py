@@ -525,6 +525,87 @@ def test_codegen_runtime_short_circuiting(codegen_single, compile_and_run, tmp_p
     assert stdout.strip() == ""
 
 
+def test_codegen_runtime_if_condition_short_circuits_arc_rhs(
+    codegen_single, compile_and_run, tmp_path
+):
+    c_code, _ = codegen_single(
+        "main",
+        """
+        module main;
+
+        import std.string;
+
+        extern func rt_print_int(x: int) -> void;
+        extern func rt_println() -> void;
+
+        func tick() -> string {
+            rt_print_int(7);
+            rt_println();
+            return concat_s("x", "");
+        }
+
+        func main() -> int {
+            if (false && len_s(tick()) > 0) {
+                rt_print_int(1);
+                rt_println();
+            }
+            rt_print_int(2);
+            rt_println();
+            return 0;
+        }
+        """,
+    )
+
+    if c_code is None:
+        return
+
+    ok, stdout, stderr = compile_and_run(c_code, tmp_path)
+    assert ok, stderr
+    assert stdout.strip() == "2"
+
+
+def test_codegen_runtime_while_condition_re_evaluates_arc_rhs(
+    codegen_single, compile_and_run, tmp_path
+):
+    c_code, _ = codegen_single(
+        "main",
+        """
+        module main;
+
+        import std.string;
+
+        extern func rt_print_int(x: int) -> void;
+        extern func rt_println() -> void;
+
+        func next_value(i: int) -> string {
+            if (i == 0) {
+                return concat_s("x", "");
+            }
+            return concat_s("", "");
+        }
+
+        func main() -> int {
+            let i: int = 0;
+            while (i < 3 && len_s(next_value(i)) > 0) {
+                rt_print_int(i);
+                rt_println();
+                i = i + 1;
+            }
+            rt_print_int(i);
+            rt_println();
+            return 0;
+        }
+        """,
+    )
+
+    if c_code is None:
+        return
+
+    ok, stdout, stderr = compile_and_run(c_code, tmp_path)
+    assert ok, stderr
+    assert stdout.strip().splitlines() == ["0", "1"]
+
+
 def test_codegen_runtime_integer_overflow_panics(codegen_single, compile_and_run, tmp_path):
     c_code, _ = codegen_single(
         "main",

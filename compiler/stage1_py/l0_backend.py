@@ -1333,6 +1333,80 @@ class Backend:
         self._next_stmt_unreachable = True
         return None
 
+    def _emit_condition_branch(self, expr: Expr, true_label: str, false_label: str) -> None:
+        """Emit control flow for one condition expression with short-circuit semantics.
+
+        This path is used only for statement conditions so ARC temps emitted by
+        expression lowering stay inside the correct structural block instead of
+        being hoisted into an enclosing `if (...)` or `while (...)` header.
+
+        Args:
+            expr: Condition expression to lower.
+            true_label: Jump target when the condition is true.
+            false_label: Jump target when the condition is false.
+        """
+        if isinstance(expr, ParenExpr):
+            self._emit_condition_branch(expr.inner, true_label, false_label)
+            return
+
+        if isinstance(expr, BinaryOp) and expr.op == "&&":
+            rhs_label = self._fresh_label("cond_rhs")
+            self._emit_condition_branch(expr.left, rhs_label, false_label)
+            self.emitter.emit_label(rhs_label)
+            self._emit_condition_branch(expr.right, true_label, false_label)
+            return
+
+        if isinstance(expr, BinaryOp) and expr.op == "||":
+            rhs_label = self._fresh_label("cond_rhs")
+            self._emit_condition_branch(expr.left, true_label, rhs_label)
+            self.emitter.emit_label(rhs_label)
+            self._emit_condition_branch(expr.right, true_label, false_label)
+            return
+
+        c_cond = self._emit_expr(expr)
+        self.emitter.emit_if_header(c_cond)
+        self.emitter.emit_block_start()
+        self.emitter.emit_goto(true_label)
+        self.emitter.emit_block_end()
+        self.emitter.emit_goto(false_label)
+
+    def _emit_condition_value(self, expr: Expr) -> str:
+        """Evaluate a statement condition into a stable boolean temporary.
+
+        The returned temp is safe to reference from an `if`/`while` header
+        because any ARC temps created while evaluating the condition are scoped
+        to the emitted condition block and cleaned before control continues.
+
+        Args:
+            expr: Condition expression to lower.
+
+        Returns:
+            Name of the generated boolean temp.
+        """
+        cond_tmp = self.emitter.fresh_tmp("cond")
+        self.emitter.emit_temp_decl(
+            self.emitter.emit_type(BuiltinType("bool")),
+            cond_tmp,
+            self.emitter.emit_bool_literal(False),
+        )
+
+        true_label = self._fresh_label("cond_true")
+        false_label = self._fresh_label("cond_false")
+        end_label = self._fresh_label("cond_end")
+
+        self.emitter.emit_block_start()
+        cond_scope = self._push_scope()
+        self._emit_condition_branch(expr, true_label, false_label)
+        self.emitter.emit_label(true_label)
+        self.emitter.emit_assignment(cond_tmp, self.emitter.emit_bool_literal(True))
+        self.emitter.emit_goto(end_label)
+        self.emitter.emit_label(false_label)
+        self.emitter.emit_label(end_label)
+        self._emit_cleanup_at_scope_exit(cond_scope)
+        self._pop_scope()
+        self.emitter.emit_block_end()
+        return cond_tmp
+
     def _emit_while(self, stmt: WhileStmt, module_name: str) -> Any:
         """Emit a while loop.
 
@@ -1344,9 +1418,14 @@ class Backend:
         continue_label = self._fresh_label("lcont")
         self._loop_label_stack.append((break_label, continue_label))
 
-        c_cond = self._emit_expr(stmt.cond)
-        self.emitter.emit_while_header(c_cond)
+        self.emitter.emit_while_header(self.emitter.emit_bool_literal(True))
         self.emitter.emit_block_start()
+
+        c_cond = self._emit_condition_value(stmt.cond)
+        self.emitter.emit_if_header(f"!({c_cond})")
+        self.emitter.emit_block_start()
+        self.emitter.emit_goto(break_label)
+        self.emitter.emit_block_end()
 
         loop_scope = self._push_scope()
         self._loop_cleanup_scope_stack.append((loop_scope, loop_scope))
@@ -1385,14 +1464,15 @@ class Backend:
         if stmt.init:
             self._emit_stmt(stmt.init, module_name)
 
-        if stmt.cond:
-            c_cond = self._emit_expr(stmt.cond)
-        else:
-            c_cond = "1"  # Infinite loop if no condition
-
-        self.emitter.emit_while_header(c_cond)
+        self.emitter.emit_while_header(self.emitter.emit_bool_literal(True))
 
         self.emitter.emit_block_start()
+        if stmt.cond:
+            c_cond = self._emit_condition_value(stmt.cond)
+            self.emitter.emit_if_header(f"!({c_cond})")
+            self.emitter.emit_block_start()
+            self.emitter.emit_goto(break_label)
+            self.emitter.emit_block_end()
         self.emitter.emit_block_start()
         loop_scope = self._push_scope()
         self._loop_cleanup_scope_stack.append((loop_scope, outer_scope))
@@ -1431,7 +1511,7 @@ class Backend:
             stmt: The IfStmt AST node.
             module_name: Name of current module.
         """
-        c_cond = self._emit_expr(stmt.cond)
+        c_cond = self._emit_condition_value(stmt.cond)
         self.emitter.emit_if_header(c_cond)
 
         self._next_stmt_unreachable = False  # Each branch starts reachable
