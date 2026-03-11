@@ -449,6 +449,35 @@ func be_is_place_expr(self: Backend*, expr_id: ExprId) -> bool {
 }
 
 /**
+ * Report whether an expression may have side effects when evaluated.
+ *
+ * @param self Backend state to inspect.
+ * @param expr_id Expression to classify.
+ * @return `true` when the expression should be cached before reuse.
+ */
+func be_has_side_effects(self: Backend*, expr_id: ExprId) -> bool {
+    let expr = expr_arena_get(be_current_expr_arena(self), expr_id);
+    match (expr.kind) {
+        EX_INT => { return false; }
+        EX_BYTE => { return false; }
+        EX_STRING => { return false; }
+        EX_BOOL => { return false; }
+        EX_NULL => { return false; }
+        EX_VAR_REF => { return false; }
+        EX_CALL => { return true; }
+        EX_NEW => { return true; }
+        EX_UNARY => { return be_has_side_effects(self, expr.expr_a); }
+        EX_BINARY => { return be_has_side_effects(self, expr.expr_a) || be_has_side_effects(self, expr.expr_b); }
+        EX_CAST => { return be_has_side_effects(self, expr.expr_a); }
+        EX_PAREN => { return be_has_side_effects(self, expr.expr_a); }
+        EX_FIELD => { return be_has_side_effects(self, expr.expr_a); }
+        EX_INDEX => { return be_has_side_effects(self, expr.expr_a) || be_has_side_effects(self, expr.expr_b); }
+        EX_TRY => { return be_has_side_effects(self, expr.expr_a); }
+        EX_TYPE => { return false; }
+    }
+}
+
+/**
  * Report whether an expression is a nullable unwrap cast from a place.
  *
  * @param self Backend state to inspect.
@@ -562,7 +591,7 @@ func be_emit_retain_for_copied_value(self: Backend*, c_expr: string, ty: Type*) 
         if (cem_is_niche_nullable(ty) || !analysis_has_arc_data(self.result, ty.inner as Type*)) {
             return;
         }
-        cem_emit_if_header(self.emitter, concat4_s("((", c_expr, ").has_value", ")"));
+        cem_emit_if_header(self.emitter, concat4_s("(", c_expr, ").has_value", ""));
         cem_emit_block_start(self.emitter);
         be_emit_retain_for_copied_value(self, concat4_s("(", c_expr, ").value", ""), ty.inner as Type*);
         cem_emit_block_end(self.emitter);
@@ -608,8 +637,7 @@ func be_emit_retain_for_copied_value(self: Backend*, c_expr: string, ty: Type*) 
             cem_emit_exit_switch(self.emitter);
             cem_emit_block_end(self.emitter);
         }
-        cem_emit_default_label(self.emitter);
-        cem_emit_exit_switch(self.emitter);
+        cem_emit_unreachable_marker(self.emitter, "retain");
         cem_emit_switch_end(self.emitter);
     }
 }
@@ -864,60 +892,64 @@ func be_collect_value_type_dependencies(ty: Type*, deps: StringSet*) {
 }
 
 /**
- * Return whether all value-type dependencies for one type are already emitted.
+ * Collect the value-type dependencies for one user-defined type.
  *
  * @param self Backend state to inspect.
- * @param type_key Type key to test.
- * @param emitted Set of already-emitted type keys.
- * @return `true` when dependencies are satisfied.
+ * @param type_key Type key to inspect.
+ * @param deps Destination set to populate.
+ * @return `true` when the type metadata was found.
  */
-func be_type_dependencies_ready(self: Backend*, type_key: string, emitted: StringSet*) -> bool {
+func be_collect_type_dependencies(self: Backend*, type_key: string, deps: StringSet*) -> bool {
     if (self.result.signatures == null) {
         return true;
     }
 
-    with (let deps = ss_create() => ss_free(deps)) {
-        let module_name = be_type_key_module(type_key);
-        let type_name = be_type_key_name(type_key);
-        if (is_empty_s(module_name) || is_empty_s(type_name)) {
-            return false;
-        }
+    let module_name = be_type_key_module(type_key);
+    let type_name = be_type_key_name(type_key);
+    if (is_empty_s(module_name) || is_empty_s(type_name)) {
+        return false;
+    }
 
-        let struct_info = sig_lookup_struct_info(self.result.signatures as SignatureTables*, module_name, type_name);
-        if (struct_info != null) {
-            let info = struct_info as StructInfo*;
-            for (let i = 0; i < vec_size(info.fields); i = i + 1) {
-                let field = ptr_vec_get(info.fields, i) as StructFieldInfo*;
-                be_collect_value_type_dependencies(field.field_type, deps);
-            }
-        } else {
-            let enum_info = sig_lookup_enum_info(self.result.signatures as SignatureTables*, module_name, type_name);
-            if (enum_info == null) {
-                return false;
-            }
-            let info2 = enum_info as EnumInfo*;
-            for (let i = 0; i < vec_size(info2.variants); i = i + 1) {
-                let variant = ptr_vec_get(info2.variants, i) as EnumVariantInfo*;
-                for (let j = 0; j < vec_size(variant.field_types); j = j + 1) {
-                    be_collect_value_type_dependencies(ptr_vec_get(variant.field_types, j) as Type*, deps);
-                }
-            }
-        }
-
-        for (let i = 0; i < ss_capacity(deps); i = i + 1) {
-            if (!ss_slot_occupied(deps, i)) {
-                continue;
-            }
-            let dep = ss_slot_key(deps, i);
-                if (eq_s(dep, type_key)) {
-                    return false;
-                }
-                if (!ss_has(emitted, dep)) {
-                    return false;
-                }
+    let struct_info = sig_lookup_struct_info(self.result.signatures as SignatureTables*, module_name, type_name);
+    if (struct_info != null) {
+        let info = struct_info as StructInfo*;
+        for (let i = 0; i < vec_size(info.fields); i = i + 1) {
+            let field = ptr_vec_get(info.fields, i) as StructFieldInfo*;
+            be_collect_value_type_dependencies(field.field_type, deps);
         }
         return true;
     }
+
+    let enum_info = sig_lookup_enum_info(self.result.signatures as SignatureTables*, module_name, type_name);
+    if (enum_info == null) {
+        return false;
+    }
+
+    let info2 = enum_info as EnumInfo*;
+    for (let i = 0; i < vec_size(info2.variants); i = i + 1) {
+        let variant = ptr_vec_get(info2.variants, i) as EnumVariantInfo*;
+        for (let j = 0; j < vec_size(variant.field_types); j = j + 1) {
+            be_collect_value_type_dependencies(ptr_vec_get(variant.field_types, j) as Type*, deps);
+        }
+    }
+    return true;
+}
+
+/**
+ * Free a vector of dependency sets.
+ *
+ * @param sets Optional vector holding `StringSet*` entries.
+ */
+func be_dependency_sets_free(sets: VectorBase*?) {
+    if (sets == null) {
+        return;
+    }
+
+    let dep_sets = sets as VectorBase*;
+    for (let i = 0; i < vec_size(dep_sets); i = i + 1) {
+        ss_free(ptr_vec_get(dep_sets, i) as StringSet*);
+    }
+    vec_free(dep_sets);
 }
 
 /**
@@ -974,52 +1006,79 @@ func be_emit_type_definitions(self: Backend*) {
     }
 
     with (let keys = be_collect_type_keys(self) => vs_free(keys),
-          let emitted = ss_create() => ss_free(emitted)) {
+          let ordered = vs_create(vs_size(keys)) => vs_free(ordered),
+          let queue = vs_create(vs_size(keys)) => vs_free(queue),
+          let dep_sets: VectorBase*? = ptr_vec_create(vs_size(keys)) => be_dependency_sets_free(dep_sets),
+          let in_degrees: VectorBase*? = id_vec_create(vs_size(keys)) => id_vec_free(in_degrees)) {
         cem_emit_section_comment(self.emitter, "Type definitions (dependency-ordered)");
 
-        let emitted_count = 0;
-        while (emitted_count < vs_size(keys)) {
-            let progress = false;
+        for (let i = 0; i < vs_size(keys); i = i + 1) {
+            let key = vs_get(keys, i);
+            let deps = ss_create();
+            if (!be_collect_type_dependencies(self, key, deps)) {
+                be_ice(concat3_s("[ICE-1341] missing dependency metadata for type key ", key, ""));
+            }
+            ptr_vec_push(dep_sets as VectorBase*, deps as void*);
 
-            for (let i = 0; i < vs_size(keys); i = i + 1) {
-                let key = vs_get(keys, i);
-                if (ss_has(emitted, key)) {
-                    continue;
-                }
-                if (!be_type_dependencies_ready(self, key, emitted)) {
-                    continue;
-                }
-
-                {
-                    let module_name = be_type_key_module(key);
-                    let type_name = be_type_key_name(key);
-
-                    let struct_info = sig_lookup_struct_info(self.result.signatures as SignatureTables*, module_name, type_name);
-                    if (struct_info != null) {
-                        let decl = be_find_struct_decl(self, module_name, type_name);
-                        if (decl == null) {
-                            be_ice(concat4_s("[ICE-1040] missing StructDecl for ", module_name, ".", type_name));
-                        }
-                        self.current_module = module_name;
-                        cem_emit_struct(self.emitter, module_name, decl as StructDecl*, struct_info as StructInfo*);
-                    } else {
-                        let enum_info = sig_lookup_enum_info(self.result.signatures as SignatureTables*, module_name, type_name);
-                        let enum_decl = be_find_enum_decl(self, module_name, type_name);
-                        if (enum_info == null || enum_decl == null) {
-                            be_ice(concat4_s("[ICE-1050] missing EnumDecl/EnumInfo for ", module_name, ".", type_name));
-                        }
-                        self.current_module = module_name;
-                        cem_emit_enum(self.emitter, module_name, enum_decl as EnumDecl*, enum_info as EnumInfo*);
-                    }
-
-                    ss_add(emitted, key);
-                    emitted_count = emitted_count + 1;
-                    progress = true;
+            let in_degree = 0;
+            for (let j = 0; j < ss_capacity(deps); j = j + 1) {
+                if (ss_slot_occupied(deps, j)) {
+                    in_degree = in_degree + 1;
                 }
             }
+            id_vec_push(in_degrees as VectorBase*, in_degree);
+            if (in_degree == 0) {
+                vs_push(queue, key);
+            }
+        }
 
-            if (!progress) {
-                be_ice("[ICE-1340] value-type cycle detected in type definitions");
+        let queue_index = 0;
+        while (queue_index < vs_size(queue)) {
+            let emitted_key = vs_get(queue, queue_index);
+            queue_index = queue_index + 1;
+            vs_push(ordered, emitted_key);
+
+            for (let i = 0; i < vs_size(keys); i = i + 1) {
+                let degree_ptr = vec_get(in_degrees as VectorBase*, i) as int*;
+                if (*degree_ptr <= 0) {
+                    continue;
+                }
+                let deps2 = ptr_vec_get(dep_sets as VectorBase*, i) as StringSet*;
+                if (!ss_has(deps2, emitted_key)) {
+                    continue;
+                }
+                *degree_ptr = *degree_ptr - 1;
+                if (*degree_ptr == 0) {
+                    vs_push(queue, vs_get(keys, i));
+                }
+            }
+        }
+
+        if (vs_size(ordered) != vs_size(keys)) {
+            be_ice("[ICE-1340] value-type cycle detected in type definitions");
+        }
+
+        for (let i = 0; i < vs_size(ordered); i = i + 1) {
+            let key = vs_get(ordered, i);
+            let module_name = be_type_key_module(key);
+            let type_name = be_type_key_name(key);
+
+            let struct_info = sig_lookup_struct_info(self.result.signatures as SignatureTables*, module_name, type_name);
+            if (struct_info != null) {
+                let decl = be_find_struct_decl(self, module_name, type_name);
+                if (decl == null) {
+                    be_ice(concat4_s("[ICE-1040] missing StructDecl for ", module_name, ".", type_name));
+                }
+                self.current_module = module_name;
+                cem_emit_struct(self.emitter, module_name, decl as StructDecl*, struct_info as StructInfo*);
+            } else {
+                let enum_info = sig_lookup_enum_info(self.result.signatures as SignatureTables*, module_name, type_name);
+                let enum_decl = be_find_enum_decl(self, module_name, type_name);
+                if (enum_info == null || enum_decl == null) {
+                    be_ice(concat4_s("[ICE-1050] missing EnumDecl/EnumInfo for ", module_name, ".", type_name));
+                }
+                self.current_module = module_name;
+                cem_emit_enum(self.emitter, module_name, enum_decl as EnumDecl*, enum_info as EnumInfo*);
             }
         }
     }
@@ -1194,7 +1253,6 @@ func be_emit_let_declarations(self: Backend*) {
             if (let_type == null) {
                 be_ice(concat4_s("[ICE-1151] missing Let type for ", root.name, ".", decl.name));
             }
-            be_emit_line_directive(self, decl.span);
             let c_init = be_emit_let_initializer(self, decl.value, let_type as Type*);
             cem_emit_let_declaration(self.emitter, root.name, decl, let_type as Type*, c_init);
         }
@@ -1245,39 +1303,66 @@ func be_emit_function_declarations(self: Backend*) {
 func be_emit_lvalue(self: Backend*, expr_id: ExprId) -> string {
     let expr = expr_arena_get(be_current_expr_arena(self), expr_id);
     match (expr.kind) {
-        EX_VAR_REF => {
-            let res = analysis_get_var_ref_resolution(self.result, self.current_module as string, expr_id);
-            if (res != null && (res as int) == ord(VAR_RES_LOCAL)) {
-                return cem_mangle_identifier(expr.text_value);
-            }
-            let sym = be_lookup_symbol(self, expr.text_value, expr.module_path, expr.name_qualifier);
-            if (sym != null && ord((sym as Symbol*).kind) == ord(SYM_LET)) {
-                return cem_mangle_let_name((sym as Symbol*).module_name, (sym as Symbol*).name);
-            }
-            return be_ice_string("[ICE-1241] invalid assignment target symbol");
-        }
         EX_UNARY => {
-            if (!eq_s(expr.text_value, "*")) {
-                return be_ice_string("[ICE-1242] unsupported unary lvalue");
+            if (eq_s(expr.text_value, "*") && be_has_side_effects(self, expr.expr_a)) {
+                with (let ptr_ty = be_expr_type(self, expr.expr_a) => type_free_opt(ptr_ty)) {
+                    if (ptr_ty == null) {
+                        return be_ice_string("[ICE-1242] missing type for dereference operand");
+                    }
+                    let ptr_temp = cem_fresh_tmp(self.emitter, "ptr");
+                    let c_ptr_expr = be_emit_expr(self, expr.expr_a);
+                    cem_emit_temp_decl(self.emitter, cem_emit_type(ptr_ty as Type*), ptr_temp, c_ptr_expr);
+                    return cem_emit_deref_lvalue(ptr_temp);
+                }
             }
-            return cem_emit_deref_lvalue(be_emit_expr(self, expr.expr_a));
         }
         EX_FIELD => {
-            with (let obj_ty = be_expr_type(self, expr.expr_a) => type_free_opt(obj_ty)) {
-                let is_pointer = obj_ty != null && ord((obj_ty as Type*).kind) == ord(TY_POINTER);
-                return cem_emit_field_lvalue(be_emit_expr(self, expr.expr_a), expr.text_value, is_pointer);
+            if (be_has_side_effects(self, expr.expr_a)) {
+                with (let obj_ty = be_expr_type(self, expr.expr_a) => type_free_opt(obj_ty)) {
+                    if (obj_ty == null) {
+                        return be_ice_string("[ICE-1243] missing type for field access object");
+                    }
+                    let obj_temp = cem_fresh_tmp(self.emitter, "obj");
+                    let c_obj_expr = be_emit_expr(self, expr.expr_a);
+                    cem_emit_temp_decl(self.emitter, cem_emit_type(obj_ty as Type*), obj_temp, c_obj_expr);
+                    let is_pointer = ord((obj_ty as Type*).kind) == ord(TY_POINTER);
+                    return cem_emit_field_lvalue(obj_temp, expr.text_value, is_pointer);
+                }
             }
         }
         EX_INDEX => {
-            return cem_emit_index_lvalue(be_emit_expr(self, expr.expr_a), be_emit_expr(self, expr.expr_b));
+            let base_has_effects = be_has_side_effects(self, expr.expr_a);
+            let index_has_effects = be_has_side_effects(self, expr.expr_b);
+            if (base_has_effects || index_has_effects) {
+                let final_base = be_emit_expr(self, expr.expr_a);
+                let final_index = be_emit_expr(self, expr.expr_b);
+
+                if (base_has_effects) {
+                    with (let base_ty = be_expr_type(self, expr.expr_a) => type_free_opt(base_ty)) {
+                        if (base_ty == null) {
+                            return be_ice_string("[ICE-1244] missing type for index base");
+                        }
+                        let base_temp = cem_fresh_tmp(self.emitter, "base");
+                        cem_emit_temp_decl(self.emitter, cem_emit_type(base_ty as Type*), base_temp, final_base);
+                        final_base = base_temp;
+                    }
+                }
+
+                if (index_has_effects) {
+                    let idx_temp = cem_fresh_tmp(self.emitter, "idx");
+                    cem_emit_temp_decl(self.emitter, "l0_int", idx_temp, final_index);
+                    final_index = idx_temp;
+                }
+
+                return cem_emit_index_lvalue(final_base, final_index);
+            }
         }
         EX_PAREN => {
             return be_emit_lvalue(self, expr.expr_a);
         }
-        _ => {
-            return be_ice_string("[ICE-1243] unsupported assignment target expression");
-        }
+        _ => {}
     }
+    return be_emit_expr(self, expr_id);
 }
 
 /**
@@ -1619,7 +1704,8 @@ func be_emit_expr(self: Backend*, expr_id: ExprId) -> string {
 
             let sym = be_lookup_symbol(self, expr.text_value, expr.module_path, expr.name_qualifier);
             if (sym == null) {
-                return be_ice_string("[ICE-1103] unresolved variable reference after type checking");
+                return be_ice_string(concat4_s("[ICE-1103] unresolved variable reference after type checking: ",
+                    self.current_module as string, "::", expr.text_value));
             }
 
             if (ord((sym as Symbol*).kind) == ord(SYM_FUNC)) {
@@ -1691,7 +1777,9 @@ func be_emit_expr(self: Backend*, expr_id: ExprId) -> string {
                     if (cem_is_niche_nullable(src_ty as Type*)) {
                         return cem_emit_unwrap_ptr(c_dst, c_inner, type_format(src_ty as Type*));
                     }
-                    return cem_emit_unwrap_opt(cem_emit_type(src_ty as Type*), c_inner, type_format(src_ty as Type*));
+                    let tmp = cem_fresh_tmp(self.emitter, "unwrap");
+                    cem_emit_temp_decl(self.emitter, cem_emit_type(src_ty as Type*), tmp, c_inner);
+                    return cem_emit_unwrap_opt(cem_emit_type(src_ty as Type*), tmp, type_format(src_ty as Type*));
                 }
 
                 return cem_emit_cast(c_dst, c_inner);
@@ -2411,6 +2499,10 @@ func be_emit_stmt(self: Backend*, stmt_id: StmtId) {
             with (let expr_ty = be_expr_type(self, stmt.expr_a) => type_free_opt(expr_ty)) {
                 if (expr_ty != null && be_should_materialize_arc_temp(self, stmt.expr_a, expr_ty as Type*)) {
                     be_materialize_arc_temp(self, c_expr, expr_ty as Type*);
+                } else if (expr_ty != null &&
+                           ord(expr_arena_get(be_current_expr_arena(self), stmt.expr_a).kind) == ord(EX_TRY) &&
+                           !analysis_has_arc_data(self.result, expr_ty as Type*)) {
+                    cem_emit_expr_stmt(self.emitter, concat4_s("(void)(", c_expr, ")", ""));
                 } else {
                     cem_emit_expr_stmt(self.emitter, c_expr);
                 }
@@ -2503,11 +2595,17 @@ func be_emit_stmt(self: Backend*, stmt_id: StmtId) {
                 if (self.current_func_result == null) {
                     be_ice("[ICE-1293] backend missing current function result type");
                 }
-                let c_value = be_emit_owned_expr_with_expected_type(self, stmt.expr_a, self.current_func_result as Type*);
+                let returned_var = be_lookup_owned_local_name(self, stmt.expr_a);
+                let c_value = "";
+                if (returned_var != null) {
+                    c_value = be_emit_expr_with_expected_type(self, stmt.expr_a, self.current_func_result as Type*);
+                } else {
+                    c_value = be_emit_owned_expr_with_expected_type(self, stmt.expr_a, self.current_func_result as Type*);
+                }
                 if (be_scope_chain_has_cleanup(self)) {
                     let ret_tmp = cem_fresh_tmp(self.emitter, "ret");
                     cem_emit_temp_decl(self.emitter, cem_emit_type(self.current_func_result as Type*), ret_tmp, c_value);
-                    be_emit_cleanup_for_return(self, be_lookup_owned_local_name(self, stmt.expr_a));
+                    be_emit_cleanup_for_return(self, returned_var);
                     cem_emit_return_stmt(self.emitter, ret_tmp);
                 } else {
                     cem_emit_return_stmt(self.emitter, c_value);

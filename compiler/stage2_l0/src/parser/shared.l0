@@ -539,6 +539,19 @@ func token_byte_text(tok: Token) -> string? {
 }
 
 /**
+ * Extract byte literal numeric value from a token.
+ *
+ * @param tok Token to inspect.
+ * @return Byte literal value, or `null` if `tok` is not `TT_BYTE`.
+ */
+func token_byte_value(tok: Token) -> byte? {
+    match (tok.token_type) {
+        TT_BYTE(t, v) => { return v; }
+        _ => { return null; }
+    }
+}
+
+/**
  * Extract string literal text from a token.
  *
  * @param tok Token to inspect.
@@ -547,6 +560,19 @@ func token_byte_text(tok: Token) -> string? {
 func token_string_text(tok: Token) -> string? {
     match (tok.token_type) {
         TT_STRING(t, v) => { return t; }
+        _ => { return null; }
+    }
+}
+
+/**
+ * Extract decoded string-literal bytes from a token.
+ *
+ * @param tok Token to inspect.
+ * @return Decoded string bytes, or `null` if `tok` is not `TT_STRING`.
+ */
+func token_string_value(tok: Token) -> string? {
+    match (tok.token_type) {
+        TT_STRING(t, v) => { return v; }
         _ => { return null; }
     }
 }

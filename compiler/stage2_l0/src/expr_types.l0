@@ -539,6 +539,14 @@ func etc_check_stmt(self: ExpressionTypeChecker*, stmt_id: StmtId) {
                     let item = ptr_vec_get(items, i) as WithItem*;
                     etc_check_stmt(self, item.init);
                 }
+                if (stmt.stmt_b < 0) {
+                    for (let j = 0; j < vec_size(items); j = j + 1) {
+                        let cleanup_item = ptr_vec_get(items, j) as WithItem*;
+                        if (cleanup_item.has_cleanup && cleanup_item.cleanup_stmt >= 0) {
+                            etc_check_stmt(self, cleanup_item.cleanup_stmt);
+                        }
+                    }
+                }
             }
             etc_check_stmt(self, stmt.stmt_a);
             etc_check_stmt(self, stmt.stmt_b);
@@ -634,14 +642,27 @@ func etc_types_equal(a: Type*?, b: Type*?) -> bool {
  */
 func etc_can_assign(self: ExpressionTypeChecker*, dst: Type*, src: Type*) -> bool {
     if (type_equals(dst, src)) return true;
-    
+
+    if (ord(src.kind) == ord(TY_NULL) && ord(dst.kind) == ord(TY_NULLABLE)) return true;
+    if (type_is_builtin(dst, "int") && type_is_builtin(src, "byte")) return true;
+
     if (ord(dst.kind) == ord(TY_NULLABLE)) {
-        if (ord(src.kind) == ord(TY_NULL)) return true;
         return etc_can_assign(self, dst.inner as Type*, src);
     }
-    
-    if (type_is_builtin(dst, "int") && type_is_builtin(src, "byte")) return true;
-    
+
+    if (ord(src.kind) == ord(TY_NULLABLE) && ord(dst.kind) == ord(TY_NULLABLE)) {
+        return etc_can_assign(self, dst.inner as Type*, src.inner as Type*);
+    }
+
+    if (ord(src.kind) == ord(TY_POINTER) && ord(dst.kind) == ord(TY_POINTER)) {
+        let dst_inner = dst.inner as Type*;
+        let src_inner = src.inner as Type*;
+        if (type_is_builtin(dst_inner, "void") || type_is_builtin(src_inner, "void")) {
+            return true;
+        }
+        return etc_can_assign(self, dst_inner, src_inner);
+    }
+
     return false;
 }
 
@@ -715,8 +736,9 @@ func etc_infer_binary(self: ExpressionTypeChecker*, expr_id: ExprId, expr: ExprN
             etc_diag_error(self, "TYP-0310", concat4_s("binary '", op, "' expects int, got ", type_format(l_ty)),
                 (self.current_unit as DriverUnit*).path, expr.span);
         }
+        type_free(l_ty);
         type_free(r_ty);
-        return l_ty;
+        return type_builtin_int();
     } else if (eq_s(op, "==") || eq_s(op, "!=")) {
         if (!etc_types_equal(l_ty, r_ty)) {
             let ok = false;
@@ -1029,7 +1051,63 @@ func etc_infer_expr(self: ExpressionTypeChecker*, expr_id: ExprId) -> Type*? {
                         self.result.names as NameResolution*, self.current_env as ModuleEnv*,
                         expr.type_ref as TypeRef*, self.result.diags, seen2);
                     if (base_ty != null) {
-                        ty = type_new_pointer(base_ty as Type*);
+                        let base = base_ty as Type*;
+                        let arg_count = 0;
+                        if (expr.ids != null) {
+                            arg_count = vec_size(expr.ids as VectorBase*);
+                        }
+
+                        if (ord(base.kind) == ord(TY_STRUCT)) {
+                            let info = sig_lookup_struct_info(self.result.signatures as SignatureTables*,
+                                base.module_name, base.name);
+                            if (info == null) {
+                                etc_diag_error(self, "TYP-0282",
+                                    concat4_s("missing struct info for ", base.module_name, ".", base.name),
+                                    unit.path, expr.span);
+                            } else {
+                                let fields = (info as StructInfo*).fields;
+                                let field_count = vec_size(fields);
+                                if (arg_count != field_count) {
+                                    etc_diag_error(self, "TYP-0283",
+                                        concat4_s("struct '", base.name, "' argument count mismatch", ""),
+                                        unit.path, expr.span);
+                                }
+                                for (let i = 0; i < arg_count; i = i + 1) {
+                                    let arg_ty = etc_infer_expr(self, id_vec_get(expr.ids as VectorBase*, i));
+                                    if (arg_ty != null) {
+                                        if (i < field_count) {
+                                            let field = ptr_vec_get(fields, i) as StructFieldInfo*;
+                                            if (!etc_can_assign(self, field.field_type, arg_ty as Type*)) {
+                                                etc_diag_error(self, "TYP-0316",
+                                                    concat4_s("field '", field.name, "' of struct initializer type mismatch", ""),
+                                                    unit.path, expr.span);
+                                            }
+                                        }
+                                        type_free(arg_ty as Type*);
+                                    }
+                                }
+                            }
+                        } else {
+                            if (arg_count > 1) {
+                                etc_diag_error(self, "TYP-0285",
+                                    concat4_s("'new ", type_format(base), "' expects at most 1 argument", ""),
+                                    unit.path, expr.span);
+                            }
+                            for (let i = 0; i < arg_count; i = i + 1) {
+                                let arg_ty2 = etc_infer_expr(self, id_vec_get(expr.ids as VectorBase*, i));
+                                if (arg_ty2 != null) {
+                                    if (i == 0 && !etc_can_assign(self, base, arg_ty2 as Type*)) {
+                                        etc_diag_error(self, "TYP-0286",
+                                            concat4_s("cannot initialize '", type_format(base), "' from argument type ",
+                                                type_format(arg_ty2 as Type*)),
+                                            unit.path, expr.span);
+                                    }
+                                    type_free(arg_ty2 as Type*);
+                                }
+                            }
+                        }
+
+                        ty = type_new_pointer(base);
                     }
                 }
             }
@@ -1038,7 +1116,24 @@ func etc_infer_expr(self: ExpressionTypeChecker*, expr_id: ExprId) -> Type*? {
             ty = etc_infer_expr(self, expr.expr_a);
         }
         EX_TRY => {
-            ty = etc_infer_expr(self, expr.expr_a);
+            let inner_ty = etc_infer_expr(self, expr.expr_a);
+            if (inner_ty != null) {
+                let nullable_ty = inner_ty as Type*;
+                if (ord(nullable_ty.kind) != ord(TY_NULLABLE)) {
+                    etc_diag_error(self, "TYP-0250",
+                        concat4_s("cannot apply '?' to non-nullable type '", type_format(nullable_ty), "'", ""),
+                        unit.path, expr.span);
+                    type_free(nullable_ty);
+                } else if (self.current_ret_type == null || ord((self.current_ret_type as Type*).kind) != ord(TY_NULLABLE)) {
+                    etc_diag_error(self, "TYP-0251",
+                        "cannot use '?' in a function that does not return a nullable type (T?)",
+                        unit.path, expr.span);
+                    type_free(nullable_ty);
+                } else {
+                    ty = type_clone(nullable_ty.inner as Type*);
+                    type_free(nullable_ty);
+                }
+            }
         }
         EX_TYPE => {
             if (expr.type_ref != null) {

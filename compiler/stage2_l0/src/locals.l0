@@ -371,12 +371,14 @@ func lc_visit_case_else(env: FunctionEnv*, arm: CaseElse*, parent_scope: Scope*)
  * Visits a with during AST traversal.
  *
  * @param env The current module environment.
+ * @param stmt_id The `with` statement id.
  * @param stmt The stmt.
  * @param parent_scope The parent scope.
  */
-func lc_visit_with(env: FunctionEnv*, stmt: StmtNode*, parent_scope: Scope*) {
+func lc_visit_with(env: FunctionEnv*, stmt_id: StmtId, stmt: StmtNode*, parent_scope: Scope*) {
     let header_scope = lc_scope_create(parent_scope);
     lc_scope_track(env, header_scope);
+    lc_scope_set_block(env, stmt_id, header_scope);
 
     let items = stmt.with_items as VectorBase*;
     for (let i = 0; i < vec_size(items); i = i + 1) {
@@ -448,7 +450,7 @@ func lc_visit_stmt(env: FunctionEnv*, stmt_id: StmtId, scope: Scope*) {
             }
         }
         ST_WITH => {
-            lc_visit_with(env, stmt, scope);
+            lc_visit_with(env, stmt_id, stmt, scope);
         }
         ST_BLOCK => {
             let block_scope = lc_scope_create(scope);

@@ -52,6 +52,26 @@ func is_escape_char(c: byte) -> bool {
 }
 
 /**
+ * Decode one simple escape-code character into its byte value.
+ *
+ * @param c Escape-code byte after the backslash.
+ * @return Decoded byte value.
+ */
+func escape_char_value(c: byte) -> byte {
+    if (c == '\\') return '\\';
+    if (c == '\'') return '\'';
+    if (c == '"') return '"';
+    if (c == '?') return '?';
+    if (c == 'a') return '\a';
+    if (c == 'b') return '\b';
+    if (c == 'f') return '\f';
+    if (c == 'n') return '\n';
+    if (c == 'r') return '\r';
+    if (c == 't') return '\t';
+    return '\v';
+}
+
+/**
  * Check whether a byte is an octal digit.
  *
  * @param c Byte to inspect.
@@ -519,7 +539,9 @@ func ls_read_valid_char_escape(self: LexerState*, single_byte: bool) -> EscapedC
 
         let c = ls_peek(self);
         if (is_escape_char(c)) {
-            cb_append(cb, ls_advance(self));
+            let esc = ls_advance(self);
+            cb_append(cb, esc);
+            char_value = escape_char_value(esc);
         }
         else if (c == 'x') {
             // Hexadecimal escape sequence: \xH+ (at least 1 hex digit)

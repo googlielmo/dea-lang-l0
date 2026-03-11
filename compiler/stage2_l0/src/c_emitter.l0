@@ -965,6 +965,7 @@ func cem_emit_main_wrapper(self: CEmitter*, entry_module: string, func_type: Typ
 
     ccb_dedent(self.out);
     ccb_emit(self.out, "}");
+    ccb_emit(self.out, "");
 }
 
 /**
@@ -1117,6 +1118,9 @@ func cem_emit_optional_wrappers(self: CEmitter*, early: bool) {
  * @return C spelling for the literal.
  */
 func cem_emit_int_literal(value: int) -> string {
+    if (value == -2147483648) {
+        return "INT32_MIN";
+    }
     return int_to_string(value);
 }
 
@@ -1147,13 +1151,61 @@ func cem_emit_const_bool_literal(value: bool) -> string {
 }
 
 /**
- * Emit a byte literal as an integer constant.
+ * Encode one byte for a C character literal body.
+ *
+ * @param value Byte value.
+ * @return Escaped character-literal body without surrounding quotes.
+ */
+func cem_encode_c_byte_literal(value: byte) -> string {
+    if (value == '\\') {
+        return "\\\\";
+    }
+    if (value == '\'') {
+        return "\\'";
+    }
+    if (value == '\n') {
+        return "\\n";
+    }
+    if (value == '\r') {
+        return "\\r";
+    }
+    if (value == '\t') {
+        return "\\t";
+    }
+    if (value == '\0') {
+        return "\\0";
+    }
+    if (value == '\a') {
+        return "\\a";
+    }
+    if (value == '\b') {
+        return "\\b";
+    }
+    if (value == '\f') {
+        return "\\f";
+    }
+    if (value == '\v') {
+        return "\\v";
+    }
+    if (value >= ' ' && value <= '~') {
+        return byte_to_s(value);
+    }
+
+    let hex = int_to_string_base(value as int, 16);
+    if (len_s(hex) == 1) {
+        return concat3_s("\\x0", hex, "");
+    }
+    return concat3_s("\\x", hex, "");
+}
+
+/**
+ * Emit a byte literal as a casted C character constant.
  *
  * @param value Byte value.
  * @return C spelling for the literal.
  */
 func cem_emit_byte_literal(value: byte) -> string {
-    return int_to_string(value as int);
+    return concat4_s("((l0_byte)'", cem_encode_c_byte_literal(value), "')", "");
 }
 
 /**
@@ -1968,6 +2020,30 @@ func cem_find_enum_decl(self: CEmitter*, module_name: string, enum_name: string)
 }
 
 /**
+ * Report whether any variant field in an enum carries ARC-managed data.
+ *
+ * @param self Emitter to inspect.
+ * @param enum_info Resolved enum metadata.
+ * @param decl Parsed enum declaration.
+ * @return `true` when cleanup code must inspect the active variant.
+ */
+func cem_enum_has_arc_data(self: CEmitter*, enum_info: EnumInfo*, decl: EnumDecl*) -> bool {
+    for (let i = 0; i < vec_size(decl.variants); i = i + 1) {
+        let variant = ptr_vec_get(decl.variants, i) as EnumVariant*;
+        let info = cem_find_enum_variant_info(enum_info, variant.name);
+        if (info == null) {
+            continue;
+        }
+        for (let j = 0; j < vec_size((info as EnumVariantInfo*).field_types); j = j + 1) {
+            if (analysis_has_arc_data(cem_analysis(self), ptr_vec_get((info as EnumVariantInfo*).field_types, j) as Type*)) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+/**
  * Emit cleanup for a by-value expression according to its type.
  *
  * @param self Emitter to update.
@@ -1985,10 +2061,11 @@ func cem_emit_value_cleanup(self: CEmitter*, c_expr: string, ty: Type*) {
         if (ord(inner.kind) == ord(TY_POINTER) || !analysis_has_arc_data(cem_analysis(self), inner)) {
             return;
         }
-        cem_emit_if_header(self, concat4_s("((", c_expr, ").has_value", ")"));
-        cem_emit_block_start(self);
+        ccb_emit(self.out, concat4_s("if ((", c_expr, ").has_value", ") {"));
+        ccb_indent(self.out);
         cem_emit_value_cleanup(self, concat4_s("(", c_expr, ").value", ""), inner);
-        cem_emit_block_end(self);
+        ccb_dedent(self.out);
+        ccb_emit(self.out, "}");
         return;
     }
 
@@ -2014,6 +2091,9 @@ func cem_emit_value_cleanup(self: CEmitter*, c_expr: string, ty: Type*) {
         if (decl == null) {
             return;
         }
+        if (!cem_enum_has_arc_data(self, enum_info as EnumInfo*, decl as EnumDecl*)) {
+            return;
+        }
 
         cem_emit_switch_start(self, concat4_s("(", c_expr, ").tag", ""));
         for (let i = 0; i < vec_size((decl as EnumDecl*).variants); i = i + 1) {
@@ -2034,8 +2114,8 @@ func cem_emit_value_cleanup(self: CEmitter*, c_expr: string, ty: Type*) {
                 continue;
             }
 
-            cem_emit_case_label(self, cem_emit_enum_tag(ty, variant.name));
-            cem_emit_block_start(self);
+            ccb_emit(self.out, concat4_s("case ", cem_emit_enum_tag(ty, variant.name), ": {", ""));
+            ccb_indent(self.out);
             for (let j = 0; j < vec_size((info2 as EnumVariantInfo*).field_types); j = j + 1) {
                 let field_decl = ptr_vec_get(variant.fields, j) as FieldDecl*;
                 let field_ty = ptr_vec_get((info2 as EnumVariantInfo*).field_types, j) as Type*;
@@ -2044,10 +2124,10 @@ func cem_emit_value_cleanup(self: CEmitter*, c_expr: string, ty: Type*) {
                     field_ty);
             }
             cem_emit_exit_switch(self);
-            cem_emit_block_end(self);
+            ccb_dedent(self.out);
+            ccb_emit(self.out, "}");
         }
-        cem_emit_default_label(self);
-        cem_emit_exit_switch(self);
+        ccb_emit(self.out, "default: break;");
         cem_emit_switch_end(self);
     }
 }
@@ -2065,13 +2145,14 @@ func cem_emit_struct_cleanup(self: CEmitter*, c_ptr_expr: string, struct_type: T
         cem_ice(concat4_s("[ICE-1270] missing StructInfo for ", struct_type.module_name, ".", struct_type.name));
     }
 
-    cem_emit_if_header(self, concat4_s(c_ptr_expr, " != NULL", "", ""));
-    cem_emit_block_start(self);
+    ccb_emit(self.out, concat4_s("if (", c_ptr_expr, " != NULL", ") {"));
+    ccb_indent(self.out);
     for (let i = 0; i < vec_size((info as StructInfo*).fields); i = i + 1) {
         let field = ptr_vec_get((info as StructInfo*).fields, i) as StructFieldInfo*;
         cem_emit_value_cleanup(self, concat4_s(c_ptr_expr, "->", field.name, ""), field.field_type);
     }
-    cem_emit_block_end(self);
+    ccb_dedent(self.out);
+    ccb_emit(self.out, "}");
 }
 
 /**
@@ -2090,9 +2171,12 @@ func cem_emit_enum_cleanup(self: CEmitter*, c_ptr_expr: string, enum_type: Type*
     if (decl == null) {
         cem_ice(concat4_s("[ICE-1302] missing variant decl for ", enum_type.module_name, ".", enum_type.name));
     }
+    if (!cem_enum_has_arc_data(self, enum_info as EnumInfo*, decl as EnumDecl*)) {
+        return;
+    }
 
-    cem_emit_if_header(self, concat4_s(c_ptr_expr, " != NULL", "", ""));
-    cem_emit_block_start(self);
+    ccb_emit(self.out, concat4_s("if (", c_ptr_expr, " != NULL", ") {"));
+    ccb_indent(self.out);
     cem_emit_switch_start(self, concat4_s(c_ptr_expr, "->tag", "", ""));
     for (let i = 0; i < vec_size((decl as EnumDecl*).variants); i = i + 1) {
         let variant = ptr_vec_get((decl as EnumDecl*).variants, i) as EnumVariant*;
@@ -2112,8 +2196,8 @@ func cem_emit_enum_cleanup(self: CEmitter*, c_ptr_expr: string, enum_type: Type*
             continue;
         }
 
-        cem_emit_case_label(self, cem_emit_enum_tag(enum_type, variant.name));
-        cem_emit_block_start(self);
+        ccb_emit(self.out, concat4_s("case ", cem_emit_enum_tag(enum_type, variant.name), ": {", ""));
+        ccb_indent(self.out);
         for (let j = 0; j < vec_size((info2 as EnumVariantInfo*).field_types); j = j + 1) {
             let field_decl = ptr_vec_get(variant.fields, j) as FieldDecl*;
             let field_ty = ptr_vec_get((info2 as EnumVariantInfo*).field_types, j) as Type*;
@@ -2121,10 +2205,11 @@ func cem_emit_enum_cleanup(self: CEmitter*, c_ptr_expr: string, enum_type: Type*
                 field_ty);
         }
         cem_emit_exit_switch(self);
-        cem_emit_block_end(self);
+        ccb_dedent(self.out);
+        ccb_emit(self.out, "}");
     }
-    cem_emit_default_label(self);
-    cem_emit_exit_switch(self);
+    ccb_emit(self.out, "default: break;");
     cem_emit_switch_end(self);
-    cem_emit_block_end(self);
+    ccb_dedent(self.out);
+    ccb_emit(self.out, "}");
 }

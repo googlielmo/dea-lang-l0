@@ -419,13 +419,14 @@ func ps_parse_primary_expr(self: ParserState*) -> ExprId? {
 
     if (ps_match_byte(self)) {
         let node = expr_node_create(EX_BYTE, ps_extend_span(self, start));
+        node.int_value = token_byte_value(tok) as byte;
         node.text_value = token_byte_text(tok) as string;
         return expr_arena_add(self.expr_arena, node);
     }
 
     if (ps_match_string(self)) {
         let node = expr_node_create(EX_STRING, ps_extend_span(self, start));
-        node.text_value = token_string_text(tok) as string;
+        node.text_value = token_string_value(tok) as string;
         return expr_arena_add(self.expr_arena, node);
     }
 

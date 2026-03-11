@@ -88,10 +88,44 @@ func test_typing_err() {
 }
 
 /**
+ * Tests successful typing for postfix try expressions.
+ */
+func test_typing_try_ok() {
+    let sp = make_paths();
+    with (let cfg = log_config_create(LL_SILENT, false) => drop cfg) {
+        let result = analysis_analyze_entry(sp, "typing_try_ok", cfg);
+        assert(!analysis_has_errors(result), "expected no typing errors for typing_try_ok");
+        analysis_result_free(result);
+    }
+    sp_free(sp);
+}
+
+/**
+ * Tests postfix try diagnostics.
+ */
+func test_typing_try_err() {
+    let sp = make_paths();
+    with (let cfg = log_config_create(LL_SILENT, false) => drop cfg) {
+        let non_nullable = analysis_analyze_entry(sp, "typing_try_non_nullable", cfg);
+        assert(analysis_has_errors(non_nullable), "expected typing errors for typing_try_non_nullable");
+        assert(has_diag_code(non_nullable, "TYP-0250"), "expected non-nullable try error");
+        analysis_result_free(non_nullable);
+
+        let bad_return = analysis_analyze_entry(sp, "typing_try_bad_return", cfg);
+        assert(analysis_has_errors(bad_return), "expected typing errors for typing_try_bad_return");
+        assert(has_diag_code(bad_return, "TYP-0251"), "expected nullable return type error");
+        analysis_result_free(bad_return);
+    }
+    sp_free(sp);
+}
+
+/**
  * Main entry point for the module.
  */
 func main() {
     test_typing_ok();
     test_typing_err();
+    test_typing_try_ok();
+    test_typing_try_err();
     printl_s("expr_types_test: all tests passed");
 }
