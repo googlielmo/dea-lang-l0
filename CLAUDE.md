@@ -43,30 +43,41 @@ Also see: `CONTRIBUTING.md`, `SECURITY.md`.
 
 ## Environment & Setup
 
-- **Virtual Environment:** Always check for a local `.venv` and/or `uv` availability. Use the local virtual environment
-  to execute `pytest` and `./l0c`.
-- **Environment Variables:** Source `source ./l0-env.sh` when needed to set up `L0_HOME`, `PATH`, and `L0_CC`.
-- **Auto-provisioning:** If no local virtual environment is available and sufficient permissions are granted, install
-  one using `uv sync` (preferred, uses `pyproject.toml`) or
-  `python3 -m venv .venv && source .venv/bin/activate && pip install -e .`.
+- **Virtual Environment:** Always check for a local `.venv` and/or `uv` availability. Prefer `make venv` for the
+  repo-managed developer setup; it reuses `.venv` if present, otherwise uses `uv` when available and falls back to a
+  plain `python3 -m venv` workflow.
+- **Manual Environment Setup:** If you are not using `make venv`, prefer `uv sync --group dev` (uses `pyproject.toml`
+  and `uv.lock`) or fall back to `python3 -m venv .venv && source .venv/bin/activate && pip install -e . "pytest>=9.0.2" "pytest-xdist>=3.5"`.
+- **Environment Variables:** Source `dist/bin/l0-env.sh` only for the repo-local dist workflow. For source-tree usage,
+  invoke `./scripts/l0c` directly; it derives `L0_HOME` on its own.
 
 ## Commands
 
-All commands run from the repository root. The `l0c` commands below describe the main Stage 1 wrapper/driver
-interface exposed today:
+All commands run from the repository root. For normal development, prefer the repo-local switchable `l0c` alias:
 
 ```bash
-./l0c -P examples --run hello     # build + run
-./l0c -P examples --build hello   # build executable
-./l0c -P examples --gen hello     # emit C only
-./l0c -P examples --check hello   # parse + type-check
-./l0c -P examples --tok hello     # dump tokens
-./l0c -P examples --ast hello     # pretty-print AST
-./l0c -P examples --sym hello     # dump symbols
-./l0c -P examples --type hello    # dump resolved top-level types
+make install-dev-stages
+make use-dev-stage1 # or `make use-dev-stage2`
+source dist/bin/l0-env.sh
+```
+
+The source-tree `./scripts/l0c` entrypoint is Stage 1 only and is mainly useful for bootstrap mechanics, internal
+tooling, and Stage 1-focused testing:
+
+```bash
+./scripts/l0c -P examples --run hello     # build + run
+./scripts/l0c -P examples --build hello   # build executable
+./scripts/l0c -P examples --gen hello     # emit C only
+./scripts/l0c -P examples --check hello   # parse + type-check
+./scripts/l0c -P examples --tok hello     # dump tokens
+./scripts/l0c -P examples --ast hello     # pretty-print AST
+./scripts/l0c -P examples --sym hello     # dump symbols
+./scripts/l0c -P examples --type hello    # dump resolved top-level types
 ./scripts/gen-docs.sh --strict    # generate docs; fail on warnings and synthetic __padN__ regressions
 ./scripts/gen-docs.sh --pdf       # also build/copy build/docs/pdf/refman.pdf
 ./scripts/gen-docs.sh --pdf-fast  # faster preview PDF build (single pdflatex pass)
+make help                         # show the repo-local developer workflow targets
+make venv                         # create or reuse the local .venv
 ```
 
 Verbosity: `-v` (info), `-vvv` (debug).
@@ -76,16 +87,17 @@ C compiler selection: `-c <compiler>`. Auto-detection order (used by `l0c` and S
 
 Trace toggles (codegen/build/run): `--trace-arc`, `--trace-memory`.
 
-For current Stage 2 CLI work, use:
+For direct Stage 2 artifact usage, use:
 
 ```bash
 ./scripts/build-stage2-l0c.sh # build the stage 2 compiler and place it under build/stage2/bin/l0c-stage2
 ./build/stage2/bin/l0c-stage2 --check -P examples hello # run the stage 2 compiler directly
 ./build/stage2/bin/l0c-stage2 --build -P examples hello # build directly with the stage 2 compiler
 ./build/stage2/bin/l0c-stage2 --run -P examples hello # build and run directly with the stage 2 compiler
-make install-all # install repo-local stage-specific launchers under dist/bin
-make use-stage2 # point dist/bin/l0c at the Stage 2 launcher and print the source command
+make install-dev-stages # install repo-local stage-specific launchers under dist/bin
+make use-dev-stage2 # point dist/bin/l0c at the Stage 2 launcher and print the source command
 source dist/bin/l0-env.sh # activate the repo-local dist workflow in your shell
+make test-all # run the full Stage 1 + Stage 2 validation suite
 make triple-test # run the strict stage2/stage3 triple-bootstrap regression
 ```
 
@@ -104,17 +116,20 @@ Release/manual publishing is handled by `.github/workflows/docs-publish.yml`; PR
 ### Testing
 
 ```bash
-cd compiler/stage1_py
-pytest -n auto                    # all tests (parallel, optimal)
-pytest tests/lexer/test_lexer.py  # specific file
-pytest -k "test_name"             # pattern match
+make install-dev-stages                                # recommended developer-facing `l0c` setup
+make use-dev-stage1
+source dist/bin/l0-env.sh
+make test-stage1                                      # recommended Stage 1 test entrypoint
+./.venv/bin/python -m pytest -n auto compiler/stage1_py/tests
+./.venv/bin/python -m pytest compiler/stage1_py/tests/lexer/test_lexer.py
+./.venv/bin/python -m pytest -k "test_name" compiler/stage1_py/tests
 ```
 
 For Stage 2 (`compiler/stage2_l0`) changes, finalization checks should include:
 
 ```bash
-./compiler/stage2_l0/run_tests.py
-./compiler/stage2_l0/run_trace_tests.py
+make test-stage2
+make test-stage2-trace
 ```
 
 `run_trace_tests.py` is an important finalization gate because it validates ARC/memory traces and leak triage across

@@ -98,7 +98,7 @@ def main() -> int:
     with stdout_path.open("w", encoding="utf-8") as stdout_file, stderr_path.open("w", encoding="utf-8") as stderr_file:
         result = subprocess.run(
             [
-                "./l0c",
+                "./scripts/l0c",
                 "-P",
                 "compiler/stage2_l0/src",
                 "--run",

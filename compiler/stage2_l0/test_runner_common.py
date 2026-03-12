@@ -90,7 +90,7 @@ def build_normal_test_command(case: TestCase) -> list[str]:
     """Return the subprocess command for one normal Stage 2 test."""
 
     if case.kind == "l0":
-        return ["./l0c", "-P", "compiler/stage2_l0/src", "--run", str(case.path)]
+        return ["./scripts/l0c", "-P", "compiler/stage2_l0/src", "--run", str(case.path)]
     if case.kind == "shell":
         return ["bash", str(case.path)]
     if case.kind == "python":

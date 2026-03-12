@@ -90,7 +90,9 @@ Current backend behavior includes:
 
 ## Stage 1 CLI and Workflow Status
 
-CLI entry point: `compiler/stage1_py/l0c.py` (wrapper: `./l0c`).
+CLI entry point: `compiler/stage1_py/l0c.py` (source-tree wrapper: `./scripts/l0c`).
+Recommended developer-facing `l0c`: the repo-local alias under `dist/bin`, selected with `make use-dev-stage1` or
+`make use-dev-stage2` and activated with `source dist/bin/l0-env.sh`.
 
 Commands and aliases:
 
@@ -215,8 +217,8 @@ Stage 2 backend/codegen status:
   `std.system.system()` for host compiler and program execution.
 - Stage 2 can now be bootstrapped into a repo-local artifact via `./scripts/build-stage2-l0c.sh`, producing
   `build/stage2/bin/l0c-stage2` and `l0c-stage2.native` by default.
-- Phase 2 now adds a repo-local `dist/bin` workflow via `make install-all`, explicit `make use-stage1` /
-  `make use-stage2` alias switching, and `source dist/bin/l0-env.sh`.
+- Phase 2 now adds a repo-local `dist/bin` workflow via `make install-dev-stages`, explicit `make use-dev-stage1` /
+  `make use-dev-stage2` alias switching, and `source dist/bin/l0-env.sh`.
 - The strict stage2/stage3 fixed-point bootstrap regression is available directly via `make triple-test`.
 - Stage 2 backend lowering now covers the Stage 1 language surface, including ownership-sensitive lowering for
   `new`, `drop`, `try`, `with`, `match`, `case`, `break`, `continue`, and ARC cleanup.

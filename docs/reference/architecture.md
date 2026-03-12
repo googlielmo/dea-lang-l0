@@ -80,9 +80,11 @@ Executable launch (`--run`)
 ```
 
 Current Stage 2 CLI entry point: `compiler/stage2_l0/src/l0c.l0`.
-Source-tree execution path: `./l0c -P compiler/stage2_l0/src --run l0c -- ...`.
+Recommended developer-facing workflow: `make install-dev-stages`, choose `make use-dev-stage1` or
+`make use-dev-stage2`, then `source dist/bin/l0-env.sh`.
+Source-tree execution path: `./scripts/l0c -P compiler/stage2_l0/src --run l0c -- ...` (`./scripts/l0c` is the
+Stage 1 source-tree wrapper).
 Repo-local bootstrap artifact path: `./scripts/build-stage2-l0c.sh`, then `./build/stage2/bin/l0c-stage2 ...`.
-Repo-local switchable developer workflow: `make install-all`, `make use-stage2`, then `source dist/bin/l0-env.sh`.
 Triple-bootstrap fixed-point regression: `make triple-test`.
 Stage 2 now implements `--build`, `--run`, `--gen`, and the existing analysis/dump modes.
 

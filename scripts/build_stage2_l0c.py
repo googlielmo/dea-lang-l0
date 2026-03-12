@@ -44,7 +44,7 @@ def main() -> int:
     c_output = layout.bin_dir / "l0c-stage2.c"
 
     build_args = [
-        "./l0c",
+        "./scripts/l0c",
         "--build",
         "-P",
         "compiler/stage2_l0/src",

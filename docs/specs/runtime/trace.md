@@ -23,9 +23,9 @@ Flags are independent and composable.
 Examples:
 
 ```bash
-./l0c --gen --trace-arc app.main
-./l0c --build --trace-memory app.main
-./l0c --run --trace-arc --trace-memory app.main
+./scripts/l0c --gen --trace-arc app.main
+./scripts/l0c --build --trace-memory app.main
+./scripts/l0c --run --trace-arc --trace-memory app.main
 ```
 
 ## 3. Generated C Contract

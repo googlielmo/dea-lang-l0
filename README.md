@@ -51,8 +51,8 @@ L0 is currently at a quite exciting phase: **The Stage 2 Bootstrap**.
 
 * Stage 2 bootstrap artifact: buildable today under `build/stage2/bin` via `./scripts/build-stage2-l0c.sh`.
 
-* Stage 2 repo-local dist workflow: available under `dist/bin` via `make install-all`; `make use-stage2` prints the
-  exact `source dist/bin/l0-env.sh` command after switching the alias.
+* Stage 2 repo-local dist workflow: available under `dist/bin` via `make install-dev-stages`; `make use-dev-stage2`
+  prints the exact `source dist/bin/l0-env.sh` command after switching the alias.
 
 * Stage 2 triple-bootstrap regression: available directly via `make triple-test`.
 
@@ -94,6 +94,7 @@ l0c --run --trace-arc --trace-memory app.l0
 - A C99 compiler
 - Python 3.14+
 - [`uv`](https://github.com/astral-sh/uv) (recommended; any venv manager works)
+- `make` (strongly recommended for the documented workflow; the underlying scripts can still be run manually)
 
 #### Supported C compilers
 
@@ -123,19 +124,24 @@ managers provide outdated versions.
 Clone this repository and `cd` into it. Then create a virtual environment and install dependencies:
 
 ```shell
-uv sync                  # create local venv from pyproject.toml
-source ./l0-env.sh       # sets L0_HOME, activates venv if present
-l0c --help
+make venv                # create or reuse local .venv; prefers uv when available
 ```
 
-For a repo-local switchable Stage 1/Stage 2 toolchain alias:
+If you prefer to manage the environment manually, `uv sync` is the recommended direct command; a plain
+`python3 -m venv .venv` workflow also works.
+
+For normal developer use, install the repo-local switchable `l0c` alias, choose the stage you want, and source the
+generated environment script:
 
 ```shell
-make install-all
-make use-stage2
+make install-dev-stages
+make use-dev-stage1      # or: make use-dev-stage2
 source dist/bin/l0-env.sh
 l0c --help
 ```
+
+The `./scripts/l0c` entrypoint remains available, but it is the source-tree Stage 1 wrapper and is mainly useful for
+bootstrap mechanics, internal tooling, and Stage 1-focused testing.
 
 ### First program
 
@@ -342,6 +348,15 @@ Stage 2 follows the same high-level pipeline with a more modular implementation 
 name resolution, type checking, backend, and C emitter are separate components with well-defined interfaces.
 Current Stage 2 implements the analysis/dump modes, deterministic `--gen`, and direct `--build` / `--run`.
 
+For normal development, pick which compiler `l0c` should refer to:
+
+```shell
+make install-dev-stages
+make use-dev-stage1      # switch `l0c` to Stage 1
+# or: make use-dev-stage2
+source dist/bin/l0-env.sh
+```
+
 You can also bootstrap a repo-local Stage 2 compiler artifact directly:
 
 ```shell
@@ -361,8 +376,9 @@ make triple-test
 For a repo-local developer workflow with a switchable `l0c` alias:
 
 ```shell
-make install-all
-make use-stage1          # or `make use-stage2`
+make install-dev-stages
+make use-dev-stage1      # switch `l0c` to Stage 1
+# or: make use-dev-stage2
 source dist/bin/l0-env.sh
 l0c --check -P examples hello
 ```
@@ -370,8 +386,8 @@ l0c --check -P examples hello
 `DIST_DIR` may be overridden, but it must stay inside the repository. For example:
 
 ```shell
-make DIST_DIR=build/dev-dist install-all
-make DIST_DIR=build/dev-dist use-stage2
+make DIST_DIR=build/dev-dist install-dev-stages
+make DIST_DIR=build/dev-dist use-dev-stage2
 source build/dev-dist/bin/l0-env.sh
 ```
 
@@ -384,8 +400,26 @@ References:
 
 ## CLI
 
-The command table below describes the main `l0c` interface exposed today by the Stage 1 wrapper/driver. Stage 2
-currently implements analysis/dump modes plus `--gen`, `--build`, and `--run`.
+The recommended developer-facing CLI is `l0c` after selecting a stage with `make use-dev-stage1` or
+`make use-dev-stage2` and sourcing `dist/bin/l0-env.sh`.
+
+The source-tree `./scripts/l0c` wrapper is Stage 1 only. It remains useful for bootstrap mechanics, internal tooling,
+and Stage 1-focused testing, but it is not the recommended general developer entrypoint.
+
+To set up the switchable repo-local `l0c` alias:
+
+```shell
+make install-dev-stages
+make use-dev-stage1      # or `make use-dev-stage2`
+source dist/bin/l0-env.sh
+```
+
+Today:
+
+- `l0c` after `make use-dev-stage1` points at `dist/bin/l0c-stage1`.
+- `l0c` after `make use-dev-stage2` points at `dist/bin/l0c-stage2`.
+- `./scripts/l0c` always runs the source-tree Stage 1 wrapper directly.
+- Stage 2 currently implements analysis/dump modes plus `--gen`, `--build`, and `--run`.
 
 For direct Stage 2 artifact usage from a repo checkout:
 
@@ -398,6 +432,8 @@ For direct Stage 2 artifact usage from a repo checkout:
 
 ```shell
 l0c [mode] [options] <target>
+# or, for the source-tree Stage 1 wrapper only:
+# ./scripts/l0c [mode] [options] <target>
 ```
 
 | Mode           | Action                      |

@@ -51,7 +51,7 @@ def run_case(name: str, expected_rc: int, expected_stdout_substr: str, artifact_
     trace_path = artifact_dir / f"{name}.stderr.log"
     report_path = artifact_dir / f"{name}.trace_report.txt"
 
-    command = ["./l0c", "--run", "--trace-memory", "--trace-arc", str(TARGET)]
+    command = ["./scripts/l0c", "--run", "--trace-memory", "--trace-arc", str(TARGET)]
     if argv:
         command.extend(["--", *argv])
 

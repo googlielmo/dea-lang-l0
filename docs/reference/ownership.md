@@ -189,7 +189,7 @@ If you observe behavior that contradicts this reference:
 Recommended commands:
 
 ```bash
-./l0c ... --gen ...
+./scripts/l0c ... --gen ...
 ./compiler/stage2_l0/run_test_trace.py <test-or-reproducer>
 ./compiler/stage2_l0/check_trace_log.py <stderr.log> --triage
 ```
@@ -227,6 +227,6 @@ Primary source files:
 Repro-style checks:
 
 ```bash
-./l0c -P compiler/stage2_l0/tests -S compiler/shared/l0/stdlib --gen -o /tmp/map_test.c map_test
-./l0c -P compiler/stage2_l0/tests -S compiler/shared/l0/stdlib --gen -o /tmp/hashmap_test.c hashmap_test
+./scripts/l0c -P compiler/stage2_l0/tests -S compiler/shared/l0/stdlib --gen -o /tmp/map_test.c map_test
+./scripts/l0c -P compiler/stage2_l0/tests -S compiler/shared/l0/stdlib --gen -o /tmp/hashmap_test.c hashmap_test
 ```

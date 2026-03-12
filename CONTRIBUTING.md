@@ -11,25 +11,38 @@ L0 is experimental. The language, compiler CLI, and runtime APIs may change with
 Prerequisites:
 
 - Python 3.14+
-- pytest >= 9.0.2 (install with `pip install pytest`)
 - A C99 compiler (GCC or Clang) for codegen tests and running compiled programs
+- `make` for the recommended developer workflow
+- [`uv`](https://github.com/astral-sh/uv) is recommended, but not required
+
+For normal development, prefer the repo-local switchable `l0c` alias:
+
+```bash
+make venv
+make install-dev-stages
+make use-dev-stage1      # or `make use-dev-stage2`
+source dist/bin/l0-env.sh
+```
+
+The source-tree `./scripts/l0c` entrypoint is Stage 1 only and is mainly useful for bootstrap mechanics, internal
+tooling, and Stage 1-focused testing.
 
 ### Running tests
 
 From the repository root:
 
 ```bash
-cd compiler/stage1_py
-pytest                           # run all tests
-pytest tests/lexer/test_lexer.py # run a specific test file
-pytest -k "test_name"           # run tests matching a pattern
+make venv
+make test-stage1
+./.venv/bin/python -m pytest compiler/stage1_py/tests/lexer/test_lexer.py
+./.venv/bin/python -m pytest -k "test_name" compiler/stage1_py/tests
 ```
 
 For Stage 2 (`compiler/stage2_l0`) changes, run:
 
 ```bash
-./compiler/stage2_l0/run_tests.py
-./compiler/stage2_l0/run_trace_tests.py
+make test-stage2
+make test-stage2-trace
 ```
 
 `run_trace_tests.py` is an important finalization gate for Stage 2 changes because it checks runtime trace health
@@ -40,8 +53,8 @@ For Stage 2 (`compiler/stage2_l0`) changes, run:
 Verify the compiler works end-to-end:
 
 ```bash
-./l0c -P examples --run hello    # build and run hello.l0
-./l0c -P examples --check hello  # parse and type-check only
+l0c -P examples --run hello    # build and run hello.l0
+l0c -P examples --check hello  # parse and type-check only
 ```
 
 ### Debugging
@@ -49,8 +62,8 @@ Verify the compiler works end-to-end:
 Use verbose flags to see compilation stages:
 
 ```bash
-./l0c -v -P examples --check hello     # info-level logging
-./l0c -vvv -P examples --check hello   # debug-level logging
+l0c -v -P examples --check hello     # info-level logging
+l0c -vvv -P examples --check hello   # debug-level logging
 ```
 
 ## Making changes

@@ -84,7 +84,7 @@ def run_one(case_index: int, case_name: str, case_path: Path, artifact_dir: Path
     with out_path.open("w", encoding="utf-8") as stdout_file, trace_path.open("w", encoding="utf-8") as stderr_file:
         run_result = subprocess.run(
             [
-                "./l0c",
+                "./scripts/l0c",
                 "--trace-memory",
                 "--trace-arc",
                 "-P",

@@ -54,7 +54,7 @@ def golden_path(case_dir: Path) -> Path:
 def generate_stage1_golden(case_dir: Path) -> str:
     module = entry_module(case_dir)
     cmd = [
-        "./l0c",
+        "./scripts/l0c",
         "--gen",
         "--no-line-directives",
         "-P",
