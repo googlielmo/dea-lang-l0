@@ -6,6 +6,7 @@
 module backend;
 
 import std.assert;
+import std.hashmap;
 import std.hashset;
 import std.string;
 import std.text;
@@ -291,6 +292,103 @@ func be_expr_type(self: Backend*, expr_id: ExprId) -> Type*? {
         return null;
     }
     return analysis_get_expr_type(self.result, self.current_module as string, expr_id);
+}
+
+/**
+ * Free a temporary vector of optional owned `Type*` values.
+ *
+ * @param items Vector to free. Null entries are ignored.
+ */
+func be_type_ptr_vec_temp_free(items: VectorBase*?) {
+    if (items == null) {
+        return;
+    }
+    let vec = items as VectorBase*;
+    for (let i = 0; i < vec_size(vec); i = i + 1) {
+        let item = ptr_vec_get(vec, i);
+        if (item != null) {
+            type_free(item as Type*);
+        }
+    }
+    vec_free(vec);
+}
+
+/**
+ * Free a temporary map of owned `Type*` values.
+ *
+ * @param items Map to free.
+ */
+func be_type_ptr_map_temp_free(items: StringPtrMap*?) {
+    if (items == null) {
+        return;
+    }
+    let map = items as StringPtrMap*;
+    for (let i = 0; i < spm_capacity(map); i = i + 1) {
+        if (spm_slot_occupied(map, i)) {
+            type_free(spm_slot_value(map, i) as Type*);
+        }
+    }
+    spm_free(map);
+}
+
+/**
+ * Resolve the type of one local `let` declaration.
+ *
+ * @param self Backend state to inspect.
+ * @param stmt Parsed `let` statement.
+ * @return Resolved type.
+ */
+func be_resolve_let_type(self: Backend*, stmt: StmtNode*) -> Type* {
+    let var_ty: Type*? = null;
+    if (stmt.type_ref != null) {
+        var_ty = be_resolve_type_ref(self, stmt.type_ref as TypeRef*);
+    }
+    if (var_ty == null) {
+        var_ty = be_expr_type(self, stmt.expr_a);
+    }
+    if (var_ty == null) {
+        be_ice(concat3_s("[ICE-1170] missing inferred type for let initializer '", stmt.name, "'"));
+    }
+    return var_ty as Type*;
+}
+
+/**
+ * Predeclare a nullable cleanup-block header let to its null literal.
+ *
+ * @param self Backend state to update.
+ * @param stmt Parsed `let` statement from a `with` header.
+ * @return Resolved nullable type when predeclared, otherwise `null`.
+ */
+func be_emit_with_cleanup_header_let_predecl(self: Backend*, stmt: StmtNode*) -> Type*? {
+    let var_ty = be_resolve_let_type(self, stmt);
+    if (ord(var_ty.kind) != ord(TY_NULLABLE)) {
+        type_free(var_ty);
+        return null;
+    }
+
+    let c_var_name = cem_mangle_identifier(stmt.name);
+    let c_type = cem_emit_type(var_ty);
+    let c_zero = cem_emit_null_literal(var_ty, true);
+    cem_emit_let_decl(self.emitter, c_type, c_var_name, c_zero);
+
+    if (self.current_scope != null) {
+        sc_add_owned(self.current_scope as ScopeContext*, c_var_name, var_ty);
+    }
+
+    return var_ty;
+}
+
+/**
+ * Emit the initializer assignment for a predeclared cleanup-block header let.
+ *
+ * @param self Backend state to update.
+ * @param stmt Parsed `let` statement from a `with` header.
+ * @param var_ty Resolved type of the predeclared variable.
+ */
+func be_emit_with_cleanup_header_let_assign(self: Backend*, stmt: StmtNode*, var_ty: Type*) {
+    let c_var_name = cem_mangle_identifier(stmt.name);
+    let c_value = be_emit_owned_expr_with_expected_type(self, stmt.expr_a, var_ty);
+    cem_emit_assignment(self.emitter, c_var_name, c_value);
 }
 
 /**
@@ -2259,11 +2357,37 @@ func be_emit_with_stmt(self: Backend*, stmt: StmtNode*) {
     }
 
     let items = stmt.with_items as VectorBase*;
-    for (let i = 0; i < vec_size(items); i = i + 1) {
-        let item = ptr_vec_get(items, i) as WithItem*;
-        be_emit_stmt(self, item.init);
-        if (stmt.stmt_b < 0 && item.has_cleanup && item.cleanup_stmt >= 0) {
-            sc_push_inline_cleanup(with_scope, item.cleanup_stmt);
+    if (stmt.stmt_b >= 0) {
+        with (let predecl_types = spm_create() => be_type_ptr_map_temp_free(predecl_types)) {
+            for (let i = 0; i < vec_size(items); i = i + 1) {
+                let item = ptr_vec_get(items, i) as WithItem*;
+                let init_stmt = stmt_arena_get(be_current_stmt_arena(self), item.init);
+                if (ord(init_stmt.kind) == ord(ST_LET)) {
+                    let predecl_ty = be_emit_with_cleanup_header_let_predecl(self, init_stmt);
+                    if (predecl_ty != null) {
+                        spm_put(predecl_types, int_to_string(i), predecl_ty as void*);
+                    }
+                }
+            }
+
+            for (let i = 0; i < vec_size(items); i = i + 1) {
+                let item = ptr_vec_get(items, i) as WithItem*;
+                let init_stmt = stmt_arena_get(be_current_stmt_arena(self), item.init);
+                let predecl_ty = spm_get(predecl_types, int_to_string(i));
+                if (predecl_ty != null && ord(init_stmt.kind) == ord(ST_LET)) {
+                    be_emit_with_cleanup_header_let_assign(self, init_stmt, predecl_ty as Type*);
+                } else {
+                    be_emit_stmt(self, item.init);
+                }
+            }
+        }
+    } else {
+        for (let i = 0; i < vec_size(items); i = i + 1) {
+            let item = ptr_vec_get(items, i) as WithItem*;
+            be_emit_stmt(self, item.init);
+            if (item.has_cleanup && item.cleanup_stmt >= 0) {
+                sc_push_inline_cleanup(with_scope, item.cleanup_stmt);
+            }
         }
     }
 

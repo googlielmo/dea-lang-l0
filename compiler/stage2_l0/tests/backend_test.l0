@@ -425,6 +425,61 @@ func test_backend_generate_match_and_with_cleanup_block() {
 }
 
 /**
+ * Tests test_backend_generate_with_cleanup_block_header_try_predeclares_nullable_lets.
+ */
+func test_backend_generate_with_cleanup_block_header_try_predeclares_nullable_lets() {
+    with (let filenames = vs_create(1) => vs_free(filenames),
+          let sources = vs_create(1) => vs_free(sources),
+          let lines = vs_create(20) => vs_free(lines),
+          let cfg = log_config_create(LL_ERROR, false) => drop cfg,
+          let opts = cg_options_create() => cg_options_free(opts)) {
+        opts.emit_line_directives = false;
+        vs_push(filenames, "demo/main.l0");
+        vs_push(lines, "module demo.main;");
+        vs_push(lines, "enum Expr {");
+        vs_push(lines, "    Num(value: int);");
+        vs_push(lines, "}");
+        vs_push(lines, "func parse(c: int) -> Expr*? {");
+        vs_push(lines, "    return null;");
+        vs_push(lines, "}");
+        vs_push(lines, "func free_expr(e: Expr*?) {");
+        vs_push(lines, "}");
+        vs_push(lines, "func main() -> Expr*? {");
+        vs_push(lines, "    let result: Expr*? = null;");
+        vs_push(lines, "    with (let left: Expr*? = parse(0)?,");
+        vs_push(lines, "          let right: Expr*? = parse(1)?) {");
+        vs_push(lines, "        return result;");
+        vs_push(lines, "    } cleanup {");
+        vs_push(lines, "        if (result == null) { free_expr(left); free_expr(right); }");
+        vs_push(lines, "    }");
+        vs_push(lines, "    return result;");
+        vs_push(lines, "}");
+        vs_push(sources, bt_source(lines));
+
+        let result = bt_analyze_sources("demo.main", filenames, sources);
+        assert(!analysis_has_errors(result), "analysis should succeed for with-header try fixture");
+
+        let generated = backend_generate(result, opts, cfg);
+        assert(contains_s(generated, "struct l0_demo_main_Expr* left = NULL;"),
+            "nullable cleanup-block header let should be predeclared to null");
+        assert(contains_s(generated, "struct l0_demo_main_Expr* right = NULL;"),
+            "second nullable cleanup-block header let should be predeclared to null");
+        assert(contains_s(generated, "left = l0_try_"), "predeclared left should be assigned after the try succeeds");
+        assert(contains_s(generated, "right = l0_try_"), "predeclared right should be assigned after the try succeeds");
+        assert(!contains_s(generated, "struct l0_demo_main_Expr* left = l0_try_"),
+            "left should not be redeclared after predeclaration");
+        assert(!contains_s(generated, "struct l0_demo_main_Expr* right = l0_try_"),
+            "right should not be redeclared after predeclaration");
+        assert(contains_s(generated, "l0_demo_main_free_expr(left);"),
+            "cleanup block should still reference the predeclared left variable");
+        assert(contains_s(generated, "l0_demo_main_free_expr(right);"),
+            "cleanup block should still reference the predeclared right variable");
+
+        analysis_result_free(result);
+    }
+}
+
+/**
  * Tests test_backend_generate_drop_statement.
  */
 func test_backend_generate_drop_statement() {
@@ -591,6 +646,7 @@ func main() {
     test_backend_generate_basic_control_flow();
     test_backend_generate_loop_exit_case_lowering();
     test_backend_generate_match_and_with_cleanup_block();
+    test_backend_generate_with_cleanup_block_header_try_predeclares_nullable_lets();
     test_backend_generate_drop_statement();
     test_backend_generate_new_and_try_lowering();
     test_backend_generate_intrinsics_use_analyzed_target_types();

@@ -76,6 +76,10 @@ EOF
 tail -n 3 "$WORK_DIR/argv.out" >"$WORK_DIR/argv.tail"
 diff -u "$WORK_DIR/argv.expected" "$WORK_DIR/argv.tail" >/dev/null || fail "argv forwarding output mismatch"
 
+"$STAGE2_L0C" --run -P examples demo -- add 2 3 >"$WORK_DIR/demo.out" 2>&1
+tail -n 1 "$WORK_DIR/demo.out" >"$WORK_DIR/demo.tail"
+assert_text_equals "$WORK_DIR/demo.tail" "= 5"
+
 set +e
 "$STAGE2_L0C" --run -P "$FIXTURE_ROOT" exit_seven >"$WORK_DIR/exit_seven.out" 2>&1
 rc=$?
