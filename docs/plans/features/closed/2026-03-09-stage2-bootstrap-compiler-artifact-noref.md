@@ -3,7 +3,7 @@
 ## Bootstrap, Make workflow, and installable Stage 2 toolchain
 
 - Date: 2026-03-10
-- Status: In Progress (Phases 1–2 complete, Phase 3 pending)
+- Status: Closed (implemented)
 - Title: Bootstrap, Make workflow, and installable Stage 2 toolchain
 - Kind: Feature
 - Severity: High
@@ -25,6 +25,7 @@
     - `compiler/stage2_l0/tests/l0c_codegen_test.sh`
     - `compiler/stage2_l0/tests/l0c_stage2_default_dist_test.sh`
     - `compiler/stage2_l0/tests/l0c_stage2_bootstrap_test.sh`
+    - `compiler/stage2_l0/tests/l0c_stage2_install_prefix_test.sh`
     - `compiler/stage2_l0/tests/l0c_triple_bootstrap_test.py`
     - `tests/test_make_dist_workflow.py`
 
@@ -37,11 +38,13 @@ Triple-bootstrap self-hosting validation and the strict triple-compilation test 
 `docs/plans/features/closed/2026-03-11-triple-bootstrap-self-hosting-noref.md`. That follow-on work depends on
 this plan’s Phase 1 and Phase 2 deliverables, but it does not replace this plan’s Phase 3 install-prefix scope.
 
-The plan has three phases:
+The plan had three phases, and all three are now implemented:
 
 1. Phase 1 builds a standalone Stage 2 compiler artifact under `build/stage2/bin` from the Stage 1 compiler.
 2. Phase 2 adds a top-level `Makefile` that centralizes the repo-local developer workflow under `dist/bin`.
-3. Phase 3 extends that workflow into a repo-independent install prefix with copied shared stdlib/runtime assets.
+3. Phase 3 extends that workflow into a repo-independent install prefix with copied shared stdlib/runtime assets and
+   installs the self-hosted Stage 2 compiler (`Compiler 2` in the triple-bootstrap chain), not the initial Stage 1
+   bootstrap artifact.
 
 The feature is Stage-2-first. Stage 1 remains the bootstrap compiler throughout these phases, but only Phase 2 needs a
 repo-local `l0c-stage1` wrapper. Phase 3 does not require Stage 1 to be installed into the final prefix.
@@ -216,7 +219,10 @@ Phase 3 is repo-independent:
 
 1. installed wrappers and `l0-env.sh` must derive paths from `PREFIX`, not from the repo checkout,
 2. the installed Stage 2 compiler must work after the repository is moved or removed,
-3. `l0-env.sh` must set `L0_HOME="$PREFIX"` and derive `L0_SYSTEM` and `L0_RUNTIME_INCLUDE` from it when unset.
+3. `l0-env.sh` must set `L0_HOME="$PREFIX"` and derive `L0_SYSTEM` and `L0_RUNTIME_INCLUDE` from it when unset,
+4. `install` must scrub inherited `L0_SYSTEM`, `L0_RUNTIME_INCLUDE`, and `L0_RUNTIME_LIB` during its internal
+   self-hosted rebuild so a caller shell sourced from an installed prefix cannot redirect Compiler 2 bootstrap inputs
+   away from the repo source tree.
 
 Phase 3 does not require `l0c-stage1` to be installed into the final prefix.
 
@@ -236,6 +242,8 @@ Phase 3 does not require `l0c-stage1` to be installed into the final prefix.
     2. prefix-relative mode for Phase 3
 7. Keep Phase 3 Stage-2-first: copied shared assets and installed Stage 2 are mandatory; Stage 1 packaging is deferred
    and not required by this plan.
+8. Keep `install` shell-state-independent: its temporary self-hosted rebuild must not consume caller-provided
+   installed-prefix `L0_*` paths.
 
 ## Test Plan
 
@@ -279,13 +287,16 @@ Phase 3 does not require `l0c-stage1` to be installed into the final prefix.
 
 ### Phase 3
 
-1. `make PREFIX=/tmp/l0-install install-stage2`
+1. `make PREFIX=/tmp/l0-install install`
 2. `source /tmp/l0-install/bin/l0-env.sh`
 3. `/tmp/l0-install/bin/l0c --check -P <project> <module>` succeeds
 4. `/tmp/l0-install/bin/l0c-stage2 --gen ...` succeeds
 5. stdlib resolves from `<PREFIX>/shared/l0/stdlib`
 6. runtime headers resolve from `<PREFIX>/shared/runtime`
 7. no repo-relative dependency on `compiler/shared/...` remains
+8. `install` still succeeds when the caller shell exports installed-prefix `L0_HOME`, `L0_SYSTEM`, and
+   `L0_RUNTIME_INCLUDE`; those values must not affect the internal self-hosted rebuild
+9. `install` installs the self-hosted Stage 2 compiler (`Compiler 2`), not the initial Stage 1-built artifact
 
 ## Assumptions and Defaults
 

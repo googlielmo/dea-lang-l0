@@ -14,7 +14,7 @@ from pathlib import Path
 import subprocess
 import sys
 
-from dist_tools_lib import normalize_dist_dir, write_stage2_wrapper
+from dist_tools_lib import DeaBuildLayout, normalize_dea_build_dir, write_stage2_wrapper
 
 
 def parse_args() -> argparse.Namespace:
@@ -24,19 +24,8 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def main() -> int:
-    """Program entrypoint."""
-
-    parse_args()
-
-    dist_dir_text = os.environ.get("DIST_DIR", "build/stage2")
-    keep_c = os.environ.get("KEEP_C", "0") == "1"
-
-    try:
-        layout = normalize_dist_dir(dist_dir_text)
-    except ValueError as exc:
-        print(f"build-stage2-l0c: {exc}", file=sys.stderr)
-        return 1
+def build_stage2_artifact(layout: DeaBuildLayout, *, keep_c: bool) -> tuple[Path, Path, Path]:
+    """Build the repo-local Stage 2 compiler artifact for one validated layout."""
 
     layout.bin_dir.mkdir(parents=True, exist_ok=True)
 
@@ -57,13 +46,37 @@ def main() -> int:
     else:
         c_output.unlink(missing_ok=True)
 
-    subprocess.run(build_args, cwd=layout.repo_root, check=True)
+    build_env = os.environ.copy()
+    build_env["L0_HOME"] = str(layout.repo_root / "compiler")
+    build_env.pop("L0_SYSTEM", None)
+    build_env.pop("L0_RUNTIME_INCLUDE", None)
+    build_env.pop("L0_RUNTIME_LIB", None)
+
+    subprocess.run(build_args, cwd=layout.repo_root, env=build_env, check=True)
 
     if not keep_c:
         c_output.unlink(missing_ok=True)
 
     wrapper_bin = write_stage2_wrapper(layout)
     native_bin.chmod(native_bin.stat().st_mode | 0o111)
+    return wrapper_bin, native_bin, c_output
+
+
+def main() -> int:
+    """Program entrypoint."""
+
+    parse_args()
+
+    dea_build_dir_text = os.environ.get("DEA_BUILD_DIR", "build/dea")
+    keep_c = os.environ.get("KEEP_C", "0") == "1"
+
+    try:
+        layout = normalize_dea_build_dir(dea_build_dir_text)
+    except ValueError as exc:
+        print(f"build-stage2-l0c: {exc}", file=sys.stderr)
+        return 1
+
+    wrapper_bin, native_bin, c_output = build_stage2_artifact(layout, keep_c=keep_c)
 
     print(f"build-stage2-l0c: wrote {wrapper_bin}")
     print(f"build-stage2-l0c: wrote {native_bin}")

@@ -49,16 +49,19 @@ L0 is currently at a quite exciting phase: **The Stage 2 Bootstrap**.
 
 * Stage 2 `--gen`: implemented and parity-tested against Stage 1 on a committed golden corpus.
 
-* Stage 2 bootstrap artifact: buildable today under `build/stage2/bin` via `./scripts/build-stage2-l0c.sh`.
+* Stage 2 bootstrap artifact: buildable today under `build/dea/bin` via `./scripts/build-stage2-l0c.sh`.
 
-* Stage 2 repo-local dist workflow: available under `dist/bin` via `make install-dev-stages`; `make use-dev-stage2`
-  prints the exact `source dist/bin/l0-env.sh` command after switching the alias.
+* Stage 2 repo-local Dea build workflow: available under `build/dea/bin` via `make install-dev-stages`;
+  `make use-dev-stage2`
+  prints the exact `source build/dea/bin/l0-env.sh` command after switching the alias.
+
+* Stage 2 install prefix: available via `make PREFIX=/tmp/l0-install install`; this installs the self-hosted
+  Stage 2 compiler (`S1 -> S2`, then `S2 -> S2`) plus copied `shared/l0/stdlib` and `shared/runtime` assets.
 
 * Stage 2 triple-bootstrap regression: available directly via `make triple-test`.
 
 Today, Stage 2 has feature parity with Stage 1 for the analysis-oriented commands `--check`, `--type`, and `--sym`,
 and also implements deterministic `--gen` plus direct `--build` / `--run`.
-The next major milestone is Phase 3: turning the repo-local workflow into a repo-independent installable toolchain.
 
 * **Built-in Observability:** Language developers need to know what memory is doing. L0 ships with native compiler flags
   to trace ARC events and allocations directly to stderr. Today these are fully usable through the Stage 1 driver and
@@ -91,10 +94,10 @@ l0c --run --trace-arc --trace-memory app.l0
 
 ### Prerequisites for Stage 1
 
-- A C99 compiler
-- Python 3.14+
-- [`uv`](https://github.com/astral-sh/uv) (recommended; any venv manager works)
-- `make` (strongly recommended for the documented workflow; the underlying scripts can still be run manually)
+- A C99 compiler (`gcc`, `clang`, and recent `tcc` version are known to work).
+- `make` is the primary entrypoint for installation and development workflows.
+- Python 3.14+.
+- [`uv`](https://github.com/astral-sh/uv) (`make` will fall back to `python3 -m venv` if `uv` is not available).
 
 #### Supported C compilers
 
@@ -136,13 +139,26 @@ generated environment script:
 ```shell
 make install-dev-stages
 make use-dev-stage1      # or: make use-dev-stage2
-source dist/bin/l0-env.sh
+source build/dea/bin/l0-env.sh
 l0c --help
 l0c --version
 ```
 
 The `./scripts/l0c` entrypoint remains available, but it is the source-tree Stage 1 wrapper and is mainly useful for
 bootstrap mechanics, internal tooling, and Stage 1-focused testing.
+
+For a repo-independent Stage 2 install prefix:
+
+```shell
+make PREFIX=/tmp/l0-install install
+source /tmp/l0-install/bin/l0-env.sh
+l0c --version
+```
+
+`make install` requires an explicit `PREFIX=...`; there is no implicit default install root.
+
+`install` installs the self-hosted Stage 2 compiler (`Compiler 2` from the triple-bootstrap chain), not the
+initial Stage 1-built bootstrap artifact.
 
 ### First program
 
@@ -180,15 +196,23 @@ The compiler resolves modules from system roots (stdlib) then project roots in o
 <summary>Environment variables</summary>
 <p>
 
-| Variable             | Default                     | Purpose                                  |
+| Variable             | Default value if not set    | Purpose                                  |
 |----------------------|-----------------------------|------------------------------------------|
-| `L0_HOME`            | `compiler/`                 | Compiler root                            |
+| `L0_HOME`            | auto-detected*              | Compiler root                            |
 | `L0_SYSTEM`          | `$L0_HOME/shared/l0/stdlib` | Standard library roots (colon-separated) |
 | `L0_RUNTIME_INCLUDE` | `$L0_HOME/shared/runtime`   | Runtime header path                      |
-| `L0_RUNTIME_LIB`     | _(unset)_                   | Runtime library path                     |
+| `L0_RUNTIME_LIB`     | _(unset)_                   | Runtime library ath                      |
 | `L0_CFLAGS`          | _(unset)_                   | Extra C compiler options (prepended)     |
 | `L0_CC`              | auto-detected               | Override C compiler                      |
 
+<small>
+
+\* The default `L0_HOME` value is determined by the specific `l0c` driver script at runtime. If `./scripts/l0c` is used,
+`L0_HOME` is set to `./compiler` relative to the repository root. The same is true for repo-local stage 1 and stage 2
+artifacts built with `make install-dev-stages` and `make use-dev-stage1` / `make use-dev-stage2`. For a Stage 2-only
+install prefix, `L0_HOME` is set to the installation root.
+
+</small>
 </details>
 
 ### Examples
@@ -360,24 +384,35 @@ For normal development, pick which compiler `l0c` should refer to:
 make install-dev-stages
 make use-dev-stage1      # switch `l0c` to Stage 1
 # or: make use-dev-stage2
-source dist/bin/l0-env.sh
+source build/dea/bin/l0-env.sh
 ```
 
 You can also bootstrap a repo-local Stage 2 compiler artifact directly:
 
 ```shell
 ./scripts/build-stage2-l0c.sh
-./build/stage2/bin/l0c-stage2 --check -P examples hello
-./build/stage2/bin/l0c-stage2 --gen -P examples hello
-./build/stage2/bin/l0c-stage2 --build -P examples hello
-./build/stage2/bin/l0c-stage2 --run -P examples hello
+./build/dea/bin/l0c-stage2 --check -P examples hello
+./build/dea/bin/l0c-stage2 --gen -P examples hello
+./build/dea/bin/l0c-stage2 --build -P examples hello
+./build/dea/bin/l0c-stage2 --run -P examples hello
+```
+
+For a repo-independent Stage 2-only install prefix:
+
+```shell
+make PREFIX=/tmp/l0-install install
+source /tmp/l0-install/bin/l0-env.sh
+l0c --check -P examples hello
 ```
 
 For the strict Stage 2 triple-bootstrap regression:
 
 ```shell
-make triple-test
+make DEA_BUILD_DIR=build/dev-dea triple-test
 ```
+
+The Stage 2 test Make targets are self-contained repo-local workflows: they ensure `./.venv`, prepare the Stage 2
+artifact under `DEA_BUILD_DIR`, and scrub installed-prefix `L0_*` env leakage before running.
 
 For a repo-local developer workflow with a switchable `l0c` alias:
 
@@ -385,16 +420,16 @@ For a repo-local developer workflow with a switchable `l0c` alias:
 make install-dev-stages
 make use-dev-stage1      # switch `l0c` to Stage 1
 # or: make use-dev-stage2
-source dist/bin/l0-env.sh
+source build/dea/bin/l0-env.sh
 l0c --check -P examples hello
 ```
 
-`DIST_DIR` may be overridden, but it must stay inside the repository. For example:
+`DEA_BUILD_DIR` may be overridden, but it must stay inside the repository. For example:
 
 ```shell
-make DIST_DIR=build/dev-dist install-dev-stages
-make DIST_DIR=build/dev-dist use-dev-stage2
-source build/dev-dist/bin/l0-env.sh
+make DEA_BUILD_DIR=build/dev-dea install-dev-stages
+make DEA_BUILD_DIR=build/dev-dea use-dev-stage2
+source build/dev-dea/bin/l0-env.sh
 ```
 
 References:
@@ -407,7 +442,7 @@ References:
 ## CLI
 
 The recommended developer-facing CLI is `l0c` after selecting a stage with `make use-dev-stage1` or
-`make use-dev-stage2` and sourcing `dist/bin/l0-env.sh`.
+`make use-dev-stage2` and sourcing `build/dea/bin/l0-env.sh`.
 
 The source-tree `./scripts/l0c` wrapper is Stage 1 only. It remains useful for bootstrap mechanics, internal tooling,
 and Stage 1-focused testing, but it is not the recommended general developer entrypoint.
@@ -417,13 +452,14 @@ To set up the switchable repo-local `l0c` alias:
 ```shell
 make install-dev-stages
 make use-dev-stage1      # or `make use-dev-stage2`
-source dist/bin/l0-env.sh
+source build/dea/bin/l0-env.sh
 ```
 
 Today:
 
-- `l0c` after `make use-dev-stage1` points at `dist/bin/l0c-stage1`.
-- `l0c` after `make use-dev-stage2` points at `dist/bin/l0c-stage2`.
+- `l0c` after `make use-dev-stage1` points at `build/dea/bin/l0c-stage1`.
+- `l0c` after `make use-dev-stage2` points at `build/dea/bin/l0c-stage2`.
+- `make PREFIX=/tmp/l0-install install` installs a separate Stage 2-only `l0c` under `/tmp/l0-install/bin`.
 - `./scripts/l0c` always runs the source-tree Stage 1 wrapper directly.
 - Stage 2 currently implements analysis/dump modes plus `--gen`, `--build`, and `--run`.
 
@@ -431,9 +467,9 @@ For direct Stage 2 artifact usage from a repo checkout:
 
 ```shell
 ./scripts/build-stage2-l0c.sh
-./build/stage2/bin/l0c-stage2 --check -P examples hello
-./build/stage2/bin/l0c-stage2 --build -P examples hello
-./build/stage2/bin/l0c-stage2 --run -P examples hello
+./build/dea/bin/l0c-stage2 --check -P examples hello
+./build/dea/bin/l0c-stage2 --build -P examples hello
+./build/dea/bin/l0c-stage2 --run -P examples hello
 ```
 
 ```shell

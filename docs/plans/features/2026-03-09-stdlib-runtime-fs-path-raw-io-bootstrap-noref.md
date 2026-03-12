@@ -196,3 +196,5 @@ Record those as follow-on work:
 2. `byte*` plus explicit lengths is the correct low-level I/O shape for LSP framing and other binary-safe stream use.
 3. Rich traversal, process, watch, and URI-conversion APIs are intentionally deferred to keep the first phase small and
    bootstrap-focused.
+4. Environment scripts should set only `L0_HOME`; `L0_SYSTEM` and `L0_RUNTIME_INCLUDE` are explicit user overrides and
+   compiler defaults must derive stdlib/runtime paths from `L0_HOME` when those overrides are unset.

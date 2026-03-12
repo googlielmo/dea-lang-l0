@@ -19,6 +19,9 @@ DEFAULT_MAX_JOBS = 9
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parent.parent
 TESTS_DIR = SCRIPT_DIR / "tests"
+DEA_BUILD_DIR_ENV = "DEA_BUILD_DIR"
+REPO_VENV_BIN = REPO_ROOT / ".venv" / "bin"
+REPO_VENV_PYTHON = REPO_VENV_BIN / "python"
 
 
 @dataclass(frozen=True)
@@ -37,6 +40,120 @@ class CommandResult:
 
     returncode: int
     output: str
+
+
+def resolve_repo_path(path_text: str) -> Path:
+    """Resolve one repo-relative or absolute path text against the repo root."""
+
+    raw_path = Path(path_text)
+    if raw_path.is_absolute():
+        return raw_path.resolve(strict=False)
+    return (REPO_ROOT / raw_path).resolve(strict=False)
+
+
+def resolve_dea_build_dir_text() -> str:
+    """Return the effective repo-local `DEA_BUILD_DIR` text."""
+
+    from_env = os.environ.get(DEA_BUILD_DIR_ENV, "").strip()
+    if from_env:
+        return from_env
+
+    completed = subprocess.run(
+        ["make", "-s", "print-dea-build-dir"],
+        cwd=REPO_ROOT,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        check=False,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    if completed.returncode != 0:
+        raise RuntimeError(
+            "could not resolve DEA_BUILD_DIR; `make -s print-dea-build-dir` failed:\n"
+            f"{completed.stdout}"
+        )
+
+    dea_build_dir_text = completed.stdout.strip()
+    if not dea_build_dir_text:
+        raise RuntimeError("could not resolve DEA_BUILD_DIR; `make -s print-dea-build-dir` produced no output")
+    return dea_build_dir_text
+
+
+def resolve_dea_build_dir() -> tuple[str, Path]:
+    """Return the effective `DEA_BUILD_DIR` text plus resolved path."""
+
+    dea_build_dir_text = resolve_dea_build_dir_text()
+    return dea_build_dir_text, resolve_repo_path(dea_build_dir_text)
+
+
+def prepend_path(existing_path: str, entries: list[Path]) -> str:
+    """Return `existing_path` with `entries` prepended once each."""
+
+    ordered: list[str] = []
+    seen: set[str] = set()
+
+    for entry in entries:
+        text = str(entry)
+        if text and text not in seen:
+            ordered.append(text)
+            seen.add(text)
+
+    for entry in existing_path.split(os.pathsep):
+        if entry and entry not in seen:
+            ordered.append(entry)
+            seen.add(entry)
+
+    return os.pathsep.join(ordered)
+
+
+def build_repo_test_env(dea_build_dir_text: str, dea_build_dir: Path) -> dict[str, str]:
+    """Return the sanitized repo-local environment for Stage 2 tests."""
+
+    env = os.environ.copy()
+    env[DEA_BUILD_DIR_ENV] = dea_build_dir_text
+    env["L0_HOME"] = str(REPO_ROOT / "compiler")
+    env.pop("L0_SYSTEM", None)
+    env.pop("L0_RUNTIME_INCLUDE", None)
+    env.pop("L0_RUNTIME_LIB", None)
+    env["PATH"] = prepend_path(env.get("PATH", ""), [REPO_VENV_BIN, dea_build_dir / "bin"])
+    return env
+
+
+def build_normal_test_env(case: TestCase, repo_env: dict[str, str]) -> dict[str, str]:
+    """Return the repo-local child env for one normal Stage 2 test case."""
+
+    if case.kind == "python":
+        return repo_env
+
+    env = repo_env.copy()
+    env.pop(DEA_BUILD_DIR_ENV, None)
+    return env
+
+
+def require_repo_stage2_test_env(entrypoint_name: str) -> tuple[Path, str, Path, dict[str, str]]:
+    """Return the repo-local Python path, `DEA_BUILD_DIR`, and sanitized env for one entrypoint."""
+
+    if not REPO_VENV_PYTHON.is_file():
+        raise RuntimeError(
+            f"{entrypoint_name}: missing repo virtual environment at {REPO_VENV_PYTHON}; run `make venv`"
+        )
+
+    dea_build_dir_text, dea_build_dir = resolve_dea_build_dir()
+    stage2_wrapper = dea_build_dir / "bin" / "l0c-stage2"
+    env_script = dea_build_dir / "bin" / "l0-env.sh"
+    if not stage2_wrapper.is_file() or not env_script.is_file():
+        raise RuntimeError(
+            f"{entrypoint_name}: missing repo-local Stage 2 tools under {dea_build_dir}; "
+            f"run `make DEA_BUILD_DIR={dea_build_dir_text} install-dev-stage2`"
+        )
+
+    return (
+        REPO_VENV_PYTHON,
+        dea_build_dir_text,
+        dea_build_dir,
+        build_repo_test_env(dea_build_dir_text, dea_build_dir),
+    )
 
 
 def discover_l0_tests() -> list[TestCase]:
@@ -86,7 +203,7 @@ def resolve_job_count() -> int:
     return max(1, min(cpu_count, DEFAULT_MAX_JOBS))
 
 
-def build_normal_test_command(case: TestCase) -> list[str]:
+def build_normal_test_command(case: TestCase, python_path: Path) -> list[str]:
     """Return the subprocess command for one normal Stage 2 test."""
 
     if case.kind == "l0":
@@ -94,16 +211,17 @@ def build_normal_test_command(case: TestCase) -> list[str]:
     if case.kind == "shell":
         return ["bash", str(case.path)]
     if case.kind == "python":
-        return [sys.executable, str(case.path)]
+        return [str(python_path), str(case.path)]
     raise ValueError(f"Unsupported test kind: {case.kind}")
 
 
-def run_combined_output(command: list[str]) -> CommandResult:
+def run_combined_output(command: list[str], *, env: dict[str, str] | None = None) -> CommandResult:
     """Run one subprocess and capture stdout/stderr as one stream."""
 
     completed = subprocess.run(
         command,
         cwd=REPO_ROOT,
+        env=env,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         check=False,

@@ -20,7 +20,14 @@ import tempfile
 import time
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
+SCRIPT_DIR = Path(__file__).resolve().parent
+PARENT_DIR = SCRIPT_DIR.parent
+if str(PARENT_DIR) not in sys.path:
+    sys.path.insert(0, str(PARENT_DIR))
+
+from test_runner_common import require_repo_stage2_test_env
+
+REPO_ROOT = SCRIPT_DIR.parent.parent.parent
 BUILD_TESTS_DIR = REPO_ROOT / "build" / "tests"
 
 
@@ -319,26 +326,27 @@ def main() -> int:
     total_start = time.monotonic()
 
     try:
-        compiler_text = resolve_host_c_compiler(os.environ)
-        merged_cflags = merge_cflags(os.environ.get("L0_CFLAGS", ""), deterministic_linker_flags(compiler_text))
+        _, _, _, repo_env = require_repo_stage2_test_env("l0c_triple_bootstrap_test.py")
+        compiler_text = resolve_host_c_compiler(repo_env)
+        merged_cflags = merge_cflags(repo_env.get("L0_CFLAGS", ""), deterministic_linker_flags(compiler_text))
         notice(f"using host C compiler: {compiler_text}")
         notice(f"using host C flags: {merged_cflags or '(none)'}")
         assert_stable_native_toolchain(compiler_text, merged_cflags, artifact_dir)
 
-        build_env = os.environ.copy()
+        build_env = repo_env.copy()
         build_env["L0_CC"] = compiler_text
         build_env["L0_CFLAGS"] = merged_cflags
         self_build_env = build_env.copy()
         self_build_env["L0_HOME"] = str(REPO_ROOT / "compiler")
 
-        first_dist = artifact_dir / "stage1-dist"
-        first_dist_rel = os.path.relpath(first_dist, REPO_ROOT)
-        stage2_wrapper = first_dist / "bin" / "l0c-stage2"
-        stage2_native = first_dist / "bin" / "l0c-stage2.native"
-        stage2_c = first_dist / "bin" / "l0c-stage2.c"
+        first_dea_build = artifact_dir / "stage1-dea-build"
+        first_dea_build_rel = os.path.relpath(first_dea_build, REPO_ROOT)
+        stage2_wrapper = first_dea_build / "bin" / "l0c-stage2"
+        stage2_native = first_dea_build / "bin" / "l0c-stage2.native"
+        stage2_c = first_dea_build / "bin" / "l0c-stage2.c"
 
         first_build_env = build_env.copy()
-        first_build_env["DIST_DIR"] = first_dist_rel
+        first_build_env["DEA_BUILD_DIR"] = first_dea_build_rel
         first_build_env["KEEP_C"] = "1"
         notice("building compiler 1/3: trusted Stage 1 -> first Stage 2 compiler")
         _, first_build_elapsed = run_logged(
@@ -434,6 +442,10 @@ def main() -> int:
         if keep_artifacts:
             notice(f"artifacts={artifact_dir}")
         return 0
+    except RuntimeError as exc:
+        keep_artifacts = True
+        print(f"l0c_triple_bootstrap_test: FAIL: {exc}")
+        return 2
     except TripleBootstrapFailure as exc:
         keep_artifacts = True
         lines = str(exc).splitlines()

@@ -14,7 +14,7 @@ import datetime as dt
 import subprocess
 import sys
 
-from test_runner_common import REPO_ROOT, SCRIPT_DIR, discover_l0_tests
+from test_runner_common import REPO_ROOT, SCRIPT_DIR, discover_l0_tests, require_repo_stage2_test_env
 
 TESTS_DIR = SCRIPT_DIR / "tests"
 
@@ -87,6 +87,11 @@ def main() -> int:
 
     args = parse_args()
     test_path = resolve_test_path(args.test_name)
+    try:
+        python_path, _, _, repo_env = require_repo_stage2_test_env("run_test_trace.py")
+    except RuntimeError as exc:
+        print(f"run_test_trace.py: {exc}", file=sys.stderr)
+        return 2
 
     default_stderr, default_stdout = default_trace_paths()
     stderr_path = Path(args.trace_stderr_path) if args.trace_stderr_path else default_stderr
@@ -107,6 +112,7 @@ def main() -> int:
                 str(test_path.relative_to(REPO_ROOT)),
             ],
             cwd=REPO_ROOT,
+            env=repo_env,
             stdout=stdout_file,
             stderr=stderr_file,
             check=False,
@@ -121,7 +127,7 @@ def main() -> int:
     print("")
     print("triage with:")
     print("")
-    print(f"\"{SCRIPT_DIR / 'check_trace_log.py'}\" \"{stderr_path}\" --triage")
+    print(f"\"{python_path}\" \"{SCRIPT_DIR / 'check_trace_log.py'}\" \"{stderr_path}\" --triage")
     return result.returncode
 
 

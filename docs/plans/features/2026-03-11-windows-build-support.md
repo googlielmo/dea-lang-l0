@@ -51,7 +51,7 @@ Actions Windows runner.
 
 ## Prerequisites
 
-- The bootstrap/Makefile plan (`2026-03-09-stage2-bootstrap-compiler-artifact-noref.md`) should be at least through
+- The bootstrap/Makefile plan (`closed/2026-03-09-stage2-bootstrap-compiler-artifact-noref.md`) should be at least through
   Phase 2 (Makefile exists) before Phase 6 CI validation of Makefile targets.
 
 ## Current Cross-Platform Foundation
@@ -75,7 +75,7 @@ The following already work or have Windows code paths:
 | `l0-env.sh` is bash/zsh only     | `./l0-env.sh`          | Out of scope — env setup via Makefile or manual           |
 | `build-stage2-l0c.sh` is bash    | `scripts/`             | Runs via MSYS2 bash from MinGW-w64; no rewrite needed     |
 | `gen-docs.sh` is bash            | `scripts/`             | Out of scope — docs build stays Linux/macOS-only          |
-| `l0c-stage2` is a POSIX launcher | `build/stage2/bin/`    | Generate `.cmd` launcher alongside on Windows             |
+| `l0c-stage2` is a POSIX launcher | `build/dea/bin/`    | Generate `.cmd` launcher alongside on Windows             |
 | Default output `a.out`           | `l0c.py`               | Use `a.exe` on Windows                                    |
 | Temp exe has no `.exe` suffix    | `l0c.py`               | Add `.exe` suffix on Windows                              |
 | `-o` flag for MSVC               | `l0c.py`               | Use `/Fe:` for MSVC (Tier 2, prep only)                   |
@@ -153,7 +153,7 @@ When `build-stage2-l0c.sh` runs on Windows (via MSYS2 bash), generate a `.cmd` c
    ```
    (Adjust the inner binary name to match what the build produces.)
 
-**Validation:** `build/stage2/bin/l0c-stage2.cmd` exists and invokes the Stage 2 binary on Windows.
+**Validation:** `build/dea/bin/l0c-stage2.cmd` exists and invokes the Stage 2 binary on Windows.
 
 ### Phase 5: Bash Test Graceful Degradation
 
@@ -239,6 +239,6 @@ Windows-specific CI considerations:
 
 ## Related Documents
 
-- [Bootstrap plan](2026-03-09-stage2-bootstrap-compiler-artifact-noref.md) — Makefile and install layout
+- [Bootstrap plan](closed/2026-03-09-stage2-bootstrap-compiler-artifact-noref.md) — Makefile and install layout
 - [Architecture](../../reference/architecture.md) — compiler pipeline and file layout
 - [Project status](../../reference/project-status.md) — platform support and roadmap

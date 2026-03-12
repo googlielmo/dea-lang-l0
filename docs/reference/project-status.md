@@ -91,8 +91,8 @@ Current backend behavior includes:
 ## Stage 1 CLI and Workflow Status
 
 CLI entry point: `compiler/stage1_py/l0c.py` (source-tree wrapper: `./scripts/l0c`).
-Recommended developer-facing `l0c`: the repo-local alias under `dist/bin`, selected with `make use-dev-stage1` or
-`make use-dev-stage2` and activated with `source dist/bin/l0-env.sh`.
+Recommended developer-facing `l0c`: the repo-local alias under `build/dea/bin`, selected with `make use-dev-stage1` or
+`make use-dev-stage2` and activated with `source build/dea/bin/l0-env.sh`.
 
 Commands and aliases:
 
@@ -226,9 +226,12 @@ Stage 2 backend/codegen status:
 - Stage 2 `l0c --help` and `--version` are implemented with Stage 2-specific identity text, and `-v` preserves that
   identity output even on CLI usage failures.
 - Stage 2 can now be bootstrapped into a repo-local artifact via `./scripts/build-stage2-l0c.sh`, producing
-  `build/stage2/bin/l0c-stage2` and `l0c-stage2.native` by default.
-- Phase 2 now adds a repo-local `dist/bin` workflow via `make install-dev-stages`, explicit `make use-dev-stage1` /
-  `make use-dev-stage2` alias switching, and `source dist/bin/l0-env.sh`.
+  `build/dea/bin/l0c-stage2` and `l0c-stage2.native` by default.
+- Phase 2 now adds a repo-local `build/dea/bin` workflow via `make install-dev-stages`, explicit `make use-dev-stage1` /
+  `make use-dev-stage2` alias switching, and `source build/dea/bin/l0-env.sh`.
+- Phase 3 now adds a repo-independent install prefix via `make PREFIX=/tmp/l0-install install`; the installed
+  binary is the self-hosted Stage 2 compiler (`Compiler 2` from the bootstrap chain), not the initial Stage 1-built
+  bootstrap artifact. `make install` requires an explicit `PREFIX=...`.
 - The strict stage2/stage3 fixed-point bootstrap regression is available directly via `make triple-test`.
 - Stage 2 backend lowering now covers the Stage 1 language surface, including ownership-sensitive lowering for
   `new`, `drop`, `try`, `with`, `match`, `case`, `break`, `continue`, and ARC cleanup.

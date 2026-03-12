@@ -10,36 +10,36 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 BOOTSTRAP_PARENT="$REPO_ROOT/build/tests"
 BOOTSTRAP_DIR=""
-ALT_DIST=""
+ALT_DEA_BUILD=""
 PROBE_ROOT=""
-OUTSIDE_DIST="$(mktemp -d /tmp/l0_stage2_outside_dist.XXXXXX)"
+OUTSIDE_DEA_BUILD="$(mktemp -d /tmp/l0_stage2_outside_dea_build.XXXXXX)"
 
 # This is the full end-to-end regression for one Stage 2 compiler artifact built
-# into an isolated repo-local test dist under `build/tests/...`.
+# into an isolated repo-local test Dea build under `build/tests/...`.
 #
 # It validates:
 # - the normal artifact shape (`l0c-stage2`, `l0c-stage2.native`, no retained C
 #   by default),
 # - direct wrapper usage for `--check`, `--gen`, `--build`, and `--run`,
 # - retained-C behavior with `KEEP_C=1`,
-# - rejection of invalid `DIST_DIR` values (outside-repo and repo-root).
+# - rejection of invalid `DEA_BUILD_DIR` values (outside-repo and repo-root).
 #
-# This test intentionally does not exercise the builder's default no-`DIST_DIR`
-# destination under `build/stage2`; that narrower contract is covered separately
-# by `l0c_stage2_default_dist_test.sh` so `run_tests.py` / `make test-all` do
-# not leave `build/stage2` behind after a normal test run.
+# This test intentionally does not exercise the builder's default no-`DEA_BUILD_DIR`
+# destination under `build/dea`; that narrower contract is covered separately
+# by `l0c_stage2_default_dea_build_test.sh` so `run_tests.py` / `make test-all` do
+# not leave `build/dea` behind after a normal test run.
 
 cleanup() {
     if [ -n "$BOOTSTRAP_DIR" ]; then
         rm -rf "$BOOTSTRAP_DIR"
     fi
-    if [ -n "$ALT_DIST" ]; then
-        rm -rf "$ALT_DIST"
+    if [ -n "$ALT_DEA_BUILD" ]; then
+        rm -rf "$ALT_DEA_BUILD"
     fi
     if [ -n "$PROBE_ROOT" ]; then
         rm -rf "$PROBE_ROOT"
     fi
-    rm -rf "$OUTSIDE_DIST"
+    rm -rf "$OUTSIDE_DEA_BUILD"
 }
 trap cleanup EXIT
 
@@ -67,7 +67,7 @@ assert_contains() {
 cd "$REPO_ROOT"
 mkdir -p "$BOOTSTRAP_PARENT"
 BOOTSTRAP_DIR="$(mktemp -d "$BOOTSTRAP_PARENT/l0_stage2_bootstrap.XXXXXX")"
-DIST_DIR="${BOOTSTRAP_DIR#$REPO_ROOT/}" ./scripts/build-stage2-l0c.sh >/dev/null
+DEA_BUILD_DIR="${BOOTSTRAP_DIR#$REPO_ROOT/}" ./scripts/build-stage2-l0c.sh >/dev/null
 
 assert_file "$BOOTSTRAP_DIR/bin/l0c-stage2"
 assert_file "$BOOTSTRAP_DIR/bin/l0c-stage2.native"
@@ -174,22 +174,22 @@ env -i PATH="$PATH" "$BOOTSTRAP_DIR/bin/l0c-stage2" --run -P examples hello > /t
 assert_contains "/tmp/l0_stage2_bootstrap_run_$$.out" "Hello, World!"
 rm -f /tmp/l0_stage2_bootstrap_cond_$$.out /tmp/l0_stage2_bootstrap_logic_$$.out /tmp/l0_stage2_bootstrap_hello_$$ /tmp/l0_stage2_bootstrap_hello_$$.c /tmp/l0_stage2_bootstrap_hello_$$.out /tmp/l0_stage2_bootstrap_run_$$.out
 
-ALT_DIST="$(mktemp -d "$BOOTSTRAP_PARENT/l0_stage2_bootstrap_keepc.XXXXXX")"
-DIST_DIR="${ALT_DIST#$REPO_ROOT/}" KEEP_C=1 ./scripts/build-stage2-l0c.sh >/dev/null
+ALT_DEA_BUILD="$(mktemp -d "$BOOTSTRAP_PARENT/l0_stage2_bootstrap_keepc.XXXXXX")"
+DEA_BUILD_DIR="${ALT_DEA_BUILD#$REPO_ROOT/}" KEEP_C=1 ./scripts/build-stage2-l0c.sh >/dev/null
 
-assert_file "$ALT_DIST/bin/l0c-stage2"
-assert_file "$ALT_DIST/bin/l0c-stage2.native"
-assert_file "$ALT_DIST/bin/l0c-stage2.c"
+assert_file "$ALT_DEA_BUILD/bin/l0c-stage2"
+assert_file "$ALT_DEA_BUILD/bin/l0c-stage2.native"
+assert_file "$ALT_DEA_BUILD/bin/l0c-stage2.c"
 
-if DIST_DIR="$OUTSIDE_DIST" ./scripts/build-stage2-l0c.sh >/tmp/l0_stage2_bootstrap_outside_$$.log 2>&1; then
+if DEA_BUILD_DIR="$OUTSIDE_DEA_BUILD" ./scripts/build-stage2-l0c.sh >/tmp/l0_stage2_bootstrap_outside_$$.log 2>&1; then
     rm -f /tmp/l0_stage2_bootstrap_outside_$$.log
-    fail "expected outside-repo DIST_DIR rejection"
+    fail "expected outside-repo DEA_BUILD_DIR rejection"
 fi
 rm -f /tmp/l0_stage2_bootstrap_outside_$$.log
 
-if DIST_DIR="." ./scripts/build-stage2-l0c.sh >/tmp/l0_stage2_bootstrap_repo_root_$$.log 2>&1; then
+if DEA_BUILD_DIR="." ./scripts/build-stage2-l0c.sh >/tmp/l0_stage2_bootstrap_repo_root_$$.log 2>&1; then
     rm -f /tmp/l0_stage2_bootstrap_repo_root_$$.log
-    fail "expected repo-root DIST_DIR rejection"
+    fail "expected repo-root DEA_BUILD_DIR rejection"
 fi
 rm -f /tmp/l0_stage2_bootstrap_repo_root_$$.log
 

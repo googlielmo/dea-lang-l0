@@ -1,7 +1,7 @@
 .DEFAULT_GOAL := help
 
-PYTHON ?= python3
-DIST_DIR ?= dist
+PYTHON ?= $(if $(wildcard ./.venv/bin/python),./.venv/bin/python,python3)
+DEA_BUILD_DIR ?= build/dea
 
 .PHONY: \
 	help \
@@ -9,6 +9,7 @@ DIST_DIR ?= dist
 	install-dev-stage1 \
 	install-dev-stage2 \
 	install-dev-stages \
+	install \
 	use-dev-stage1 \
 	use-dev-stage2 \
 	test-stage1 \
@@ -16,36 +17,47 @@ DIST_DIR ?= dist
 	test-stage2-trace \
 	triple-test \
 	test-all \
+	print-dea-build-dir \
 	docs \
 	docs-pdf \
 	clean \
-	clean-dist
+	clean-dea-build
 
 help:
 	@printf '%s\n' \
-		'L0 repo-local dist workflow' \
+		'Dea/L0 installation and development workflow' \
 		'' \
 		'Targets:' \
-		'  help               Show this help text.' \
+		'  install            Install the self-hosted Stage 2 compiler under PREFIX.' \
+		'' \
+		'Development targets:' \
 		'  venv               Create the local `.venv` (prefer `uv`, fall back to `python -m venv`).' \
+		'  install-dev-stages Prepare both Stage 1 and Stage 2 launchers under DEA_BUILD_DIR.' \
 		'  install-dev-stage1 Install the repo-local Stage 1 launcher and environment script.' \
 		'  install-dev-stage2 Build and install the repo-local Stage 2 launcher.' \
-		'  install-dev-stages Prepare both Stage 1 and Stage 2 launchers under DIST_DIR.' \
 		'  use-dev-stage1     Switch the repo-local `l0c` alias to Stage 1.' \
 		'  use-dev-stage2     Switch the repo-local `l0c` alias to Stage 2.' \
+		'  test-all           Run the full Stage 1 and Stage 2 validation suite.' \
 		'  test-stage1        Validate the Stage 1 Python compiler test suite.' \
 		'  test-stage2        Validate the Stage 2 compiler test suite, including triple-bootstrap.' \
 		'  test-stage2-trace  Validate Stage 2 ARC and memory tracing behavior.' \
-		'  test-all           Run the full Stage 1 and Stage 2 validation suite.' \
 		'  triple-test        Run the Stage 2 triple-bootstrap check on its own.' \
+		'' \
+		'Documentation targets:' \
 		'  docs               Generate the project documentation.' \
 		'  docs-pdf           Generate the project documentation, including the PDF manual.' \
-		'  clean              Remove repo-local build artifacts under `build/*`, Stage 2 test `.tmp*` files, and default executables.' \
-		'  clean-dist         Remove the repo-local dist tree (override with `DIST_DIR`, see below).' \
+		'' \
+		'Other targets:' \
+		'  help               Show this help text.' \
+		'  clean              Remove all repo-local build artifacts under `build/*`, temporary test files, and default executables.' \
+		'  clean-dea-build    Remove the repo-local Dea build tree (override with `DEA_BUILD_DIR`, see below).' \
 		'' \
 		'Variables:' \
-		'  DIST_DIR=dist      Repo-local output root. Must stay inside the repository.' \
-		'                     Example: make DIST_DIR=./dev-dist install-dev-stages'
+		'  PREFIX=<required>  Install prefix for `install`.' \
+		'                     Example: make PREFIX=/opt/dea install' \
+		'  DEA_BUILD_DIR=build/dea' \
+		'                     Repo-local build root. Must stay inside the repository.' \
+		'                     Example: make DEA_BUILD_DIR=build/dev-dea install-dev-stages'
 
 venv:
 	@if [ -x ./.venv/bin/python ]; then \
@@ -58,46 +70,59 @@ venv:
 	fi
 
 install-dev-stage1:
-	$(PYTHON) ./scripts/gen_dist_tools.py write-stage1-wrapper --dist-dir "$(DIST_DIR)"
-	$(PYTHON) ./scripts/gen_dist_tools.py write-env-script --dist-dir "$(DIST_DIR)"
+	$(PYTHON) ./scripts/gen_dist_tools.py write-stage1-wrapper --dea-build-dir "$(DEA_BUILD_DIR)"
+	$(PYTHON) ./scripts/gen_dist_tools.py write-env-script --dea-build-dir "$(DEA_BUILD_DIR)"
 
 install-dev-stage2:
-	DIST_DIR="$(DIST_DIR)" ./scripts/build-stage2-l0c.sh
-	$(PYTHON) ./scripts/gen_dist_tools.py write-env-script --dist-dir "$(DIST_DIR)"
+	DEA_BUILD_DIR="$(DEA_BUILD_DIR)" ./scripts/build-stage2-l0c.sh
+	$(PYTHON) ./scripts/gen_dist_tools.py write-env-script --dea-build-dir "$(DEA_BUILD_DIR)"
 
 install-dev-stages: install-dev-stage1 install-dev-stage2
 
-use-dev-stage1: install-dev-stage1
-	$(PYTHON) ./scripts/gen_dist_tools.py set-alias --dist-dir "$(DIST_DIR)" --stage stage1
+install:
+	@if [ -z "$(strip $(PREFIX))" ]; then \
+		printf '%s\n' 'make install: PREFIX is required; example: make PREFIX=/tmp/l0-install L0_CC=gcc install' >&2; \
+		exit 2; \
+	fi
+	$(PYTHON) ./scripts/gen_dist_tools.py install-prefix --prefix "$(PREFIX)"
 	@printf '\n------------------------------------------------------------------------------\n'
-	@printf 'To activate the selected l0c stage in this shell execute:\n\n    source %s/bin/l0-env.sh\n\nThis adds %s/bin to your current PATH, so `l0c` invokes the selected compiler. See README.md for more information.' "$(DIST_DIR)" "$(DIST_DIR)"
+	@printf 'Dea/L0 compiler installed at %s/bin/l0c.\nTo add the installed compiler to your current PATH in this shell, run:\n\n    source %s/bin/l0-env.sh\n\nSee README.md for more information.' "$(PREFIX)" "$(PREFIX)"
+	@printf '\n------------------------------------------------------------------------------\n'
+
+use-dev-stage1: install-dev-stage1
+	$(PYTHON) ./scripts/gen_dist_tools.py set-alias --dea-build-dir "$(DEA_BUILD_DIR)" --stage stage1
+	@printf '\n------------------------------------------------------------------------------\n'
+	@printf 'To activate the selected l0c stage in this shell, run:\n\n    source %s/bin/l0-env.sh\n\nThis adds %s/bin to your current PATH, so `l0c` invokes the selected compiler. See README.md for more information.' "$(DEA_BUILD_DIR)" "$(DEA_BUILD_DIR)"
 	@printf '\n------------------------------------------------------------------------------\n'
 
 use-dev-stage2: install-dev-stage2
-	$(PYTHON) ./scripts/gen_dist_tools.py set-alias --dist-dir "$(DIST_DIR)" --stage stage2
+	$(PYTHON) ./scripts/gen_dist_tools.py set-alias --dea-build-dir "$(DEA_BUILD_DIR)" --stage stage2
 	@printf '\n------------------------------------------------------------------------------\n'
-	@printf 'To activate the selected l0c stage in this shell execute:\n\n    source %s/bin/l0-env.sh\n\nThis adds %s/bin to your current PATH, so `l0c` invokes the selected compiler. See README.md for more information.' "$(DIST_DIR)" "$(DIST_DIR)"
+	@printf 'To activate the selected l0c stage in this shell, run:\n\n    source %s/bin/l0-env.sh\n\nThis adds %s/bin to your current PATH, so `l0c` invokes the selected compiler. See README.md for more information.' "$(DEA_BUILD_DIR)" "$(DEA_BUILD_DIR)"
 	@printf '\n------------------------------------------------------------------------------\n'
 
 test-stage1: venv
 	./.venv/bin/python -m pytest -n auto
 
-test-stage2:
-	./compiler/stage2_l0/run_tests.py
+test-stage2: venv install-dev-stage2
+	DEA_BUILD_DIR="$(DEA_BUILD_DIR)" $(PYTHON) ./compiler/stage2_l0/run_tests.py
 
-test-stage2-trace:
-	./compiler/stage2_l0/run_trace_tests.py
+test-stage2-trace: venv install-dev-stage2
+	DEA_BUILD_DIR="$(DEA_BUILD_DIR)" $(PYTHON) ./compiler/stage2_l0/run_trace_tests.py
 
 test-all: test-stage1 test-stage2 test-stage2-trace
 
-triple-test:
-	$(PYTHON) ./compiler/stage2_l0/tests/l0c_triple_bootstrap_test.py
+triple-test: venv install-dev-stage2
+	DEA_BUILD_DIR="$(DEA_BUILD_DIR)" $(PYTHON) ./compiler/stage2_l0/tests/l0c_triple_bootstrap_test.py
+
+print-dea-build-dir:
+	@printf '%s\n' "$(DEA_BUILD_DIR)"
 
 docs:
-	./scripts/gen-docs.sh
+	./scripts/gen-docs.sh --strict
 
 docs-pdf:
-	./scripts/gen-docs.sh --pdf
+	./scripts/gen-docs.sh --strict --pdf
 
 clean:
 	rm -rf ./build/*
@@ -105,5 +130,5 @@ clean:
 	rm -f ./compiler/stage2_l0/a.out ./compiler/stage2_l0/a.exe
 	rm -f ./compiler/stage2_l0/tests/.tmp*
 
-clean-dist:
-	$(PYTHON) ./scripts/gen_dist_tools.py clean-dist --dist-dir "$(DIST_DIR)"
+clean-dea-build:
+	$(PYTHON) ./scripts/gen_dist_tools.py clean-dea-build --dea-build-dir "$(DEA_BUILD_DIR)"

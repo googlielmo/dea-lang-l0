@@ -4,43 +4,98 @@
 # Copyright (c) 2026 gwz
 #
 
-"""Generate repo-local dist tooling artifacts."""
+"""Generate repo-local Dea build and install-prefix tooling artifacts."""
 
 from __future__ import annotations
 
 import argparse
+import os
+from pathlib import Path
+import shlex
+import shutil
+import subprocess
 import sys
+import tempfile
 
-from dist_tools_lib import normalize_dist_dir, remove_dist_tree, set_alias, write_env_script, write_stage1_wrapper, write_stage2_wrapper
+from build_stage2_l0c import build_stage2_artifact
+from dist_tools_lib import (
+    install_prefix_stage2,
+    normalize_dea_build_dir,
+    normalize_prefix_dir,
+    remove_dea_build_tree,
+    set_alias,
+    write_env_script,
+    write_stage1_wrapper,
+    write_stage2_wrapper,
+)
 
 
-def add_dist_dir_arg(parser: argparse.ArgumentParser) -> None:
-    """Attach the shared dist-dir option to one parser."""
+def print_progress(message: str) -> None:
+    """Emit one install-progress line immediately."""
 
-    parser.add_argument("--dist-dir", required=True, help="Repo-local dist directory to generate into.")
+    print(f"gen-dea-build-tools: {message}", flush=True)
+
+
+def print_toolchain_env() -> None:
+    """Emit the current host toolchain-related environment."""
+
+    for name in ("L0_CC", "L0_CFLAGS"):
+        value = os.environ.get(name)
+        if value is None:
+            rendered = "<unset>"
+        elif value == "":
+            rendered = "''"
+        else:
+            rendered = shlex.quote(value)
+        print_progress(f"{name}={rendered}")
+
+
+def add_dea_build_dir_arg(parser: argparse.ArgumentParser) -> None:
+    """Attach the shared repo-local Dea build dir option to one parser."""
+
+    parser.add_argument(
+        "--dea-build-dir",
+        required=True,
+        help="Repo-local Dea build directory to generate into.",
+    )
+
+
+def add_prefix_arg(parser: argparse.ArgumentParser) -> None:
+    """Attach the shared prefix option to one parser."""
+
+    parser.add_argument("--prefix", required=True, help="Install prefix to generate into.")
 
 
 def parse_args() -> argparse.Namespace:
     """Parse command-line arguments."""
 
-    parser = argparse.ArgumentParser(description="Generate repo-local dist wrapper artifacts.")
+    parser = argparse.ArgumentParser(description="Generate repo-local Dea build and install-prefix artifacts.")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     write_stage1 = subparsers.add_parser("write-stage1-wrapper", help="Write `bin/l0c-stage1`.")
-    add_dist_dir_arg(write_stage1)
+    add_dea_build_dir_arg(write_stage1)
 
     write_stage2 = subparsers.add_parser("write-stage2-wrapper", help="Write `bin/l0c-stage2`.")
-    add_dist_dir_arg(write_stage2)
+    add_dea_build_dir_arg(write_stage2)
 
     write_env = subparsers.add_parser("write-env-script", help="Write `bin/l0-env.sh`.")
-    add_dist_dir_arg(write_env)
+    add_dea_build_dir_arg(write_env)
 
     alias_parser = subparsers.add_parser("set-alias", help="Point `bin/l0c` at one stage wrapper.")
-    add_dist_dir_arg(alias_parser)
+    add_dea_build_dir_arg(alias_parser)
     alias_parser.add_argument("--stage", choices=("stage1", "stage2"), required=True)
 
-    clean_parser = subparsers.add_parser("clean-dist", help="Delete one validated dist tree.")
-    add_dist_dir_arg(clean_parser)
+    clean_parser = subparsers.add_parser(
+        "clean-dea-build",
+        help="Delete one validated repo-local Dea build tree.",
+    )
+    add_dea_build_dir_arg(clean_parser)
+
+    install_prefix = subparsers.add_parser(
+        "install-prefix",
+        help="Build compiler 2 (self-hosted Stage 2) and install it into one prefix.",
+    )
+    add_prefix_arg(install_prefix)
 
     return parser.parse_args()
 
@@ -50,30 +105,69 @@ def main() -> int:
 
     args = parse_args()
     try:
-        layout = normalize_dist_dir(args.dist_dir)
+        if args.command == "install-prefix":
+            prefix_layout = normalize_prefix_dir(args.prefix)
+            build_root = prefix_layout.repo_root / "build"
+            build_root.mkdir(parents=True, exist_ok=True)
+            temp_dist = Path(tempfile.mkdtemp(prefix="install_stage2_prefix.", dir=build_root))
+            try:
+                temp_layout = normalize_dea_build_dir(str(temp_dist))
+                print_toolchain_env()
+                print_progress(f"stage 1/3: building bootstrap Stage 2 compiler under {temp_layout.dea_build_dir}")
+                stage2_wrapper, _, _ = build_stage2_artifact(temp_layout, keep_c=False)
+                self_hosted_native = temp_dist / "l0c-stage2-selfhosted.native"
+                self_build_env = os.environ.copy()
+                self_build_env["L0_HOME"] = str(prefix_layout.repo_root / "compiler")
+                self_build_env.pop("L0_SYSTEM", None)
+                self_build_env.pop("L0_RUNTIME_INCLUDE", None)
+                self_build_env.pop("L0_RUNTIME_LIB", None)
+                print_progress(f"stage 2/3: self-hosting Stage 2 compiler into {self_hosted_native}")
+                subprocess.run(
+                    [
+                        str(stage2_wrapper),
+                        "--build",
+                        "-P",
+                        "compiler/stage2_l0/src",
+                        "-o",
+                        str(self_hosted_native),
+                        "l0c",
+                    ],
+                    cwd=prefix_layout.repo_root,
+                    env=self_build_env,
+                    check=True,
+                )
+                print_progress(f"stage 3/3: installing self-hosted Stage 2 compiler into {prefix_layout.prefix_dir}")
+                installed_native = install_prefix_stage2(prefix_layout, self_hosted_native)
+                print_progress(f"installed self-hosted Stage 2 compiler at {installed_native}")
+                print_progress(f"installed prefix layout at {prefix_layout.prefix_dir}")
+                return 0
+            finally:
+                shutil.rmtree(temp_dist, ignore_errors=True)
+
+        layout = normalize_dea_build_dir(args.dea_build_dir)
         if args.command == "write-stage1-wrapper":
             path = write_stage1_wrapper(layout)
-            print(f"gen-dist-tools: wrote {path}")
+            print(f"gen-dea-build-tools: wrote {path}")
             return 0
         if args.command == "write-stage2-wrapper":
             path = write_stage2_wrapper(layout)
-            print(f"gen-dist-tools: wrote {path}")
+            print(f"gen-dea-build-tools: wrote {path}")
             return 0
         if args.command == "write-env-script":
             path = write_env_script(layout)
-            print(f"gen-dist-tools: wrote {path}")
+            print(f"gen-dea-build-tools: wrote {path}")
             return 0
         if args.command == "set-alias":
             path = set_alias(layout, args.stage)
-            print(f"gen-dist-tools: linked {path} -> {path.readlink()}")
+            print(f"gen-dea-build-tools: linked {path} -> {path.readlink()}")
             return 0
-        if args.command == "clean-dist":
-            remove_dist_tree(layout)
-            print(f"gen-dist-tools: removed {layout.dist_dir}")
+        if args.command == "clean-dea-build":
+            remove_dea_build_tree(layout)
+            print(f"gen-dea-build-tools: removed {layout.dea_build_dir}")
             return 0
         raise AssertionError(f"unhandled command: {args.command}")
     except ValueError as exc:
-        print(f"gen-dist-tools: {exc}", file=sys.stderr)
+        print(f"gen-dea-build-tools: {exc}", file=sys.stderr)
         return 1
 
 

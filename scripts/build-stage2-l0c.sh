@@ -7,5 +7,14 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd -P)"
+PYTHON_BIN="${PYTHON:-}"
 
-exec python3 "${SCRIPT_DIR}/build_stage2_l0c.py" "$@"
+if [ -z "${PYTHON_BIN}" ] && [ -x "${REPO_ROOT}/.venv/bin/python" ]; then
+    PYTHON_BIN="${REPO_ROOT}/.venv/bin/python"
+fi
+if [ -z "${PYTHON_BIN}" ]; then
+    PYTHON_BIN="python3"
+fi
+
+exec "${PYTHON_BIN}" "${SCRIPT_DIR}/build_stage2_l0c.py" "$@"

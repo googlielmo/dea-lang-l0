@@ -17,7 +17,7 @@ import subprocess
 import sys
 import tempfile
 
-from test_runner_common import REPO_ROOT, SCRIPT_DIR, discover_l0_tests, first_lines, resolve_job_count
+from test_runner_common import REPO_ROOT, SCRIPT_DIR, discover_l0_tests, first_lines, require_repo_stage2_test_env, resolve_job_count
 
 TRACE_CHECKER = SCRIPT_DIR / "check_trace_log.py"
 
@@ -74,7 +74,15 @@ def leak_summary(report_text: str) -> str:
     return " ".join(fields)
 
 
-def run_one(case_index: int, case_name: str, case_path: Path, artifact_dir: Path, max_details: int) -> TraceResult:
+def run_one(
+        case_index: int,
+        case_name: str,
+        case_path: Path,
+        artifact_dir: Path,
+        max_details: int,
+        python_path: Path,
+        repo_env: dict[str, str],
+) -> TraceResult:
     """Run one trace test and analyze its log."""
 
     out_path = artifact_dir / f"{case_name}.stdout.log"
@@ -93,6 +101,7 @@ def run_one(case_index: int, case_name: str, case_path: Path, artifact_dir: Path
                 str(case_path),
             ],
             cwd=REPO_ROOT,
+            env=repo_env,
             stdout=stdout_file,
             stderr=stderr_file,
             check=False,
@@ -115,7 +124,7 @@ def run_one(case_index: int, case_name: str, case_path: Path, artifact_dir: Path
     with report_path.open("w", encoding="utf-8") as report_file:
         analyzer_result = subprocess.run(
             [
-                sys.executable,
+                str(python_path),
                 str(TRACE_CHECKER),
                 str(trace_path),
                 "--triage",
@@ -123,6 +132,7 @@ def run_one(case_index: int, case_name: str, case_path: Path, artifact_dir: Path
                 str(max_details),
             ],
             cwd=REPO_ROOT,
+            env=repo_env,
             stdout=report_file,
             stderr=subprocess.STDOUT,
             check=False,
@@ -159,6 +169,11 @@ def main() -> int:
     try:
         jobs = resolve_job_count()
     except ValueError as exc:
+        print(f"run_trace_tests.py: {exc}", file=sys.stderr)
+        return 2
+    try:
+        python_path, _, _, repo_env = require_repo_stage2_test_env("run_trace_tests.py")
+    except RuntimeError as exc:
         print(f"run_trace_tests.py: {exc}", file=sys.stderr)
         return 2
 
@@ -204,7 +219,16 @@ def main() -> int:
 
         with ThreadPoolExecutor(max_workers=jobs) as executor:
             future_map = {
-                executor.submit(run_one, case.index, case.name, case.path, artifact_dir, args.max_details): case.index
+                executor.submit(
+                    run_one,
+                    case.index,
+                    case.name,
+                    case.path,
+                    artifact_dir,
+                    args.max_details,
+                    python_path,
+                    repo_env,
+                ): case.index
                 for case in cases
             }
             for future in as_completed(future_map):

@@ -48,8 +48,9 @@ Also see: `CONTRIBUTING.md`, `SECURITY.md`.
   plain `python3 -m venv` workflow.
 - **Manual Environment Setup:** If you are not using `make venv`, prefer `uv sync --group dev` (uses `pyproject.toml`
   and `uv.lock`) or fall back to `python3 -m venv .venv && source .venv/bin/activate && pip install -e . "pytest>=9.0.2" "pytest-xdist>=3.5"`.
-- **Environment Variables:** Source `dist/bin/l0-env.sh` only for the repo-local dist workflow. For source-tree usage,
-  invoke `./scripts/l0c` directly; it derives `L0_HOME` on its own.
+- **Environment Variables:** Source `build/dea/bin/l0-env.sh` only for the repo-local Dea build workflow. For an installed
+  Stage 2 prefix, source `<PREFIX>/bin/l0-env.sh`. For source-tree usage, invoke `./scripts/l0c` directly; it derives
+  `L0_HOME` on its own.
 
 ## Commands
 
@@ -58,8 +59,12 @@ All commands run from the repository root. For normal development, prefer the re
 ```bash
 make install-dev-stages
 make use-dev-stage1 # or `make use-dev-stage2`
-source dist/bin/l0-env.sh
+source build/dea/bin/l0-env.sh
+make PREFIX=/tmp/l0-install install
+source /tmp/l0-install/bin/l0-env.sh
 ```
+
+`make install` requires an explicit `PREFIX=...`; it does not default to a repo-local install root.
 
 The source-tree `./scripts/l0c` entrypoint is Stage 1 only and is mainly useful for bootstrap mechanics, internal
 tooling, and Stage 1-focused testing:
@@ -90,13 +95,14 @@ Trace toggles (codegen/build/run): `--trace-arc`, `--trace-memory`.
 For direct Stage 2 artifact usage, use:
 
 ```bash
-./scripts/build-stage2-l0c.sh # build the stage 2 compiler and place it under build/stage2/bin/l0c-stage2
-./build/stage2/bin/l0c-stage2 --check -P examples hello # run the stage 2 compiler directly
-./build/stage2/bin/l0c-stage2 --build -P examples hello # build directly with the stage 2 compiler
-./build/stage2/bin/l0c-stage2 --run -P examples hello # build and run directly with the stage 2 compiler
-make install-dev-stages # install repo-local stage-specific launchers under dist/bin
-make use-dev-stage2 # point dist/bin/l0c at the Stage 2 launcher and print the source command
-source dist/bin/l0-env.sh # activate the repo-local dist workflow in your shell
+./scripts/build-stage2-l0c.sh # build the stage 2 compiler and place it under build/dea/bin/l0c-stage2
+./build/dea/bin/l0c-stage2 --check -P examples hello # run the stage 2 compiler directly
+./build/dea/bin/l0c-stage2 --build -P examples hello # build directly with the stage 2 compiler
+./build/dea/bin/l0c-stage2 --run -P examples hello # build and run directly with the stage 2 compiler
+make install-dev-stages # install repo-local stage-specific launchers under build/dea/bin
+make use-dev-stage2 # point build/dea/bin/l0c at the Stage 2 launcher and print the source command
+source build/dea/bin/l0-env.sh # activate the repo-local Dea build workflow in your shell
+make PREFIX=/tmp/l0-install install # install the self-hosted Stage 2 compiler under one prefix
 make test-all # run the full Stage 1 + Stage 2 validation suite
 make triple-test # run the strict stage2/stage3 triple-bootstrap regression
 ```
@@ -118,7 +124,7 @@ Release/manual publishing is handled by `.github/workflows/docs-publish.yml`; PR
 ```bash
 make install-dev-stages                                # recommended developer-facing `l0c` setup
 make use-dev-stage1
-source dist/bin/l0-env.sh
+source build/dea/bin/l0-env.sh
 make test-stage1                                      # recommended Stage 1 test entrypoint
 ./.venv/bin/python -m pytest -n auto compiler/stage1_py/tests
 ./.venv/bin/python -m pytest compiler/stage1_py/tests/lexer/test_lexer.py
@@ -128,9 +134,13 @@ make test-stage1                                      # recommended Stage 1 test
 For Stage 2 (`compiler/stage2_l0`) changes, finalization checks should include:
 
 ```bash
-make test-stage2
-make test-stage2-trace
+make DEA_BUILD_DIR=build/dev-dea test-stage2
+make DEA_BUILD_DIR=build/dev-dea test-stage2-trace
+make DEA_BUILD_DIR=build/dev-dea triple-test
 ```
+
+These Make targets are self-contained repo-local workflows: they ensure `./.venv`, prepare the Stage 2 artifact under
+`DEA_BUILD_DIR`, and scrub installed-prefix `L0_*` env leakage before running.
 
 `run_trace_tests.py` is an important finalization gate because it validates ARC/memory traces and leak triage across
 all Stage 2 tests.

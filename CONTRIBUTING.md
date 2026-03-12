@@ -21,7 +21,7 @@ For normal development, prefer the repo-local switchable `l0c` alias:
 make venv
 make install-dev-stages
 make use-dev-stage1      # or `make use-dev-stage2`
-source dist/bin/l0-env.sh
+source build/dea/bin/l0-env.sh
 ```
 
 The source-tree `./scripts/l0c` entrypoint is Stage 1 only and is mainly useful for bootstrap mechanics, internal
@@ -41,9 +41,13 @@ make test-stage1
 For Stage 2 (`compiler/stage2_l0`) changes, run:
 
 ```bash
-make test-stage2
-make test-stage2-trace
+make DEA_BUILD_DIR=build/dev-dea test-stage2
+make DEA_BUILD_DIR=build/dev-dea test-stage2-trace
+make DEA_BUILD_DIR=build/dev-dea triple-test
 ```
+
+These Make targets are self-contained repo-local workflows: they ensure `./.venv`, prepare the Stage 2 artifact under
+`DEA_BUILD_DIR`, and ignore any previously sourced installed-prefix `L0_*` env.
 
 `run_trace_tests.py` is an important finalization gate for Stage 2 changes because it checks runtime trace health
 (including leak triage) across the full Stage 2 test suite.

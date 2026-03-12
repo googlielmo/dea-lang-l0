@@ -11,36 +11,61 @@ Build a repo-local Stage 2 compiler artifact:
 
 ```bash
 ./scripts/build-stage2-l0c.sh
-./build/stage2/bin/l0c-stage2 --check -P examples hello
-./build/stage2/bin/l0c-stage2 --gen -P examples hello
-./build/stage2/bin/l0c-stage2 --build -P examples hello
-./build/stage2/bin/l0c-stage2 --run -P examples hello
+./build/dea/bin/l0c-stage2 --check -P examples hello
+./build/dea/bin/l0c-stage2 --gen -P examples hello
+./build/dea/bin/l0c-stage2 --build -P examples hello
+./build/dea/bin/l0c-stage2 --run -P examples hello
 ```
 
 Optional builder environment variables:
 
-- `DIST_DIR=build/stage2-alt` writes the same artifact layout under a different repo-local output root.
+- `DEA_BUILD_DIR=build/dea-alt` writes the same artifact layout under a different repo-local output root.
 - `KEEP_C=1` retains `l0c-stage2.c` alongside the wrapper and native binary.
 
-Phase 1 `DIST_DIR` values must resolve to a strict subdirectory inside the repository. The generated launcher derives
+Phase 1 `DEA_BUILD_DIR` values must resolve to a strict subdirectory inside the repository. The generated launcher derives
 the repo root relative to itself and sets `L0_HOME` automatically when unset.
 
-## Repo-local dist workflow
+## Repo-local Dea build workflow
 
-For normal development, install both stage-specific launchers under `dist/bin`, then select which one `l0c` should
+For normal development, install both stage-specific launchers under `build/dea/bin`, then select which one `l0c` should
 point at:
 
 ```bash
 make install-dev-stages
 make use-dev-stage1      # or: make use-dev-stage2
-source dist/bin/l0-env.sh
+source build/dea/bin/l0-env.sh
 l0c --check -P examples hello
 l0c --version
 ```
 
-The generated `dist/bin/l0-env.sh` keeps `L0_HOME` repo-relative, activates `.venv` if present, prepends `dist/bin`
-to `PATH`, and leaves `L0_SYSTEM` unset. `make use-dev-stage2` switches `dist/bin/l0c` and prints the exact `source`
-command to run next. `DIST_DIR` may be overridden, but it must remain inside the repository.
+The generated `build/dea/bin/l0-env.sh` keeps `L0_HOME` repo-relative, activates `.venv` if present, prepends `build/dea/bin`
+to `PATH`, and leaves `L0_SYSTEM` unset. `make use-dev-stage2` switches `build/dea/bin/l0c` and prints the exact `source`
+command to run next. `DEA_BUILD_DIR` may be overridden, but it must remain inside the repository.
+
+## Install prefix
+
+Install a repo-independent Stage 2 toolchain under one prefix:
+
+```bash
+make PREFIX=/tmp/l0-install install
+source /tmp/l0-install/bin/l0-env.sh
+l0c --check -P examples hello
+```
+
+`make install` requires an explicit `PREFIX=...`; there is no implicit default install root.
+
+`install` installs the self-hosted Stage 2 compiler (`Compiler 2` from the triple-bootstrap chain), not the
+initial Stage 1-built artifact. The installed prefix contains:
+
+- `bin/l0c-stage2`
+- `bin/l0c-stage2.native`
+- `bin/l0c`
+- `bin/l0-env.sh`
+- `shared/l0/stdlib/...`
+- `shared/runtime/...`
+
+The installed wrapper derives `L0_HOME` from `PREFIX` at runtime. The installed `l0-env.sh` sets `L0_HOME="$PREFIX"`
+only; the compiler then derives stdlib and runtime defaults from `L0_HOME` unless you explicitly override them.
 
 The Stage 2 CLI also supports `--help` and `--version`. Both show the Stage 2 identity text
 `Dea language / L0 compiler (Stage 2)`. Verbose mode (`-v`) emits the same identity line on stderr through the normal
@@ -54,12 +79,26 @@ tooling, and Stage 1-focused testing.
 Run Stage 2 L0 tests:
 
 ```bash
-./compiler/stage2_l0/run_tests.py
+make DEA_BUILD_DIR=build/dev-dea test-stage2
+make DEA_BUILD_DIR=build/dev-dea test-stage2-trace
+make DEA_BUILD_DIR=build/dev-dea triple-test
 ```
 
-This runner executes `*.l0` test modules plus `*_test.sh` and `*_test.py` regression scripts under
-`compiler/stage2_l0/tests/`.
-It uses a bounded auto-detected worker count by default; override with `L0_TEST_JOBS=<n>`.
+These Make targets are self-contained repo-local workflows: they ensure `./.venv`, prepare the Stage 2 artifact under
+`DEA_BUILD_DIR`, and scrub installed-prefix `L0_*` env leakage before running.
+
+If you invoke the Python helpers directly instead, prepare the repo-local env first:
+
+```bash
+make venv
+make DEA_BUILD_DIR=build/dev-dea install-dev-stage2
+./.venv/bin/python ./compiler/stage2_l0/run_tests.py
+./.venv/bin/python ./compiler/stage2_l0/run_trace_tests.py
+./.venv/bin/python ./compiler/stage2_l0/run_test_trace.py parser_test
+```
+
+`run_tests.py` executes `*.l0` test modules plus `*_test.sh` and `*_test.py` regression scripts under
+`compiler/stage2_l0/tests/`. It uses a bounded auto-detected worker count by default; override with `L0_TEST_JOBS=<n>`.
 
 Options:
 
@@ -75,8 +114,8 @@ Output:
 Run the strict triple-bootstrap / triple-compilation regression directly from the repo root:
 
 ```bash
-make triple-test
-python3 compiler/stage2_l0/tests/l0c_triple_bootstrap_test.py
+make DEA_BUILD_DIR=build/dev-dea triple-test
+./.venv/bin/python compiler/stage2_l0/tests/l0c_triple_bootstrap_test.py
 ```
 
 Useful environment overrides:
@@ -111,7 +150,7 @@ export L0_CC=clang
 export L0_CFLAGS="-Wl,-no_uuid"         # macOS
 # export L0_CFLAGS="-Wl,--build-id=none"  # Linux
 
-DIST_DIR=build/tests/triple-manual KEEP_C=1 ./scripts/build-stage2-l0c.sh
+DEA_BUILD_DIR=build/tests/triple-manual KEEP_C=1 ./scripts/build-stage2-l0c.sh
 L0_HOME="$PWD/compiler" ./build/tests/triple-manual/bin/l0c-stage2 --build --keep-c -P compiler/stage2_l0/src -o build/tests/triple-manual/l0c-stage2-second.native l0c
 L0_HOME="$PWD/compiler" ./build/tests/triple-manual/l0c-stage2-second.native --build --keep-c -P compiler/stage2_l0/src -o build/tests/triple-manual/l0c-stage2-third.native l0c
 cmp build/tests/triple-manual/l0c-stage2-second.c build/tests/triple-manual/l0c-stage2-third.c

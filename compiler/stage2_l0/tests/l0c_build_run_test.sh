@@ -57,7 +57,7 @@ assert_text_equals() {
 cd "$REPO_ROOT"
 mkdir -p "$BOOTSTRAP_PARENT"
 BOOTSTRAP_DIR="$(mktemp -d "$BOOTSTRAP_PARENT/l0_stage2_buildrun.XXXXXX")"
-DIST_DIR="${BOOTSTRAP_DIR#$REPO_ROOT/}" ./scripts/build-stage2-l0c.sh >/dev/null
+DEA_BUILD_DIR="${BOOTSTRAP_DIR#$REPO_ROOT/}" ./scripts/build-stage2-l0c.sh >/dev/null
 STAGE2_L0C="$BOOTSTRAP_DIR/bin/l0c-stage2"
 STAGE2_NATIVE="$BOOTSTRAP_DIR/bin/l0c-stage2.native"
 

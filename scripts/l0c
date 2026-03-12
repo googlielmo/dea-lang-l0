@@ -6,9 +6,17 @@
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd -P)"
+PYTHON_BIN="${PYTHON:-}"
+
+if [ -z "${PYTHON_BIN}" ] && [ -x "${REPO_ROOT}/.venv/bin/python" ]; then
+    PYTHON_BIN="${REPO_ROOT}/.venv/bin/python"
+fi
+if [ -z "${PYTHON_BIN}" ]; then
+    PYTHON_BIN="python3"
+fi
 
 # Set the L0_HOME environment variable to point to the compiler root if not already set.
 export L0_HOME="${L0_HOME:-${REPO_ROOT}/compiler}"
 
 # Run the Stage 1 compiler (l0c.py) with the provided arguments.
-python3 "$L0_HOME/stage1_py/l0c.py" "$@"
+exec "${PYTHON_BIN}" "$L0_HOME/stage1_py/l0c.py" "$@"
