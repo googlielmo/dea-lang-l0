@@ -3,8 +3,7 @@
 ## Expand shared stdlib/runtime bootstrap APIs for filesystem, path, metadata, and raw byte stdio
 
 - Date: 2026-03-09
-- Status: In Progress (partial: `RtFileInfo`/`rt_file_info` in `sys.rt`, `file_exists`/`delete_file` in `std.io`;
-  `std.fs`, `std.path`, raw byte stdio APIs pending)
+- Status: Closed (implemented)
 - Title: Add shared stdlib/runtime bootstrap APIs for filesystem helpers, path utilities, file metadata, and raw byte
   stdio
 - Kind: Feature
@@ -20,9 +19,10 @@
     - `compiler/stage2_l0/src/source_paths.l0`
     - `compiler/stage2_l0/src/util/path.l0`
 - Test modules:
-    - `compiler/stage1_py/tests/backend/test_string_runtime.py`
-    - `compiler/stage2_l0/tests/io_errno_test.l0`
-    - `compiler/stage2_l0/tests`
+    - `compiler/stage1_py/tests/backend/test_stdlib_fs_path_raw_io.py`
+    - `compiler/stage2_l0/tests/fs_path_test.l0`
+    - `compiler/stage2_l0/tests/source_paths_test.l0`
+    - `compiler/stage2_l0/tests/l0c_stage2_install_prefix_test.sh`
 
 ## Summary
 
@@ -78,10 +78,10 @@ and platform-specific POSIX/Windows shims where strict C99 is insufficient.
 
 ### 1. Filesystem and metadata
 
-3. Add `rt_file_info` as the low-level metadata entrypoint instead of separate `sys.rt` calls for each field.
-4. `RtFileInfo` must always return `exists`, `is_file`, and `is_dir`.
-5. Size and modification time fields are nullable when unavailable or inapplicable.
-6. First phase excludes symlink-specific APIs, permission bits, ownership fields, and directory-entry iteration.
+1. Add `rt_file_info` as the low-level metadata entrypoint instead of separate `sys.rt` calls for each field.
+2. `RtFileInfo` must always return `exists`, `is_file`, and `is_dir`.
+3. Size and modification time fields are nullable when unavailable or inapplicable.
+4. First phase excludes symlink-specific APIs, permission bits, ownership fields, and directory-entry iteration.
 
 ### 2. Shared path module
 

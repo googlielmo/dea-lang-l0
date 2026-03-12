@@ -1,0 +1,80 @@
+/*
+ * SPDX-License-Identifier: MIT OR Apache-2.0
+ * Copyright (c) 2026 gwz
+ */
+
+module fs_path_test;
+
+import std.assert;
+import std.fs;
+import std.io;
+import std.path;
+import std.string;
+
+/**
+ * Tests shared `std.path` helpers.
+ */
+func test_std_path_helpers() {
+    assert(is_sep('/'), "slash should be recognized as a separator");
+    assert(is_sep('\\'), "backslash should be recognized as a separator");
+    assert(is_absolute("/tmp/demo.l0"), "POSIX absolute path should be recognized");
+    assert(is_absolute("C:\\tmp\\demo.l0"), "drive-rooted path should be recognized");
+    assert(!is_absolute("demo.l0"), "relative path should not be absolute");
+    assert(has_parent("src/demo.l0"), "path with slash should have parent");
+    assert(eq_s(basename("src/demo.l0"), "demo.l0"), "basename mismatch");
+    assert(eq_s(parent("src/demo.l0"), "src"), "parent mismatch");
+    assert(eq_s(stem("src/demo.name.l0"), "demo.name"), "stem should strip the last extension");
+    assert(eq_s(join("src", "demo.l0"), "src/demo.l0"), "join should add one separator");
+    assert(has_extension("src/demo.l0", ".l0"), "extension match with dot should succeed");
+    assert(has_extension("src/demo.l0", "l0"), "extension match without dot should succeed");
+    assert(!has_extension(".gitignore", "gitignore"), "dotfile should not report a normal extension");
+}
+
+/**
+ * Tests shared `std.fs` wrappers over runtime metadata.
+ */
+func test_std_fs_helpers() {
+    let missing = stat("/tmp/l0_stage2_std_fs_missing_probe_20260312.txt");
+    assert(!missing.exists, "missing path should report exists=false");
+
+    assert(is_dir("."), "current directory should be reported as a directory");
+    assert(!is_file("."), "current directory should not be reported as a file");
+
+    let path = "/tmp/l0_stage2_std_fs_probe_20260312.txt";
+    delete_file(path);
+
+    let wrote = write_file(path, "abc");
+    assert(wrote != null, "write_file should create the probe file");
+    assert(file_exists(path), "file_exists should report created file");
+
+    let info = stat(path);
+    assert(info.exists, "created file should exist");
+    assert(info.is_file, "created path should be a file");
+    assert(!info.is_dir, "created path should not be a directory");
+
+    let size = file_size(path);
+    assert(size != null, "file_size should be populated for a regular file");
+    assert((size as int) == 3, "file size should match written bytes");
+
+    let mt_sec = mtime_sec(path);
+    if (mt_sec != null) {
+        assert((mt_sec as int) >= 0, "mtime seconds should be non-negative when present");
+    }
+    if (info.mtime_nsec != null) {
+        let ns = info.mtime_nsec as int;
+        assert(ns >= 0 && ns < 1000000000, "mtime nanoseconds should be in range");
+    }
+
+    let deleted = delete_file(path);
+    assert(deleted != null, "delete_file should remove the probe file");
+    assert(!file_exists(path), "deleted file should no longer exist");
+}
+
+/**
+ * Main entry point for the module.
+ */
+func main() {
+    test_std_path_helpers();
+    test_std_fs_helpers();
+    printl_s("fs_path_test: all tests passed");
+}

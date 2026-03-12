@@ -7,8 +7,10 @@ module build_driver;
 
 import sys.rt;
 
+import std.fs;
 import std.hashmap;
 import std.io;
+import std.path;
 import std.string;
 import std.system;
 import std.text;
@@ -17,7 +19,6 @@ import std.vector;
 import util.diag;
 import util.log;
 
-import util.path;
 import util.strings;
 import source_paths;
 import analysis;
@@ -174,8 +175,24 @@ func bd_collect_c_option_words(opts: CliOptions*) -> VectorString* {
  * @param path Path to rewrite.
  * @return Path with `.c` suffix.
  */
+func bd_find_last_sep(path: string) -> int {
+    let last = -1;
+    for (let i = 0; i < len_s(path); i = i + 1) {
+        if (is_sep(char_at_s(path, i))) {
+            last = i;
+        }
+    }
+    return last;
+}
+
+/**
+ * Replace or add a `.c` suffix on a path string.
+ *
+ * @param path Path to rewrite.
+ * @return Path with `.c` suffix.
+ */
 func bd_with_c_suffix(path: string) -> string {
-    let last_sep = up_find_last_sep(path);
+    let last_sep = bd_find_last_sep(path);
     let last_dot = find_last_s(path, ".");
     if (last_dot > last_sep + 1) {
         return concat_s(slice_s(path, 0, last_dot), ".c");
@@ -190,8 +207,7 @@ func bd_with_c_suffix(path: string) -> string {
  * @return `true` when the path exists and is a directory.
  */
 func bd_is_dir(path: string) -> bool {
-    let info = rt_file_info(path);
-    return info.exists && info.is_dir;
+    return std.fs::is_dir(path);
 }
 
 /**
@@ -248,19 +264,19 @@ func bd_temp_stem(tag: string) -> string {
             sb_append_int(sb, nsec);
             sb_append(sb, "-");
             sb_append_int(sb, attempt);
-            let stem = up_join(root, sb_to_string(sb));
-            if (!file_exists(stem) &&
-                !file_exists(concat_s(stem, ".c")) &&
-                !file_exists(concat_s(stem, ".out")) &&
-                !file_exists(concat_s(stem, ".stdout")) &&
-                !file_exists(concat_s(stem, ".stderr")))
+            let temp_stem = join(root, sb_to_string(sb));
+            if (!file_exists(temp_stem) &&
+                !file_exists(concat_s(temp_stem, ".c")) &&
+                !file_exists(concat_s(temp_stem, ".out")) &&
+                !file_exists(concat_s(temp_stem, ".stdout")) &&
+                !file_exists(concat_s(temp_stem, ".stderr")))
             {
-                return stem;
+                return temp_stem;
             }
         }
     }
 
-    return up_join(root, concat4_s("l0c-stage2-", tag, "-fallback", ""));
+    return join(root, concat4_s("l0c-stage2-", tag, "-fallback", ""));
 }
 
 /**
@@ -334,7 +350,7 @@ func bd_join_display_words(words: VectorString*) -> string {
  * @return Flag-family tag.
  */
 func bd_compiler_flag_family(compiler: string) -> string {
-    let base = up_basename(compiler);
+    let base = basename(compiler);
     if (eq_s(base, "tcc") || eq_s(base, "tcc.exe") || starts_with_s(base, "tcc-")) {
         return "tcc";
     }
@@ -468,7 +484,7 @@ func bd_runtime_include_dir(opts: CliOptions*) -> string? {
 
     let home = env_get("L0_HOME");
     if (home != null) {
-        return up_join(home as string, "shared/runtime");
+        return join(home as string, "shared/runtime");
     }
     return null;
 }
@@ -510,10 +526,10 @@ func bd_validate_runtime_lib(runtime_lib_path: string, diags: DiagCollector*) ->
         return false;
     }
 
-    let has_runtime = file_exists(up_join(runtime_lib_path, "libl0runtime.a")) ||
-        file_exists(up_join(runtime_lib_path, "libl0runtime.so")) ||
-        file_exists(up_join(runtime_lib_path, "libl0runtime.dylib")) ||
-        file_exists(up_join(runtime_lib_path, "l0runtime.lib"));
+    let has_runtime = file_exists(join(runtime_lib_path, "libl0runtime.a")) ||
+        file_exists(join(runtime_lib_path, "libl0runtime.so")) ||
+        file_exists(join(runtime_lib_path, "libl0runtime.dylib")) ||
+        file_exists(join(runtime_lib_path, "l0runtime.lib"));
     if (!has_runtime) {
         diag_error(
             diags,

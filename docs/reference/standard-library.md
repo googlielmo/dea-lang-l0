@@ -1,6 +1,6 @@
 # The L0 Standard Library
 
-Version: 2026-03-10
+Version: 2026-03-12
 
 The standard library provides ergonomic L0 modules (`std.*`) and low-level runtime bindings (`sys.*`).
 
@@ -17,8 +17,9 @@ For canonical ownership behavior around `new`/`drop`, ARC strings, and container
                              ▼
 ┌─────────────────────────────────────────────────────────┐
 │                      std.* Modules                      │
-│ array, assert, hashmap, hashset, io, linear_map, math,  │
-│ optional, rand, string, system, text, time, unit, vector │
+│ array, assert, fs, hashmap, hashset, io, linear_map,    │
+│ math, optional, path, rand, string, system, text, time, │
+│ unit, vector                                            │
 └─────────────────────────────────────────────────────────┘
                              │
                              ▼
@@ -56,6 +57,19 @@ For canonical ownership behavior around `new`/`drop`, ARC strings, and container
 | `arr_get`     | `(self: ArrayBase*, index: int) -> void*`                             | Returns element pointer at index.                  |
 | `arr_zap`     | `(self: ArrayBase*, index: int) -> void`                              | Zeroes one element slot.                           |
 | `arr_free`    | `(self: ArrayBase*) -> void`                                          | Frees backing storage and drops container.         |
+
+### `std.fs`
+
+**Imports:** `sys.rt`
+
+| Type/Function | Signature                                                                                              | Description                                             |
+|---------------|--------------------------------------------------------------------------------------------------------|---------------------------------------------------------|
+| `FileInfo`    | `struct { exists: bool; is_file: bool; is_dir: bool; size: int?; mtime_sec: int?; mtime_nsec: int?; }` | Public file-metadata wrapper type.                      |
+| `stat`        | `(path: string) -> FileInfo`                                                                           | Returns path metadata with nullable size/timestamps.    |
+| `is_file`     | `(path: string) -> bool`                                                                               | Returns whether path exists and is a regular file.      |
+| `is_dir`      | `(path: string) -> bool`                                                                               | Returns whether path exists and is a directory.         |
+| `file_size`   | `(path: string) -> int?`                                                                               | Returns file size in bytes when available.              |
+| `mtime_sec`   | `(path: string) -> int?`                                                                               | Returns modification time in Unix seconds if available. |
 
 ### `std.vector`
 
@@ -128,62 +142,67 @@ For canonical ownership behavior around `new`/`drop`, ARC strings, and container
 
 ### `std.io`
 
-**Imports:** `sys.rt`, `std.unit`
+**Imports:** `sys.rt`, `sys.unsafe`, `std.unit`
 
 `std.io` classifies I/O success/failure from direct runtime return values (optional/boolean/sentinel results).
 
-| Function           | Signature                               | Description                                 |
-|--------------------|-----------------------------------------|---------------------------------------------|
-| `file_exists`      | `(path: string) -> bool`                | Checks if a file exists at the given path.  |
-| `delete_file`      | `(path: string) -> bool`                | Deletes a file.                             |
-| `read_file`        | `(path: string) -> string?`             | Reads entire file; `null` on error.         |
-| `write_file`       | `(path: string, data: string) -> Unit?` | Writes entire file; `null` on error.        |
-| `read_line`        | `() -> string?`                         | Reads line from stdin; `null` on EOF/error. |
-| `read_char`        | `() -> int?`                            | Reads one byte as int; `null` on EOF/error. |
-| `read_char_or_eof` | `() -> int`                             | Reads one byte; returns `-1` on EOF/error.  |
-| `flush_stdout`     | `() -> void`                            | Flushes stdout.                             |
-| `flush_stderr`     | `() -> void`                            | Flushes stderr.                             |
-| `printl`           | `() -> void`                            | Prints newline to stdout.                   |
-| `print_s`          | `(s: string) -> void`                   | Prints string to stdout.                    |
-| `print_i`          | `(x: int) -> void`                      | Prints int to stdout.                       |
-| `print_b`          | `(x: bool) -> void`                     | Prints bool to stdout.                      |
-| `printl_s`         | `(s: string) -> void`                   | Prints string + newline to stdout.          |
-| `printl_i`         | `(x: int) -> void`                      | Prints int + newline to stdout.             |
-| `printl_b`         | `(x: bool) -> void`                     | Prints bool + newline to stdout.            |
-| `print_ss`         | `(s1: string, s2: string) -> void`      | Prints two values separated by space.       |
-| `print_si`         | `(s: string, x: int) -> void`           | Prints two values separated by space.       |
-| `print_sb`         | `(s: string, b: bool) -> void`          | Prints two values separated by space.       |
-| `print_is`         | `(x: int, s: string) -> void`           | Prints two values separated by space.       |
-| `print_ii`         | `(x1: int, x2: int) -> void`            | Prints two values separated by space.       |
-| `print_ib`         | `(x: int, b: bool) -> void`             | Prints two values separated by space.       |
-| `print_bs`         | `(b: bool, s: string) -> void`          | Prints two values separated by space.       |
-| `print_bi`         | `(b: bool, x: int) -> void`             | Prints two values separated by space.       |
-| `print_bb`         | `(b1: bool, b2: bool) -> void`          | Prints two values separated by space.       |
-| `printl_ss`        | `(s1: string, s2: string) -> void`      | `print_ss` + newline.                       |
-| `printl_si`        | `(s: string, x: int) -> void`           | `print_si` + newline.                       |
-| `printl_sb`        | `(s: string, b: bool) -> void`          | `print_sb` + newline.                       |
-| `printl_is`        | `(x: int, s: string) -> void`           | `print_is` + newline.                       |
-| `printl_ii`        | `(x1: int, x2: int) -> void`            | `print_ii` + newline.                       |
-| `printl_ib`        | `(x: int, b: bool) -> void`             | `print_ib` + newline.                       |
-| `printl_bs`        | `(b: bool, s: string) -> void`          | `print_bs` + newline.                       |
-| `printl_bi`        | `(b: bool, x: int) -> void`             | `print_bi` + newline.                       |
-| `printl_bb`        | `(b1: bool, b2: bool) -> void`          | `print_bb` + newline.                       |
-| `err_printl`       | `() -> void`                            | Prints newline to stderr.                   |
-| `err_print_s`      | `(s: string) -> void`                   | Prints string to stderr.                    |
-| `err_print_i`      | `(x: int) -> void`                      | Prints int to stderr.                       |
-| `err_print_b`      | `(x: bool) -> void`                     | Prints bool to stderr.                      |
-| `err_printl_s`     | `(s: string) -> void`                   | Prints string + newline to stderr.          |
-| `err_printl_i`     | `(x: int) -> void`                      | Prints int + newline to stderr.             |
-| `err_printl_b`     | `(x: bool) -> void`                     | Prints bool + newline to stderr.            |
-| `err_print_ss`     | `(s1: string, s2: string) -> void`      | Prints two values separated by space.       |
-| `err_print_si`     | `(s: string, x: int) -> void`           | Prints two values separated by space.       |
-| `err_print_sb`     | `(s: string, b: bool) -> void`          | Prints two values separated by space.       |
-| `err_print_is`     | `(x: int, s: string) -> void`           | Prints two values separated by space.       |
-| `err_print_ii`     | `(x1: int, x2: int) -> void`            | Prints two values separated by space.       |
-| `err_print_ib`     | `(x: int, b: bool) -> void`             | Prints two values separated by space.       |
-| `err_print_bs`     | `(b: bool, s: string) -> void`          | Prints two values separated by space.       |
-| `err_print_bi`     | `(b: bool, x: int) -> void`             | Prints two values separated by space.       |
-| `err_print_bb`     | `(b1: bool, b2: bool) -> void`          | Prints two values separated by space.       |
+| Function            | Signature                               | Description                                                |
+|---------------------|-----------------------------------------|------------------------------------------------------------|
+| `file_exists`       | `(path: string) -> bool`                | Checks if a regular file exists at the given path.         |
+| `delete_file`       | `(path: string) -> Unit?`               | Deletes a file; returns `null` on failure.                 |
+| `read_file`         | `(path: string) -> string?`             | Reads entire file; `null` on error.                        |
+| `write_file`        | `(path: string, data: string) -> Unit?` | Writes entire file; `null` on error.                       |
+| `read_line`         | `() -> string?`                         | Reads line from stdin; `null` on EOF/error.                |
+| `read_char`         | `() -> int?`                            | Reads one byte as int; `null` on EOF/error.                |
+| `read_char_or_eof`  | `() -> int`                             | Reads one byte; returns `-1` on EOF/error.                 |
+| `read_stdin_some`   | `(buf: byte*, capacity: int) -> int?`   | Reads raw bytes; `0` means EOF and `null` means error.     |
+| `write_stdout_some` | `(buf: byte*, len: int) -> int?`        | Writes raw bytes to stdout; returns partial count or null. |
+| `write_stderr_some` | `(buf: byte*, len: int) -> int?`        | Writes raw bytes to stderr; returns partial count or null. |
+| `write_stdout_all`  | `(buf: byte*, len: int) -> Unit?`       | Writes exactly `len` bytes to stdout or returns `null`.    |
+| `write_stderr_all`  | `(buf: byte*, len: int) -> Unit?`       | Writes exactly `len` bytes to stderr or returns `null`.    |
+| `flush_stdout`      | `() -> void`                            | Flushes stdout.                                            |
+| `flush_stderr`      | `() -> void`                            | Flushes stderr.                                            |
+| `printl`            | `() -> void`                            | Prints newline to stdout.                                  |
+| `print_s`           | `(s: string) -> void`                   | Prints string to stdout.                                   |
+| `print_i`           | `(x: int) -> void`                      | Prints int to stdout.                                      |
+| `print_b`           | `(x: bool) -> void`                     | Prints bool to stdout.                                     |
+| `printl_s`          | `(s: string) -> void`                   | Prints string + newline to stdout.                         |
+| `printl_i`          | `(x: int) -> void`                      | Prints int + newline to stdout.                            |
+| `printl_b`          | `(x: bool) -> void`                     | Prints bool + newline to stdout.                           |
+| `print_ss`          | `(s1: string, s2: string) -> void`      | Prints two values separated by space.                      |
+| `print_si`          | `(s: string, x: int) -> void`           | Prints two values separated by space.                      |
+| `print_sb`          | `(s: string, b: bool) -> void`          | Prints two values separated by space.                      |
+| `print_is`          | `(x: int, s: string) -> void`           | Prints two values separated by space.                      |
+| `print_ii`          | `(x1: int, x2: int) -> void`            | Prints two values separated by space.                      |
+| `print_ib`          | `(x: int, b: bool) -> void`             | Prints two values separated by space.                      |
+| `print_bs`          | `(b: bool, s: string) -> void`          | Prints two values separated by space.                      |
+| `print_bi`          | `(b: bool, x: int) -> void`             | Prints two values separated by space.                      |
+| `print_bb`          | `(b1: bool, b2: bool) -> void`          | Prints two values separated by space.                      |
+| `printl_ss`         | `(s1: string, s2: string) -> void`      | `print_ss` + newline.                                      |
+| `printl_si`         | `(s: string, x: int) -> void`           | `print_si` + newline.                                      |
+| `printl_sb`         | `(s: string, b: bool) -> void`          | `print_sb` + newline.                                      |
+| `printl_is`         | `(x: int, s: string) -> void`           | `print_is` + newline.                                      |
+| `printl_ii`         | `(x1: int, x2: int) -> void`            | `print_ii` + newline.                                      |
+| `printl_ib`         | `(x: int, b: bool) -> void`             | `print_ib` + newline.                                      |
+| `printl_bs`         | `(b: bool, s: string) -> void`          | `print_bs` + newline.                                      |
+| `printl_bi`         | `(b: bool, x: int) -> void`             | `print_bi` + newline.                                      |
+| `printl_bb`         | `(b1: bool, b2: bool) -> void`          | `print_bb` + newline.                                      |
+| `err_printl`        | `() -> void`                            | Prints newline to stderr.                                  |
+| `err_print_s`       | `(s: string) -> void`                   | Prints string to stderr.                                   |
+| `err_print_i`       | `(x: int) -> void`                      | Prints int to stderr.                                      |
+| `err_print_b`       | `(x: bool) -> void`                     | Prints bool to stderr.                                     |
+| `err_printl_s`      | `(s: string) -> void`                   | Prints string + newline to stderr.                         |
+| `err_printl_i`      | `(x: int) -> void`                      | Prints int + newline to stderr.                            |
+| `err_printl_b`      | `(x: bool) -> void`                     | Prints bool + newline to stderr.                           |
+| `err_print_ss`      | `(s1: string, s2: string) -> void`      | Prints two values separated by space.                      |
+| `err_print_si`      | `(s: string, x: int) -> void`           | Prints two values separated by space.                      |
+| `err_print_sb`      | `(s: string, b: bool) -> void`          | Prints two values separated by space.                      |
+| `err_print_is`      | `(x: int, s: string) -> void`           | Prints two values separated by space.                      |
+| `err_print_ii`      | `(x1: int, x2: int) -> void`            | Prints two values separated by space.                      |
+| `err_print_ib`      | `(x: int, b: bool) -> void`             | Prints two values separated by space.                      |
+| `err_print_bs`      | `(b: bool, s: string) -> void`          | Prints two values separated by space.                      |
+| `err_print_bi`      | `(b: bool, x: int) -> void`             | Prints two values separated by space.                      |
+| `err_print_bb`      | `(b1: bool, b2: bool) -> void`          | Prints two values separated by space.                      |
 
 ### `std.math`
 
@@ -205,6 +224,21 @@ For canonical ownership behavior around `new`/`drop`, ARC strings, and container
 | `expect_s`    | `(opt: string?, msg: string) -> string`     | Returns value or aborts with message. |
 | `expect_i`    | `(opt: int?, msg: string) -> int`           | Returns value or aborts with message. |
 | `expect_b`    | `(opt: bool?, msg: string) -> bool`         | Returns value or aborts with message. |
+
+### `std.path`
+
+**Imports:** `std.string`, `std.text`
+
+| Function        | Signature                               | Description                                                    |
+|-----------------|-----------------------------------------|----------------------------------------------------------------|
+| `is_sep`        | `(c: byte) -> bool`                     | Returns whether byte is `/` or `\\`.                           |
+| `is_absolute`   | `(path: string) -> bool`                | Supports POSIX absolute paths and Windows drive roots.         |
+| `has_parent`    | `(path: string) -> bool`                | Returns whether the path contains a separator.                 |
+| `basename`      | `(path: string) -> string`              | Returns final path component with trailing separators trimmed. |
+| `parent`        | `(path: string) -> string`              | Returns parent directory or `.` when no parent exists.         |
+| `stem`          | `(path: string) -> string`              | Removes the final extension from the basename when present.    |
+| `join`          | `(root: string, rel: string) -> string` | Appends one path separator between `root` and `rel`.           |
+| `has_extension` | `(path: string, ext: string) -> bool`   | Matches the final basename extension, with or without `.`.     |
 
 ### `std.rand`
 
@@ -254,14 +288,14 @@ For canonical ownership behavior around `new`/`drop`, ARC strings, and container
 
 **Imports:** `sys.rt`
 
-| Function  | Signature                       | Description                                      |
-|-----------|---------------------------------|--------------------------------------------------|
-| `exit`    | `(code: int) -> void`           | Exits program with status code.                  |
-| `env_get` | `(var_name: string) -> string?` | Returns environment variable or `null`.          |
-| `argc`    | `() -> int`                     | Returns command-line argument count.             |
-| `argv`    | `(index: int) -> string`        | Returns command-line argument string at index.   |
-| `abort`   | `(message: string) -> void`     | Aborts program with message.                     |
-| `errno`   | `() -> int`                     | Returns runtime error number.                    |
+| Function  | Signature                       | Description                                                         |
+|-----------|---------------------------------|---------------------------------------------------------------------|
+| `exit`    | `(code: int) -> void`           | Exits program with status code.                                     |
+| `env_get` | `(var_name: string) -> string?` | Returns environment variable or `null`.                             |
+| `argc`    | `() -> int`                     | Returns command-line argument count.                                |
+| `argv`    | `(index: int) -> string`        | Returns command-line argument string at index.                      |
+| `abort`   | `(message: string) -> void`     | Aborts program with message.                                        |
+| `errno`   | `() -> int`                     | Returns runtime error number.                                       |
 | `system`  | `(cmd: string) -> int`          | Executes command in shell and returns normalized child exit status. |
 
 ### `std.text`
@@ -324,7 +358,8 @@ Used by `std.hashmap` and `std.hashset` for hash calculations.
 ### `sys.rt`
 
 Low-level runtime FFI for strings, I/O, process/system, time, and errors.
-Also defines `RtTimeParts` (`struct { sec: int; nsec: int; }`) used by time snapshot externs.
+Also defines `RtTimeParts` (`struct { sec: int; nsec: int; }`) and
+`RtFileInfo` (`struct { exists: bool; is_file: bool; is_dir: bool; size: int?; mtime_sec: int?; mtime_nsec: int?; }`).
 
 ### `sys.unsafe`
 
@@ -334,7 +369,7 @@ Low-level raw memory FFI. Misuse can cause undefined behavior.
 
 All `extern func` symbols exposed to L0 from stdlib modules are listed here.
 
-### Declared in `sys.rt` (41)
+### Declared in `sys.rt` (45)
 
 | Function                      | Signature                                     |
 |-------------------------------|-----------------------------------------------|
@@ -376,8 +411,12 @@ All `extern func` symbols exposed to L0 from stdlib modules are listed here.
 | `rt_time_local_offset_sec`    | `(unix_sec: int) -> int?`                     |
 | `rt_time_local_is_dst`        | `(unix_sec: int) -> bool?`                    |
 | `rt_system`                   | `(cmd: string) -> int`                        |
+| `rt_file_info`                | `(path: string) -> RtFileInfo`                |
 | `rt_file_exists`              | `(path: string) -> bool`                      |
 | `rt_delete_file`              | `(path: string) -> bool`                      |
+| `rt_stdin_read`               | `(buf: byte*, capacity: int) -> int`          |
+| `rt_stdout_write`             | `(buf: byte*, len: int) -> int`               |
+| `rt_stderr_write`             | `(buf: byte*, len: int) -> int`               |
 
 ### Declared in `sys.unsafe` (8)
 

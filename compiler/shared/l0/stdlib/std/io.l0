@@ -12,6 +12,7 @@
 module std.io;
 
 import sys.rt;
+import sys.unsafe;
 
 import std.unit;
 
@@ -30,13 +31,16 @@ func file_exists(path: string) -> bool {
 }
 
 /**
- * Delete the file at the given path, returning true on success.
+ * Delete the file at the given path.
  *
  * @param path The file path.
- * @return True if deleted, false otherwise.
+ * @return present() if deleted, or null on error.
  */
-func delete_file(path: string) -> bool {
-    return rt_delete_file(path);
+func delete_file(path: string) -> Unit? {
+    if (!rt_delete_file(path)) {
+        return null;
+    }
+    return present();
 }
 
 /**
@@ -112,6 +116,107 @@ func read_char_or_eof() -> int {
         return -1;
     }
     return c;
+}
+
+/**
+ * Read up to `capacity` raw bytes from standard input.
+ *
+ * @param buf Destination buffer.
+ * @param capacity Maximum number of bytes to read.
+ * @return Bytes read, `0` on EOF, or null on error.
+ */
+func read_stdin_some(buf: byte*, capacity: int) -> int? {
+    let n = rt_stdin_read(buf, capacity);
+    if (n == -1) {
+        return null;
+    }
+    return n as int?;
+}
+
+/**
+ * Write up to `len` raw bytes to standard output.
+ *
+ * @param buf Source buffer.
+ * @param len Maximum number of bytes to write.
+ * @return Bytes written, or null on error.
+ */
+func write_stdout_some(buf: byte*, len: int) -> int? {
+    let n = rt_stdout_write(buf, len);
+    if (n == -1) {
+        return null;
+    }
+    return n as int?;
+}
+
+/**
+ * Write up to `len` raw bytes to standard error.
+ *
+ * @param buf Source buffer.
+ * @param len Maximum number of bytes to write.
+ * @return Bytes written, or null on error.
+ */
+func write_stderr_some(buf: byte*, len: int) -> int? {
+    let n = rt_stderr_write(buf, len);
+    if (n == -1) {
+        return null;
+    }
+    return n as int?;
+}
+
+/**
+ * Write exactly `len` raw bytes to standard output.
+ *
+ * @param buf Source buffer.
+ * @param len Exact number of bytes to write.
+ * @return present() on success, or null on error.
+ */
+func write_stdout_all(buf: byte*, len: int) -> Unit? {
+    if (len < 0) {
+        return null;
+    }
+
+    let written = 0;
+    while (written < len) {
+        let chunk_opt = write_stdout_some(rt_array_element(buf as void*, 1, written) as byte*, len - written);
+        if (chunk_opt == null) {
+            return null;
+        }
+        let chunk = chunk_opt as int;
+        if (chunk == 0) {
+            return null;
+        }
+        written = written + chunk;
+    }
+
+    return present();
+}
+
+/**
+ * Write exactly `len` raw bytes to standard error.
+ *
+ * @param buf Source buffer.
+ * @param len Exact number of bytes to write.
+ * @return present() on success, or null on error.
+ */
+func write_stderr_all(buf: byte*, len: int) -> Unit? {
+    if (len < 0) {
+        return null;
+    }
+
+    let written = 0;
+    while (written < len) {
+        let chunk_opt = write_stderr_some(rt_array_element(buf as void*, 1, written) as byte*, len - written);
+        if (chunk_opt == null) {
+            return null;
+        }
+        let chunk = chunk_opt as int;
+        if (chunk == 0) {
+            return null;
+        }
+        written = written + chunk;
+    }
+
+    return present();
 }
 
 /* ---------------------------------

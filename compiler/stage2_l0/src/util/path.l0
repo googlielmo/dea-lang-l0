@@ -5,8 +5,8 @@
 
 module util.path;
 
+import std.path;
 import std.string;
-import std.text;
 
 /**
  * Check whether a byte is a path separator.
@@ -15,7 +15,7 @@ import std.text;
  * @return `true` if `c` is `/` or `\\`.
  */
 func up_is_sep(c: byte) -> bool {
-    return c == '/' || c == '\\';
+    return is_sep(c);
 }
 
 /**
@@ -25,17 +25,7 @@ func up_is_sep(c: byte) -> bool {
  * @return `true` for POSIX absolute paths and Windows drive-rooted paths.
  */
 func up_is_absolute(path: string) -> bool {
-    let n = len_s(path);
-    if (n == 0) {
-        return false;
-    }
-    if (up_is_sep(char_at_s(path, 0))) {
-        return true;
-    }
-    if (n >= 3 && char_at_s(path, 1) == ':' && up_is_sep(char_at_s(path, 2))) {
-        return true;
-    }
-    return false;
+    return is_absolute(path);
 }
 
 /**
@@ -48,7 +38,7 @@ func up_find_last_sep(path: string) -> int {
     let n = len_s(path);
     let last = -1;
     for (let i = 0; i < n; i = i + 1) {
-        if (up_is_sep(char_at_s(path, i))) {
+        if (is_sep(char_at_s(path, i))) {
             last = i;
         }
     }
@@ -62,7 +52,7 @@ func up_find_last_sep(path: string) -> int {
  * @return `true` if the path contains a separator.
  */
 func up_has_parent(path: string) -> bool {
-    return up_find_last_sep(path) >= 0;
+    return has_parent(path);
 }
 
 /**
@@ -72,24 +62,7 @@ func up_has_parent(path: string) -> bool {
  * @return Basename with trailing separators ignored.
  */
 func up_basename(path: string) -> string {
-    let n = len_s(path);
-    if (n == 0) {
-        return path;
-    }
-
-    let end = n;
-    while (end > 1 && up_is_sep(char_at_s(path, end - 1))) {
-        end = end - 1;
-    }
-
-    let last = -1;
-    for (let i = 0; i < end; i = i + 1) {
-        if (up_is_sep(char_at_s(path, i))) {
-            last = i;
-        }
-    }
-
-    return slice_s(path, last + 1, end);
+    return basename(path);
 }
 
 /**
@@ -99,35 +72,7 @@ func up_basename(path: string) -> string {
  * @return Parent directory, or `.` when the path has no parent.
  */
 func up_parent(path: string) -> string {
-    let n = len_s(path);
-    if (n == 0) {
-        return ".";
-    }
-
-    let end = n;
-    while (end > 1 && up_is_sep(char_at_s(path, end - 1))) {
-        end = end - 1;
-    }
-
-    let last = -1;
-    for (let i = 0; i < end; i = i + 1) {
-        if (up_is_sep(char_at_s(path, i))) {
-            last = i;
-        }
-    }
-
-    if (last < 0) {
-        return ".";
-    }
-    if (last == 0) {
-        return slice_s(path, 0, 1);
-    }
-
-    if (len_s(path) >= 3 && char_at_s(path, 1) == ':' && last == 2) {
-        return slice_s(path, 0, 3);
-    }
-
-    return slice_s(path, 0, last);
+    return parent(path);
 }
 
 /**
@@ -137,7 +82,7 @@ func up_parent(path: string) -> string {
  * @return `true` if `path` has the `.l0` suffix.
  */
 func up_is_l0_file(path: string) -> bool {
-    return ends_with_s(path, ".l0");
+    return has_extension(path, ".l0");
 }
 
 /**
@@ -147,11 +92,7 @@ func up_is_l0_file(path: string) -> bool {
  * @return Basename stem.
  */
 func up_stem(path: string) -> string {
-    let base = up_basename(path);
-    if (up_is_l0_file(base)) {
-        return slice_s(base, 0, len_s(base) - 3);
-    }
-    return base;
+    return stem(path);
 }
 
 /**
@@ -162,13 +103,5 @@ func up_stem(path: string) -> string {
  * @return Combined path.
  */
 func up_join(root: string, rel: string) -> string {
-    if (is_empty_s(root)) {
-        return rel;
-    }
-
-    let tail = char_at_s(root, len_s(root) - 1);
-    if (up_is_sep(tail)) {
-        return concat_s(root, rel);
-    }
-    return concat3_s(root, "/", rel);
+    return join(root, rel);
 }

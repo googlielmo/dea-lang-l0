@@ -32,7 +32,7 @@ Stage 1 is the oracle for CLI semantics, diagnostic-code reuse, compiler selecti
 `--output`, `L0_CFLAGS` merge order, runtime include/lib resolution, and normal process exit behavior.
 
 This milestone stays intentionally narrow. The broader shared-runtime process roadmap already exists in
-`docs/plans/features/2026-03-09-stdlib-runtime-fs-path-raw-io-bootstrap-noref.md`, which defers a general subprocess
+`docs/plans/features/closed/2026-03-09-stdlib-runtime-fs-path-raw-io-bootstrap-noref.md`, which defers a general subprocess
 API with explicit pipe control to its Phase 3. This feature must not invent a competing generic exec layer; it should
 only use the existing `system()` path plus the minimum shared-runtime adjustments needed for Stage 2 CLI parity.
 
@@ -153,7 +153,7 @@ only use the existing `system()` path plus the minimum shared-runtime adjustment
    - `rt_file_info` metadata support required by runtime-lib validation and temp-root selection.
 2. Do not implement raw byte stdio, directory traversal, subprocess pipes, or a second execution API here.
 3. The plan must explicitly reference the broader runtime plan:
-   `docs/plans/features/2026-03-09-stdlib-runtime-fs-path-raw-io-bootstrap-noref.md`
+   `docs/plans/features/closed/2026-03-09-stdlib-runtime-fs-path-raw-io-bootstrap-noref.md`
    as the future home for a general subprocess interface with explicit pipe control.
 
 ## Test Cases And Scenarios
@@ -205,7 +205,7 @@ python3 compiler/stage2_l0/run_trace_tests.py
 4. Update `docs/reference/standard-library.md` so the `std.system.system()` contract matches the normalized runtime
    behavior.
 5. Mention in the new milestone plan and any touched docs that the broader process API remains deferred to
-   `docs/plans/features/2026-03-09-stdlib-runtime-fs-path-raw-io-bootstrap-noref.md` Phase 3.
+   `docs/plans/features/closed/2026-03-09-stdlib-runtime-fs-path-raw-io-bootstrap-noref.md` Phase 3.
 
 ## Assumptions And Defaults
 

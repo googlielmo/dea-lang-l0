@@ -337,3 +337,30 @@ extern func rt_file_exists(path: string) -> bool;
  * @return True if deleted, false otherwise.
  */
 extern func rt_delete_file(path: string) -> bool;
+
+/**
+ * Read up to `capacity` bytes from standard input into `buf`.
+ *
+ * @param buf Destination buffer.
+ * @param capacity Maximum number of bytes to read.
+ * @return Bytes read, `0` on EOF, or `-1` on error.
+ */
+extern func rt_stdin_read(buf: byte*, capacity: int) -> int;
+
+/**
+ * Write up to `len` bytes from `buf` to standard output.
+ *
+ * @param buf Source buffer.
+ * @param len Maximum number of bytes to write.
+ * @return Bytes written, or `-1` on error.
+ */
+extern func rt_stdout_write(buf: byte*, len: int) -> int;
+
+/**
+ * Write up to `len` bytes from `buf` to standard error.
+ *
+ * @param buf Source buffer.
+ * @param len Maximum number of bytes to write.
+ * @return Bytes written, or `-1` on error.
+ */
+extern func rt_stderr_write(buf: byte*, len: int) -> int;

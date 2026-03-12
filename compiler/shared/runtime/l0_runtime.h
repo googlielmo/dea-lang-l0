@@ -1583,12 +1583,19 @@ static l0_bool rt_write_file_all(l0_string path, l0_string data) {
  */
 static l0_bool rt_file_exists(l0_string path) {
     char *c = _rt_string_bytes(path);
-    FILE *f = fopen(c, "rb");
-    if (f) {
-        fclose(f);
-        return 1;
+#if defined(_WIN32)
+    struct _stat64 st;
+    if (_stat64(c, &st) != 0) {
+        return 0;
     }
-    return 0;
+    return (st.st_mode & _S_IFREG) ? 1 : 0;
+#else
+    struct stat st;
+    if (stat(c, &st) != 0) {
+        return 0;
+    }
+    return S_ISREG(st.st_mode) ? 1 : 0;
+#endif
 }
 
 /**
@@ -1609,6 +1616,24 @@ static struct l0_sys_rt_RtFileInfo rt_file_info(l0_string path) {
         .mtime_nsec = { .has_value = 0 },
     };
     char *c = _rt_string_bytes(path);
+#if defined(_WIN32)
+    struct _stat64 st;
+    if (_stat64(c, &st) != 0) {
+        return out;
+    }
+
+    out.exists = 1;
+    out.is_file = (st.st_mode & _S_IFREG) ? 1 : 0;
+    out.is_dir = (st.st_mode & _S_IFDIR) ? 1 : 0;
+
+    if (st.st_size >= 0 && (__int64)(l0_int)st.st_size == st.st_size) {
+        out.size = (l0_opt_int){ .has_value = 1, .value = (l0_int)st.st_size };
+    }
+    if ((time_t)(l0_int)st.st_mtime == st.st_mtime) {
+        out.mtime_sec = (l0_opt_int){ .has_value = 1, .value = (l0_int)st.st_mtime };
+    }
+    return out;
+#else
     struct stat st;
     if (stat(c, &st) != 0) {
         return out;
@@ -1631,11 +1656,10 @@ static struct l0_sys_rt_RtFileInfo rt_file_info(l0_string path) {
         if ((long)(l0_int)st.st_mtim.tv_nsec == st.st_mtim.tv_nsec) {
             out.mtime_nsec = (l0_opt_int){ .has_value = 1, .value = (l0_int)st.st_mtim.tv_nsec };
         }
-#else
-        out.mtime_nsec = (l0_opt_int){ .has_value = 1, .value = 0 };
 #endif
     }
     return out;
+#endif
 }
 
 /**
@@ -1651,6 +1675,87 @@ static l0_bool rt_delete_file(l0_string path) {
     char *c = _rt_string_bytes(path);
     int result = remove(c);
     return result == 0;
+}
+
+/**
+ * Write raw bytes to one standard stream.
+ *
+ * @param stream Target stream.
+ * @param buf Source bytes.
+ * @param len Maximum number of bytes to write.
+ * @return Bytes written, or `-1` on error.
+ */
+static l0_int _rt_stream_write_some(FILE *stream, const l0_byte *buf, l0_int len) {
+    if (len < 0) {
+        return -1;
+    }
+    if (len == 0) {
+        return 0;
+    }
+    if (buf == NULL) {
+        return -1;
+    }
+
+    clearerr(stream);
+    size_t written = fwrite(buf, 1, (size_t)len, stream);
+    if (written == 0 && ferror(stream)) {
+        return -1;
+    }
+    return (l0_int)written;
+}
+
+/**
+ * Read raw bytes from standard input.
+ *
+ * @param buf Destination bytes.
+ * @param capacity Maximum number of bytes to read.
+ * @return Bytes read, `0` on EOF, or `-1` on error.
+ *
+ * L0 signature: `extern func rt_stdin_read(buf: byte*, capacity: int) -> int;`
+ */
+static l0_int rt_stdin_read(l0_byte *buf, l0_int capacity) {
+    if (capacity < 0) {
+        return -1;
+    }
+    if (capacity == 0) {
+        return 0;
+    }
+    if (buf == NULL) {
+        return -1;
+    }
+
+    clearerr(stdin);
+    size_t nread = fread(buf, 1, (size_t)capacity, stdin);
+    if (nread == 0 && ferror(stdin)) {
+        return -1;
+    }
+    return (l0_int)nread;
+}
+
+/**
+ * Write raw bytes to standard output.
+ *
+ * @param buf Source bytes.
+ * @param len Maximum number of bytes to write.
+ * @return Bytes written, or `-1` on error.
+ *
+ * L0 signature: `extern func rt_stdout_write(buf: byte*, len: int) -> int;`
+ */
+static l0_int rt_stdout_write(l0_byte *buf, l0_int len) {
+    return _rt_stream_write_some(stdout, buf, len);
+}
+
+/**
+ * Write raw bytes to standard error.
+ *
+ * @param buf Source bytes.
+ * @param len Maximum number of bytes to write.
+ * @return Bytes written, or `-1` on error.
+ *
+ * L0 signature: `extern func rt_stderr_write(buf: byte*, len: int) -> int;`
+ */
+static l0_int rt_stderr_write(l0_byte *buf, l0_int len) {
+    return _rt_stream_write_some(stderr, buf, len);
 }
 
 /* =========================================================================

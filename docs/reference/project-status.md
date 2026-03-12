@@ -127,9 +127,11 @@ CLI identity/help behavior:
 Current std/sys modules in tree:
 
 - `std.assert`
+- `std.fs`
 - `std.io`
 - `std.math`
 - `std.optional`
+- `std.path`
 - `std.rand`
 - `std.string`
 - `std.system`
@@ -258,7 +260,6 @@ Current Stage 2 limitations:
 
 Near-term project direction, consistent with current docs/code:
 
-1. Keep Stage 1/Stage 2 backend and driver behavior deterministic and parity-tested as Stage 2 takes on more direct use.
-2. Extend parity coverage beyond the current curated golden corpus as new backend-sensitive cases are added.
-3. Continue the shared-runtime bootstrap plan, including the later general subprocess API deferred in
-   `docs/plans/features/2026-03-09-stdlib-runtime-fs-path-raw-io-bootstrap-noref.md`.
+1. Add Windows build support, with MinGW-w64 as the primary target and CI validation for Stage 1 and Stage 2 workflows.
+2. Define a shared CLI contract spec so Stage 1 and Stage 2 parity has one stable normative source.
+3. Embed build-provenance metadata in installed and repo-local Stage 2 binaries without perturbing triple-bootstrap stability.
