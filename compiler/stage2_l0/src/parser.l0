@@ -5,6 +5,7 @@
 
 module parser;
 
+import lexer;
 import tokens;
 import ast;
 import util.diag;
@@ -96,6 +97,31 @@ func impl_result_to_public(self: ImplParseResult*) -> ParseResult* {
  */
 func parse_module_tokens(tokens: TokenVector, filename: string) -> ParseResult* {
     let impl = parser.decl::impl_parse_module_tokens(tokens, filename);
+    return impl_result_to_public(impl);
+}
+
+/**
+ * Parse a module from an existing token stream and free the token buffer.
+ *
+ * @param tokens Token stream to parse.
+ * @param filename Source filename used in diagnostics.
+ * @return Parse result for the module.
+ */
+func parse_module_tokens_owned(tokens: TokenVector, filename: string) -> ParseResult* {
+    let impl = parser.decl::impl_parse_module_tokens(tokens, filename);
+    tv_free(tokens);
+    return impl_result_to_public(impl);
+}
+
+/**
+ * Convert lexer diagnostics into a public parse result and free the lexer state.
+ *
+ * @param ls Lexer state holding diagnostics.
+ * @param filename Source filename used in diagnostics.
+ * @return Parse result containing the copied lexer diagnostics.
+ */
+func parse_lex_error_result(ls: LexerState*, filename: string) -> ParseResult* {
+    let impl = parser.decl::ps_lex_error_result(ls, filename);
     return impl_result_to_public(impl);
 }
 

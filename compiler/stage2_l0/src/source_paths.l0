@@ -107,6 +107,30 @@ func sp_project_root_get(self: SourceSearchPaths*, index: int) -> string {
 }
 
 /**
+ * Format one root list using the Stage 1 verbose display contract.
+ *
+ * @param roots Root vector to format.
+ * @return Comma-joined quoted roots, or `<none>` when empty.
+ */
+func sp_format_root_list(roots: VectorString*) -> string {
+    if (vs_size(roots) == 0) {
+        return "<none>";
+    }
+
+    with (let sb = sb_create() => sb_free(sb)) {
+        for (let i = 0; i < vs_size(roots); i = i + 1) {
+            if (i > 0) {
+                sb_append(sb, ",");
+            }
+            sb_append(sb, "'");
+            sb_append(sb, vs_get(roots, i));
+            sb_append(sb, "'");
+        }
+        return sb_to_string(sb);
+    }
+}
+
+/**
  * Convert a dotted module name to its relative `.l0` path.
  *
  * @param module_name Dotted module name such as `foo.bar`.

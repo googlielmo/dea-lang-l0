@@ -7,6 +7,7 @@ module analysis;
 
 import std.hashmap;
 import std.string;
+import std.text;
 import std.vector;
 import util.diag;
 
@@ -29,6 +30,27 @@ import util.log;
 func analysis_copy_driver_diags(dst: DiagCollector*, src: DriverState*) {
     for (let i = 0; i < driver_diag_count(src); i = i + 1) {
         diag_copy(dst, driver_diag_get(src, i));
+    }
+}
+
+/**
+ * Format the Stage 1-style signature-resolution summary text.
+ *
+ * @param sigs Resolved signature tables.
+ * @return Summary string for verbose logging.
+ */
+func analysis_signature_summary(sigs: SignatureTables*) -> string {
+    with (let sb = sb_create() => sb_free(sb)) {
+        sb_append(sb, "Signature resolution found ");
+        sb_append(sb, int_to_string(spm_size(sigs.func_types)));
+        sb_append(sb, " function(s), ");
+        sb_append(sb, int_to_string(spm_size(sigs.struct_infos)));
+        sb_append(sb, " struct(s), ");
+        sb_append(sb, int_to_string(spm_size(sigs.enum_infos)));
+        sb_append(sb, " enum(s), ");
+        sb_append(sb, int_to_string(spm_size(sigs.let_types)));
+        sb_append(sb, " let(s)");
+        return sb_to_string(sb);
     }
 }
 
@@ -58,20 +80,37 @@ func analysis_analyze_entry(search_paths: SourceSearchPaths*, entry_module: stri
         return result;
     }
 
+    log_stage(cfg, "Resolving module-level names", "");
+    let nr_diag_start = diag_count(result.diags);
     let names = nr_resolve(driver_state, result.diags);
     result.names = names;
+    log_debug(cfg, concat4_s("Name resolution produced ", int_to_string(diag_count(result.diags) - nr_diag_start),
+        " diagnostic(s)", ""));
 
+    log_stage(cfg, "Resolving type signatures", "");
     let sigs = sig_resolve(driver_state, names, result.diags);
     result.signatures = sigs;
+    log_debug(cfg, analysis_signature_summary(sigs));
 
+    log_stage(cfg, "Resolving local scopes", "");
     let local_envs = locals_resolve(driver_state, result.diags);
     result.locals_result = local_envs;
+    log_debug(cfg, concat4_s("Local scope resolution processed ", int_to_string(locals_env_count(local_envs)),
+        " function(s)", ""));
 
     if (analysis_has_errors(result)) {
+        log_info(cfg, concat4_s("Analysis complete: ", int_to_string(analysis_diag_count(result)),
+            " total diagnostic(s), ", concat_s(int_to_string(result.diags.error_count), " error(s)")));
         return result;
     }
 
+    log_stage(cfg, "Type-checking expressions", "");
+    let expr_diag_start = diag_count(result.diags);
     expr_types_check(result);
+    log_debug(cfg, concat4_s("Expression type checking produced ",
+        int_to_string(diag_count(result.diags) - expr_diag_start), " diagnostic(s)", ""));
+    log_info(cfg, concat4_s("Analysis complete: ", int_to_string(analysis_diag_count(result)),
+        " total diagnostic(s), ", concat_s(int_to_string(result.diags.error_count), " error(s)")));
 
     return result;
 }

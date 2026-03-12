@@ -61,13 +61,25 @@ func bd_prepared_input_free_opt(self: BuildPreparedInput*?) {
 }
 
 /**
+ * Log the effective system and project roots for build/run commands.
+ *
+ * @param cfg Logging configuration.
+ * @param sys_roots Effective system-root vector.
+ * @param project_roots Effective project-root vector.
+ */
+func bd_log_effective_roots(cfg: LogConfig*, sys_roots: VectorString*, project_roots: VectorString*) {
+    log_info(cfg, concat_s("System root(s): ", sp_format_root_list(sys_roots)));
+    log_info(cfg, concat_s("Project root(s): ", sp_format_root_list(project_roots)));
+}
+
+/**
  * Normalize CLI target input into an entry module and source search paths.
  *
  * @param opts Parsed CLI options.
  * @param diags Diagnostic collector for normalization failures.
  * @return Prepared input bundle, or `null` on failure.
  */
-func bd_prepare_input(opts: CliOptions*, diags: DiagCollector*) -> BuildPreparedInput*? {
+func bd_prepare_input(opts: CliOptions*, diags: DiagCollector*, cfg: LogConfig*) -> BuildPreparedInput*? {
     with (
         let project_roots = us_vs_clone(opts.project_roots) => vs_free(project_roots),
         let sys_roots = us_vs_clone(opts.sys_roots) => vs_free(sys_roots)
@@ -82,6 +94,7 @@ func bd_prepare_input(opts: CliOptions*, diags: DiagCollector*) -> BuildPrepared
         }
 
         let entry_module = entry_opt as string;
+        bd_log_effective_roots(cfg, sys_roots, project_roots);
         let sp = sp_build_from_roots(project_roots, sys_roots);
         return new BuildPreparedInput(entry_module, sp);
     }
@@ -117,6 +130,32 @@ func bd_merge_c_option_words(env_opts: string?, cli_opts: string?) -> VectorStri
     bd_append_c_option_words(out, env_opts);
     bd_append_c_option_words(out, cli_opts);
     return out;
+}
+
+/**
+ * Format option words using the Stage 1 verbose display contract.
+ *
+ * @param words Option vector to format.
+ * @return Python-list-style rendering for verbose logs.
+ */
+func bd_format_word_list(words: VectorString*) -> string {
+    if (vs_size(words) == 0) {
+        return "[]";
+    }
+
+    with (let sb = sb_create() => sb_free(sb)) {
+        sb_append(sb, "[");
+        for (let i = 0; i < vs_size(words); i = i + 1) {
+            if (i > 0) {
+                sb_append(sb, ", ");
+            }
+            sb_append(sb, "'");
+            sb_append(sb, vs_get(words, i));
+            sb_append(sb, "'");
+        }
+        sb_append(sb, "]");
+        return sb_to_string(sb);
+    }
 }
 
 /**
@@ -276,6 +315,16 @@ func bd_join_shell_words(words: VectorString*) -> string {
         }
         return sb_to_string(sb);
     }
+}
+
+/**
+ * Join command words into the Stage 1 visible command-line form.
+ *
+ * @param words Command words to join.
+ * @return Space-delimited command line without shell quoting.
+ */
+func bd_join_display_words(words: VectorString*) -> string {
+    return join_s(words, " ");
 }
 
 /**
@@ -667,7 +716,7 @@ func bd_build_to_exe(opts: CliOptions*, cfg: LogConfig*, exe_path: string, keep_
         let validate_diags = diag_create() => diag_free(validate_diags),
         let cmd_diags = diag_create() => diag_free(cmd_diags)
     ) {
-        let prepared = bd_prepare_input(opts, cmd_diags);
+        let prepared = bd_prepare_input(opts, cmd_diags, cfg);
         if (prepared == null) {
             dp_print_collector(cmd_diags);
             return 1;
@@ -695,9 +744,20 @@ func bd_build_to_exe(opts: CliOptions*, cfg: LogConfig*, exe_path: string, keep_
 
         with (
             let cg_opts = cg_options_create() => cg_options_free(cg_opts),
-            let extra_opts = bd_collect_c_option_words(opts) => vs_free(extra_opts),
+            let env_opts = vs_create(4) => vs_free(env_opts),
+            let cli_opts = vs_create(4) => vs_free(cli_opts),
+            let extra_opts = vs_create(4) => vs_free(extra_opts),
             let command_words = vs_create(16) => vs_free(command_words)
         ) {
+            bd_append_c_option_words(env_opts, env_get("L0_CFLAGS"));
+            bd_append_c_option_words(cli_opts, opts.c_options);
+            for (let i = 0; i < vs_size(env_opts); i = i + 1) {
+                vs_push(extra_opts, vs_get(env_opts, i));
+            }
+            for (let i = 0; i < vs_size(cli_opts); i = i + 1) {
+                vs_push(extra_opts, vs_get(cli_opts, i));
+            }
+
             cg_opts.emit_line_directives = !opts.no_line_directives;
             cg_opts.trace_arc = opts.trace_arc;
             cg_opts.trace_memory = opts.trace_memory;
@@ -722,6 +782,7 @@ func bd_build_to_exe(opts: CliOptions*, cfg: LogConfig*, exe_path: string, keep_
                 }
                 return 1;
             }
+            log_info(cfg, concat_s("Generated C code: ", c_path as string));
 
             let compiler = opts.c_compiler;
             if (compiler == null) {
@@ -748,8 +809,19 @@ func bd_build_to_exe(opts: CliOptions*, cfg: LogConfig*, exe_path: string, keep_
                 }
                 return 1;
             }
+            log_info(cfg, concat_s("Using C compiler: ", compiler as string));
 
             let family = bd_compiler_flag_family(compiler as string);
+            log_info(cfg, concat_s("Detected compiler flag family: ", family));
+            if (vs_size(env_opts) > 0) {
+                log_info(cfg, concat_s("C compiler options from $L0_CFLAGS: ", bd_format_word_list(env_opts)));
+            }
+            if (vs_size(cli_opts) > 0) {
+                log_info(cfg, concat_s("C compiler options from --c-options: ", bd_format_word_list(cli_opts)));
+            }
+            if (vs_size(extra_opts) > 0) {
+                log_info(cfg, concat_s("Extra C compiler options: ", bd_format_word_list(extra_opts)));
+            }
             let runtime_lib = bd_runtime_lib_dir(opts);
             if (runtime_lib != null && !bd_validate_runtime_lib(runtime_lib as string, cmd_diags)) {
                 dp_print_collector(cmd_diags);
@@ -770,10 +842,15 @@ func bd_build_to_exe(opts: CliOptions*, cfg: LogConfig*, exe_path: string, keep_
             for (let i = 0; i < vs_size(extra_opts); i = i + 1) {
                 vs_push(command_words, vs_get(extra_opts, i));
             }
+            if (eq_s(family, "unknown")) {
+                log_warning(cfg, concat4_s("Unsupported compiler '", compiler as string,
+                    "' (flag family '", concat_s(family, "'): not adding standard flags")));
+            }
             bd_push_standard_flags(command_words, family);
 
             let optimize = bd_get_optimize_flag(family, extra_opts);
             if (optimize != null) {
+                log_info(cfg, concat_s("Adding optimization flag: ", optimize as string));
                 vs_push(command_words, optimize as string);
             }
 
@@ -788,6 +865,8 @@ func bd_build_to_exe(opts: CliOptions*, cfg: LogConfig*, exe_path: string, keep_
                 vs_push(command_words, runtime_lib as string);
                 vs_push(command_words, "-ll0runtime");
             }
+            log_info(cfg, "Compiling:");
+            log_info(cfg, bd_join_display_words(command_words));
 
             let compile_cmd = concat4_s(
                 bd_join_shell_words(command_words),
@@ -813,6 +892,7 @@ func bd_build_to_exe(opts: CliOptions*, cfg: LogConfig*, exe_path: string, keep_
             if (compile_failed) {
                 return 1;
             }
+            log_info(cfg, concat_s("Built executable: ", exe_path));
             return 0;
         }
     }
@@ -886,6 +966,7 @@ func bd_cmd_run(opts: CliOptions*, cfg: LogConfig*) -> int {
                 vs_push(words, vs_get(opts.program_args, i));
             }
 
+            log_info(cfg, concat_s("Running: ", bd_join_display_words(words)));
             let run_cmd = bd_join_shell_words(words);
             let run_rc = system(run_cmd);
             bd_delete_if_present(temp_exe);

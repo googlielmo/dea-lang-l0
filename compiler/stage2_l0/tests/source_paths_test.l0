@@ -58,6 +58,18 @@ func test_explicit_sys_root_suppresses_defaults() {
 }
 
 /**
+ * Tests test_format_root_list_matches_stage1_contract.
+ */
+func test_format_root_list_matches_stage1_contract() {
+    with (let roots = vs_create(2) => vs_free(roots)) {
+        assert(eq_s(sp_format_root_list(roots), "<none>"), "empty roots should render as <none>");
+        vs_push(roots, "/sys/a");
+        vs_push(roots, "/sys/b");
+        assert(eq_s(sp_format_root_list(roots), "'/sys/a','/sys/b'"), "root list rendering mismatch");
+    }
+}
+
+/**
  * Main entry point for the module.
  */
 func main() {
@@ -65,5 +77,6 @@ func main() {
     test_default_sys_roots_l0_system_precedence();
     test_default_sys_roots_l0_home_fallback();
     test_explicit_sys_root_suppresses_defaults();
+    test_format_root_list_matches_stage1_contract();
     printl_s("source_paths_test: all tests passed");
 }

@@ -73,13 +73,25 @@ func l0c_copy_collector(dst: DiagCollector*, src: DiagCollector*) {
 }
 
 /**
+ * Log the effective system and project roots for one CLI invocation.
+ *
+ * @param cfg Logging configuration.
+ * @param sys_roots Effective system-root vector.
+ * @param project_roots Effective project-root vector.
+ */
+func l0c_log_effective_roots(cfg: LogConfig*, sys_roots: VectorString*, project_roots: VectorString*) {
+    log_info(cfg, concat_s("System root(s): ", sp_format_root_list(sys_roots)));
+    log_info(cfg, concat_s("Project root(s): ", sp_format_root_list(project_roots)));
+}
+
+/**
  * Normalize CLI input into an entry module and search paths.
  *
  * @param opts Parsed CLI options.
  * @param diags Diagnostic collector for normalization errors.
  * @return Prepared input bundle, or `null` if normalization fails.
  */
-func l0c_prepare_input(opts: CliOptions*, diags: DiagCollector*) -> PreparedInput*? {
+func l0c_prepare_input(opts: CliOptions*, diags: DiagCollector*, cfg: LogConfig*) -> PreparedInput*? {
     with (
         let project_roots = us_vs_clone(opts.project_roots) => vs_free(project_roots),
         let sys_roots = us_vs_clone(opts.sys_roots) => vs_free(sys_roots)
@@ -95,6 +107,7 @@ func l0c_prepare_input(opts: CliOptions*, diags: DiagCollector*) -> PreparedInpu
         }
 
         let entry_module = entry_opt as string;
+        l0c_log_effective_roots(cfg, sys_roots, project_roots);
         let sp = sp_build_from_roots(project_roots, sys_roots);
         return new PreparedInput(entry_module, sp);
     }
@@ -183,7 +196,7 @@ func l0c_dump_tokens_for_path(path: string, include_eof: bool, diags: DiagCollec
  */
 func l0c_cmd_check(opts: CliOptions*, cfg: LogConfig*) -> int {
     with (let diags = diag_create() => diag_free(diags)) {
-        let prepared = l0c_prepare_input(opts, diags);
+        let prepared = l0c_prepare_input(opts, diags, cfg);
         if (prepared == null) {
             dp_print_collector(diags);
             return 1;
@@ -200,9 +213,6 @@ func l0c_cmd_check(opts: CliOptions*, cfg: LogConfig*) -> int {
             rc = 1;
         }
 
-        log_info(cfg, concat4_s("Analysis complete: ", int_to_string(analysis_diag_count(result)),
-            " diagnostic(s), ", concat_s(int_to_string(result.diags.error_count), " error(s)")));
-
         analysis_result_free(result);
         return rc;
     }
@@ -217,7 +227,7 @@ func l0c_cmd_check(opts: CliOptions*, cfg: LogConfig*) -> int {
  */
 func l0c_cmd_tok(opts: CliOptions*, cfg: LogConfig*) -> int {
     with (let diags = diag_create() => diag_free(diags)) {
-        let prepared = l0c_prepare_input(opts, diags);
+        let prepared = l0c_prepare_input(opts, diags, cfg);
         if (prepared == null) {
             dp_print_collector(diags);
             return 1;
@@ -295,7 +305,7 @@ func l0c_cmd_tok(opts: CliOptions*, cfg: LogConfig*) -> int {
  */
 func l0c_cmd_gen(opts: CliOptions*, cfg: LogConfig*) -> int {
     with (let diags = diag_create() => diag_free(diags)) {
-        let prepared = l0c_prepare_input(opts, diags);
+        let prepared = l0c_prepare_input(opts, diags, cfg);
         if (prepared == null) {
             dp_print_collector(diags);
             return 1;
@@ -344,7 +354,7 @@ func l0c_cmd_gen(opts: CliOptions*, cfg: LogConfig*) -> int {
  */
 func l0c_cmd_sym(opts: CliOptions*, cfg: LogConfig*) -> int {
     with (let diags = diag_create() => diag_free(diags)) {
-        let prepared = l0c_prepare_input(opts, diags);
+        let prepared = l0c_prepare_input(opts, diags, cfg);
         if (prepared == null) {
             dp_print_collector(diags);
             return 1;
@@ -474,7 +484,7 @@ func l0c_cmd_sym(opts: CliOptions*, cfg: LogConfig*) -> int {
  */
 func l0c_cmd_type(opts: CliOptions*, cfg: LogConfig*) -> int {
     with (let diags = diag_create() => diag_free(diags)) {
-        let prepared = l0c_prepare_input(opts, diags);
+        let prepared = l0c_prepare_input(opts, diags, cfg);
         if (prepared == null) {
             dp_print_collector(diags);
             return 1;

@@ -2863,8 +2863,10 @@ func backend_generate(result: AnalysisResult*, opts: CodegenOptions*, cfg: LogCo
     }
 
     with (let self = be_create(result, opts, cfg) => be_free(self)) {
-        log_stage(cfg, "Generating", result.driver_state.entry_module);
+        log_stage(cfg, "Generating C code", "");
+        log_debug(cfg, "Preparing optional wrapper types");
         cem_prepare_optional_wrappers(self.emitter);
+        log_debug(cfg, "Emitting header and forward declarations");
         cem_emit_header(self.emitter, opts);
         cem_emit_forward_decls(self.emitter);
         cem_emit_section_comment(self.emitter, "Optional wrapper types (builtins / early)");

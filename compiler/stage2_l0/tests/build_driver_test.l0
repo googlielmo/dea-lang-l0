@@ -44,6 +44,32 @@ func test_join_shell_words_quotes_every_token() {
 }
 
 /**
+ * Tests test_join_display_words_matches_stage1_logging.
+ */
+func test_join_display_words_matches_stage1_logging() {
+    with (let words = vs_create(3) => vs_free(words)) {
+        vs_push(words, "clang");
+        vs_push(words, "file.c");
+        vs_push(words, "-O1");
+
+        let joined = bd_join_display_words(words);
+        assert(eq_s(joined, "clang file.c -O1"), "display command mismatch");
+    }
+}
+
+/**
+ * Tests test_format_word_list_matches_stage1_logging.
+ */
+func test_format_word_list_matches_stage1_logging() {
+    with (let words = vs_create(2) => vs_free(words)) {
+        assert(eq_s(bd_format_word_list(words), "[]"), "empty option list mismatch");
+        vs_push(words, "-g");
+        vs_push(words, "-O0");
+        assert(eq_s(bd_format_word_list(words), "['-g', '-O0']"), "formatted option list mismatch");
+    }
+}
+
+/**
  * Tests test_compiler_flag_family_detection.
  */
 func test_compiler_flag_family_detection() {
@@ -88,6 +114,8 @@ func main() {
     test_with_c_suffix_rewrites_existing_extension();
     test_shell_quote_posix_handles_spaces_and_quotes();
     test_join_shell_words_quotes_every_token();
+    test_join_display_words_matches_stage1_logging();
+    test_format_word_list_matches_stage1_logging();
     test_compiler_flag_family_detection();
     test_get_optimize_flag_defaults_and_overrides();
     printl_s("build_driver_test: all tests passed");

@@ -16,7 +16,9 @@ import util.diag;
 import util.strings;
 import util.log;
 import source_paths;
+import lexer;
 import parser;
+import tokens;
 import ast;
 
 /**
@@ -219,14 +221,78 @@ func dr_mark_loaded(loaded: VectorString*, module_name: string) {
     }
 }
 
+/**
+ * Lex and parse one module source file while emitting Stage 1-style debug logs.
+ *
+ * @param path Source path being processed.
+ * @param source Source text to lex and parse.
+ * @param cfg Logging configuration.
+ * @return Parse result for the module.
+ */
+func dr_parse_source(path: string, source: string, cfg: LogConfig*) -> ParseResult* {
+    log_debug(cfg, concat_s("Lexing ", path));
+    let ls = ls_create(source, path);
+    let toks = tokenize(ls);
+    if (toks == null) {
+        return parse_lex_error_result(ls, path);
+    }
+
+    let tv = toks as TokenVector;
+    log_debug(cfg, concat4_s("Lexed ", int_to_string(tv_len(tv)), " token(s) from ", path));
+    log_debug(cfg, concat_s("Parsing ", path));
+    let pr = parse_module_tokens_owned(tv, path);
+    ls_free(ls);
+
+    if (pr.root_module != null) {
+        let mod = pr.root_module as Module*;
+        log_debug(cfg, concat4_s("Parsed module '", mod.name, "' from ", path));
+    }
+
+    return pr;
+}
+
+/**
+ * Revisit the loaded module closure to mirror Stage 1 cache-hit logging.
+ *
+ * @param state Driver state containing loaded modules.
+ * @param search_paths Source search paths used for lookups.
+ * @param module_name Current module name.
+ * @param visited Module names already traversed by this closure walk.
+ * @param cfg Logging configuration.
+ */
+func dr_visit_closure(state: DriverState*, search_paths: SourceSearchPaths*, module_name: string, visited: VectorString*,
+                      cfg: LogConfig*) {
+    let unit_opt = driver_find_unit(state, module_name);
+    if (unit_opt == null) {
+        return;
+    }
+
+    if (dr_vs_has(visited, module_name)) {
+        return;
+    }
+    vs_push(visited, module_name);
+
+    let unit = unit_opt as DriverUnit*;
+    if (unit.parse_result.root_module == null) {
+        return;
+    }
+
+    let mod = unit.parse_result.root_module as Module*;
+    for (let i = 0; i < vec_size(mod.imports); i = i + 1) {
+        let imp = ptr_vec_get(mod.imports, i) as Import*;
+        dr_load_module(state, search_paths, "|", imp.name, cfg);
+        dr_visit_closure(state, search_paths, imp.name, visited, cfg);
+    }
+}
+
 func dr_load_module(state: DriverState*, search_paths: SourceSearchPaths*, loading_chain: string,
                     module_name: string, cfg: LogConfig*) -> bool {
     if (dr_vs_has(state.loaded, module_name)) {
-        log_debug(cfg, concat3_s("Module '", module_name, "' already loaded (cached)"));
+        log_debug(cfg, concat3_s("Module '", module_name, "' already loaded (cache hit)"));
         return true;
     }
 
-    log_stage(cfg, "Loading", module_name);
+    log_debug(cfg, concat3_s("Loading module '", module_name, "'"));
 
     let cycle_token = concat3_s("|", module_name, "|");
     if (contains_s(loading_chain, cycle_token)) {
@@ -243,6 +309,7 @@ func dr_load_module(state: DriverState*, search_paths: SourceSearchPaths*, loadi
         ok = false;
     } else {
         let path = path_opt as string;
+        log_debug(cfg, concat4_s("Resolved '", module_name, "' to ", path));
 
         let source_opt = read_file(path);
         if (source_opt == null) {
@@ -255,7 +322,7 @@ func dr_load_module(state: DriverState*, search_paths: SourceSearchPaths*, loadi
             vs_push(state.source_names, path);
             vs_push(state.source_texts, source);
 
-            let pr = parse_module_source(source, path);
+            let pr = dr_parse_source(path, source, cfg);
 
             let unit = new DriverUnit(module_name, path, pr);
             ptr_vec_push(state.units, unit as void*);
@@ -301,10 +368,20 @@ func dr_load_module(state: DriverState*, search_paths: SourceSearchPaths*, loadi
  */
 func driver_analyze_entry(search_paths: SourceSearchPaths*, entry_module: string, cfg: LogConfig*) -> DriverState* {
     log_info(cfg, concat3_s("Starting analysis for entry module '", entry_module, "'"));
+    log_stage(cfg, "Building compilation unit", entry_module);
     let state = new DriverState(
         entry_module, ptr_vec_create(8), vs_create(8),
         diag_create(), vs_create(4), vs_create(4)
     );
     dr_load_module(state, search_paths, "|", entry_module, cfg);
+    if (!driver_has_errors(state)) {
+        with (let visited = vs_create(driver_unit_count(state)) => vs_free(visited)) {
+            dr_visit_closure(state, search_paths, entry_module, visited, cfg);
+        }
+        with (let names = driver_module_names_sorted(state) => vs_free(names)) {
+            log_debug(cfg, concat4_s("Compilation unit contains ", int_to_string(vs_size(names)),
+                " module(s): ", join_s(names, ", ")));
+        }
+    }
     return state;
 }
