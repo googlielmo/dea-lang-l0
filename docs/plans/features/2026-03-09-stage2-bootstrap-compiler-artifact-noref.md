@@ -50,13 +50,13 @@ repo-local `l0c-stage1` wrapper. Phase 3 does not require Stage 1 to be installe
 
 1. Produce a concrete, runnable Stage 2 compiler artifact as the first deliverable.
 2. Centralize the common developer workflow under one top-level `Makefile`.
-3. Support repo-local alias switching between Stage 1 and Stage 2 without replacing `./l0c`.
+3. Support repo-local alias switching between Stage 1 and Stage 2 without replacing the source-tree Stage 1 wrapper.
 4. Preserve a clean path from repo-local developer tooling to a later repo-independent install prefix.
 5. Keep Stage 1 as the bootstrap builder until a separate plan explicitly changes that.
 
 ## Non-Goals
 
-1. Replacing the top-level `./l0c` wrapper with Stage 2 in this feature.
+1. Replacing the source-tree Stage 1 wrapper with Stage 2 in this feature.
 2. Requiring Stage 2 self-hosting in this feature; that work is tracked in
    `docs/plans/features/closed/2026-03-11-triple-bootstrap-self-hosting-noref.md`.
 3. Making Stage 1 independently installable under the final Phase 3 prefix.
@@ -140,36 +140,38 @@ Phase 2 is intentionally repo-centric:
 Public Make targets:
 
 1. `help`
-2. `install-stage1`
-3. `install-stage2`
-4. `install-all`
-5. `use-stage1`
-6. `use-stage2`
-7. `test-stage1`
-8. `test-stage2`
-9. `test-stage2-trace`
-10. `triple-test`
-11. `test-all`
-12. `docs`
-13. `docs-pdf`
-14. `clean`
-15. `clean-dist`
+2. `venv`
+3. `install-dev-stage1`
+4. `install-dev-stage2`
+5. `install-dev-stages`
+6. `use-dev-stage1`
+7. `use-dev-stage2`
+8. `test-stage1`
+9. `test-stage2`
+10. `test-stage2-trace`
+11. `triple-test`
+12. `test-all`
+13. `docs`
+14. `docs-pdf`
+15. `clean`
+16. `clean-dist`
 
 Target behavior:
 
-1. `install-stage1` writes `<DIST_DIR>/bin/l0c-stage1`.
-2. `install-stage2` builds and installs the Phase 1 artifact into `<DIST_DIR>/bin`.
-3. `install-all` installs both stage-specific commands and does not rewrite `<DIST_DIR>/bin/l0c`.
-4. `use-stage1` and `use-stage2` are the only targets that switch `<DIST_DIR>/bin/l0c`.
-5. `use-stage1` and `use-stage2` print the exact `source <DIST_DIR>/bin/l0-env.sh` command to run next.
-6. `test-stage1` runs `pytest -n auto`.
-7. `test-stage2` runs `./compiler/stage2_l0/run_tests.py`.
-8. `test-stage2-trace` runs `./compiler/stage2_l0/run_trace_tests.py`.
-9. `test-all` runs the three test targets above.
-10. `triple-test` runs `./compiler/stage2_l0/tests/l0c_triple_bootstrap_test.py` only as a convenience entrypoint for
+1. `venv` creates or reuses `./.venv`, preferring `uv` when available and falling back to `python -m venv`.
+2. `install-dev-stage1` writes `<DIST_DIR>/bin/l0c-stage1`.
+3. `install-dev-stage2` builds and installs the Phase 1 artifact into `<DIST_DIR>/bin`.
+4. `install-dev-stages` installs both stage-specific commands and does not rewrite `<DIST_DIR>/bin/l0c`.
+5. `use-dev-stage1` and `use-dev-stage2` are the only targets that switch `<DIST_DIR>/bin/l0c`.
+6. `use-dev-stage1` and `use-dev-stage2` print the exact `source <DIST_DIR>/bin/l0-env.sh` command to run next.
+7. `test-stage1` ensures the local virtual environment exists, then runs `python -m pytest -n auto` from `./.venv`.
+8. `test-stage2` runs `./compiler/stage2_l0/run_tests.py`.
+9. `test-stage2-trace` runs `./compiler/stage2_l0/run_trace_tests.py`.
+10. `test-all` runs the three test targets above.
+11. `triple-test` runs `./compiler/stage2_l0/tests/l0c_triple_bootstrap_test.py` only as a convenience entrypoint for
     the separately tracked strict bootstrap fixed-point regression.
-11. `docs` runs `./scripts/gen-docs.sh`.
-12. `docs-pdf` runs `./scripts/gen-docs.sh --pdf`.
+12. `docs` runs `./scripts/gen-docs.sh`.
+13. `docs-pdf` runs `./scripts/gen-docs.sh --pdf`.
 
 Phase 2 `l0-env.sh` behavior:
 
@@ -257,22 +259,23 @@ Phase 3 does not require `l0c-stage1` to be installed into the final prefix.
 
 ### Phase 2
 
-1. `make install-stage1`
-2. `make install-stage2`
-3. `make install-all`
-4. `make use-stage1`
-5. `make use-stage2`
-6. `make DIST_DIR=build/dev-dist install-all`
-7. `make DIST_DIR=build/dev-dist use-stage2`
-8. after sourcing `<DIST_DIR>/bin/l0-env.sh`, `l0c --check -P examples hello` succeeds with Stage 1 selected
-9. after sourcing `<DIST_DIR>/bin/l0-env.sh`, `l0c --check -P examples hello` succeeds with Stage 2 selected
-10. `make test-stage1`
-11. `make test-stage2`
-12. `make test-stage2-trace`
-13. `make triple-test`
-14. `make test-all`
-15. `make docs`
-16. `make docs-pdf`
+1. `make venv`
+2. `make install-dev-stage1`
+3. `make install-dev-stage2`
+4. `make install-dev-stages`
+5. `make use-dev-stage1`
+6. `make use-dev-stage2`
+7. `make DIST_DIR=build/dev-dist install-dev-stages`
+8. `make DIST_DIR=build/dev-dist use-dev-stage2`
+9. after sourcing `<DIST_DIR>/bin/l0-env.sh`, `l0c --check -P examples hello` succeeds with Stage 1 selected
+10. after sourcing `<DIST_DIR>/bin/l0-env.sh`, `l0c --check -P examples hello` succeeds with Stage 2 selected
+11. `make test-stage1`
+12. `make test-stage2`
+13. `make test-stage2-trace`
+14. `make triple-test`
+15. `make test-all`
+16. `make docs`
+17. `make docs-pdf`
 
 ### Phase 3
 
