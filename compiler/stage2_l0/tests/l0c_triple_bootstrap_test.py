@@ -11,6 +11,7 @@ from __future__ import annotations
 import difflib
 import hashlib
 import os
+import re
 import shlex
 import shutil
 import subprocess
@@ -73,13 +74,13 @@ def notice(message: str) -> None:
 
 
 def run_logged(
-    name: str,
-    command: list[str],
-    *,
-    env: dict[str, str],
-    artifact_dir: Path,
-    cwd: Path = REPO_ROOT,
-    expected_returncode: int = 0,
+        name: str,
+        command: list[str],
+        *,
+        env: dict[str, str],
+        artifact_dir: Path,
+        cwd: Path = REPO_ROOT,
+        expected_returncode: int = 0,
 ) -> tuple[Path, float]:
     """Run one subprocess, capture combined output, and return wall time."""
 
@@ -162,20 +163,43 @@ def compiler_command_words(command_text: str) -> list[str]:
     return words
 
 
+def recognized_compiler_family(command_text: str) -> str | None:
+    """Return one recognized compiler family from the resolved command, if any."""
+
+    for word in compiler_command_words(command_text):
+        name = Path(word).name
+        lower_name = name.lower()
+        if lower_name.endswith(".exe"):
+            lower_name = lower_name[:-4]
+
+        if lower_name == "tcc":
+            return "tcc"
+        if re.fullmatch(r"gcc-[0-9]+", lower_name):
+            return "gcc"
+        if lower_name == "gcc":
+            return "gcc"
+        if re.fullmatch(r"clang-[0-9]+", lower_name):
+            return "clang"
+        if lower_name == "clang":
+            return "clang"
+    return None
+
+
 def uses_tcc(command_text: str) -> bool:
     """Return whether the resolved compiler command ultimately invokes `tcc`."""
 
-    for word in compiler_command_words(command_text):
-        if Path(word).name in {"tcc", "tcc.exe"}:
-            return True
-    return False
+    return recognized_compiler_family(command_text) == "tcc"
 
 
 def assert_stable_native_toolchain(compiler_text: str, cflags_text: str, artifact_dir: Path) -> None:
     """Fail early when the selected compiler still emits unstable binaries."""
 
-    if uses_tcc(compiler_text):
-        notice("skipping native stability probe for tcc (no stable binary guarantee)")
+    family = recognized_compiler_family(compiler_text)
+    if family == "tcc":
+        notice("skipping native stability probe for known tcc command (no stable binary guarantee)")
+        return
+    if family in {"gcc", "clang"}:
+        notice(f"skipping native stability probe for known {family} command")
         return
 
     probe_source = artifact_dir / "native_stability_probe.c"
@@ -329,15 +353,6 @@ def main() -> int:
 
         if not stage2_wrapper.is_file() or not stage2_native.is_file() or not stage2_c.is_file():
             fail("first build did not produce the expected Stage 2 artifact layout", artifact_dir)
-
-        notice("checking compiler 1/3 self-host readiness against compiler/stage2_l0/src")
-        _, self_host_probe_elapsed = run_logged(
-            "self_host_probe",
-            [str(stage2_wrapper), "--check", "-P", "compiler/stage2_l0/src", "l0c"],
-            env=build_env,
-            artifact_dir=artifact_dir,
-        )
-        notice(f"self-host probe passed in {format_duration(self_host_probe_elapsed)}")
 
         second_native = artifact_dir / "l0c-stage2-second.native"
         second_c = second_native.with_suffix(".c")

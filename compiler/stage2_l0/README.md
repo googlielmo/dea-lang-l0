@@ -27,18 +27,22 @@ the repo root relative to itself and sets `L0_HOME` automatically when unset.
 
 ## Repo-local dist workflow
 
-Install both stage-specific launchers under `dist/bin`, then select which one `l0c` should point at:
+For normal development, install both stage-specific launchers under `dist/bin`, then select which one `l0c` should
+point at:
 
 ```bash
-make install-all
-make use-stage2
+make install-dev-stages
+make use-dev-stage1      # or: make use-dev-stage2
 source dist/bin/l0-env.sh
 l0c --check -P examples hello
 ```
 
 The generated `dist/bin/l0-env.sh` keeps `L0_HOME` repo-relative, activates `.venv` if present, prepends `dist/bin`
-to `PATH`, and leaves `L0_SYSTEM` unset. `make use-stage2` switches `dist/bin/l0c` and prints the exact `source`
+to `PATH`, and leaves `L0_SYSTEM` unset. `make use-dev-stage2` switches `dist/bin/l0c` and prints the exact `source`
 command to run next. `DIST_DIR` may be overridden, but it must remain inside the repository.
+
+The source-tree `./scripts/l0c` entrypoint is Stage 1 only and is mainly useful for bootstrap mechanics, internal
+tooling, and Stage 1-focused testing.
 
 ## Running tests
 
@@ -89,12 +93,11 @@ L0_CC=clang KEEP_ARTIFACTS=1 python3 compiler/stage2_l0/tests/l0c_triple_bootstr
 The test performs, in order:
 
 1. trusted Stage 1 -> first Stage 2 build with retained C enabled
-2. built Stage 2 self-host probe (`--check -P compiler/stage2_l0/src l0c`)
-3. first Stage 2 compiler -> second self-built Stage 2 compiler
-4. second self-built Stage 2 compiler -> third self-built Stage 2 compiler
-5. byte-for-byte comparison of second-build vs third-build retained C
-6. byte-for-byte comparison of second-build vs third-build native compiler binaries, unless the host compiler is `tcc`
-7. smoke run through the third self-built compiler
+2. first Stage 2 compiler -> second self-built Stage 2 compiler
+3. second self-built Stage 2 compiler -> third self-built Stage 2 compiler
+4. byte-for-byte comparison of second-build vs third-build retained C
+5. byte-for-byte comparison of second-build vs third-build native compiler binaries, unless the host compiler is `tcc`
+6. smoke run through the third self-built compiler
 
 If you want to run the same flow manually step by step, keep one compiler and one flag set for both builds:
 
@@ -104,7 +107,6 @@ export L0_CFLAGS="-Wl,-no_uuid"         # macOS
 # export L0_CFLAGS="-Wl,--build-id=none"  # Linux
 
 DIST_DIR=build/tests/triple-manual KEEP_C=1 ./scripts/build-stage2-l0c.sh
-./build/tests/triple-manual/bin/l0c-stage2 --check -P compiler/stage2_l0/src l0c
 L0_HOME="$PWD/compiler" ./build/tests/triple-manual/bin/l0c-stage2 --build --keep-c -P compiler/stage2_l0/src -o build/tests/triple-manual/l0c-stage2-second.native l0c
 L0_HOME="$PWD/compiler" ./build/tests/triple-manual/l0c-stage2-second.native --build --keep-c -P compiler/stage2_l0/src -o build/tests/triple-manual/l0c-stage2-third.native l0c
 cmp build/tests/triple-manual/l0c-stage2-second.c build/tests/triple-manual/l0c-stage2-third.c
@@ -153,7 +155,7 @@ The test argument accepts either `parser_test` or `parser_test.l0`.
 This runs:
 
 ```bash
-./l0c -P compiler/stage2_l0/src --run --trace-arc --trace-memory compiler/stage2_l0/tests/parser_test.l0
+./scripts/l0c -P compiler/stage2_l0/src --run --trace-arc --trace-memory compiler/stage2_l0/tests/parser_test.l0
 ```
 
 By default, output files are written under `/tmp` and printed at the end:

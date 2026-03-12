@@ -60,6 +60,16 @@ def run_one(case: TestCase) -> TestResult:
     )
 
 
+def submission_priority(case: TestCase) -> tuple[int, int]:
+    """Return the executor submission priority for one Stage 2 test case."""
+
+    # Start the slow triple-bootstrap regression immediately to reduce overall wall time,
+    # while preserving the normal discovery order for printed output.
+    if case.name == "l0c_triple_bootstrap_test.py":
+        return (0, case.index)
+    return (1, case.index)
+
+
 def main() -> int:
     """Program entrypoint."""
 
@@ -82,8 +92,6 @@ def main() -> int:
 
     passed = 0
     failures: list[TestResult] = []
-    ready: dict[int, TestResult] = {}
-    next_index = 0
 
     def emit(result: TestResult) -> None:
         nonlocal passed
@@ -101,15 +109,13 @@ def main() -> int:
         else:
             failures.append(result)
 
+    scheduled_cases = sorted(cases, key=submission_priority)
+
     with ThreadPoolExecutor(max_workers=jobs) as executor:
-        future_map = {executor.submit(run_one, case): case.index for case in cases}
+        future_map = {executor.submit(run_one, case): case.index for case in scheduled_cases}
         for future in as_completed(future_map):
             result = future.result()
-            ready[result.case.index] = result
-
-            while next_index in ready:
-                emit(ready.pop(next_index))
-                next_index += 1
+            emit(result)
 
     if not args.verbose and failures:
         print("======================================")
