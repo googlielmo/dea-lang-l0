@@ -34,6 +34,37 @@ from l0_types import (
 ### - Building the compilation context and search paths
 
 
+def compiler_identity_text() -> str:
+    """Return the user-facing compiler identity/version text."""
+    return "Dea language / L0 compiler (Stage 1)"
+
+
+def _count_cli_verbosity(argv: Sequence[str]) -> int:
+    """Count verbosity flags in compiler CLI args before `--`."""
+    cli_argv, _ = _split_cli_and_program_args(argv)
+    count = 0
+    for token in cli_argv:
+        if token == "--verbose":
+            count += 1
+            continue
+        if len(token) >= 2 and token.startswith("-") and set(token[1:]) == {"v"}:
+            count += len(token) - 1
+    return count
+
+
+def _has_cli_log_flag(argv: Sequence[str]) -> bool:
+    """Report whether compiler CLI args enable rich logging before `--`."""
+    cli_argv, _ = _split_cli_and_program_args(argv)
+    return any(token in {"-l", "--log"} for token in cli_argv)
+
+
+def _emit_verbose_compiler_identity(args: argparse.Namespace) -> None:
+    """Emit the compiler identity through the normal verbose logging path."""
+    if getattr(args, "verbosity", 0) < 1:
+        return
+    log_info(build_compilation_context(args), compiler_identity_text())
+
+
 def _init_env_defaults() -> None:
     """Initialize default environment variables based on L0_HOME."""
     l0_home = os.getenv("L0_HOME")
@@ -1147,11 +1178,17 @@ def main(argv=None) -> None:
     _init_env_defaults()
     parser = argparse.ArgumentParser(
         prog="l0c",
-        description="L0 compiler (Stage 1)",
+        description=compiler_identity_text(),
         epilog=(
             "Modes are selected with flags (default: --build). "
             "Use '--' to pass program arguments for --run."
         ),
+    )
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=compiler_identity_text(),
+        help="show compiler version and exit",
     )
 
     parser.add_argument("-v", "--verbose",
@@ -1215,7 +1252,19 @@ def main(argv=None) -> None:
 
     raw_argv = list(argv) if argv is not None else sys.argv[1:]
     cli_argv, program_args = _split_cli_and_program_args(raw_argv)
-    args = parser.parse_args(cli_argv)
+    try:
+        args = parser.parse_args(cli_argv)
+    except SystemExit as exc:
+        if exc.code == 2 and _count_cli_verbosity(raw_argv) >= 1:
+            fallback_args = argparse.Namespace(
+                verbosity=_count_cli_verbosity(raw_argv),
+                log=_has_cli_log_flag(raw_argv),
+                no_line_directives=False,
+                trace_arc=False,
+                trace_memory=False,
+            )
+            log_info(build_compilation_context(fallback_args), compiler_identity_text())
+        raise
 
     if args.mode == "run":
         if len(args.targets) > 1:
@@ -1230,6 +1279,7 @@ def main(argv=None) -> None:
         args.entry = args.targets[0]
 
     _validate_mode_scoped_flags(parser, args)
+    _emit_verbose_compiler_identity(args)
 
     dispatch = {
         "run": cmd_run,

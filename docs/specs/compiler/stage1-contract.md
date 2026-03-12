@@ -1,6 +1,6 @@
 # L0 Stage 1 Compiler Contract
 
-Version: 2026-03-09
+Version: 2026-03-12
 
 This document is the compact Stage 1 contract and navigation index.
 
@@ -53,6 +53,7 @@ Mode selection uses flags only:
 
 Global options:
 
+- `--version`
 - `-v` / `--verbose` (counted)
 - `-l` / `--log`
 - `-P` / `--project-root`
@@ -78,6 +79,9 @@ Debug-dump options:
 
 Exit behavior:
 
+- `--version` prints `Dea language / L0 compiler (Stage 1)` and exits `0`,
+- `-v` includes the same compiler identity text in info-level stderr output, including CLI usage failures such as a
+  missing target,
 - analysis or C-compilation failures return non-zero from CLI modes,
 - `--run` returns the executed program's process exit code (`KeyboardInterrupt` -> `130`).
 

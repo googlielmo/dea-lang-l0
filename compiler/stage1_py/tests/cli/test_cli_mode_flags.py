@@ -208,3 +208,47 @@ def test_default_build_allows_target_named_run(monkeypatch):
     name, args = calls[0]
     assert name == "build"
     assert args.entry == "run"
+
+
+def test_help_uses_compiler_identity_text(capsys):
+    with pytest.raises(SystemExit) as exc:
+        l0c.main(["--help"])
+
+    assert exc.value.code == 0
+    captured = capsys.readouterr()
+    assert "Dea language / L0 compiler (Stage 1)" in captured.out
+    assert "show compiler version and exit" in captured.out
+    assert captured.err == ""
+
+
+def test_version_prints_compiler_identity_text(capsys):
+    with pytest.raises(SystemExit) as exc:
+        l0c.main(["--version"])
+
+    assert exc.value.code == 0
+    captured = capsys.readouterr()
+    assert captured.out == "Dea language / L0 compiler (Stage 1)\n"
+    assert captured.err == ""
+
+
+def test_verbose_logs_compiler_identity_text(monkeypatch, capsys):
+    calls = _patch_handlers(monkeypatch)
+
+    rc = _run_main(["-v", "app.main"])
+
+    assert rc == 0
+    assert len(calls) == 1
+    captured = capsys.readouterr()
+    assert "Dea language / L0 compiler (Stage 1)" in captured.err
+
+
+def test_verbose_missing_target_still_logs_compiler_identity_text(monkeypatch, capsys):
+    calls = _patch_handlers(monkeypatch)
+
+    rc = _run_main(["-v"])
+
+    assert rc == 2
+    assert calls == []
+    captured = capsys.readouterr()
+    assert "the following arguments are required: targets" in captured.err
+    assert "Dea language / L0 compiler (Stage 1)" in captured.err

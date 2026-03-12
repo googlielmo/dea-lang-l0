@@ -639,7 +639,25 @@ func l0c_cmd_nyi(mode: CliMode, cfg: LogConfig*) -> int {
  */
 func run_with_argv(argv: VectorString*) -> int {
     let parsed = cli_parse(argv);
+    if (parsed.help_requested) {
+        cli_print_help();
+        cli_parse_result_free(parsed);
+        return 0;
+    }
+
+    if (parsed.version_requested) {
+        cli_print_version();
+        cli_parse_result_free(parsed);
+        return 0;
+    }
+
     if (diag_has_errors(parsed.diags) || parsed.options == null) {
+        with (
+            let err_cfg = log_config_create(log_level_from_verbosity(parsed.verbosity), parsed.rich_log) => drop err_cfg
+        ) {
+            log_info(err_cfg, cli_compiler_identity_text());
+        }
+        cli_print_usage(true);
         dp_print_collector(parsed.diags);
         cli_parse_result_free(parsed);
         return 2;
@@ -649,6 +667,8 @@ func run_with_argv(argv: VectorString*) -> int {
     parsed.options = null;
 
     with (let cfg = log_config_create(log_level_from_verbosity(opts.verbosity), opts.log) => drop cfg) {
+        log_info(cfg, cli_compiler_identity_text());
+
         let rc = 1;
         match (opts.mode) {
             CM_CHECK => {

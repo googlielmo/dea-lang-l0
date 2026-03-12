@@ -35,11 +35,16 @@ make install-dev-stages
 make use-dev-stage1      # or: make use-dev-stage2
 source dist/bin/l0-env.sh
 l0c --check -P examples hello
+l0c --version
 ```
 
 The generated `dist/bin/l0-env.sh` keeps `L0_HOME` repo-relative, activates `.venv` if present, prepends `dist/bin`
 to `PATH`, and leaves `L0_SYSTEM` unset. `make use-dev-stage2` switches `dist/bin/l0c` and prints the exact `source`
 command to run next. `DIST_DIR` may be overridden, but it must remain inside the repository.
+
+The Stage 2 CLI also supports `--help` and `--version`. Both show the Stage 2 identity text
+`Dea language / L0 compiler (Stage 2)`. Verbose mode (`-v`) emits the same identity line on stderr through the normal
+info-level log path, including CLI usage failures such as `l0c -v` without a target.
 
 The source-tree `./scripts/l0c` entrypoint is Stage 1 only and is mainly useful for bootstrap mechanics, internal
 tooling, and Stage 1-focused testing.

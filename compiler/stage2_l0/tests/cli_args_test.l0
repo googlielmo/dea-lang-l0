@@ -110,6 +110,42 @@ func test_multiple_targets_rejected() {
 }
 
 /**
+ * Tests test_help_flag_short_circuits_validation.
+ */
+func test_help_flag_short_circuits_validation() {
+    with (let argv = vs_create(4) => vs_free(argv)) {
+        vs_push(argv, "-h");
+        vs_push(argv, "--bogus");
+
+        let parsed = cli_parse(argv);
+        assert(parsed.help_requested, "expected help request");
+        assert(!diag_has_errors(parsed.diags), "help should not emit diagnostics");
+        assert(parsed.options == null, "help should not return parsed options");
+
+        cli_parse_result_free(parsed);
+    }
+}
+
+/**
+ * Tests test_version_flag_short_circuits_validation.
+ */
+func test_version_flag_short_circuits_validation() {
+    with (let argv = vs_create(4) => vs_free(argv)) {
+        vs_push(argv, "--version");
+        vs_push(argv, "--bogus");
+
+        let parsed = cli_parse(argv);
+        assert(parsed.version_requested, "expected version request");
+        assert(!parsed.help_requested, "version should not set help");
+        assert(!diag_has_errors(parsed.diags), "version should not emit diagnostics");
+        assert(parsed.options == null, "version should not return parsed options");
+        assert(parsed.verbosity == 0, "version request should preserve parsed verbosity");
+
+        cli_parse_result_free(parsed);
+    }
+}
+
+/**
  * Tests test_no_legacy_command_rewrite.
  */
 func test_no_legacy_command_rewrite() {
@@ -132,6 +168,8 @@ func main() {
     test_non_run_rejects_program_args_separator();
     test_mode_scoped_flag_validation();
     test_multiple_targets_rejected();
+    test_help_flag_short_circuits_validation();
+    test_version_flag_short_circuits_validation();
     test_no_legacy_command_rewrite();
     printl_s("cli_args_test: all tests passed");
 }

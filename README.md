@@ -138,6 +138,7 @@ make install-dev-stages
 make use-dev-stage1      # or: make use-dev-stage2
 source dist/bin/l0-env.sh
 l0c --help
+l0c --version
 ```
 
 The `./scripts/l0c` entrypoint remains available, but it is the source-tree Stage 1 wrapper and is mainly useful for
@@ -160,7 +161,12 @@ func main() -> int {
 l0c hello.l0 -o hello && ./hello        # produce a binary and run it
 l0c --run hello.l0                      # compile and execute in one step
 l0c --check hello.l0                    # analyze only, no output (use `-v`/`-vvv` for verbose diagnostics)
+l0c --version                           # print the active compiler stage identity and exit
 ```
+
+`--help` and `--version` print the active stage identity (`Dea language / L0 compiler (Stage 1)` or
+`Dea language / L0 compiler (Stage 2)`). `-v` also emits that identity line on stderr through the normal verbose log
+path, even when the command later fails with usage such as `l0c -v`.
 
 ### Multi-module projects
 
@@ -435,6 +441,8 @@ l0c [mode] [options] <target>
 # or, for the source-tree Stage 1 wrapper only:
 # ./scripts/l0c [mode] [options] <target>
 ```
+
+Global identity and logging options include `--help`, `--version`, `-v/--verbose`, and `-l/--log`.
 
 | Mode           | Action                      |
 |----------------|-----------------------------|

@@ -1,6 +1,6 @@
 # L0 Project Status
 
-Version: 2026-03-11
+Version: 2026-03-12
 
 This document summarizes what is implemented in this repository today and what remains open.
 
@@ -107,12 +107,20 @@ Commands and aliases:
 
 Common supported options:
 
-- Roots and logging: `-P/--project-root`, `-S/--sys-root`, `-v/--verbose`, `-l/--log`
+- Roots and logging: `-P/--project-root`, `-S/--sys-root`, `--version`, `-v/--verbose`, `-l/--log`
 - Build/codegen: `-NLD/--no-line-directives`, `--trace-arc`, `--trace-memory`, `-c/--c-compiler`, `-C/--c-options`,
   `-I/--runtime-include`,
   `-L/--runtime-lib`, `-o/--output`, `--keep-c`
   - C compiler flags can also be provided via `$L0_CFLAGS`; effective order is `$L0_CFLAGS` first, then `--c-options`.
 - Dumps: `-a/--all-modules` for `tok|ast|sym|type`, `-I/--include-eof` for `tok`
+
+CLI identity/help behavior:
+
+- `--version` prints one stage-specific line and exits (`Dea language / L0 compiler (Stage 1)` or
+  `Dea language / L0 compiler (Stage 2)`).
+- `--help` uses the same stage-specific identity text as the help description heading.
+- `-v` also emits the same identity text on stderr through the normal info-level logging path, including CLI usage
+  failures such as invoking `l0c -v` without a target.
 
 ## Standard Library Status
 
@@ -215,6 +223,8 @@ Stage 2 backend/codegen status:
   `--trace-memory`.
 - Stage 2 `l0c --build` and `--run` are implemented on top of the same analysis plus backend path, using
   `std.system.system()` for host compiler and program execution.
+- Stage 2 `l0c --help` and `--version` are implemented with Stage 2-specific identity text, and `-v` preserves that
+  identity output even on CLI usage failures.
 - Stage 2 can now be bootstrapped into a repo-local artifact via `./scripts/build-stage2-l0c.sh`, producing
   `build/stage2/bin/l0c-stage2` and `l0c-stage2.native` by default.
 - Phase 2 now adds a repo-local `dist/bin` workflow via `make install-dev-stages`, explicit `make use-dev-stage1` /
