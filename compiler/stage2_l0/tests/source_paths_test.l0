@@ -9,6 +9,7 @@ import std.assert;
 import std.io;
 import std.string;
 import std.vector;
+import util.diag;
 
 import source_paths;
 
@@ -70,6 +71,22 @@ func test_format_root_list_matches_stage1_contract() {
 }
 
 /**
+ * Tests test_path_target_parent_suppresses_default_dot_root.
+ */
+func test_path_target_parent_suppresses_default_dot_root() {
+    with (
+        let roots = vs_create(2) => vs_free(roots),
+        let diags = diag_create() => diag_free(diags)
+    ) {
+        let entry = sp_normalize_entry_target("examples/demo.l0", roots, diags);
+        assert(entry != null && eq_s(entry as string, "demo"), "expected demo entry module");
+        sp_apply_default_project_roots(roots);
+        assert(vs_size(roots) == 1, "path target should not keep default '.' root");
+        assert(eq_s(vs_get(roots, 0), "examples"), "path target parent should become the only root");
+    }
+}
+
+/**
  * Main entry point for the module.
  */
 func main() {
@@ -78,5 +95,6 @@ func main() {
     test_default_sys_roots_l0_home_fallback();
     test_explicit_sys_root_suppresses_defaults();
     test_format_root_list_matches_stage1_contract();
+    test_path_target_parent_suppresses_default_dot_root();
     printl_s("source_paths_test: all tests passed");
 }

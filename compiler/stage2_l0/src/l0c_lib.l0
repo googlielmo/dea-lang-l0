@@ -96,7 +96,6 @@ func l0c_prepare_input(opts: CliOptions*, diags: DiagCollector*, cfg: LogConfig*
         let project_roots = us_vs_clone(opts.project_roots) => vs_free(project_roots),
         let sys_roots = us_vs_clone(opts.sys_roots) => vs_free(sys_roots)
     ) {
-        sp_apply_default_project_roots(project_roots);
         sp_apply_default_sys_roots(sys_roots);
 
         let entry_target = opts.entry_target as string;
@@ -106,6 +105,7 @@ func l0c_prepare_input(opts: CliOptions*, diags: DiagCollector*, cfg: LogConfig*
             return null;
         }
 
+        sp_apply_default_project_roots(project_roots);
         let entry_module = entry_opt as string;
         l0c_log_effective_roots(cfg, sys_roots, project_roots);
         let sp = sp_build_from_roots(project_roots, sys_roots);

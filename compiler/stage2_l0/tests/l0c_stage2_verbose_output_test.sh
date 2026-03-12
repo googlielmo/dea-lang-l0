@@ -114,6 +114,16 @@ assert_contains "$VVV_STDERR" "Emitting header and forward declarations"
 assert_not_contains "$VVV_STDERR" "Generating module 'ok_main'"
 assert_not_contains "$VVV_STDERR" "already loaded (cached)"
 
+PATH_STDOUT="$TMP_DIR/path.stdout"
+PATH_STDERR="$TMP_DIR/path.stderr"
+if ! env -i PATH="$PATH" "$STAGE2_L0C" -vvv examples/demo.l0 >"$PATH_STDOUT" 2>"$PATH_STDERR"; then
+    fail "-vvv examples/demo.l0 should succeed"
+fi
+
+assert_empty "$PATH_STDOUT"
+assert_contains "$PATH_STDERR" "Project root(s): 'examples'"
+assert_not_contains "$PATH_STDERR" "Project root(s): '.','examples'"
+
 RUN_STDOUT="$TMP_DIR/run.stdout"
 RUN_STDERR="$TMP_DIR/run.stderr"
 if ! env -i PATH="$PATH" "$STAGE2_L0C" -v --run -P "$FIXTURE_ROOT" ok_main >"$RUN_STDOUT" 2>"$RUN_STDERR"; then
