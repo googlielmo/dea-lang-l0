@@ -120,6 +120,36 @@ func test_typing_try_err() {
 }
 
 /**
+ * Tests successful typing for `new` parity cases.
+ */
+func test_typing_new_ok() {
+    let sp = make_paths();
+    with (let cfg = log_config_create(LL_SILENT, false) => drop cfg) {
+        let result = analysis_analyze_entry(sp, "typing_new_ok", cfg);
+        assert(!analysis_has_errors(result), "expected no typing errors for typing_new_ok");
+        analysis_result_free(result);
+    }
+    sp_free(sp);
+}
+
+/**
+ * Tests `new` diagnostics for invalid construction cases.
+ */
+func test_typing_new_err() {
+    let sp = make_paths();
+    with (let cfg = log_config_create(LL_SILENT, false) => drop cfg) {
+        let result = analysis_analyze_entry(sp, "typing_new_err", cfg);
+        assert(analysis_has_errors(result), "expected typing errors for typing_new_err");
+        assert(has_diag_code(result, "TYP-0281"), "expected enum-allocation-without-variant error");
+        assert(has_diag_code(result, "TYP-0283"), "expected struct new arity error");
+        assert(has_diag_code(result, "TYP-0333"), "expected enum variant payload type mismatch error");
+        assert(!has_diag_code(result, "SIG-0010"), "new variant should not be treated as a type name");
+        analysis_result_free(result);
+    }
+    sp_free(sp);
+}
+
+/**
  * Main entry point for the module.
  */
 func main() {
@@ -127,5 +157,7 @@ func main() {
     test_typing_err();
     test_typing_try_ok();
     test_typing_try_err();
+    test_typing_new_ok();
+    test_typing_new_err();
     printl_s("expr_types_test: all tests passed");
 }

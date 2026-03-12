@@ -74,6 +74,8 @@ assert_file "$BOOTSTRAP_DIR/bin/l0c-stage2.native"
 assert_no_file "$BOOTSTRAP_DIR/bin/l0c-stage2.c"
 
 env -i PATH="$PATH" "$BOOTSTRAP_DIR/bin/l0c-stage2" --check -P examples hello >/dev/null
+env -i PATH="$PATH" "$BOOTSTRAP_DIR/bin/l0c-stage2" --check -P examples newdrop >/dev/null
+env -i PATH="$PATH" "$BOOTSTRAP_DIR/bin/l0c-stage2" --check -P examples hamurabi >/dev/null
 PROBE_ROOT="$(mktemp -d "$BOOTSTRAP_PARENT/l0_stage2_probe.XXXXXX")"
 cat > "$PROBE_ROOT/qualified_expr.l0" <<'EOF'
 module qualified_expr;

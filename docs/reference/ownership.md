@@ -49,6 +49,10 @@ How it lowers at runtime:
 
 - `new` → `_rt_alloc_obj(bytes)`.
 - `drop` → `_rt_drop(ptr)`.
+- `new Struct` and `new Struct()` allocate one heap object and zero-initialize it.
+- `new Struct(args...)` allocates one heap object and initializes fields positionally; when arguments are present, the
+  constructor requires full struct-field arity.
+- `new Variant(args...)` allocates the owning enum object initialized to that specific variant.
 - The `drop` statement accepts both standard pointers (`T*`) and nullable pointers (`T*?`).
 - `_rt_drop(NULL)` is a safe no-op (e.g. `drop p` where `p` is `null` does nothing).
 - Dropping a pointer that was not allocated by `new` triggers a runtime panic.

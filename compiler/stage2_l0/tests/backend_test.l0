@@ -461,7 +461,7 @@ func test_backend_generate_drop_statement() {
 func test_backend_generate_new_and_try_lowering() {
     with (let filenames = vs_create(1) => vs_free(filenames),
           let sources = vs_create(1) => vs_free(sources),
-          let lines = vs_create(18) => vs_free(lines),
+          let lines = vs_create(24) => vs_free(lines),
           let cfg = log_config_create(LL_ERROR, false) => drop cfg,
           let opts = cg_options_create() => cg_options_free(opts)) {
         opts.emit_line_directives = false;
@@ -470,14 +470,21 @@ func test_backend_generate_new_and_try_lowering() {
         vs_push(lines, "struct Box {");
         vs_push(lines, "    value: int;");
         vs_push(lines, "}");
+        vs_push(lines, "enum Result {");
+        vs_push(lines, "    Ok(value: int);");
+        vs_push(lines, "}");
         vs_push(lines, "func maybe(flag: bool) -> int? {");
         vs_push(lines, "    if (flag) { return 7; }");
         vs_push(lines, "    return null;");
         vs_push(lines, "}");
         vs_push(lines, "func main() -> int? {");
+        vs_push(lines, "    let z = new Box();");
         vs_push(lines, "    let p = new Box(7);");
+        vs_push(lines, "    let r = new Ok(9);");
         vs_push(lines, "    let x = maybe(true)?;");
+        vs_push(lines, "    drop z;");
         vs_push(lines, "    drop p;");
+        vs_push(lines, "    drop r;");
         vs_push(lines, "    return x;");
         vs_push(lines, "}");
         vs_push(sources, bt_source(lines));
@@ -488,7 +495,11 @@ func test_backend_generate_new_and_try_lowering() {
         let generated = backend_generate(result, opts, cfg);
         assert(contains_s(generated, "_rt_alloc_obj((l0_int)sizeof(struct l0_demo_main_Box));"),
             "new expression should allocate heap storage");
+        assert(contains_s(generated, "(struct l0_demo_main_Box){ 0 }"),
+            "zero-arg struct new should lower to zero initialization");
         assert(contains_s(generated, "*l0_new_"), "new expression should initialize the allocated object");
+        assert(contains_s(generated, "l0_demo_main_Result_Ok"),
+            "enum variant new should initialize the variant tag");
         assert(contains_s(generated, "l0_opt_int l0_try_"), "try expression should materialize a temp");
         assert(contains_s(generated, "if (!l0_try_"), "try expression should check has_value");
 

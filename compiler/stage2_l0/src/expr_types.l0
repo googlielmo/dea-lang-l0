@@ -1046,18 +1046,63 @@ func etc_infer_expr(self: ExpressionTypeChecker*, expr_id: ExprId) -> Type*? {
         }
         EX_NEW => {
             if (expr.type_ref != null) {
+                let target_ref = expr.type_ref as TypeRef*;
+                let arg_count = 0;
+                if (expr.ids != null) {
+                    arg_count = vec_size(expr.ids as VectorBase*);
+                }
+
+                let sym = etc_lookup_symbol(self, target_ref.name, target_ref.module_path, target_ref.name_qualifier);
+                if (sym != null &&
+                    ord((sym as Symbol*).kind) == ord(SYM_ENUM_VARIANT) &&
+                    target_ref.pointer_depth == 0 &&
+                    !target_ref.is_nullable) {
+                    let s = sym as Symbol*;
+                    let enum_info = sig_lookup_enum_info(self.result.signatures as SignatureTables*, s.module_name, s.owner_name);
+                    if (enum_info != null) {
+                        let variants = (enum_info as EnumInfo*).variants;
+                        for (let i = 0; i < vec_size(variants); i = i + 1) {
+                            let variant = ptr_vec_get(variants, i) as EnumVariantInfo*;
+                            if (!eq_s(variant.name, s.name)) {
+                                continue;
+                            }
+
+                            let field_count = vec_size(variant.field_types);
+                            if (arg_count != field_count) {
+                                etc_diag_error(self, "TYP-0332",
+                                    concat_s("enum variant constructor field count mismatch", ""),
+                                    unit.path, expr.span);
+                            }
+                            for (let j = 0; j < arg_count; j = j + 1) {
+                                let arg_ty = etc_infer_expr(self, id_vec_get(expr.ids as VectorBase*, j));
+                                if (arg_ty != null) {
+                                    if (j < field_count) {
+                                        let field_ty = ptr_vec_get(variant.field_types, j) as Type*;
+                                        if (!etc_can_assign(self, field_ty, arg_ty as Type*)) {
+                                            etc_diag_error(self, "TYP-0333",
+                                                concat_s("enum variant constructor field type mismatch", ""),
+                                                unit.path, expr.span);
+                                        }
+                                    }
+                                    type_free(arg_ty as Type*);
+                                }
+                            }
+                            break;
+                        }
+                    }
+                    ty = type_new_pointer(type_new_enum(s.module_name, s.owner_name));
+                } else {
                 with (let seen2 = ss_create() => ss_free(seen2)) {
                     let base_ty = tr_resolve_type_ref(self.result.signatures as SignatureTables*,
                         self.result.names as NameResolution*, self.current_env as ModuleEnv*,
-                        expr.type_ref as TypeRef*, self.result.diags, seen2);
+                        target_ref, self.result.diags, seen2);
                     if (base_ty != null) {
                         let base = base_ty as Type*;
-                        let arg_count = 0;
-                        if (expr.ids != null) {
-                            arg_count = vec_size(expr.ids as VectorBase*);
-                        }
-
-                        if (ord(base.kind) == ord(TY_STRUCT)) {
+                        if (ord(base.kind) == ord(TY_ENUM)) {
+                            etc_diag_error(self, "TYP-0281",
+                                concat4_s("cannot allocate enum type '", type_format(base), "' without a variant", ""),
+                                unit.path, expr.span);
+                        } else if (ord(base.kind) == ord(TY_STRUCT)) {
                             let info = sig_lookup_struct_info(self.result.signatures as SignatureTables*,
                                 base.module_name, base.name);
                             if (info == null) {
@@ -1067,7 +1112,7 @@ func etc_infer_expr(self: ExpressionTypeChecker*, expr_id: ExprId) -> Type*? {
                             } else {
                                 let fields = (info as StructInfo*).fields;
                                 let field_count = vec_size(fields);
-                                if (arg_count != field_count) {
+                                if (arg_count > 0 && arg_count != field_count) {
                                     etc_diag_error(self, "TYP-0283",
                                         concat4_s("struct '", base.name, "' argument count mismatch", ""),
                                         unit.path, expr.span);
@@ -1107,8 +1152,13 @@ func etc_infer_expr(self: ExpressionTypeChecker*, expr_id: ExprId) -> Type*? {
                             }
                         }
 
-                        ty = type_new_pointer(base);
+                        if (ord(base.kind) != ord(TY_ENUM)) {
+                            ty = type_new_pointer(base);
+                        } else {
+                            type_free(base);
+                        }
                     }
+                }
                 }
             }
         }
