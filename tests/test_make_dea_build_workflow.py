@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 import os
 from pathlib import Path
 import shlex
@@ -19,6 +20,11 @@ import tempfile
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 BUILD_TESTS_ROOT = REPO_ROOT / "build" / "tests"
+SCRIPTS_DIR = REPO_ROOT / "scripts"
+if str(SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS_DIR))
+
+from dist_tools_lib import Stage2BuildProvenance, format_build_time_utc, format_commit_for_version, render_stage2_build_info_module
 
 
 def fail(message: str) -> None:
@@ -110,6 +116,52 @@ def assert_output_contains(text: str, expected: str) -> None:
         fail(f"expected {expected!r} in output:\n{text}")
 
 
+def assert_output_not_contains(text: str, unexpected: str) -> None:
+    if unexpected in text:
+        fail(f"did not expect {unexpected!r} in output:\n{text}")
+
+
+def assert_version_report(text: str) -> None:
+    for expected in (
+        "Dea language / L0 compiler (Stage 2)",
+        "build: ",
+        "build time: ",
+        "commit: ",
+        "host: ",
+        "compiler: ",
+    ):
+        assert_output_contains(text, expected)
+    for unexpected in ("tree: ", "build id: ", "built at: ", "compiler version: "):
+        assert_output_not_contains(text, unexpected)
+
+
+def assert_provenance_helper_contract() -> None:
+    timestamp = datetime(2026, 3, 12, 23, 55, 56, tzinfo=timezone.utc)
+    if format_build_time_utc(timestamp) != "2026-03-12 23:55:56+00:00":
+        fail("format_build_time_utc must use the fixed `+00:00` rendering")
+    if format_commit_for_version("abc123", "clean") != "abc123":
+        fail("clean commit formatting must not add a suffix")
+    if format_commit_for_version("abc123", "dirty") != "abc123+dirty":
+        fail("dirty commit formatting must append +dirty")
+
+    rendered = render_stage2_build_info_module(
+        Stage2BuildProvenance(
+            commit_full="f8174b779f339af1f159765880b92f3b5c40490b",
+            commit_short="f8174b7",
+            tree_state="dirty",
+            build_id="f8174b7-20260312T235556Z",
+            build_time="2026-03-12 23:55:56+00:00",
+            host="Darwin 24.6.0 x86_64",
+            compiler_banner="gcc-15 (Homebrew GCC 15.2.0_1) 15.2.0",
+            has_embedded_version=True,
+        )
+    )
+    for expected in ("build: ", "build time: ", "commit: ", "host: ", "compiler: ", "+dirty", "Darwin 24.6.0 x86_64"):
+        assert_output_contains(rendered, expected)
+    for unexpected in ("tree: ", "build id: ", "built at: ", "compiler version: "):
+        assert_output_not_contains(rendered, unexpected)
+
+
 def source_env_and_check(dea_build_dir: Path) -> None:
     env_script = dea_build_dir / "bin" / "l0-env.sh"
     command = [
@@ -122,6 +174,7 @@ def source_env_and_check(dea_build_dir: Path) -> None:
 
 def main() -> int:
     BUILD_TESTS_ROOT.mkdir(parents=True, exist_ok=True)
+    assert_provenance_helper_contract()
     dea_build_dir = Path(tempfile.mkdtemp(prefix="make_dea_build.", dir=BUILD_TESTS_ROOT))
     prefix_dir = Path(tempfile.mkdtemp(prefix="make_prefix.")).resolve(strict=False)
     dea_build_rel = os.path.relpath(dea_build_dir, REPO_ROOT)
@@ -177,6 +230,11 @@ def main() -> int:
         assert_exists(native_path)
         assert_exists(env_path)
         assert_missing(alias_path)
+        repo_wrapper_version = run_checked([str(stage2_path), "--version"])
+        repo_native_version = run_checked([str(native_path), "--version"])
+        assert_version_report(repo_wrapper_version)
+        if repo_native_version != repo_wrapper_version:
+            fail("expected repo-local wrapper/native --version output to match")
         if env_path.read_text(encoding="utf-8") != stable_env_text:
             fail("expected l0-env.sh to remain stable after install-dev-stage2")
 
@@ -213,6 +271,11 @@ def main() -> int:
         assert_exists(prefix_dir / "shared" / "runtime" / "l0_runtime.h")
         assert_symlink_target(prefix_alias_path, "l0c-stage2")
         assert_output_contains(install_prefix_output, "installed self-hosted Stage 2 compiler")
+        prefix_wrapper_version = run_checked([str(prefix_stage2_path), "--version"])
+        prefix_native_version = run_checked([str(prefix_native_path), "--version"])
+        assert_version_report(prefix_wrapper_version)
+        if prefix_native_version != prefix_wrapper_version:
+            fail("expected installed wrapper/native --version output to match")
 
         run_expected_fail(
             ["make", "DEA_BUILD_DIR=/tmp/l0-dev", "install-dev-stage1"],
@@ -224,7 +287,7 @@ def main() -> int:
         )
         run_expected_fail(
             ["make", "install"],
-            "make install: PREFIX is required; example: make PREFIX=/tmp/l0-install install",
+            "make install: PREFIX is required; example: make PREFIX=/tmp/l0-install L0_CC=gcc install",
         )
         run_expected_fail(
             ["make", "PREFIX=.", "install"],
@@ -248,7 +311,7 @@ def main() -> int:
             "triple-test": "./.venv/bin/python ./compiler/stage2_l0/tests/l0c_triple_bootstrap_test.py",
             "test-all": "./compiler/stage2_l0/run_trace_tests.py",
             "docs": "./scripts/gen-docs.sh",
-            "docs-pdf": "./scripts/gen-docs.sh --pdf",
+            "docs-pdf": "./scripts/gen-docs.sh --strict --pdf",
         }
         for target, expected in dry_run_expectations.items():
             output = run_checked(make_command(dea_build_rel, target, dry_run=True))

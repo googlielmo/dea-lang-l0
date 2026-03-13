@@ -67,9 +67,21 @@ initial Stage 1-built artifact. The installed prefix contains:
 The installed wrapper derives `L0_HOME` from `PREFIX` at runtime. The installed `l0-env.sh` sets `L0_HOME="$PREFIX"`
 only; the compiler then derives stdlib and runtime defaults from `L0_HOME` unless you explicitly override them.
 
-The Stage 2 CLI also supports `--help` and `--version`. Both show the Stage 2 identity text
-`Dea language / L0 compiler (Stage 2)`. Verbose mode (`-v`) emits the same identity line on stderr through the normal
-info-level log path, including CLI usage failures such as `l0c -v` without a target.
+The Stage 2 CLI also supports `--help` and `--version`.
+
+- `--help` stays on the static Stage 2 identity text `Dea language / L0 compiler (Stage 2)`.
+- `--version` prints the same first line plus embedded build provenance for repo-local and install-prefix artifacts built
+  through `./scripts/build-stage2-l0c.sh`, `make install-dev-stage2`, `make install-dev-stages`, and `make install`.
+  The report uses `build:`, `build time:`, `commit:`, `host:`, and `compiler:` lines.
+- `commit:` appends `+dirty` only when the repository tree was dirty at build time.
+- `build time:` is rendered in UTC as `YYYY-MM-DD HH:MM:SS+00:00`.
+- `host:` is the compact kernel triplet from `uname -s`, `uname -r`, and `uname -m`.
+- `compiler:` is the first line of `<compiler> --version`; the compiler command itself is not printed separately.
+- Direct `l0c-stage2.native --version` works the same way because the provenance is compiled into the binary itself.
+- Verbose mode (`-v`) still emits only the static identity line on stderr through the normal info-level log path,
+  including CLI usage failures such as `l0c -v` without a target.
+- Raw self-hosted compiler 2 / compiler 3 binaries in the strict triple-bootstrap regression intentionally remain on
+  the static fallback `--version` output so bootstrap identity stays byte-stable.
 
 The source-tree `./scripts/l0c` entrypoint is Stage 1 only and is mainly useful for bootstrap mechanics, internal
 tooling, and Stage 1-focused testing.

@@ -3,8 +3,9 @@
 ## Embed build-provenance metadata in installed and repo-local Stage 2 compiler binaries
 
 - Date: 2026-03-12
-- Status: Draft
-- Title: Embed build-provenance metadata in Stage 2 binaries for `install-dev-stage2` and `install` without perturbing triple-bootstrap stability
+- Status: Closed (implemented)
+- Title: Embed build-provenance metadata in Stage 2 binaries for `install-dev-stage2` and `install` without perturbing
+  triple-bootstrap stability
 - Kind: Feature
 - Severity: Medium
 - Stage: 2
@@ -13,6 +14,7 @@
     - `compiler/stage2_l0/src/build_info.l0`
     - `compiler/stage2_l0/src/cli_args.l0`
     - `scripts/build_stage2_l0c.py`
+    - `scripts/dist_tools_lib.py`
     - `scripts/gen_dist_tools.py`
     - `compiler/stage2_l0/README.md`
     - `docs/reference/project-status.md`
@@ -21,14 +23,15 @@
     - `compiler/stage2_l0/tests/l0c_stage2_install_prefix_test.sh`
     - `compiler/stage2_l0/tests/l0c_triple_bootstrap_test.py`
     - `tests/test_make_dea_build_workflow.py`
+    - `tests/test_dist_tools_lib_fallback.py`
 
 ## Summary
 
 The current Stage 2 `--version` path prints only the static identity string:
 `Dea language / L0 compiler (Stage 2)`.
 That is sufficient for source-tree parity, but it does not answer the operational questions an installed compiler
-should answer: which commit produced it, whether the source tree was clean, when it was built, on what host, and with
-which C compiler.
+should answer: which build produced it, when it was built, which commit it came from, which host built it, and which
+host compiler banner identifies the actual native toolchain.
 
 The approved direction is to embed this metadata in the binary itself, but only in artifact-producing flows:
 
@@ -55,26 +58,27 @@ embedded metadata. This avoids wrapper-side metadata plumbing and avoids fragile
     - short git commit hash
     - repository cleanliness (`clean` / `dirty`)
     - build id
-    - UTC build timestamp
+    - one captured UTC build timestamp reused for both the build ID suffix and rendered build time
     - host platform text
-    - resolved host C compiler command
     - the first line of `<compiler> --version`
-4. Host platform text should use `uname -a` on Unix-like systems. On non-Unix systems it should use a portable
-   fallback that at minimum reports operating system and architecture.
-5. Repository cleanliness should come from git state at build time and should qualify the meaning of the commit hash:
-    - `tree: clean` means the commit hash identifies the exact source tree
-    - `tree: dirty` means the commit hash identifies only the checked-out base commit
+4. Host platform text should use `uname -s`, `uname -r`, and `uname -m` on Unix-like systems, joined as
+   `<kernel-name> <kernel-release> <machine>`. On non-Unix systems it should use a portable fallback with the same
+   three-field shape.
+5. Repository cleanliness should come from git state at build time and should be expressed only in the `commit:` line:
+    - clean tree: `<fullsha>`
+    - dirty tree: `<fullsha>+dirty`
 6. Resolve the host C compiler once in Python using the same precedence already used by the compiler drivers:
     - `L0_CC`
     - `tcc`, `gcc`, `clang`, `cc`
     - `CC`
-   Then export that exact value back into the subprocess environment as `L0_CC` so the recorded compiler and the
-   actual build compiler agree.
+      Then export that exact value back into the subprocess environment as `L0_CC` so the captured compiler banner and
+      the
+      actual build compiler agree.
 7. For `install-dev-stage2`, `scripts/build_stage2_l0c.py` should:
     - generate a temporary overlay root containing a synthesized `build_info.l0`
     - invoke the Stage 1 builder with:
-      - `-P <overlay_root>`
-      - `-P compiler/stage2_l0/src`
+        - `-P <overlay_root>`
+        - `-P compiler/stage2_l0/src`
     - embed the collected build metadata in compiler 1
 8. For `install`, `scripts/gen_dist_tools.py install-prefix` should:
     - generate the same kind of temporary overlay root
@@ -87,36 +91,46 @@ embedded metadata. This avoids wrapper-side metadata plumbing and avoids fragile
 11. The embedded `--version` report shape should be:
     - first line: `Dea language / L0 compiler (Stage 2)`
     - subsequent labeled lines:
-      - `commit:`
-      - `tree:`
-      - `build id:`
-      - `built at:`
-      - `host:`
-      - `compiler:`
-      - `compiler version:`
-12. Build ID precedence should be:
+        - `build:`
+        - `build time:`
+        - `commit:`
+        - `host:`
+        - `compiler:`
+12. `build time:` should render the same captured UTC instant used by the build ID logic, formatted as
+    `YYYY-MM-DD HH:MM:SS+00:00`.
+13. `compiler:` should print only the first line of `<compiler> --version`; do not print a separate compiler command
+    line or a separate compiler-version line.
+14. Build ID precedence should be:
     - `DEA_BUILD_ID`, if set
     - GitHub Actions auto-derived ID when `GITHUB_ACTIONS=true`
     - local fallback
-13. The GitHub Actions auto-derived build ID format should be:
+15. The GitHub Actions auto-derived build ID format should be:
     - `gha-<run_id>.<run_attempt>-<job>-<runner_os>-<runner_arch>`
-   using:
+      using:
     - `GITHUB_RUN_ID`
     - `GITHUB_RUN_ATTEMPT`
     - `GITHUB_JOB`
     - `RUNNER_OS`
     - `RUNNER_ARCH`
-14. For other CI systems in v1, do not add a broad provider-detection table. If a non-GitHub CI pipeline wants a
+16. For other CI systems in v1, do not add a broad provider-detection table. If a non-GitHub CI pipeline wants a
     CI-native build identifier, it should set `DEA_BUILD_ID` explicitly. Otherwise the tooling should fall back to a
     local-style build id.
-15. The local fallback build ID should be:
+17. The local fallback build ID should be:
     - `<shortsha>-<utcstamp>` when a git short SHA is available
     - `local-<utcstamp>` otherwise
-16. Update Stage 2 docs to state:
+18. Update Stage 2 docs to state:
     - built and installed Stage 2 binaries embed provenance for `--version`
     - direct `.native --version` works because the data is in the binary
     - `--help` and verbose identity remain static
     - compiler 2 / compiler 3 in the triple test intentionally remain on the static/fallback path
+    - the report uses `build`, `build time`, `commit`, `host`, and `compiler`
+    - `commit` appends `+dirty` only for dirty trees
+    - `host` is the compact uname triplet
+    - `compiler` is the compiler banner only
+19. When git metadata is unavailable, the embedded report should still be emitted if the non-git fields are available:
+    - `build` should fall back to the local timestamp form
+    - `commit` should render as `unknown`
+    - missing `git` should not abort artifact-producing builds
 
 ## Verification
 
@@ -128,6 +142,7 @@ env -i PATH="$PATH" ./build/dea/bin/l0c-stage2 --help
 env -i PATH="$PATH" ./build/dea/bin/l0c-stage2 --version
 env -i PATH="$PATH" ./build/dea/bin/l0c-stage2.native --version
 python3 tests/test_make_dea_build_workflow.py
+python3 tests/test_dist_tools_lib_fallback.py
 bash compiler/stage2_l0/tests/l0c_stage2_help_output_test.sh
 bash compiler/stage2_l0/tests/l0c_stage2_install_prefix_test.sh
 python3 compiler/stage2_l0/tests/l0c_triple_bootstrap_test.py
@@ -139,6 +154,8 @@ Expected:
    both wrapper and `.native` `--version`.
 2. Stage 2 `--help` and verbose startup output remain unchanged apart from any intentional documentation wording
    changes.
-3. Compiler 2 and compiler 3 in the strict triple-bootstrap regression remain on the static/fallback `--version` path.
-4. The strict triple-bootstrap regression still compares byte-stable compiler 2 / compiler 3 `.c` and `.native`
+3. Archive or source-tree builds without usable git metadata still emit partial embedded provenance with
+   `commit: unknown` instead of aborting.
+4. Compiler 2 and compiler 3 in the strict triple-bootstrap regression remain on the static/fallback `--version` path.
+5. The strict triple-bootstrap regression still compares byte-stable compiler 2 / compiler 3 `.c` and `.native`
    outputs, with no generated build metadata leaking into those artifacts.

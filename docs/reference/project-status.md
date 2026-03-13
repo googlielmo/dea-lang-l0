@@ -1,6 +1,6 @@
 # L0 Project Status
 
-Version: 2026-03-12
+Version: 2026-03-13
 
 This document summarizes what is implemented in this repository today and what remains open.
 
@@ -116,8 +116,9 @@ Common supported options:
 
 CLI identity/help behavior:
 
-- `--version` prints one stage-specific line and exits (`Dea language / L0 compiler (Stage 1)` or
-  `Dea language / L0 compiler (Stage 2)`).
+- `--version` prints one stage-specific line and exits for Stage 1, while built Stage 2 artifacts prepend the same
+  line to an embedded multiline provenance report with `build`, `build time`, `commit`, `host`, and `compiler`
+  fields.
 - `--help` uses the same stage-specific identity text as the help description heading.
 - `-v` also emits the same identity text on stderr through the normal info-level logging path, including CLI usage
   failures such as invoking `l0c -v` without a target.
@@ -225,15 +226,19 @@ Stage 2 backend/codegen status:
   `--trace-memory`.
 - Stage 2 `l0c --build` and `--run` are implemented on top of the same analysis plus backend path, using
   `std.system.system()` for host compiler and program execution.
-- Stage 2 `l0c --help` and `--version` are implemented with Stage 2-specific identity text, and `-v` preserves that
-  identity output even on CLI usage failures.
+- Stage 2 `l0c --help` and `-v` use the static Stage 2 identity text, while built repo-local and install-prefix
+  Stage 2 binaries embed provenance into `--version` for both the wrapper and `.native` entrypoints. The compact
+  report uses the optional `+dirty` commit suffix, compact uname host triplet, and compiler banner only. When git
+  metadata is unavailable, the embedded report still renders the available fields and falls back to `commit: unknown`
+  with a local build ID instead of aborting the build.
 - Stage 2 can now be bootstrapped into a repo-local artifact via `./scripts/build-stage2-l0c.sh`, producing
   `build/dea/bin/l0c-stage2` and `l0c-stage2.native` by default.
 - Phase 2 now adds a repo-local `build/dea/bin` workflow via `make install-dev-stages`, explicit `make use-dev-stage1` /
   `make use-dev-stage2` alias switching, and `source build/dea/bin/l0-env.sh`.
 - Phase 3 now adds a repo-independent install prefix via `make PREFIX=/tmp/l0-install install`; the installed
   binary is the self-hosted Stage 2 compiler (`Compiler 2` from the bootstrap chain), not the initial Stage 1-built
-  bootstrap artifact. `make install` requires an explicit `PREFIX=...`.
+  bootstrap artifact. `make install` requires an explicit `PREFIX=...`. Compiler 2 / compiler 3 inside the strict
+  triple-bootstrap regression intentionally remain on the static fallback `--version` path.
 - The strict stage2/stage3 fixed-point bootstrap regression is available directly via `make triple-test`.
 - Stage 2 backend lowering now covers the Stage 1 language surface, including ownership-sensitive lowering for
   `new`, `drop`, `try`, `with`, `match`, `case`, `break`, `continue`, and ARC cleanup.
@@ -262,5 +267,5 @@ Near-term project direction, consistent with current docs/code:
 
 1. Add Windows build support, with MinGW-w64 as the primary target and CI validation for Stage 1 and Stage 2 workflows.
 2. Define a shared CLI contract spec so Stage 1 and Stage 2 parity has one stable normative source.
-3. Embed build-provenance metadata in installed and repo-local Stage 2 binaries without perturbing triple-bootstrap
-   stability.
+3. Add a release-oriented source-revision override for Stage 2 provenance so source archives can embed packaged
+   revision metadata without requiring git history.

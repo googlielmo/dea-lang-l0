@@ -317,6 +317,30 @@ def assert_same_bytes(label: str, left: Path, right: Path, artifact_dir: Path, *
     fail("\n".join(lines), artifact_dir)
 
 
+def assert_fallback_version(name: str, compiler_path: Path, *, env: dict[str, str], artifact_dir: Path) -> None:
+    """Assert that one raw self-hosted compiler stays on the static fallback `--version` path."""
+
+    version_log, _ = run_logged(
+        name,
+        [str(compiler_path), "--version"],
+        env=env,
+        artifact_dir=artifact_dir,
+    )
+    version_text = read_text(version_log).strip()
+    expected = "Dea language / L0 compiler (Stage 2)"
+    if version_text != expected:
+        fail(
+            "\n".join(
+                [
+                    f"expected fallback --version output for {compiler_path}",
+                    f"log={version_log}",
+                    f"got={version_text!r}",
+                ]
+            ),
+            artifact_dir,
+        )
+
+
 def main() -> int:
     """Program entrypoint."""
 
@@ -386,6 +410,12 @@ def main() -> int:
 
         if not second_native.is_file() or not second_c.is_file():
             fail("second self-build did not retain both native and C artifacts", artifact_dir)
+        assert_fallback_version(
+            "second_version",
+            second_native,
+            env=self_build_env,
+            artifact_dir=artifact_dir,
+        )
 
         third_native = artifact_dir / "l0c-stage2-third.native"
         third_c = third_native.with_suffix(".c")
@@ -411,6 +441,12 @@ def main() -> int:
 
         if not third_native.is_file() or not third_c.is_file():
             fail("third self-build did not retain both native and C artifacts", artifact_dir)
+        assert_fallback_version(
+            "third_version",
+            third_native,
+            env=self_build_env,
+            artifact_dir=artifact_dir,
+        )
 
         notice("comparing second and third self-built retained C artifacts")
         assert_same_bytes("retained C (stage2 vs stage3)", second_c, third_c, artifact_dir, include_diff=True)

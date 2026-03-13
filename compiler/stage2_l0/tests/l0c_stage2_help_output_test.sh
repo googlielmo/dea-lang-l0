@@ -28,9 +28,31 @@ assert_contains() {
     grep -F "$text" "$path" >/dev/null || fail "expected '$text' in $path"
 }
 
+assert_not_contains() {
+    local path="$1"
+    local text="$2"
+    if grep -F "$text" "$path" >/dev/null; then
+        fail "did not expect '$text' in $path"
+    fi
+}
+
 assert_empty() {
     local path="$1"
     [ ! -s "$path" ] || fail "expected empty file: $path"
+}
+
+assert_version_report() {
+    local path="$1"
+    assert_contains "$path" "Dea language / L0 compiler (Stage 2)"
+    assert_contains "$path" "build: "
+    assert_contains "$path" "build time: "
+    assert_contains "$path" "commit: "
+    assert_contains "$path" "host: "
+    assert_contains "$path" "compiler: "
+    assert_not_contains "$path" "tree: "
+    assert_not_contains "$path" "build id: "
+    assert_not_contains "$path" "built at: "
+    assert_not_contains "$path" "compiler version: "
 }
 
 cd "$REPO_ROOT"
@@ -46,6 +68,7 @@ assert_contains "$HELP_STDOUT" "usage: l0c [-h]"
 assert_contains "$HELP_STDOUT" "Dea language / L0 compiler (Stage 2)"
 assert_contains "$HELP_STDOUT" "  -h, --help            show this help message and exit"
 assert_contains "$HELP_STDOUT" "  --version             show compiler version and exit"
+assert_not_contains "$HELP_STDOUT" "commit: "
 assert_empty "$HELP_STDERR"
 
 VERSION_STDOUT="$TMP_DIR/version.stdout"
@@ -54,8 +77,18 @@ if ! env -i PATH="$PATH" "$DEA_BUILD_DIR/bin/l0c-stage2" --version >"$VERSION_ST
     fail "--version should exit successfully"
 fi
 
-assert_contains "$VERSION_STDOUT" "Dea language / L0 compiler (Stage 2)"
+assert_version_report "$VERSION_STDOUT"
 assert_empty "$VERSION_STDERR"
+
+NATIVE_VERSION_STDOUT="$TMP_DIR/native-version.stdout"
+NATIVE_VERSION_STDERR="$TMP_DIR/native-version.stderr"
+if ! env -i PATH="$PATH" "$DEA_BUILD_DIR/bin/l0c-stage2.native" --version >"$NATIVE_VERSION_STDOUT" 2>"$NATIVE_VERSION_STDERR"; then
+    fail "native --version should exit successfully"
+fi
+
+assert_version_report "$NATIVE_VERSION_STDOUT"
+assert_empty "$NATIVE_VERSION_STDERR"
+cmp -s "$VERSION_STDOUT" "$NATIVE_VERSION_STDOUT" || fail "wrapper and native --version output must match"
 
 VERBOSE_STDOUT="$TMP_DIR/verbose.stdout"
 VERBOSE_STDERR="$TMP_DIR/verbose.stderr"

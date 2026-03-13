@@ -8,11 +8,18 @@
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 from dataclasses import dataclass
+from datetime import datetime, timezone
+import json
 from pathlib import Path
 import os
+import platform
+import shlex
 import shutil
 import stat
+import subprocess
+import tempfile
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -39,6 +46,29 @@ class PrefixLayout:
     shared_dir: Path
     stdlib_dir: Path
     runtime_dir: Path
+
+
+@dataclass(frozen=True)
+class Stage2BuildProvenance:
+    """Resolved build-provenance fields embedded into artifact-producing Stage 2 binaries."""
+
+    commit_full: str
+    commit_short: str
+    tree_state: str
+    build_id: str
+    build_time: str
+    host: str
+    compiler_banner: str
+    has_embedded_version: bool
+
+
+@dataclass(frozen=True)
+class Stage2BuildInfoOverlay:
+    """One temporary overlay root plus the exact build env used with it."""
+
+    overlay_root: Path
+    build_env: dict[str, str]
+    provenance: Stage2BuildProvenance
 
 
 def normalize_dea_build_dir(dea_build_dir_text: str) -> DeaBuildLayout:
@@ -101,6 +131,297 @@ def normalize_prefix_dir(prefix_dir_text: str) -> PrefixLayout:
         stdlib_dir=shared_dir / "l0" / "stdlib",
         runtime_dir=shared_dir / "runtime",
     )
+
+
+def resolve_host_c_compiler(env: dict[str, str]) -> str | None:
+    """Resolve the exact host C compiler command using the shared precedence contract."""
+
+    from_env = env.get("L0_CC", "").strip()
+    if from_env:
+        return from_env
+
+    path_text = env.get("PATH")
+    for candidate in ("tcc", "gcc", "clang", "cc"):
+        if shutil.which(candidate, path=path_text):
+            return candidate
+
+    from_cc = env.get("CC", "").strip()
+    if from_cc:
+        return from_cc
+    return None
+
+
+def _capture_first_line(command: list[str], *, cwd: Path, env: dict[str, str]) -> str | None:
+    """Return the first non-empty output line for one subprocess, or `None` on failure."""
+
+    completed = subprocess.run(
+        command,
+        cwd=cwd,
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        check=False,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    if completed.returncode != 0:
+        return None
+
+    for line in completed.stdout.splitlines():
+        stripped = line.strip()
+        if stripped:
+            return stripped
+    return None
+
+
+def _git_output(repo_root: Path, env: dict[str, str], *args: str) -> str | None:
+    """Return stripped git stdout for one repo-relative command, or `None` on failure."""
+
+    try:
+        completed = subprocess.run(
+            ["git", *args],
+            cwd=repo_root,
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
+    except FileNotFoundError:
+        return None
+    if completed.returncode != 0:
+        return None
+    return completed.stdout.strip()
+
+
+def format_host_triplet(kernel_name: str, kernel_release: str, machine: str) -> str:
+    """Format the compact host triplet used by the Stage 2 `--version` output."""
+
+    return " ".join((kernel_name, kernel_release, machine))
+
+
+def _host_platform_text(repo_root: Path, env: dict[str, str]) -> str:
+    """Return the recorded host platform text with the compact uname triplet contract."""
+
+    if os.name != "nt":
+        uname_parts: list[str] = []
+        for flag in ("-s", "-r", "-m"):
+            value = _capture_first_line(["uname", flag], cwd=repo_root, env=env)
+            if value is None:
+                uname_parts = []
+                break
+            uname_parts.append(value)
+        if len(uname_parts) == 3:
+            return format_host_triplet(uname_parts[0], uname_parts[1], uname_parts[2])
+
+    return format_host_triplet(
+        platform.system().strip() or "unknown",
+        platform.release().strip() or "unknown",
+        platform.machine().strip() or "unknown",
+    )
+
+
+def _compiler_banner_text(repo_root: Path, env: dict[str, str], compiler_text: str) -> str:
+    """Return the first line of `<compiler> --version`, or `unknown` when unavailable."""
+
+    try:
+        compiler_words = shlex.split(compiler_text)
+    except ValueError:
+        return "unknown"
+    if not compiler_words:
+        return "unknown"
+
+    version_line = _capture_first_line([*compiler_words, "--version"], cwd=repo_root, env=env)
+    if version_line:
+        return version_line
+    return "unknown"
+
+
+def format_build_time_utc(timestamp: datetime) -> str:
+    """Render one UTC datetime for the Stage 2 `build time:` line."""
+
+    return timestamp.astimezone(timezone.utc).isoformat(sep=" ", timespec="seconds")
+
+
+def format_commit_for_version(commit_full: str, tree_state: str) -> str:
+    """Return the Stage 2 `commit:` field text."""
+
+    if tree_state == "dirty" and commit_full != "unknown":
+        return f"{commit_full}+dirty"
+    return commit_full
+
+
+def _sanitize_build_id_component(text: str, default: str = "unknown") -> str:
+    """Normalize one build-id component to a shell- and log-friendly token."""
+
+    stripped = text.strip()
+    if not stripped:
+        return default
+    return "".join(ch if ch.isalnum() or ch in "._-" else "_" for ch in stripped)
+
+
+def _derive_build_id(env: dict[str, str], commit_short: str, build_stamp: str) -> str:
+    """Return the build identifier following the approved precedence order."""
+
+    explicit = env.get("DEA_BUILD_ID", "").strip()
+    if explicit:
+        return explicit
+
+    if env.get("GITHUB_ACTIONS") == "true":
+        return (
+            "gha-"
+            f"{_sanitize_build_id_component(env.get('GITHUB_RUN_ID', ''))}."
+            f"{_sanitize_build_id_component(env.get('GITHUB_RUN_ATTEMPT', ''))}-"
+            f"{_sanitize_build_id_component(env.get('GITHUB_JOB', ''))}-"
+            f"{_sanitize_build_id_component(env.get('RUNNER_OS', ''))}-"
+            f"{_sanitize_build_id_component(env.get('RUNNER_ARCH', ''))}"
+        )
+
+    if commit_short != "unknown":
+        return f"{commit_short}-{build_stamp}"
+    return f"local-{build_stamp}"
+
+
+def collect_stage2_build_provenance(repo_root: Path, env: dict[str, str]) -> tuple[Stage2BuildProvenance, str]:
+    """Capture one build-provenance snapshot for Stage 2 artifact-producing flows."""
+
+    resolved_compiler = resolve_host_c_compiler(env)
+    if resolved_compiler is None:
+        raise ValueError("no host C compiler found; set L0_CC or CC")
+
+    git_env = env.copy()
+    git_env.setdefault("LC_ALL", "C")
+    git_env.setdefault("LANG", "C")
+
+    commit_full = _git_output(repo_root, git_env, "rev-parse", "HEAD") or "unknown"
+    commit_short = _git_output(repo_root, git_env, "rev-parse", "--short", "HEAD") or "unknown"
+
+    status_output = _git_output(repo_root, git_env, "status", "--porcelain", "--untracked-files=normal")
+    if status_output is None:
+        tree_state = "unknown"
+    elif status_output == "":
+        tree_state = "clean"
+    else:
+        tree_state = "dirty"
+
+    build_timestamp = datetime.now(timezone.utc).replace(microsecond=0)
+    build_stamp = build_timestamp.strftime("%Y%m%dT%H%M%SZ")
+    build_time = format_build_time_utc(build_timestamp)
+    host = _host_platform_text(repo_root, env)
+    compiler_banner = _compiler_banner_text(repo_root, env, resolved_compiler)
+    build_id = _derive_build_id(env, commit_short, build_stamp)
+
+    required_fields = (build_id, build_time, host, compiler_banner)
+    has_embedded_version = all(field and field != "unknown" for field in required_fields)
+
+    return Stage2BuildProvenance(
+        commit_full=commit_full,
+        commit_short=commit_short,
+        tree_state=tree_state,
+        build_id=build_id,
+        build_time=build_time,
+        host=host,
+        compiler_banner=compiler_banner,
+        has_embedded_version=has_embedded_version,
+    ), resolved_compiler
+
+
+def _render_l0_string(text: str) -> str:
+    """Render one Python string as an escaped L0 string literal."""
+
+    return json.dumps(text, ensure_ascii=True)
+
+
+def render_stage2_build_info_module(provenance: Stage2BuildProvenance) -> str:
+    """Render one overlay `build_info.l0` module for embedded Stage 2 provenance."""
+
+    enabled = "true" if provenance.has_embedded_version else "false"
+    commit_text = format_commit_for_version(provenance.commit_full, provenance.tree_state)
+    return f"""/*
+ * SPDX-License-Identifier: MIT OR Apache-2.0
+ * Copyright (c) 2026 gwz
+ */
+
+module build_info;
+
+import std.text;
+
+func build_info_has_embedded_version() -> bool {{
+    return {enabled};
+}}
+
+func build_info_build_id() -> string {{
+    return {_render_l0_string(provenance.build_id)};
+}}
+
+func build_info_build_time() -> string {{
+    return {_render_l0_string(provenance.build_time)};
+}}
+
+func build_info_commit() -> string {{
+    return {_render_l0_string(commit_text)};
+}}
+
+func build_info_host() -> string {{
+    return {_render_l0_string(provenance.host)};
+}}
+
+func build_info_compiler() -> string {{
+    return {_render_l0_string(provenance.compiler_banner)};
+}}
+
+func build_info_version_text(identity: string) -> string? {{
+    if (!build_info_has_embedded_version()) {{
+        return null;
+    }}
+
+    with (let sb = sb_create() => sb_free(sb)) {{
+        sb_append(sb, identity);
+        sb_append(sb, "\\nbuild: ");
+        sb_append(sb, build_info_build_id());
+        sb_append(sb, "\\nbuild time: ");
+        sb_append(sb, build_info_build_time());
+        sb_append(sb, "\\ncommit: ");
+        sb_append(sb, build_info_commit());
+        sb_append(sb, "\\nhost: ");
+        sb_append(sb, build_info_host());
+        sb_append(sb, "\\ncompiler: ");
+        sb_append(sb, build_info_compiler());
+        return sb_to_string(sb);
+    }}
+}}
+"""
+
+
+@contextmanager
+def stage2_build_info_overlay(
+        repo_root: Path,
+        env: dict[str, str],
+        *,
+        temp_parent: Path | None = None,
+):
+    """Yield one temporary overlay root and exact build env for embedded provenance builds."""
+
+    provenance, resolved_compiler = collect_stage2_build_provenance(repo_root, env)
+    temp_dir = Path(tempfile.mkdtemp(prefix="stage2_build_info.", dir=temp_parent))
+    try:
+        overlay_root = temp_dir.resolve(strict=False)
+        (overlay_root / "build_info.l0").write_text(
+            render_stage2_build_info_module(provenance),
+            encoding="utf-8",
+        )
+        build_env = env.copy()
+        build_env["L0_CC"] = resolved_compiler
+        yield Stage2BuildInfoOverlay(
+            overlay_root=overlay_root,
+            build_env=build_env,
+            provenance=provenance,
+        )
+    finally:
+        shutil.rmtree(temp_dir, ignore_errors=True)
 
 
 def ensure_dea_build_bin_dir(layout: DeaBuildLayout) -> None:

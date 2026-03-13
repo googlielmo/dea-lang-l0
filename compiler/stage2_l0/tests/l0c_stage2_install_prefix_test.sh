@@ -16,10 +16,12 @@ INSTALL_LOG="/tmp/l0_stage2_install_prefix_$$.log"
 REINSTALL_LOG="/tmp/l0_stage2_install_prefix_reinstall_$$.log"
 RUN_OUTPUT="/tmp/l0_stage2_install_prefix_run_$$.out"
 ENV_RUN_OUTPUT="/tmp/l0_stage2_install_prefix_env_run_$$.out"
+VERSION_OUTPUT="/tmp/l0_stage2_install_prefix_version_$$.out"
+NATIVE_VERSION_OUTPUT="/tmp/l0_stage2_install_prefix_native_version_$$.out"
 
 cleanup() {
     rm -rf "$PREFIX_DIR" "$PROJECT_DIR"
-    rm -f "$INSTALL_LOG" "$REINSTALL_LOG" "$RUN_OUTPUT" "$ENV_RUN_OUTPUT" "$PROJECT_DIR/hello"
+    rm -f "$INSTALL_LOG" "$REINSTALL_LOG" "$RUN_OUTPUT" "$ENV_RUN_OUTPUT" "$VERSION_OUTPUT" "$NATIVE_VERSION_OUTPUT" "$PROJECT_DIR/hello"
 }
 trap cleanup EXIT
 
@@ -54,6 +56,20 @@ assert_not_contains() {
     if grep -F "$needle" "$path" >/dev/null; then
         fail "did not expect '$needle' in $path"
     fi
+}
+
+assert_version_report() {
+    local path="$1"
+    assert_contains "$path" "Dea language / L0 compiler (Stage 2)"
+    assert_contains "$path" "build: "
+    assert_contains "$path" "build time: "
+    assert_contains "$path" "commit: "
+    assert_contains "$path" "host: "
+    assert_contains "$path" "compiler: "
+    assert_not_contains "$path" "tree: "
+    assert_not_contains "$path" "build id: "
+    assert_not_contains "$path" "built at: "
+    assert_not_contains "$path" "compiler version: "
 }
 
 cd "$REPO_ROOT"
@@ -98,6 +114,12 @@ assert_contains "$REINSTALL_LOG" "gen-dea-build-tools: L0_CFLAGS="
 
 assert_not_contains "$PREFIX_DIR/bin/l0c-stage2" "$REPO_ROOT"
 assert_not_contains "$PREFIX_DIR/bin/l0-env.sh" "$REPO_ROOT"
+
+env -i PATH="$PATH" "$PREFIX_DIR/bin/l0c-stage2" --version >"$VERSION_OUTPUT"
+env -i PATH="$PATH" "$PREFIX_DIR/bin/l0c-stage2.native" --version >"$NATIVE_VERSION_OUTPUT"
+assert_version_report "$VERSION_OUTPUT"
+assert_version_report "$NATIVE_VERSION_OUTPUT"
+cmp -s "$VERSION_OUTPUT" "$NATIVE_VERSION_OUTPUT" || fail "wrapper and native --version output must match"
 
 env -i PATH="$PATH" "$PREFIX_DIR/bin/l0c-stage2" --check -P "$PROJECT_DIR" hello >/dev/null
 env -i PATH="$PATH" "$PREFIX_DIR/bin/l0c-stage2" --build -P "$PROJECT_DIR" -o "$PROJECT_DIR/hello" hello >/dev/null

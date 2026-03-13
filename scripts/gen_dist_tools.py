@@ -24,6 +24,7 @@ from dist_tools_lib import (
     normalize_prefix_dir,
     remove_dea_build_tree,
     set_alias,
+    stage2_build_info_overlay,
     write_env_script,
     write_stage1_wrapper,
     write_stage2_wrapper,
@@ -36,11 +37,12 @@ def print_progress(message: str) -> None:
     print(f"gen-dea-build-tools: {message}", flush=True)
 
 
-def print_toolchain_env() -> None:
+def print_toolchain_env(env: dict[str, str] | None = None) -> None:
     """Emit the current host toolchain-related environment."""
 
+    source_env = os.environ if env is None else env
     for name in ("L0_CC", "L0_CFLAGS"):
-        value = os.environ.get(name)
+        value = source_env.get(name)
         if value is None:
             rendered = "<unset>"
         elif value == "":
@@ -112,35 +114,43 @@ def main() -> int:
             temp_dist = Path(tempfile.mkdtemp(prefix="install_stage2_prefix.", dir=build_root))
             try:
                 temp_layout = normalize_dea_build_dir(str(temp_dist))
-                print_toolchain_env()
-                print_progress(f"stage 1/3: building bootstrap Stage 2 compiler under {temp_layout.dea_build_dir}")
-                stage2_wrapper, _, _ = build_stage2_artifact(temp_layout, keep_c=False)
-                self_hosted_native = temp_dist / "l0c-stage2-selfhosted.native"
-                self_build_env = os.environ.copy()
-                self_build_env["L0_HOME"] = str(prefix_layout.repo_root / "compiler")
-                self_build_env.pop("L0_SYSTEM", None)
-                self_build_env.pop("L0_RUNTIME_INCLUDE", None)
-                self_build_env.pop("L0_RUNTIME_LIB", None)
-                print_progress(f"stage 2/3: self-hosting Stage 2 compiler into {self_hosted_native}")
-                subprocess.run(
-                    [
-                        str(stage2_wrapper),
-                        "--build",
-                        "-P",
-                        "compiler/stage2_l0/src",
-                        "-o",
-                        str(self_hosted_native),
-                        "l0c",
-                    ],
-                    cwd=prefix_layout.repo_root,
-                    env=self_build_env,
-                    check=True,
-                )
-                print_progress(f"stage 3/3: installing self-hosted Stage 2 compiler into {prefix_layout.prefix_dir}")
-                installed_native = install_prefix_stage2(prefix_layout, self_hosted_native)
-                print_progress(f"installed self-hosted Stage 2 compiler at {installed_native}")
-                print_progress(f"installed prefix layout at {prefix_layout.prefix_dir}")
-                return 0
+                with stage2_build_info_overlay(prefix_layout.repo_root, os.environ.copy(), temp_parent=build_root) as overlay:
+                    print_toolchain_env(overlay.build_env)
+                    print_progress(f"stage 1/3: building bootstrap Stage 2 compiler under {temp_layout.dea_build_dir}")
+                    stage2_wrapper, _, _ = build_stage2_artifact(
+                        temp_layout,
+                        keep_c=False,
+                        extra_project_roots=[str(overlay.overlay_root)],
+                        extra_env=overlay.build_env,
+                    )
+                    self_hosted_native = temp_dist / "l0c-stage2-selfhosted.native"
+                    self_build_env = overlay.build_env.copy()
+                    self_build_env["L0_HOME"] = str(prefix_layout.repo_root / "compiler")
+                    self_build_env.pop("L0_SYSTEM", None)
+                    self_build_env.pop("L0_RUNTIME_INCLUDE", None)
+                    self_build_env.pop("L0_RUNTIME_LIB", None)
+                    print_progress(f"stage 2/3: self-hosting Stage 2 compiler into {self_hosted_native}")
+                    subprocess.run(
+                        [
+                            str(stage2_wrapper),
+                            "--build",
+                            "-P",
+                            str(overlay.overlay_root),
+                            "-P",
+                            "compiler/stage2_l0/src",
+                            "-o",
+                            str(self_hosted_native),
+                            "l0c",
+                        ],
+                        cwd=prefix_layout.repo_root,
+                        env=self_build_env,
+                        check=True,
+                    )
+                    print_progress(f"stage 3/3: installing self-hosted Stage 2 compiler into {prefix_layout.prefix_dir}")
+                    installed_native = install_prefix_stage2(prefix_layout, self_hosted_native)
+                    print_progress(f"installed self-hosted Stage 2 compiler at {installed_native}")
+                    print_progress(f"installed prefix layout at {prefix_layout.prefix_dir}")
+                    return 0
             finally:
                 shutil.rmtree(temp_dist, ignore_errors=True)
 

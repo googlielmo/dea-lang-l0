@@ -9,12 +9,13 @@
 from __future__ import annotations
 
 import argparse
+from collections.abc import Mapping, Sequence
 import os
 from pathlib import Path
 import subprocess
 import sys
 
-from dist_tools_lib import DeaBuildLayout, normalize_dea_build_dir, write_stage2_wrapper
+from dist_tools_lib import DeaBuildLayout, normalize_dea_build_dir, stage2_build_info_overlay, write_stage2_wrapper
 
 
 def parse_args() -> argparse.Namespace:
@@ -24,7 +25,13 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def build_stage2_artifact(layout: DeaBuildLayout, *, keep_c: bool) -> tuple[Path, Path, Path]:
+def build_stage2_artifact(
+        layout: DeaBuildLayout,
+        *,
+        keep_c: bool,
+        extra_project_roots: Sequence[str] | None = None,
+        extra_env: Mapping[str, str] | None = None,
+) -> tuple[Path, Path, Path]:
     """Build the repo-local Stage 2 compiler artifact for one validated layout."""
 
     layout.bin_dir.mkdir(parents=True, exist_ok=True)
@@ -32,21 +39,18 @@ def build_stage2_artifact(layout: DeaBuildLayout, *, keep_c: bool) -> tuple[Path
     native_bin = layout.bin_dir / "l0c-stage2.native"
     c_output = layout.bin_dir / "l0c-stage2.c"
 
-    build_args = [
-        "./scripts/l0c",
-        "--build",
-        "-P",
-        "compiler/stage2_l0/src",
-        "-o",
-        str(native_bin),
-        "l0c",
-    ]
+    build_args = ["./scripts/l0c", "--build"]
     if keep_c:
-        build_args.insert(1, "--keep-c")
+        build_args.append("--keep-c")
     else:
         c_output.unlink(missing_ok=True)
+    for root in extra_project_roots or ():
+        build_args.extend(["-P", root])
+    build_args.extend(["-P", "compiler/stage2_l0/src", "-o", str(native_bin), "l0c"])
 
     build_env = os.environ.copy()
+    if extra_env is not None:
+        build_env.update(extra_env)
     build_env["L0_HOME"] = str(layout.repo_root / "compiler")
     build_env.pop("L0_SYSTEM", None)
     build_env.pop("L0_RUNTIME_INCLUDE", None)
@@ -76,7 +80,19 @@ def main() -> int:
         print(f"build-stage2-l0c: {exc}", file=sys.stderr)
         return 1
 
-    wrapper_bin, native_bin, c_output = build_stage2_artifact(layout, keep_c=keep_c)
+    build_root = layout.repo_root / "build"
+    build_root.mkdir(parents=True, exist_ok=True)
+    try:
+        with stage2_build_info_overlay(layout.repo_root, os.environ.copy(), temp_parent=build_root) as overlay:
+            wrapper_bin, native_bin, c_output = build_stage2_artifact(
+                layout,
+                keep_c=keep_c,
+                extra_project_roots=[str(overlay.overlay_root)],
+                extra_env=overlay.build_env,
+            )
+    except ValueError as exc:
+        print(f"build-stage2-l0c: {exc}", file=sys.stderr)
+        return 1
 
     print(f"build-stage2-l0c: wrote {wrapper_bin}")
     print(f"build-stage2-l0c: wrote {native_bin}")

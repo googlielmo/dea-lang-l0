@@ -10,6 +10,7 @@ import std.string;
 import std.text;
 import std.vector;
 import util.diag;
+import build_info;
 
 /**
  * Defines the CliMode enumeration.
@@ -396,7 +397,12 @@ func cli_print_help() {
  * Print the compiler identity/version text.
  */
 func cli_print_version() {
-    printl_s(cli_compiler_identity_text());
+    let version_text = build_info_version_text(cli_compiler_identity_text());
+    if (version_text == null) {
+        printl_s(cli_compiler_identity_text());
+        return;
+    }
+    printl_s(version_text as string);
 }
 
 /**
