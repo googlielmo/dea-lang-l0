@@ -31,8 +31,8 @@ assumptions block Windows support. The C runtime (`l0_runtime.h`) already has `_
 exists in the driver.
 
 This plan adds Windows build support using **MinGW-w64 as Tier 1** (GCC flags, GNU Make, MSYS2 bash all work
-unchanged) and **MSVC as Tier 2** (partial flag support exists, full support deferred). Validation is via a GitHub
-Actions Windows runner.
+unchanged) and **MSVC as Tier 2** (partial flag support exists, full support deferred). Linux CI validation now lands
+first via `.github/workflows/ci.yml`; Windows runner validation remains a follow-up extension of that workflow.
 
 ## Goals
 
@@ -51,7 +51,8 @@ Actions Windows runner.
 
 ## Prerequisites
 
-- The bootstrap/Makefile plan (`closed/2026-03-09-stage2-bootstrap-compiler-artifact-noref.md`) should be at least through
+- The bootstrap/Makefile plan (`closed/2026-03-09-stage2-bootstrap-compiler-artifact-noref.md`) should be at least
+  through
   Phase 2 (Makefile exists) before Phase 6 CI validation of Makefile targets.
 
 ## Current Cross-Platform Foundation
@@ -75,7 +76,7 @@ The following already work or have Windows code paths:
 | `l0-env.sh` is bash/zsh only     | `./l0-env.sh`          | Out of scope — env setup via Makefile or manual           |
 | `build-stage2-l0c.sh` is bash    | `scripts/`             | Runs via MSYS2 bash from MinGW-w64; no rewrite needed     |
 | `gen-docs.sh` is bash            | `scripts/`             | Out of scope — docs build stays Linux/macOS-only          |
-| `l0c-stage2` is a POSIX launcher | `build/dea/bin/`    | Generate `.cmd` launcher alongside on Windows             |
+| `l0c-stage2` is a POSIX launcher | `build/dea/bin/`       | Generate `.cmd` launcher alongside on Windows             |
 | Default output `a.out`           | `l0c.py`               | Use `a.exe` on Windows                                    |
 | Temp exe has no `.exe` suffix    | `l0c.py`               | Add `.exe` suffix on Windows                              |
 | `-o` flag for MSVC               | `l0c.py`               | Use `/Fe:` for MSVC (Tier 2, prep only)                   |
@@ -85,7 +86,7 @@ The following already work or have Windows code paths:
 | Stage 2 POSIX shell quoting      | `build_driver.l0`      | Add Windows quoting path                                  |
 | `command -v` probe in Stage 2    | `build_driver.l0`      | Use `where.exe` on Windows                                |
 | `Makefile` targets use shell     | `Makefile` (upcoming)  | GNU Make from MinGW-w64 + MSYS2 bash                      |
-| CI only runs on Ubuntu           | `.github/workflows/`   | Add Windows matrix                                        |
+| CI is Linux-only today           | `.github/workflows/`   | Extend `ci.yml` with a Windows job or matrix              |
 
 ## Implementation Phases
 
@@ -171,47 +172,30 @@ This way MSYS2/Git Bash users get full coverage; native Windows users degrade gr
 
 ### Phase 6: GitHub Actions CI
 
-Create a unified CI workflow for both platforms.
+Extend the Linux-first CI workflow to cover Windows as a follow-up.
 
 **New file: `.github/workflows/ci.yml`:**
 
-```yaml
-name: CI
-on: [ push, pull_request ]
-jobs:
-  test:
-    strategy:
-      matrix:
-        os: [ ubuntu-latest, windows-latest ]
-    runs-on: ${{ matrix.os }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.14"
-      - uses: astral-sh/setup-uv@v6
-      - name: Install MinGW-w64 (Windows)
-        if: runner.os == 'Windows'
-        run: choco install mingw
-      - run: uv sync
-      - name: Stage 1 tests
-        run: uv run pytest -n auto
-        working-directory: compiler/stage1_py
-      - name: Build Stage 2
-        run: bash scripts/build-stage2-l0c.sh
-      - name: Stage 2 tests
-        run: uv run python compiler/stage2_l0/run_tests.py
-      - name: Stage 2 trace tests
-        run: uv run python compiler/stage2_l0/run_trace_tests.py
-```
+The repository now has a Linux-only `CI` workflow that runs `make test-all` on `ubuntu-latest` for `pull_request` and
+`workflow_dispatch`, with a commented-out `push` trigger block reserved for later.
+
+**Follow-up changes to `.github/workflows/ci.yml`:**
+
+1. Keep the existing Linux job as the baseline path.
+2. Add a Windows job or `os` matrix entry using `windows-latest`.
+3. Install MinGW-w64 and any shell tooling required by the Windows bootstrap path.
+4. Reuse the same top-level validation entrypoint where feasible (`make test-all` if the Windows shell environment is
+   ready; otherwise an equivalent explicit command sequence).
+5. Preserve the manual and PR triggers unless there is a deliberate CI policy change.
 
 Windows-specific CI considerations:
 
 - `mingw32-make` or ensure `make` is on PATH for Makefile targets.
 - MSYS2 provides bash — `.sh` tests will run.
-- Test the Makefile targets (`make test-all`) once the Makefile lands.
+- Test the Makefile targets (`make test-all`) once the Windows shell environment is ready.
 
-**Validation:** CI is green on both Ubuntu and Windows runners.
+**Validation:** CI stays green on Ubuntu after the current rollout, then goes green on both Ubuntu and Windows once the
+follow-up lands.
 
 ### Phase 7: Documentation
 
@@ -221,19 +205,21 @@ Windows-specific CI considerations:
 
 ## Verification Criteria
 
-1. CI green on both Ubuntu and Windows in the new `ci.yml` workflow.
-2. `pytest -n auto` passes on Windows runner (MinGW-w64 GCC).
-3. `build-stage2-l0c.sh` succeeds on Windows via MSYS2 bash.
-4. Stage 2 `run_tests.py` and `run_trace_tests.py` pass on Windows.
-5. `l0c --build -P examples hello` produces `a.exe` on Windows and runs correctly.
-6. `.sh` test scripts run when bash is available, skip gracefully otherwise.
-7. Makefile targets work on Windows once the Makefile lands (future validation).
+1. Linux CI stays green in the current `ci.yml` workflow.
+2. Windows CI goes green in the follow-up extension of `ci.yml`.
+3. `pytest -n auto` passes on Windows runner (MinGW-w64 GCC).
+4. `build-stage2-l0c.sh` succeeds on Windows via MSYS2 bash.
+5. Stage 2 `run_tests.py` and `run_trace_tests.py` pass on Windows.
+6. `l0c --build -P examples hello` produces `a.exe` on Windows and runs correctly.
+7. `.sh` test scripts run when bash is available, skip gracefully otherwise.
+8. Makefile targets work on Windows once the shell/toolchain setup is validated.
 
 ## Risk Assessment
 
 - **Low risk:** Phases 1–2 are Python-only changes with clear platform guards (`sys.platform`).
 - **Medium risk:** Phase 3 (Stage 2 build driver) requires L0 code changes and a platform detection mechanism.
-- **Medium risk:** Phase 6 (CI) depends on MinGW-w64 and Python 3.14 availability in GitHub Actions runners.
+- **Medium risk:** Phase 6 (Windows CI follow-up) depends on MinGW-w64 and Python 3.14 availability in GitHub Actions
+  runners.
 - **Mitigation:** MinGW-w64 is well-supported via `choco install mingw`; Python 3.14 is available via
   `actions/setup-python@v5`.
 

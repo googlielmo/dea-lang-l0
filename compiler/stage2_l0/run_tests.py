@@ -79,27 +79,30 @@ def submission_priority(case: TestCase) -> tuple[int, int]:
 def main() -> int:
     """Program entrypoint."""
 
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(line_buffering=True)
+
     args = parse_args()
 
     try:
         jobs = resolve_job_count()
     except ValueError as exc:
-        print(f"run_tests.py: {exc}", file=sys.stderr)
+        print(f"run_tests.py: {exc}", file=sys.stderr, flush=True)
         return 2
     try:
         python_path, _, _, repo_env = require_repo_stage2_test_env("run_tests.py")
     except RuntimeError as exc:
-        print(f"run_tests.py: {exc}", file=sys.stderr)
+        print(f"run_tests.py: {exc}", file=sys.stderr, flush=True)
         return 2
 
     cases = discover_stage2_tests()
     if not cases:
-        print("No tests found in compiler/stage2_l0/tests")
+        print("No tests found in compiler/stage2_l0/tests", flush=True)
         return 0
 
-    print("Running stage2_l0 tests...")
-    print(f"Parallel jobs: {jobs}")
-    print("======================================")
+    print("Running stage2_l0 tests...", flush=True)
+    print(f"Parallel jobs: {jobs}", flush=True)
+    print("======================================", flush=True)
 
     passed = 0
     failures: list[TestResult] = []
@@ -109,11 +112,12 @@ def main() -> int:
 
         status = "PASS" if result.returncode == 0 else "FAIL"
         if args.verbose:
-            print(f"Running {result.case.name}...")
+            print(f"Running {result.case.name}...", flush=True)
             print_output_block(result.output)
-            print(status)
+            sys.stdout.flush()
+            print(status, flush=True)
         else:
-            print(f"Running {result.case.name}... {status}")
+            print(f"Running {result.case.name}... {status}", flush=True)
 
         if result.returncode == 0:
             passed += 1
@@ -132,22 +136,23 @@ def main() -> int:
             emit(result)
 
     if not args.verbose and failures:
-        print("======================================")
-        print("Failed test outputs:")
+        print("======================================", flush=True)
+        print("Failed test outputs:", flush=True)
         for result in failures:
-            print(f"Output for {result.case.name}:")
+            print(f"Output for {result.case.name}:", flush=True)
             print_output_block(result.output)
-            print("--------------------------------------")
+            sys.stdout.flush()
+            print("--------------------------------------", flush=True)
 
-    print("======================================")
-    print(f"Passed: {passed}")
-    print(f"Failed: {len(failures)}")
+    print("======================================", flush=True)
+    print(f"Passed: {passed}", flush=True)
+    print(f"Failed: {len(failures)}", flush=True)
 
     if failures:
-        print(f"Failed tests: {summarize_failures(result.case for result in failures)}")
+        print(f"Failed tests: {summarize_failures(result.case for result in failures)}", flush=True)
         return 1
 
-    print("All tests passed!")
+    print("All tests passed!", flush=True)
     return 0
 
 

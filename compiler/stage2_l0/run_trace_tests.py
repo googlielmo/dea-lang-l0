@@ -166,21 +166,24 @@ def run_one(
 def main() -> int:
     """Program entrypoint."""
 
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(line_buffering=True)
+
     args = parse_args()
     try:
         jobs = resolve_job_count()
     except ValueError as exc:
-        print(f"run_trace_tests.py: {exc}", file=sys.stderr)
+        print(f"run_trace_tests.py: {exc}", file=sys.stderr, flush=True)
         return 2
     try:
         python_path, _, _, repo_env = require_repo_stage2_test_env("run_trace_tests.py")
     except RuntimeError as exc:
-        print(f"run_trace_tests.py: {exc}", file=sys.stderr)
+        print(f"run_trace_tests.py: {exc}", file=sys.stderr, flush=True)
         return 2
 
     cases = discover_l0_tests()
     if not cases:
-        print("No tests found in compiler/stage2_l0/tests")
+        print("No tests found in compiler/stage2_l0/tests", flush=True)
         return 0
 
     artifact_dir = Path(tempfile.mkdtemp(prefix="l0_stage2_trace_tests."))
@@ -189,10 +192,10 @@ def main() -> int:
     passed = 0
 
     try:
-        print("Running stage2_l0 trace checks...")
-        print(f"artifacts={artifact_dir}")
-        print(f"Parallel jobs: {jobs}")
-        print("======================================")
+        print("Running stage2_l0 trace checks...", flush=True)
+        print(f"artifacts={artifact_dir}", flush=True)
+        print(f"Parallel jobs: {jobs}", flush=True)
+        print("======================================", flush=True)
 
         ready: dict[int, TraceResult] = {}
         next_index = 0
@@ -201,7 +204,7 @@ def main() -> int:
             nonlocal passed
 
             suffix = f" {result.summary}" if result.summary else ""
-            print(f"{result.case_name}: {result.status}{suffix}")
+            print(f"{result.case_name}: {result.status}{suffix}", flush=True)
 
             if result.status == "TRACE_OK":
                 passed += 1
@@ -209,6 +212,7 @@ def main() -> int:
                     sys.stdout.write(first_lines(result.report_text, 80))
                     if result.report_text and not result.report_text.endswith("\n"):
                         sys.stdout.write("\n")
+                    sys.stdout.flush()
                 return
 
             failed_names.append(result.case_name)
@@ -217,6 +221,7 @@ def main() -> int:
                 sys.stdout.write(first_lines(detail_text, 120))
                 if detail_text and not detail_text.endswith("\n"):
                     sys.stdout.write("\n")
+                sys.stdout.flush()
 
         with ThreadPoolExecutor(max_workers=jobs) as executor:
             future_map = {
@@ -240,19 +245,19 @@ def main() -> int:
                     emit(ready.pop(next_index))
                     next_index += 1
 
-        print("======================================")
-        print(f"Passed: {passed}")
-        print(f"Failed: {len(failed_names)}")
+        print("======================================", flush=True)
+        print(f"Passed: {passed}", flush=True)
+        print(f"Failed: {len(failed_names)}", flush=True)
 
         if failed_names:
-            print(f"Failed tests: {' '.join(failed_names)}")
-            print(f"Trace artifacts kept at: {artifact_dir}")
+            print(f"Failed tests: {' '.join(failed_names)}", flush=True)
+            print(f"Trace artifacts kept at: {artifact_dir}", flush=True)
             keep_artifacts = True
             return 1
 
-        print("All trace checks passed!")
+        print("All trace checks passed!", flush=True)
         if keep_artifacts:
-            print(f"Trace artifacts kept at: {artifact_dir}")
+            print(f"Trace artifacts kept at: {artifact_dir}", flush=True)
         return 0
     finally:
         if not keep_artifacts:
