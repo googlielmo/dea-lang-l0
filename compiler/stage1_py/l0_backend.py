@@ -824,8 +824,9 @@ class Backend:
             c_arg = self._emit_let_initializer(arg, field.type)
             field_inits.append((field.name, c_arg))
 
-        # Delegate C-specific formatting to emitter
-        return self.emitter.emit_struct_constructor_for_type(struct_type, field_inits)
+        # File-scope static initializers must use brace-only initializers; nested
+        # compound literals are rejected by gcc under strict C99 here.
+        return self.emitter.emit_struct_static_initializer_for_type(struct_type, field_inits)
 
     def _emit_const_variant_constructor(self, expr: CallExpr, enum_type: EnumType) -> str:
         """Emit constant enum variant constructor for static initialization.
@@ -872,8 +873,7 @@ class Backend:
             c_arg = self._emit_let_initializer(arg, variant_info.field_types[idx])
             payload_inits.append((field.name, c_arg))
 
-        # Delegate C-specific formatting to emitter
-        return self.emitter.emit_variant_constructor_for_type(enum_type, variant_name, payload_inits)
+        return self.emitter.emit_variant_static_initializer_for_type(enum_type, variant_name, payload_inits)
 
     # -------------------------------------------------------------------------
     # Function declarations and definitions

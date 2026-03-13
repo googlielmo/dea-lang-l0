@@ -1508,6 +1508,33 @@ func cem_emit_struct_constructor(c_struct_name: string, field_inits: VectorStrin
 }
 
 /**
+ * Emit a brace-only struct initializer for static storage duration.
+ *
+ * @param field_inits Vector of alternating field-name and field-value strings.
+ * @return Brace-only initializer text.
+ */
+func cem_emit_struct_static_initializer(field_inits: VectorString*) -> string {
+    if (vs_size(field_inits) == 0) {
+        return "{ 0 }";
+    }
+
+    with (let sb = sb_create() => sb_free(sb)) {
+        sb_append(sb, "{ ");
+        for (let i = 0; i < vs_size(field_inits); i = i + 2) {
+            if (i > 0) {
+                sb_append(sb, ", ");
+            }
+            sb_append(sb, ".");
+            sb_append(sb, vs_get(field_inits, i));
+            sb_append(sb, " = ");
+            sb_append(sb, vs_get(field_inits, i + 1));
+        }
+        sb_append(sb, " }");
+        return sb_to_string(sb);
+    }
+}
+
+/**
  * Emit a struct constructor for a resolved struct type.
  *
  * @param struct_type Struct type to construct.
@@ -1516,6 +1543,17 @@ func cem_emit_struct_constructor(c_struct_name: string, field_inits: VectorStrin
  */
 func cem_emit_struct_constructor_for_type(struct_type: Type*, field_inits: VectorString*) -> string {
     return cem_emit_struct_constructor(cem_mangle_struct_name(struct_type.module_name, struct_type.name), field_inits);
+}
+
+/**
+ * Emit a brace-only struct initializer for a resolved struct type.
+ *
+ * @param struct_type Struct type to construct.
+ * @param field_inits Vector of alternating field-name and field-value strings.
+ * @return Brace-only initializer text.
+ */
+func cem_emit_struct_static_initializer_for_type(struct_type: Type*, field_inits: VectorString*) -> string {
+    return cem_emit_struct_static_initializer(field_inits);
 }
 
 /**
@@ -1556,6 +1594,40 @@ func cem_emit_variant_constructor(c_enum_name: string, variant_name: string, tag
 }
 
 /**
+ * Emit a brace-only enum-variant initializer for static storage duration.
+ *
+ * @param variant_name Variant name.
+ * @param tag_value Mangled tag constant.
+ * @param payload_inits Vector of alternating field-name and field-value strings.
+ * @return Brace-only tagged-union initializer.
+ */
+func cem_emit_variant_static_initializer(variant_name: string, tag_value: string,
+                                         payload_inits: VectorString*) -> string {
+    if (vs_size(payload_inits) == 0) {
+        return concat3_s("{ .tag = ", tag_value, " }");
+    }
+
+    with (let sb = sb_create() => sb_free(sb)) {
+        sb_append(sb, "{ .tag = ");
+        sb_append(sb, tag_value);
+        sb_append(sb, ", .data = { .");
+        sb_append(sb, variant_name);
+        sb_append(sb, " = { ");
+        for (let i = 0; i < vs_size(payload_inits); i = i + 2) {
+            if (i > 0) {
+                sb_append(sb, ", ");
+            }
+            sb_append(sb, ".");
+            sb_append(sb, vs_get(payload_inits, i));
+            sb_append(sb, " = ");
+            sb_append(sb, vs_get(payload_inits, i + 1));
+        }
+        sb_append(sb, " } } }");
+        return sb_to_string(sb);
+    }
+}
+
+/**
  * Emit an enum-variant constructor for a resolved enum type.
  *
  * @param enum_type Enum type to construct.
@@ -1567,6 +1639,20 @@ func cem_emit_variant_constructor_for_type(enum_type: Type*, variant_name: strin
     let c_enum_name = cem_mangle_enum_name(enum_type.module_name, enum_type.name);
     let tag_value = cem_emit_enum_tag(enum_type, variant_name);
     return cem_emit_variant_constructor(c_enum_name, variant_name, tag_value, payload_inits);
+}
+
+/**
+ * Emit a brace-only enum-variant initializer for a resolved enum type.
+ *
+ * @param enum_type Enum type to construct.
+ * @param variant_name Variant name.
+ * @param payload_inits Vector of alternating field-name and field-value strings.
+ * @return Brace-only tagged-union initializer.
+ */
+func cem_emit_variant_static_initializer_for_type(enum_type: Type*, variant_name: string,
+                                                  payload_inits: VectorString*) -> string {
+    let tag_value = cem_emit_enum_tag(enum_type, variant_name);
+    return cem_emit_variant_static_initializer(variant_name, tag_value, payload_inits);
 }
 
 /**

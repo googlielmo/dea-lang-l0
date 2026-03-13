@@ -277,7 +277,7 @@ func test_backend_generate_types_and_top_level_lets() {
         assert(contains_s(generated,
             "struct l0_demo_main_Point {\n    l0_int x;\n    l0_int y;\n};\n#endif\n\n#ifndef L0_DEFINED_l0_demo_main_MaybePoint"),
             "struct should be emitted before dependent enum");
-        assert(contains_s(generated, "static struct l0_demo_main_Point l0_demo_main_origin = (struct l0_demo_main_Point){ .x = 0, .y = 0 };"),
+        assert(contains_s(generated, "static struct l0_demo_main_Point l0_demo_main_origin = { .x = 0, .y = 0 };"),
             "top-level struct constructor let mismatch");
         assert(contains_s(generated, "return (p).x;"), "field access lowering mismatch");
 

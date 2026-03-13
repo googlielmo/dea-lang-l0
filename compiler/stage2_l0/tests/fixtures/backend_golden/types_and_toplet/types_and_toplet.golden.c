@@ -44,7 +44,7 @@ struct l0_main_MaybePoint {
 /* Optional wrapper types (late) */
 /* Top-level let declarations */
 /* Module: main */
-static struct l0_main_Point l0_main_origin = (struct l0_main_Point){ .x = 0, .y = 0 };
+static struct l0_main_Point l0_main_origin = { .x = 0, .y = 0 };
 /* Function declarations */
 /* Module: main */
 l0_int l0_main_main(void);

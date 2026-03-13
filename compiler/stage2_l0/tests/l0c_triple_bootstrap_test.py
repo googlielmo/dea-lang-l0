@@ -278,6 +278,50 @@ def artifact_summary(path: Path) -> str:
     return f"{path} size={path.stat().st_size} sha256={sha256_hex(path)[:16]}"
 
 
+def resolve_strip_command() -> list[str] | None:
+    """Return one available strip command for native artifact normalization."""
+
+    for candidate in ("strip", "llvm-strip"):
+        resolved = shutil.which(candidate)
+        if resolved:
+            return [resolved, "-s"]
+    return None
+
+
+def normalized_native_artifact(path: Path, artifact_dir: Path) -> Path:
+    """Return one normalized native artifact path for byte-identity comparison."""
+
+    if not sys.platform.startswith("linux"):
+        return path
+
+    strip_command = resolve_strip_command()
+    if strip_command is None:
+        raise TripleBootstrapFailure("no strip tool found for Linux native identity comparison")
+
+    normalized = artifact_dir / f"{path.name}.stripped"
+    completed = subprocess.run(
+        [*strip_command, "-o", str(normalized), str(path)],
+        cwd=REPO_ROOT,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        check=False,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    if completed.returncode != 0:
+        raise TripleBootstrapFailure(
+            "\n".join(
+                [
+                    f"failed to normalize native artifact with {' '.join(strip_command)}",
+                    f"path={path}",
+                    completed.stdout.rstrip(),
+                ]
+            ).rstrip()
+        )
+    return normalized
+
+
 def short_unified_diff(left: Path, right: Path, artifact_dir: Path) -> str:
     """Write and return a short unified diff for retained-C mismatches."""
 
@@ -453,11 +497,16 @@ def main() -> int:
         if uses_tcc(compiler_text):
             notice("skipping native binary comparison for tcc (no stable binary guarantee)")
         else:
-            notice("comparing second and third self-built native compiler binaries")
+            native_left = normalized_native_artifact(second_native, artifact_dir)
+            native_right = normalized_native_artifact(third_native, artifact_dir)
+            if sys.platform.startswith("linux"):
+                notice("comparing stripped second and third self-built native compiler binaries")
+            else:
+                notice("comparing second and third self-built native compiler binaries")
             assert_same_bytes(
                 "native binary (stage2 vs stage3)",
-                second_native,
-                third_native,
+                native_left,
+                native_right,
                 artifact_dir,
                 include_diff=False,
             )

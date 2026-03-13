@@ -155,6 +155,10 @@ The test performs, in order:
 5. byte-for-byte comparison of second-build vs third-build native compiler binaries, unless the host compiler is `tcc`
 6. smoke run through the third self-built compiler
 
+On Linux, the native identity step compares stripped binaries. Raw ELF outputs can differ across identical builds when
+the retained C source path changes, even after disabling the linker build ID. Stripping preserves the meaningful native
+code / link-result comparison while ignoring filename-sensitive metadata.
+
 If you want to run the same flow manually step by step, keep one compiler and one flag set for both builds:
 
 ```bash
@@ -166,7 +170,9 @@ DEA_BUILD_DIR=build/tests/triple-manual KEEP_C=1 ./scripts/build-stage2-l0c.sh
 L0_HOME="$PWD/compiler" ./build/tests/triple-manual/bin/l0c-stage2 --build --keep-c -P compiler/stage2_l0/src -o build/tests/triple-manual/l0c-stage2-second.native l0c
 L0_HOME="$PWD/compiler" ./build/tests/triple-manual/l0c-stage2-second.native --build --keep-c -P compiler/stage2_l0/src -o build/tests/triple-manual/l0c-stage2-third.native l0c
 cmp build/tests/triple-manual/l0c-stage2-second.c build/tests/triple-manual/l0c-stage2-third.c
-cmp build/tests/triple-manual/l0c-stage2-second.native build/tests/triple-manual/l0c-stage2-third.native
+strip -s -o build/tests/triple-manual/l0c-stage2-second.stripped build/tests/triple-manual/l0c-stage2-second.native
+strip -s -o build/tests/triple-manual/l0c-stage2-third.stripped build/tests/triple-manual/l0c-stage2-third.native
+cmp build/tests/triple-manual/l0c-stage2-second.stripped build/tests/triple-manual/l0c-stage2-third.stripped
 L0_HOME="$PWD/compiler" ./build/tests/triple-manual/l0c-stage2-third.native --run -P examples hello
 ```
 

@@ -1317,10 +1317,29 @@ class CEmitter:
         inits_str = ", ".join(f".{name} = {value}" for name, value in field_inits)
         return f"(struct {c_struct_name}){{ {inits_str} }}"
 
+    def emit_struct_static_initializer(self, field_inits: List[Tuple[str, str]]) -> str:
+        """Emit a brace-only struct initializer for static storage duration."""
+
+        if not field_inits:
+            return "{ 0 }"
+
+        inits_str = ", ".join(f".{name} = {value}" for name, value in field_inits)
+        return f"{{ {inits_str} }}"
+
     def emit_struct_constructor_for_type(self, struct_type: StructType, field_inits: List[Tuple[str, str]]) -> str:
         """Emit a C struct constructor for an L0 struct type."""
         c_struct_name = self.mangle_struct_name(struct_type.module, struct_type.name)
         return self.emit_struct_constructor(c_struct_name, field_inits)
+
+    def emit_struct_static_initializer_for_type(
+            self,
+            struct_type: StructType,
+            field_inits: List[Tuple[str, str]],
+    ) -> str:
+        """Emit a static-storage struct initializer for an L0 struct type."""
+
+        del struct_type
+        return self.emit_struct_static_initializer(field_inits)
 
     def emit_variant_constructor(
             self,
@@ -1346,6 +1365,20 @@ class CEmitter:
         payload_str = ", ".join(f".{name} = {value}" for name, value in payload_inits)
         return f"(struct {c_enum_name}){{ .tag = {tag_value}, .data = {{ .{variant_name} = {{ {payload_str} }} }} }}"
 
+    def emit_variant_static_initializer(
+            self,
+            variant_name: str,
+            tag_value: str,
+            payload_inits: List[Tuple[str, str]],
+    ) -> str:
+        """Emit a brace-only enum tagged-union initializer for static storage duration."""
+
+        if not payload_inits:
+            return f"{{ .tag = {tag_value} }}"
+
+        payload_str = ", ".join(f".{name} = {value}" for name, value in payload_inits)
+        return f"{{ .tag = {tag_value}, .data = {{ .{variant_name} = {{ {payload_str} }} }} }}"
+
     def emit_variant_constructor_for_type(
             self,
             enum_type: EnumType,
@@ -1356,6 +1389,17 @@ class CEmitter:
         c_enum_name = self.mangle_enum_name(enum_type.module, enum_type.name)
         tag_value = self.emit_enum_tag(enum_type, variant_name)
         return self.emit_variant_constructor(c_enum_name, variant_name, tag_value, payload_inits)
+
+    def emit_variant_static_initializer_for_type(
+            self,
+            enum_type: EnumType,
+            variant_name: str,
+            payload_inits: List[Tuple[str, str]],
+    ) -> str:
+        """Emit a static-storage tagged union initializer for a given L0 enum type."""
+
+        tag_value = self.emit_enum_tag(enum_type, variant_name)
+        return self.emit_variant_static_initializer(variant_name, tag_value, payload_inits)
 
     def emit_pattern_binding_init(self, scrutinee: str, variant: str, field: str) -> str:
         """Emit C code for accessing a variant field during pattern matching.

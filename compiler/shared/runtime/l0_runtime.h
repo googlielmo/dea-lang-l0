@@ -39,6 +39,7 @@
 #include <stdarg.h>
 #include <errno.h>
 #include <time.h>
+#include <sys/types.h>
 #include <sys/stat.h>
 
 #if !defined(_WIN32)
@@ -1488,36 +1489,24 @@ static l0_opt_string rt_read_file_all(l0_string path) {
     }
 
     char *path_cstr = _rt_string_bytes(path);
+    struct stat st;
+
+    if (stat(path_cstr, &st) != 0) {
+        return L0_OPT_STRING_NULL;
+    }
+    if (!S_ISREG(st.st_mode)) {
+        return L0_OPT_STRING_NULL;
+    }
+    if (st.st_size < 0 || (uint64_t)st.st_size > INT32_MAX) {
+        return L0_OPT_STRING_NULL;
+    }
 
     FILE *file = fopen(path_cstr, "rb");
     if (file == NULL) {
         return L0_OPT_STRING_NULL;
     }
 
-    /* Get file size */
-    if (fseek(file, 0, SEEK_END) != 0) {
-        fclose(file);
-        return L0_OPT_STRING_NULL;
-    }
-
-    long file_size = ftell(file);
-    if (file_size < 0) {
-        fclose(file);
-        return L0_OPT_STRING_NULL;
-    }
-
-    if (fseek(file, 0, SEEK_SET) != 0) {
-        fclose(file);
-        return L0_OPT_STRING_NULL;
-    }
-
-    /* Check for overflow */
-    if ((uint64_t)file_size > INT32_MAX) {
-        fclose(file);
-        _rt_panic("rt_read_file_all: file size too large for l0_int");
-    }
-
-    size_t size = (size_t)file_size;
+    size_t size = (size_t)st.st_size;
 
     l0_string result = _rt_alloc_string((l0_int)size);
     char *buffer = _rt_string_bytes(result);
@@ -1630,7 +1619,7 @@ static struct l0_sys_rt_RtFileInfo rt_file_info(l0_string path) {
         if ((long)(l0_int)st.st_mtimespec.tv_nsec == st.st_mtimespec.tv_nsec) {
             out.mtime_nsec = (l0_opt_int){ .has_value = 1, .value = (l0_int)st.st_mtimespec.tv_nsec };
         }
-#elif defined(_POSIX_C_SOURCE) || defined(__linux__) || defined(__unix__) || defined(__unix)
+#elif defined(_POSIX_C_SOURCE) && _POSIX_C_SOURCE >= 200809L
         if ((long)(l0_int)st.st_mtim.tv_nsec == st.st_mtim.tv_nsec) {
             out.mtime_nsec = (l0_opt_int){ .has_value = 1, .value = (l0_int)st.st_mtim.tv_nsec };
         }

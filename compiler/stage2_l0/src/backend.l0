@@ -1258,7 +1258,7 @@ func be_emit_const_constructor(self: Backend*, expr_id: ExprId, expected_type: T
                 vs_push(field_inits,
                     be_emit_let_initializer(self, id_vec_get(call.ids as VectorBase*, i), field.field_type));
             }
-            return cem_emit_struct_constructor_for_type(expected_type, field_inits);
+            return cem_emit_struct_static_initializer_for_type(expected_type, field_inits);
         }
     }
 
@@ -1287,7 +1287,7 @@ func be_emit_const_constructor(self: Backend*, expr_id: ExprId, expected_type: T
                 vs_push(payload_inits,
                     be_emit_let_initializer(self, id_vec_get(call.ids as VectorBase*, i), ptr_vec_get(info2.field_types, i) as Type*));
             }
-            return cem_emit_variant_constructor_for_type(expected_type, variant_name, payload_inits);
+            return cem_emit_variant_static_initializer_for_type(expected_type, variant_name, payload_inits);
         }
     }
 
