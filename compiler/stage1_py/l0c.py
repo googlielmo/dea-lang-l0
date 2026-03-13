@@ -357,6 +357,37 @@ def _compiler_flag_family(compiler):
         return "unknown"
 
 
+def _is_windows_host() -> bool:
+    """Return whether the current Python host is Windows."""
+    return os.name == "nt"
+
+
+def _default_executable_name() -> str:
+    """Return the default build output name for the current platform."""
+    return "a.exe" if _is_windows_host() else "a.out"
+
+
+def _runtime_include_flags(flag_family: str, runtime_include: str) -> list[str]:
+    """Return compiler-family-specific runtime include flags."""
+    if flag_family == "msvc":
+        return [f"/I{runtime_include}"]
+    return ["-I", runtime_include]
+
+
+def _runtime_library_flags(flag_family: str, runtime_lib: str) -> list[str]:
+    """Return compiler-family-specific runtime library flags."""
+    if flag_family == "msvc":
+        return ["/link", f"/LIBPATH:{runtime_lib}", "l0runtime.lib"]
+    return ["-L", runtime_lib, "-ll0runtime"]
+
+
+def _output_flags(flag_family: str, exe_path: Path) -> list[str]:
+    """Return compiler-family-specific output flags."""
+    if flag_family == "msvc":
+        return [f"/Fe:{exe_path}"]
+    return ["-o", str(exe_path)]
+
+
 def _check_entry_main_for_build(result: AnalysisResult, entry_name: str, context: CompilationContext) -> bool:
     """Check that the entry module defines a valid 'main' function for build/run.
 
@@ -512,7 +543,7 @@ def cmd_build(args: argparse.Namespace) -> int:
     if args.output:
         exe_path = Path(args.output)
     else:
-        exe_path = Path("a.out")
+        exe_path = Path(_default_executable_name())
 
     # Write C code to temporary or specified file
     if args.keep_c:
@@ -553,7 +584,8 @@ def cmd_build(args: argparse.Namespace) -> int:
             log_info(context, f"Extra C compiler options: {extra_opts}")
 
         # Build compiler command
-        cmd = [compiler, str(c_path), "-o", str(exe_path)]
+        cmd = [compiler, str(c_path)]
+        cmd.extend(_output_flags(flag_family, exe_path))
         cmd.extend(extra_opts)
 
         # Add standard flags
@@ -576,9 +608,9 @@ def cmd_build(args: argparse.Namespace) -> int:
 
         # Add runtime include path
         if args.runtime_include:
-            cmd.extend(["-I", args.runtime_include])
+            cmd.extend(_runtime_include_flags(flag_family, args.runtime_include))
         elif os.getenv("L0_RUNTIME_INCLUDE"):
-            cmd.extend(["-I", os.getenv("L0_RUNTIME_INCLUDE")])
+            cmd.extend(_runtime_include_flags(flag_family, os.getenv("L0_RUNTIME_INCLUDE")))
 
         # Add runtime library
         runtime_lib_path = args.runtime_lib or os.getenv("L0_RUNTIME_LIB")
@@ -587,9 +619,9 @@ def cmd_build(args: argparse.Namespace) -> int:
                 return 1
 
         if args.runtime_lib:
-            cmd.extend(["-L", args.runtime_lib, "-ll0runtime"])
+            cmd.extend(_runtime_library_flags(flag_family, args.runtime_lib))
         elif os.getenv("L0_RUNTIME_LIB"):
-            cmd.extend(["-L", os.getenv("L0_RUNTIME_LIB"), "-ll0runtime"])
+            cmd.extend(_runtime_library_flags(flag_family, os.getenv("L0_RUNTIME_LIB")))
 
         log_info(context, f"Compiling:")
         log_info(context, f"{' '.join(cmd)}")
@@ -629,7 +661,8 @@ def cmd_run(args: argparse.Namespace) -> int:
     """
     context = build_compilation_context(args)
     # Create temporary executable
-    with tempfile.NamedTemporaryFile(mode='w', suffix='', delete=False) as f:
+    temp_exe_suffix = ".exe" if _is_windows_host() else ""
+    with tempfile.NamedTemporaryFile(mode='w', suffix=temp_exe_suffix, delete=False) as f:
         temp_exe = f.name
 
     try:
@@ -647,7 +680,7 @@ def cmd_run(args: argparse.Namespace) -> int:
             if output_arg:
                 c_output_path = str(Path(output_arg).with_suffix(".c"))
             else:
-                c_output_path = str(Path("a.out").with_suffix(".c"))
+                c_output_path = str(Path(_default_executable_name()).with_suffix(".c"))
 
         build_args = argparse.Namespace(
             entry=args.entry,

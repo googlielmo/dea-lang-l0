@@ -13,8 +13,15 @@ PYTHON_BIN="${PYTHON:-}"
 if [ -z "${PYTHON_BIN}" ] && [ -x "${REPO_ROOT}/.venv/bin/python" ]; then
     PYTHON_BIN="${REPO_ROOT}/.venv/bin/python"
 fi
+if [ -z "${PYTHON_BIN}" ] && [ -x "${REPO_ROOT}/.venv/Scripts/python.exe" ]; then
+    PYTHON_BIN="${REPO_ROOT}/.venv/Scripts/python.exe"
+fi
 if [ -z "${PYTHON_BIN}" ]; then
-    PYTHON_BIN="python3"
+    if command -v python3 >/dev/null 2>&1; then
+        PYTHON_BIN="python3"
+    else
+        PYTHON_BIN="python"
+    fi
 fi
 
 exec "${PYTHON_BIN}" "${SCRIPT_DIR}/build_stage2_l0c.py" "$@"

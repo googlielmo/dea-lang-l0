@@ -59,6 +59,16 @@ def shell_join(command: list[str]) -> str:
     return " ".join(shlex.quote(part) for part in command)
 
 
+def stage2_wrapper_command(wrapper_path: Path) -> list[str]:
+    """Return the command used to invoke one generated Stage 2 wrapper."""
+
+    if os.name == "nt":
+        cmd_path = wrapper_path.with_suffix(".cmd")
+        if cmd_path.is_file():
+            return [str(cmd_path)]
+    return [str(wrapper_path)]
+
+
 def first_lines(text: str, limit: int) -> str:
     """Return at most `limit` lines from `text`."""
 
@@ -436,7 +446,7 @@ def main() -> int:
         _, second_build_elapsed = run_logged(
             "second_build",
             [
-                str(stage2_wrapper),
+                *stage2_wrapper_command(stage2_wrapper),
                 "--build",
                 "--keep-c",
                 "-P",

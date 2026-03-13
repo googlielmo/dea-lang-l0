@@ -577,7 +577,8 @@ class CEmitter:
             if mod:
                 filename = mod.filename or f"{current_module}.l0"
         if filename:
-            self.out.emit(f'#line {node.span.start_line} "{filename}"')
+            escaped_filename = encode_c_string_bytes(str(filename).encode("utf-8"))
+            self.out.emit(f'#line {node.span.start_line} "{escaped_filename}"')
 
     def emit_forward_decls(self) -> None:
         """Emit forward declarations for all structs and enums in compilation unit."""

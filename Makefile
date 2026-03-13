@@ -1,6 +1,14 @@
 .DEFAULT_GOAL := help
 
-PYTHON ?= $(if $(wildcard ./.venv/bin/python),./.venv/bin/python,python3)
+ifeq ($(OS),Windows_NT)
+VENV_PYTHON_DEFAULT := ./.venv/Scripts/python.exe
+else
+VENV_PYTHON_DEFAULT := ./.venv/bin/python
+endif
+
+HOST_PYTHON ?= $(shell if command -v python3 >/dev/null 2>&1; then printf '%s' python3; else printf '%s' python; fi)
+VENV_PYTHON := $(shell if [ -x ./.venv/bin/python ]; then printf '%s' ./.venv/bin/python; elif [ -x ./.venv/Scripts/python.exe ]; then printf '%s' ./.venv/Scripts/python.exe; else printf '%s' $(VENV_PYTHON_DEFAULT); fi)
+PYTHON ?= $(shell if [ -x ./.venv/bin/python ]; then printf '%s' ./.venv/bin/python; elif [ -x ./.venv/Scripts/python.exe ]; then printf '%s' ./.venv/Scripts/python.exe; else printf '%s' $(HOST_PYTHON); fi)
 DEA_BUILD_DIR ?= build/dea
 DOCKER_IMAGE ?= l0-test
 
@@ -69,16 +77,16 @@ help:
 
 venv:
 	@if command -v uv >/dev/null 2>&1; then \
-		if [ -x ./.venv/bin/python ]; then \
+		if [ -x "$(VENV_PYTHON)" ]; then \
 			printf '%s\n' 'make venv: syncing existing .venv with uv'; \
 		fi; \
 		uv sync --group dev --group docs; \
-	elif [ -x ./.venv/bin/python ]; then \
+	elif [ -x "$(VENV_PYTHON)" ]; then \
 		printf '%s\n' 'make venv: refreshing existing .venv with pip'; \
-		./.venv/bin/python -m pip install -e . "pytest>=9.0.2" "pytest-xdist>=3.5" "jinja2>=3.1.6" "PyYAML>=6.0.2" "pygments>=2.19.2"; \
+		"$(VENV_PYTHON)" -m pip install -e . "pytest>=9.0.2" "pytest-xdist>=3.5" "jinja2>=3.1.6" "PyYAML>=6.0.2" "pygments>=2.19.2"; \
 	else \
 		$(PYTHON) -m venv .venv; \
-		./.venv/bin/python -m pip install -e . "pytest>=9.0.2" "pytest-xdist>=3.5" "jinja2>=3.1.6" "PyYAML>=6.0.2" "pygments>=2.19.2"; \
+		"$(VENV_PYTHON)" -m pip install -e . "pytest>=9.0.2" "pytest-xdist>=3.5" "jinja2>=3.1.6" "PyYAML>=6.0.2" "pygments>=2.19.2"; \
 	fi
 
 install-dev-stage1:
@@ -114,18 +122,18 @@ use-dev-stage2: install-dev-stage2
 	@printf '\n------------------------------------------------------------------------------\n'
 
 test-stage1: venv
-	./.venv/bin/python -m pytest -n auto
+	"$(VENV_PYTHON)" -m pytest -n auto
 
 test-stage2: venv install-dev-stage2
-	DEA_BUILD_DIR="$(DEA_BUILD_DIR)" $(PYTHON) ./compiler/stage2_l0/run_tests.py
+	DEA_BUILD_DIR="$(DEA_BUILD_DIR)" "$(VENV_PYTHON)" ./compiler/stage2_l0/run_tests.py
 
 test-stage2-trace: venv install-dev-stage2
-	DEA_BUILD_DIR="$(DEA_BUILD_DIR)" $(PYTHON) ./compiler/stage2_l0/run_trace_tests.py
+	DEA_BUILD_DIR="$(DEA_BUILD_DIR)" "$(VENV_PYTHON)" ./compiler/stage2_l0/run_trace_tests.py
 
 test-all: test-stage1 test-stage2 test-stage2-trace
 
 triple-test: venv install-dev-stage2
-	DEA_BUILD_DIR="$(DEA_BUILD_DIR)" $(PYTHON) ./compiler/stage2_l0/tests/l0c_triple_bootstrap_test.py
+	DEA_BUILD_DIR="$(DEA_BUILD_DIR)" "$(VENV_PYTHON)" ./compiler/stage2_l0/tests/l0c_triple_bootstrap_test.py
 
 print-dea-build-dir:
 	@printf '%s\n' "$(DEA_BUILD_DIR)"

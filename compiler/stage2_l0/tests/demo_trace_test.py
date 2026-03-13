@@ -44,6 +44,17 @@ def assert_contains(path: Path, needle: str, artifact_dir: Path) -> None:
         fail(f"expected {needle!r} in {path}", artifact_dir)
 
 
+def source_tree_l0c_command() -> list[str]:
+    """Return the command used to invoke the source-tree Stage 1 compiler."""
+
+    if os.name == "nt":
+        cmd_path = REPO_ROOT / "scripts" / "l0c.cmd"
+        if cmd_path.is_file():
+            return [str(cmd_path)]
+        return [sys.executable, str(REPO_ROOT / "compiler" / "stage1_py" / "l0c.py")]
+    return ["./scripts/l0c"]
+
+
 def run_case(name: str, expected_rc: int, expected_stdout_substr: str, artifact_dir: Path, *argv: str) -> None:
     """Run one demo trace scenario and assert trace health."""
 
@@ -51,7 +62,7 @@ def run_case(name: str, expected_rc: int, expected_stdout_substr: str, artifact_
     trace_path = artifact_dir / f"{name}.stderr.log"
     report_path = artifact_dir / f"{name}.trace_report.txt"
 
-    command = ["./scripts/l0c", "--run", "--trace-memory", "--trace-arc", str(TARGET)]
+    command = [*source_tree_l0c_command(), "--run", "--trace-memory", "--trace-arc", str(TARGET)]
     if argv:
         command.extend(["--", *argv])
 

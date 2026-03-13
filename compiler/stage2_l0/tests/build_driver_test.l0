@@ -30,6 +30,15 @@ func test_shell_quote_posix_handles_spaces_and_quotes() {
 }
 
 /**
+ * Tests test_shell_quote_windows_handles_spaces_and_quotes.
+ */
+func test_shell_quote_windows_handles_spaces_and_quotes() {
+    assert(eq_s(bd_shell_quote_windows("two words"), "\"two words\""), "space quoting mismatch");
+    assert(eq_s(bd_shell_quote_windows("say \"hi\""), "\"say \\\"hi\\\"\""), "double-quote escaping mismatch");
+    assert(eq_s(bd_shell_quote_windows(""), "\"\""), "empty string should still be quoted");
+}
+
+/**
  * Tests test_join_shell_words_quotes_every_token.
  */
 func test_join_shell_words_quotes_every_token() {
@@ -108,15 +117,51 @@ func test_get_optimize_flag_defaults_and_overrides() {
 }
 
 /**
+ * Tests test_output_flag_selection_matches_compiler_family.
+ */
+func test_output_flag_selection_matches_compiler_family() {
+    with (let gcc_words = vs_create(4) => vs_free(gcc_words)) {
+        bd_push_output_flags(gcc_words, "gcc", "out.exe");
+        assert(vs_size(gcc_words) == 2, "gcc output flags should use two argv words");
+        assert(eq_s(vs_get(gcc_words, 0), "-o"), "gcc output flag mismatch");
+        assert(eq_s(vs_get(gcc_words, 1), "out.exe"), "gcc output path mismatch");
+    }
+
+    with (let msvc_words = vs_create(2) => vs_free(msvc_words)) {
+        bd_push_output_flags(msvc_words, "msvc", "out.exe");
+        assert(vs_size(msvc_words) == 1, "msvc output flags should use one argv word");
+        assert(eq_s(vs_get(msvc_words, 0), "/Fe:out.exe"), "msvc output flag mismatch");
+    }
+}
+
+/**
+ * Tests test_exe_name_helpers_are_consistent.
+ */
+func test_exe_name_helpers_are_consistent() {
+    if (bd_is_windows()) {
+        assert(eq_s(bd_default_exe_name(), "a.exe"), "windows build name mismatch");
+        assert(eq_s(bd_exe_suffix(), ".exe"), "windows suffix mismatch");
+        assert(eq_s(bd_null_device(), "NUL"), "windows null device mismatch");
+    } else {
+        assert(eq_s(bd_default_exe_name(), "a.out"), "posix build name mismatch");
+        assert(eq_s(bd_exe_suffix(), ".out"), "posix suffix mismatch");
+        assert(eq_s(bd_null_device(), "/dev/null"), "posix null device mismatch");
+    }
+}
+
+/**
  * Main entry point for the module.
  */
 func main() {
     test_with_c_suffix_rewrites_existing_extension();
     test_shell_quote_posix_handles_spaces_and_quotes();
+    test_shell_quote_windows_handles_spaces_and_quotes();
     test_join_shell_words_quotes_every_token();
     test_join_display_words_matches_stage1_logging();
     test_format_word_list_matches_stage1_logging();
     test_compiler_flag_family_detection();
     test_get_optimize_flag_defaults_and_overrides();
+    test_output_flag_selection_matches_compiler_family();
+    test_exe_name_helpers_are_consistent();
     printl_s("build_driver_test: all tests passed");
 }

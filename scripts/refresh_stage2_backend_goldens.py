@@ -11,6 +11,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from dist_tools_lib import source_tree_stage1_command
+
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 FIXTURE_ROOT = REPO_ROOT / "compiler" / "stage2_l0" / "tests" / "fixtures" / "backend_golden"
@@ -54,7 +56,7 @@ def golden_path(case_dir: Path) -> Path:
 def generate_stage1_golden(case_dir: Path) -> str:
     module = entry_module(case_dir)
     cmd = [
-        "./scripts/l0c",
+        *source_tree_stage1_command(REPO_ROOT),
         "--gen",
         "--no-line-directives",
         "-P",

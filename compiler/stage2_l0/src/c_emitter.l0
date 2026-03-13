@@ -689,7 +689,15 @@ func cem_emit_line_directive(self: CEmitter*, line: int, current_module: string,
     if (!opts.emit_line_directives || line <= 0) {
         return;
     }
-    ccb_emit(self.out, concat4_s("#line ", int_to_string(line), " \"", concat_s(cem_module_filename(self, current_module), "\"")));
+    ccb_emit(
+        self.out,
+        concat4_s(
+            "#line ",
+            int_to_string(line),
+            " \"",
+            concat_s(se_encode_c_string_bytes(cem_module_filename(self, current_module)), "\"")
+        )
+    );
 }
 
 /**

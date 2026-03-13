@@ -52,6 +52,12 @@ mkdir -p "$REPO_ROOT/build"
 DEA_BUILD_DIR="$DEA_BUILD_DIR" ./scripts/build-stage2-l0c.sh >/dev/null
 
 STAGE2_L0C="$DEA_BUILD_DIR/bin/l0c-stage2"
+EXPECTED_EXE="a.out"
+case "$(uname -s)" in
+    CYGWIN*|MINGW*|MSYS*)
+        EXPECTED_EXE="a.exe"
+        ;;
+esac
 
 V_STDOUT="$TMP_DIR/v.stdout"
 V_STDERR="$TMP_DIR/v.stderr"
@@ -76,8 +82,8 @@ assert_contains "$V_STDERR" "Using C compiler: "
 assert_contains "$V_STDERR" "Detected compiler flag family: "
 assert_contains "$V_STDERR" "Adding optimization flag: "
 assert_contains "$V_STDERR" "Compiling:"
-assert_matches "$V_STDERR" " -o a\\.out"
-assert_contains "$V_STDERR" "Built executable: a.out"
+assert_matches "$V_STDERR" " -o ${EXPECTED_EXE//./\\.}"
+assert_contains "$V_STDERR" "Built executable: $EXPECTED_EXE"
 assert_not_contains "$V_STDERR" "Loading module 'ok_main'"
 assert_not_contains "$V_STDERR" "Preparing optional wrapper types"
 assert_not_contains "$V_STDERR" "already loaded (cache hit)"

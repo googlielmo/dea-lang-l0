@@ -412,7 +412,7 @@ def test_field_assign_with_function_call_object(tmp_path, write_l0_file, search_
         func get_box() -> Box* {
             counter = counter + 1;
             // Use calloc to get zeroed memory for the struct
-            let ptr: void* = rt_calloc(1, 24) as void*;
+            let ptr: void* = rt_calloc(1, sizeof(Box)) as void*;
             return ptr as Box*;
         }
 

@@ -10,8 +10,11 @@ authors = [{ name = "gwz (googlielmo)", email = "googlielmo@gmail.com" }]
 requires-python = ">=3.14"
 dependencies = []
 
+[project.scripts]
+l0c = "l0c:main"
+
 [dependency-groups]
-dev = ["pytest>=9.0.2", "pytest-xdist>=3.5"]
+dev = ["pre-commit>=4.5.0", "pytest>=9.0.2", "pytest-xdist>=3.5"]
 docs = [
     "jinja2>=3.1.6",
     "PyYAML>=6.0.2",

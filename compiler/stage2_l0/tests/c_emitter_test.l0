@@ -193,6 +193,27 @@ func test_emitter_header_honors_trace_flags() {
 }
 
 /**
+ * Tests test_emitter_line_directives_escape_windows_paths.
+ */
+func test_emitter_line_directives_escape_windows_paths() {
+    let result = cet_empty_analysis_result();
+    let decls = ptr_vec_create(0);
+    cet_push_module(result, cet_module("demo.main", "D:\\tmp\\project\\demo.l0", decls));
+
+    let emitter = cem_create();
+    let opts = cg_options_create();
+    cem_set_analysis(emitter, result);
+
+    cem_emit_line_directive(emitter, 7, "demo.main", opts);
+    let text = cem_get_output(emitter);
+    assert(eq_s(text, "#line 7 \"D:\\\\tmp\\\\project\\\\demo.l0\"\n"), "line directive path escaping mismatch");
+
+    cg_options_free(opts);
+    cem_free(emitter);
+    analysis_result_free(result);
+}
+
+/**
  * Tests test_emitter_string_literals_use_l0_string_const.
  */
 func test_emitter_string_literals_use_l0_string_const() {
@@ -533,6 +554,7 @@ func main() {
     test_emitter_name_mangling();
     test_emitter_type_lowering_and_null_forms();
     test_emitter_header_honors_trace_flags();
+    test_emitter_line_directives_escape_windows_paths();
     test_emitter_string_literals_use_l0_string_const();
     test_emitter_expression_and_statement_helpers();
     test_emitter_cleanup_and_switch_helpers();

@@ -19,10 +19,38 @@ import shlex
 import shutil
 import stat
 import subprocess
+import sys
 import tempfile
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+
+
+def is_windows_host() -> bool:
+    """Return whether the current Python host is Windows."""
+
+    return os.name == "nt"
+
+
+def source_tree_stage1_command(repo_root: Path) -> list[str]:
+    """Return the command used to invoke the source-tree Stage 1 compiler."""
+
+    if is_windows_host():
+        cmd_path = repo_root / "scripts" / "l0c.cmd"
+        if cmd_path.is_file():
+            return [str(cmd_path)]
+        return [sys.executable, str(repo_root / "compiler" / "stage1_py" / "l0c.py")]
+    return ["./scripts/l0c"]
+
+
+def stage2_wrapper_command(wrapper_path: Path) -> list[str]:
+    """Return the command used to invoke one generated Stage 2 wrapper."""
+
+    if is_windows_host():
+        cmd_path = wrapper_path.with_suffix(".cmd")
+        if cmd_path.is_file():
+            return [str(cmd_path)]
+    return [str(wrapper_path)]
 
 
 @dataclass(frozen=True)
@@ -486,7 +514,22 @@ if [ -z "${{L0_HOME:-}}" ]; then
     export L0_HOME="${{repo_root}}/compiler"
 fi
 
-exec python3 "${{L0_HOME}}/stage1_py/l0c.py" "$@"
+python_bin="${{PYTHON:-}}"
+if [ -z "${{python_bin}}" ] && [ -x "${{repo_root}}/.venv/bin/python" ]; then
+    python_bin="${{repo_root}}/.venv/bin/python"
+fi
+if [ -z "${{python_bin}}" ] && [ -x "${{repo_root}}/.venv/Scripts/python.exe" ]; then
+    python_bin="${{repo_root}}/.venv/Scripts/python.exe"
+fi
+if [ -z "${{python_bin}}" ]; then
+    if command -v python3 >/dev/null 2>&1; then
+        python_bin="python3"
+    else
+        python_bin="python"
+    fi
+fi
+
+exec "${{python_bin}}" "${{L0_HOME}}/stage1_py/l0c.py" "$@"
 """
 
 
@@ -504,6 +547,14 @@ if [ -z "${{L0_HOME:-}}" ]; then
 fi
 
 exec "${{script_dir}}/l0c-stage2.native" "$@"
+"""
+
+
+def render_stage2_cmd_wrapper(native_name: str = "l0c-stage2.native") -> str:
+    """Return the Windows batch Stage 2 launcher."""
+
+    return f"""@echo off
+"%~dp0{native_name}" %*
 """
 
 
@@ -645,6 +696,8 @@ def write_stage2_wrapper(layout: DeaBuildLayout) -> Path:
     ensure_dea_build_bin_dir(layout)
     path = layout.bin_dir / "l0c-stage2"
     write_executable(path, render_stage2_wrapper(layout))
+    if is_windows_host():
+        (layout.bin_dir / "l0c-stage2.cmd").write_text(render_stage2_cmd_wrapper(), encoding="utf-8")
     return path
 
 
@@ -663,6 +716,8 @@ def write_prefix_stage2_wrapper(layout: PrefixLayout) -> Path:
     ensure_prefix_bin_dir(layout)
     path = layout.bin_dir / "l0c-stage2"
     write_executable(path, render_prefix_stage2_wrapper())
+    if is_windows_host():
+        (layout.bin_dir / "l0c-stage2.cmd").write_text(render_stage2_cmd_wrapper(), encoding="utf-8")
     return path
 
 

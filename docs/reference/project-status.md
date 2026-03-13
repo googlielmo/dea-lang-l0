@@ -90,7 +90,7 @@ Current backend behavior includes:
 
 ## Stage 1 CLI and Workflow Status
 
-CLI entry point: `compiler/stage1_py/l0c.py` (source-tree wrapper: `./scripts/l0c`).
+CLI entry point: `compiler/stage1_py/l0c.py` (source-tree wrappers: `./scripts/l0c` on POSIX, `scripts/l0c.cmd` on Windows).
 Recommended developer-facing `l0c`: the repo-local alias under `build/dea/bin`, selected with `make use-dev-stage1` or
 `make use-dev-stage2` and activated with `source build/dea/bin/l0-env.sh`.
 
@@ -122,6 +122,12 @@ CLI identity/help behavior:
 - `--help` uses the same stage-specific identity text as the help description heading.
 - `-v` also emits the same identity text on stderr through the normal info-level logging path, including CLI usage
   failures such as invoking `l0c -v` without a target.
+
+Platform support:
+
+- Linux and macOS remain supported host platforms for Stage 1 and Stage 2 workflows.
+- Windows is now supported for build and test workflows with MinGW-w64/GCC as the primary toolchain.
+- MSVC support remains partial/Tier 2: compiler-family flag handling exists, but the Windows CI path validates MinGW-w64.
 
 ## Standard Library Status
 
@@ -265,7 +271,6 @@ Current Stage 2 limitations:
 
 Near-term project direction, consistent with current docs/code:
 
-1. Add Windows build support, with MinGW-w64 as the primary target and CI validation for Stage 1 and Stage 2 workflows.
-2. Define a shared CLI contract spec so Stage 1 and Stage 2 parity has one stable normative source.
-3. Add a release-oriented source-revision override for Stage 2 provenance so source archives can embed packaged
+1. Define a shared CLI contract spec so Stage 1 and Stage 2 parity has one stable normative source.
+2. Add a release-oriented source-revision override for Stage 2 provenance so source archives can embed packaged
    revision metadata without requiring git history.

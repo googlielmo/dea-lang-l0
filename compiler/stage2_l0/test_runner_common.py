@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
 import os
+import shutil
 import subprocess
 import sys
 
@@ -20,8 +21,70 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parent.parent
 TESTS_DIR = SCRIPT_DIR / "tests"
 DEA_BUILD_DIR_ENV = "DEA_BUILD_DIR"
-REPO_VENV_BIN = REPO_ROOT / ".venv" / "bin"
-REPO_VENV_PYTHON = REPO_VENV_BIN / "python"
+
+
+def repo_venv_bin_dir() -> Path:
+    """Return the repo-local virtualenv executable directory for the host platform."""
+
+    candidates = [
+        REPO_ROOT / ".venv" / "bin",
+        REPO_ROOT / ".venv" / "Scripts",
+    ]
+    for candidate in candidates:
+        if candidate.is_dir():
+            return candidate
+    return candidates[1] if os.name == "nt" else candidates[0]
+
+
+REPO_VENV_BIN = repo_venv_bin_dir()
+REPO_VENV_PYTHON = REPO_VENV_BIN / ("python.exe" if REPO_VENV_BIN.name == "Scripts" else "python")
+
+
+def source_tree_l0c_command() -> list[str]:
+    """Return the command used to invoke the source-tree Stage 1 compiler."""
+
+    if os.name == "nt":
+        cmd_path = REPO_ROOT / "scripts" / "l0c.cmd"
+        if cmd_path.is_file():
+            return [str(cmd_path)]
+        return [str(REPO_VENV_PYTHON), str(REPO_ROOT / "compiler" / "stage1_py" / "l0c.py")]
+    return ["./scripts/l0c"]
+
+
+def is_windows_wsl_bash_path(path: Path) -> bool:
+    """Return whether `path` is the legacy Windows WSL bash shim."""
+
+    if os.name != "nt":
+        return False
+    normalized = str(path).replace("/", "\\").lower()
+    return normalized.endswith("\\system32\\bash.exe") or normalized.endswith("\\sysnative\\bash.exe")
+
+
+def resolve_shell_bash_path() -> Path | None:
+    """Return one usable bash executable for shell tests, if available."""
+
+    bash_text = shutil.which("bash")
+    if bash_text is None:
+        return None
+
+    bash_path = Path(bash_text)
+    if is_windows_wsl_bash_path(bash_path):
+        return None
+
+    completed = subprocess.run(
+        [str(bash_path), "--version"],
+        cwd=REPO_ROOT,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        check=False,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    if completed.returncode != 0:
+        return None
+    return bash_path
 
 
 @dataclass(frozen=True)
@@ -175,9 +238,22 @@ def discover_stage2_tests() -> list[TestCase]:
         cases.append(TestCase(index=index, name=path.stem, path=path, kind="l0"))
         index += 1
 
+    bash_path = resolve_shell_bash_path()
+    skipped_shell: list[Path] = []
     for path in sorted(TESTS_DIR.glob("*_test.sh")):
+        if bash_path is None:
+            skipped_shell.append(path)
+            continue
         cases.append(TestCase(index=index, name=path.name, path=path, kind="shell"))
         index += 1
+
+    if skipped_shell:
+        skipped_names = " ".join(path.name for path in skipped_shell)
+        print(
+            f"Skipping Stage 2 shell tests because a usable `bash` is unavailable: {skipped_names}",
+            file=sys.stderr,
+            flush=True,
+        )
 
     for path in sorted(TESTS_DIR.glob("*_test.py")):
         cases.append(TestCase(index=index, name=path.name, path=path, kind="python"))
@@ -207,9 +283,12 @@ def build_normal_test_command(case: TestCase, python_path: Path) -> list[str]:
     """Return the subprocess command for one normal Stage 2 test."""
 
     if case.kind == "l0":
-        return ["./scripts/l0c", "-P", "compiler/stage2_l0/src", "--run", str(case.path)]
+        return [*source_tree_l0c_command(), "-P", "compiler/stage2_l0/src", "--run", str(case.path)]
     if case.kind == "shell":
-        return ["bash", str(case.path)]
+        bash_path = resolve_shell_bash_path()
+        if bash_path is None:
+            raise RuntimeError("shell test requested without a usable `bash` executable")
+        return [str(bash_path), str(case.path)]
     if case.kind == "python":
         return [str(python_path), str(case.path)]
     raise ValueError(f"Unsupported test kind: {case.kind}")

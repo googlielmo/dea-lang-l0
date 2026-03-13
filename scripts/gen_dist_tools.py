@@ -24,6 +24,7 @@ from dist_tools_lib import (
     normalize_prefix_dir,
     remove_dea_build_tree,
     set_alias,
+    stage2_wrapper_command,
     stage2_build_info_overlay,
     write_env_script,
     write_stage1_wrapper,
@@ -132,7 +133,7 @@ def main() -> int:
                     print_progress(f"stage 2/3: self-hosting Stage 2 compiler into {self_hosted_native}")
                     subprocess.run(
                         [
-                            str(stage2_wrapper),
+                            *stage2_wrapper_command(stage2_wrapper),
                             "--build",
                             "-P",
                             str(overlay.overlay_root),

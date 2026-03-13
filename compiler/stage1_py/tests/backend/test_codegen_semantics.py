@@ -461,6 +461,26 @@ def test_codegen_line_directives_and_mangling(codegen_single):
     assert "_tmp__v" in c_code
 
 
+def test_codegen_line_directives_escape_windows_paths(analyze_single):
+    from pathlib import PureWindowsPath
+    from l0_backend import Backend
+
+    result = analyze_single(
+        "main",
+        """
+        module main;
+
+        func main() -> int { return 0; }
+        """,
+    )
+
+    assert not result.has_errors()
+    result.cu.modules["main"].filename = str(PureWindowsPath(r"D:\tmp\project\main.l0"))
+    c_code = Backend(result).generate()
+
+    assert '#line 4 "D:\\\\tmp\\\\project\\\\main.l0"' in c_code
+
+
 # ---------------------------------------------------------------------------
 # Runtime-backed tests
 # ---------------------------------------------------------------------------

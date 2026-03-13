@@ -27,6 +27,18 @@ import shutil
 import pytest
 
 
+def _compiler_flag_family(compiler: str) -> str:
+    """Return the compiler family tag used for test compile helpers."""
+    lower = compiler.lower()
+    if lower.endswith("tcc") or lower.endswith("tcc.exe"):
+        return "tcc"
+    if lower.endswith(("gcc", "gcc.exe", "clang", "clang.exe", "cc", "cc.exe")):
+        return "gcc"
+    if lower.endswith(("cl", "cl.exe")):
+        return "msvc"
+    return "unknown"
+
+
 def pytest_configure(config) -> None:
     """Configure pytest environment and print the detected C compiler.
 
@@ -132,7 +144,7 @@ def write_l0_file(temp_project: Path):
         parts = module_name.split(".")
         file_path = temp_project.joinpath(*parts).with_suffix(".l0")
         file_path.parent.mkdir(parents=True, exist_ok=True)
-        file_path.write_text(dedent(content))
+        file_path.write_text(dedent(content), newline="\n")
         return file_path
 
     return _write
@@ -164,7 +176,7 @@ def write_l0_file_to():
         parts = module_name.split(".")
         file_path = root.joinpath(*parts).with_suffix(".l0")
         file_path.parent.mkdir(parents=True, exist_ok=True)
-        file_path.write_text(dedent(content))
+        file_path.write_text(dedent(content), newline="\n")
         return file_path
 
     return _write
@@ -232,14 +244,25 @@ def compile_and_run(runtime_dir: Path):
     """
     def _compile_and_run(c_code: str, work_dir: Path) -> tuple[bool, str, str]:
         cc = _find_cc()
+        flag_family = _compiler_flag_family(cc)
 
         c_file = work_dir / "output.c"
-        exe_file = work_dir / "output"
+        exe_name = "output.exe" if os.name == "nt" else "output"
+        exe_file = work_dir / exe_name
 
         c_file.write_text(c_code)
 
-        result = subprocess.run(
-            [
+        if flag_family == "msvc":
+            command = [
+                cc,
+                str(c_file),
+                "/std:c11",
+                "/Od",
+                f"/I{runtime_dir}",
+                f"/Fe:{exe_file}",
+            ]
+        else:
+            command = [
                 cc,
                 "-std=c99",
                 "-Og",
@@ -249,7 +272,10 @@ def compile_and_run(runtime_dir: Path):
                 str(c_file),
                 "-o",
                 str(exe_file),
-            ],
+            ]
+
+        result = subprocess.run(
+            command,
             capture_output=True,
             text=True,
             timeout=30,
@@ -299,7 +325,7 @@ def analyze_single(temp_project: Path, stage1_root: Path):
         parts = module_name.split(".")
         file_path = temp_project.joinpath(*parts).with_suffix(".l0")
         file_path.parent.mkdir(parents=True, exist_ok=True)
-        file_path.write_text(dedent(src))
+        file_path.write_text(dedent(src), newline="\n")
 
         driver = L0Driver()
         driver.search_paths.add_system_root(stage1_root.parent / "shared" / "l0" / "stdlib")

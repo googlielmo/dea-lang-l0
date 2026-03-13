@@ -15,7 +15,13 @@ from pathlib import Path
 import subprocess
 import sys
 
-from dist_tools_lib import DeaBuildLayout, normalize_dea_build_dir, stage2_build_info_overlay, write_stage2_wrapper
+from dist_tools_lib import (
+    DeaBuildLayout,
+    normalize_dea_build_dir,
+    source_tree_stage1_command,
+    stage2_build_info_overlay,
+    write_stage2_wrapper,
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -39,7 +45,7 @@ def build_stage2_artifact(
     native_bin = layout.bin_dir / "l0c-stage2.native"
     c_output = layout.bin_dir / "l0c-stage2.c"
 
-    build_args = ["./scripts/l0c", "--build"]
+    build_args = [*source_tree_stage1_command(layout.repo_root), "--build"]
     if keep_c:
         build_args.append("--keep-c")
     else:

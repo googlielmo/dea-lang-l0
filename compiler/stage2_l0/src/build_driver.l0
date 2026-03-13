@@ -267,6 +267,7 @@ func bd_temp_stem(tag: string) -> string {
             if (!exists(temp_stem) &&
                 !exists(concat_s(temp_stem, ".c")) &&
                 !exists(concat_s(temp_stem, ".out")) &&
+                !exists(concat_s(temp_stem, ".exe")) &&
                 !exists(concat_s(temp_stem, ".stdout")) &&
                 !exists(concat_s(temp_stem, ".stderr")))
             {
@@ -287,6 +288,68 @@ func bd_delete_if_present(path: string) {
     if (exists(path)) {
         delete_file(path);
     }
+}
+
+/**
+ * Return whether the current host should use Windows command behavior.
+ *
+ * @return `true` when Windows shell rules should apply.
+ */
+func bd_is_windows() -> bool {
+    let platform_override = env_get("L0_PLATFORM");
+    if (platform_override != null) {
+        let lowered = to_lower_s(platform_override as string);
+        if (eq_s(lowered, "windows") || eq_s(lowered, "win32")) {
+            return true;
+        }
+        if (eq_s(lowered, "posix") || eq_s(lowered, "unix")) {
+            return false;
+        }
+    }
+
+    let os_name = env_get("OS");
+    if (os_name != null && eq_s(os_name as string, "Windows_NT")) {
+        return true;
+    }
+
+    let msystem = env_get("MSYSTEM");
+    return msystem != null && !is_empty_s(msystem as string);
+}
+
+/**
+ * Return the executable suffix for the current host.
+ *
+ * @return `.exe` on Windows, otherwise `.out`.
+ */
+func bd_exe_suffix() -> string {
+    if (bd_is_windows()) {
+        return ".exe";
+    }
+    return ".out";
+}
+
+/**
+ * Return the default build output name for the current host.
+ *
+ * @return `a.exe` on Windows, otherwise `a.out`.
+ */
+func bd_default_exe_name() -> string {
+    if (bd_is_windows()) {
+        return "a.exe";
+    }
+    return "a.out";
+}
+
+/**
+ * Return the shell null device for the current host shell.
+ *
+ * @return `NUL` on Windows, otherwise `/dev/null`.
+ */
+func bd_null_device() -> string {
+    if (bd_is_windows()) {
+        return "NUL";
+    }
+    return "/dev/null";
 }
 
 /**
@@ -315,6 +378,42 @@ func bd_shell_quote_posix(arg: string) -> string {
 }
 
 /**
+ * Quote one shell token for Windows `system()` execution.
+ *
+ * @param arg Raw token.
+ * @return Safely double-quoted token.
+ */
+func bd_shell_quote_windows(arg: string) -> string {
+    with (let sb = sb_create() => sb_free(sb)) {
+        sb_append(sb, "\"");
+        for (let i = 0; i < len_s(arg); i = i + 1) {
+            let c = char_at_s(arg, i);
+            if (c == '"') {
+                sb_append(sb, "\\");
+                sb_append(sb, "\"");
+            } else {
+                sb_append_byte(sb, c);
+            }
+        }
+        sb_append(sb, "\"");
+        return sb_to_string(sb);
+    }
+}
+
+/**
+ * Quote one shell token for the active host shell.
+ *
+ * @param arg Raw token.
+ * @return Safely quoted token.
+ */
+func bd_shell_quote(arg: string) -> string {
+    if (bd_is_windows()) {
+        return bd_shell_quote_windows(arg);
+    }
+    return bd_shell_quote_posix(arg);
+}
+
+/**
  * Join command words into one shell command line.
  *
  * @param words Command words to quote and join.
@@ -326,7 +425,7 @@ func bd_join_shell_words(words: VectorString*) -> string {
             if (i > 0) {
                 sb_append(sb, " ");
             }
-            sb_append(sb, bd_shell_quote_posix(vs_get(words, i)));
+            sb_append(sb, bd_shell_quote(vs_get(words, i)));
         }
         return sb_to_string(sb);
     }
@@ -451,7 +550,12 @@ func bd_find_c_compiler() -> string? {
         vs_push(candidates, "cc");
         for (let i = 0; i < vs_size(candidates); i = i + 1) {
             let candidate = vs_get(candidates, i);
-            let probe = concat4_s("command -v ", bd_shell_quote_posix(candidate), " >/dev/null 2>&1", "");
+            let probe = "";
+            if (bd_is_windows()) {
+                probe = concat4_s("where.exe ", bd_shell_quote(candidate), concat4_s(" >", bd_null_device(), " 2>&1", ""), "");
+            } else {
+                probe = concat4_s("command -v ", bd_shell_quote(candidate), concat4_s(" >", bd_null_device(), " 2>&1", ""), "");
+            }
             if (system(probe) == 0) {
                 return candidate;
             }
@@ -681,6 +785,22 @@ func bd_push_standard_flags(words: VectorString*, family: string) {
 }
 
 /**
+ * Push compiler-family output-path flags into a command-word vector.
+ *
+ * @param words Command words to extend.
+ * @param family Compiler flag-family name.
+ * @param exe_path Output executable path.
+ */
+func bd_push_output_flags(words: VectorString*, family: string, exe_path: string) {
+    if (eq_s(family, "msvc")) {
+        vs_push(words, concat_s("/Fe:", exe_path));
+        return;
+    }
+    vs_push(words, "-o");
+    vs_push(words, exe_path);
+}
+
+/**
  * Replay compiler output captured into temp files.
  *
  * @param cfg Logging configuration.
@@ -851,8 +971,7 @@ func bd_build_to_exe(opts: CliOptions*, cfg: LogConfig*, exe_path: string, keep_
 
             vs_push(command_words, compiler as string);
             vs_push(command_words, c_path as string);
-            vs_push(command_words, "-o");
-            vs_push(command_words, exe_path);
+            bd_push_output_flags(command_words, family, exe_path);
 
             for (let i = 0; i < vs_size(extra_opts); i = i + 1) {
                 vs_push(command_words, vs_get(extra_opts, i));
@@ -886,8 +1005,8 @@ func bd_build_to_exe(opts: CliOptions*, cfg: LogConfig*, exe_path: string, keep_
             let compile_cmd = concat4_s(
                 bd_join_shell_words(command_words),
                 " > ",
-                bd_shell_quote_posix(stdout_path),
-                concat4_s(" 2> ", bd_shell_quote_posix(stderr_path), "", "")
+                bd_shell_quote(stdout_path),
+                concat4_s(" 2> ", bd_shell_quote(stderr_path), "", "")
             );
             let compile_rc = system(compile_cmd);
             let compile_failed = compile_rc != 0;
@@ -921,7 +1040,7 @@ func bd_build_to_exe(opts: CliOptions*, cfg: LogConfig*, exe_path: string, keep_
  * @return Process-style status code.
  */
 func bd_cmd_build(opts: CliOptions*, cfg: LogConfig*) -> int {
-    let exe_path = "a.out";
+    let exe_path = bd_default_exe_name();
     if (opts.output != null) {
         exe_path = opts.output as string;
     }
@@ -943,7 +1062,7 @@ func bd_cmd_build(opts: CliOptions*, cfg: LogConfig*) -> int {
 func bd_cmd_run(opts: CliOptions*, cfg: LogConfig*) -> int {
     with (let run_diags = diag_create() => diag_free(run_diags)) {
         let temp_stem = bd_temp_stem("run");
-        let temp_exe = concat_s(temp_stem, ".out");
+        let temp_exe = concat_s(temp_stem, bd_exe_suffix());
 
         if (opts.output != null && !opts.keep_c) {
             diag_warn(

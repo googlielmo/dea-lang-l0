@@ -14,7 +14,7 @@ import datetime as dt
 import subprocess
 import sys
 
-from test_runner_common import REPO_ROOT, SCRIPT_DIR, discover_l0_tests, require_repo_stage2_test_env
+from test_runner_common import REPO_ROOT, SCRIPT_DIR, discover_l0_tests, require_repo_stage2_test_env, source_tree_l0c_command
 
 TESTS_DIR = SCRIPT_DIR / "tests"
 
@@ -103,7 +103,7 @@ def main() -> int:
     with stdout_path.open("w", encoding="utf-8") as stdout_file, stderr_path.open("w", encoding="utf-8") as stderr_file:
         result = subprocess.run(
             [
-                "./scripts/l0c",
+                *source_tree_l0c_command(),
                 "-P",
                 "compiler/stage2_l0/src",
                 "--run",

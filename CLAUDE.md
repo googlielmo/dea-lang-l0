@@ -48,6 +48,10 @@ Also see: `CONTRIBUTING.md`, `SECURITY.md`.
   plain `python3 -m venv` workflow.
 - **Manual Environment Setup:** If you are not using `make venv`, prefer `uv sync --group dev --group docs` (uses `pyproject.toml`
   and `uv.lock`) or fall back to `python3 -m venv .venv && source .venv/bin/activate && pip install -e . "pytest>=9.0.2" "pytest-xdist>=3.5" "jinja2>=3.1.6" "PyYAML>=6.0.2" "pygments>=2.19.2"`.
+- **Windows Host Setup:** For Windows validation, use an MSYS2 `MINGW64` shell with MinGW-w64 GCC and GNU Make on
+  `PATH`. Source-tree Stage 1 usage is available through `./scripts/l0c.cmd`, while repo-local Make targets use the
+  normal `./scripts/l0c` and `./scripts/build-stage2-l0c.sh` entrypoints from within MSYS2 bash. Keep the fallback
+  under `scripts/`: the root-level `l0c` name is reserved for the selected dev or installed compiler command.
 - **Environment Variables:** Source `build/dea/bin/l0-env.sh` only for the repo-local Dea build workflow. For an installed
   Stage 2 prefix, source `<PREFIX>/bin/l0-env.sh`. For source-tree usage, invoke `./scripts/l0c` directly; it derives
   `L0_HOME` on its own.

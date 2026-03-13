@@ -50,6 +50,18 @@ detect_cc() {
     return 1
 }
 
+resolve_python() {
+    if command -v python3 >/dev/null 2>&1; then
+        printf '%s\n' python3
+        return 0
+    fi
+    if command -v python >/dev/null 2>&1; then
+        printf '%s\n' python
+        return 0
+    fi
+    fail "python is required"
+}
+
 compile_generated_c() {
     local compiler="$1"
     local src="$2"
@@ -70,7 +82,7 @@ compile_generated_c() {
 normalize_text_file() {
     local src="$1"
     local dst="$2"
-    python3 - "$src" "$dst" <<'PY'
+    "$PYTHON_BIN" - "$src" "$dst" <<'PY'
 from pathlib import Path
 import sys
 
@@ -83,7 +95,8 @@ PY
 }
 
 cd "$REPO_ROOT"
-python3 "$REFRESH_SCRIPT" --check "$@"
+PYTHON_BIN="$(resolve_python)"
+"$PYTHON_BIN" "$REFRESH_SCRIPT" --check "$@"
 
 mkdir -p "$BOOTSTRAP_PARENT"
 BOOTSTRAP_DIR="$(mktemp -d "$BOOTSTRAP_PARENT/l0_stage2_codegen.XXXXXX")"

@@ -188,6 +188,70 @@ def test_build_merges_l0_cflags_and_cli_c_options_with_cli_last(tmp_path, monkey
     assert env_two_idx < cli_two_idx
 
 
+def test_build_uses_a_exe_by_default_on_windows(tmp_path, monkeypatch):
+    _write_module(
+        tmp_path,
+        "main",
+        """
+        module main;
+        func main() -> int { return 0; }
+        """,
+    )
+    captured = {}
+
+    def _fake_run(cmd, *args, **kwargs):
+        captured["cmd"] = cmd
+        return _RunResult(returncode=0)
+
+    monkeypatch.setattr("l0c._is_windows_host", lambda: True)
+    monkeypatch.setattr("l0c.subprocess.run", _fake_run)
+
+    rc = cmd_build(_build_args(tmp_path, "main", c_compiler="gcc", output=None))
+
+    assert rc == 0
+    assert captured["cmd"][-1] == "-O1"
+    assert "a.exe" in captured["cmd"]
+    assert "a.out" not in captured["cmd"]
+
+
+def test_build_uses_msvc_flag_forms_for_output_and_runtime_paths(tmp_path, monkeypatch):
+    _write_module(
+        tmp_path,
+        "main",
+        """
+        module main;
+        func main() -> int { return 0; }
+        """,
+    )
+    runtime_lib = tmp_path / "runtime_lib"
+    runtime_lib.mkdir()
+    (runtime_lib / "l0runtime.lib").write_text("", encoding="utf-8")
+    captured = {}
+
+    def _fake_run(cmd, *args, **kwargs):
+        captured["cmd"] = cmd
+        return _RunResult(returncode=0)
+
+    monkeypatch.setattr("l0c.subprocess.run", _fake_run)
+
+    rc = cmd_build(
+        _build_args(
+            tmp_path,
+            "main",
+            c_compiler="cl.exe",
+            runtime_include=str(tmp_path),
+            runtime_lib=str(runtime_lib),
+        )
+    )
+
+    assert rc == 0
+    assert any(arg.startswith("/Fe:") for arg in captured["cmd"])
+    assert any(arg.startswith("/I") for arg in captured["cmd"])
+    assert "/link" in captured["cmd"]
+    assert any(arg.startswith("/LIBPATH:") for arg in captured["cmd"])
+    assert "l0runtime.lib" in captured["cmd"]
+
+
 def test_run_forwards_c_options_to_build(tmp_path, monkeypatch):
     captured = {}
 
@@ -286,6 +350,39 @@ def test_run_with_keep_c_uses_default_build_c_path_and_temp_exe(tmp_path, monkey
     assert captured["keep_c"] is True
     assert captured["output"] != "a.out"
     assert captured["c_output_path"] == "a.c"
+
+
+def test_run_uses_exe_suffix_for_temp_output_on_windows(tmp_path, monkeypatch):
+    captured = {}
+
+    def _fake_cmd_build(args):
+        captured["output"] = args.output
+        return 1
+
+    monkeypatch.setattr("l0c._is_windows_host", lambda: True)
+    monkeypatch.setattr("l0c.cmd_build", _fake_cmd_build)
+
+    args = argparse.Namespace(
+        entry="app.main",
+        args=[],
+        c_compiler="cc",
+        c_options=None,
+        runtime_include=None,
+        runtime_lib=None,
+        keep_c=False,
+        verbosity=0,
+        project_root=[str(tmp_path)],
+        sys_root=[],
+        no_line_directives=False,
+        trace_arc=False,
+        trace_memory=False,
+        log=False,
+    )
+
+    rc = cmd_run(args)
+
+    assert rc == 1
+    assert captured["output"].endswith(".exe")
 
 
 def test_run_with_keep_c_and_output_uses_output_stem_for_c_path(tmp_path, monkeypatch):

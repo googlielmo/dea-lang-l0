@@ -15,6 +15,11 @@ on:
         options:
           - gcc
           - clang
+      make_target:
+        description: Make target to run on both Linux and Windows
+        required: true
+        default: test-all
+        type: string
   # push:
   #   branches:
   #     - main
@@ -33,6 +38,9 @@ jobs:
 
       - name: Set up uv
         uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-suffix: linux-py3.14
 
       - name: Install Linux build toolchain
         run: |
@@ -48,7 +56,58 @@ jobs:
             echo "value=gcc" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Run full validation suite
+      - name: Select Make target
+        id: select-make-target
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "value=${{ inputs.make_target }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=test-all" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run Make target
         env:
           L0_CC: ${{ steps.select-cc.outputs.value }}
-        run: make test-all
+        run: make ${{ steps.select-make-target.outputs.value }}
+
+  test-all-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Set up MSYS2 MinGW-w64 toolchain
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          path-type: inherit
+          install: >-
+            make
+            mingw-w64-x86_64-gcc
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-suffix: windows-py3.14
+
+      - name: Select Make target
+        id: select-make-target
+        shell: msys2 {0}
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "value=${{ inputs.make_target }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=test-all" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run Make target
+        shell: msys2 {0}
+        env:
+          L0_CC: gcc
+        run: make ${{ steps.select-make-target.outputs.value }}

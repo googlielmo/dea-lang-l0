@@ -31,7 +31,7 @@ assumptions block Windows support. The C runtime (`l0_runtime.h`) already has `_
 exists in the driver.
 
 This plan adds Windows build support using **MinGW-w64 as Tier 1** (GCC flags, GNU Make, MSYS2 bash all work
-unchanged) and **MSVC as Tier 2** (partial flag support exists, full support deferred). Linux CI validation now lands
+unchanged) and **MSVC as Tier 2** (basic flag-family support exists, full native link-model support deferred). Linux CI validation now lands
 first via `.github/workflows/ci.yml`; Windows runner validation remains a follow-up extension of that workflow.
 
 ## Goals
@@ -44,7 +44,7 @@ first via `.github/workflows/ci.yml`; Windows runner validation remains a follow
 
 ## Non-Goals
 
-- Full MSVC Tier 1 support (link model, `/Fe:`, MSVC lib syntax) — deferred.
+- Full MSVC Tier 1 support (native link model, runtime library syntax, end-to-end CI validation) — deferred.
 - Porting `gen-docs.sh` — docs build stays Linux/macOS-only.
 - Porting `l0-env.sh` — env setup on Windows via Makefile targets or manual config.
 - Rewriting `.sh` test scripts in Python — they run via bash when available, skip otherwise.
@@ -72,14 +72,14 @@ The following already work or have Windows code paths:
 
 | Blocker                          | Location               | Fix                                                       |
 |----------------------------------|------------------------|-----------------------------------------------------------|
-| `l0c` is a bash script           | `./l0c`                | Python `console_scripts` entry point + `l0c.cmd` fallback |
+| `l0c` is a bash script           | `./scripts/l0c`        | Python `console_scripts` entry point + `scripts/l0c.cmd` fallback |
 | `l0-env.sh` is bash/zsh only     | `./l0-env.sh`          | Out of scope — env setup via Makefile or manual           |
 | `build-stage2-l0c.sh` is bash    | `scripts/`             | Runs via MSYS2 bash from MinGW-w64; no rewrite needed     |
 | `gen-docs.sh` is bash            | `scripts/`             | Out of scope — docs build stays Linux/macOS-only          |
 | `l0c-stage2` is a POSIX launcher | `build/dea/bin/`       | Generate `.cmd` launcher alongside on Windows             |
 | Default output `a.out`           | `l0c.py`               | Use `a.exe` on Windows                                    |
 | Temp exe has no `.exe` suffix    | `l0c.py`               | Add `.exe` suffix on Windows                              |
-| `-o` flag for MSVC               | `l0c.py`               | Use `/Fe:` for MSVC (Tier 2, prep only)                   |
+| Output flag for MSVC            | `l0c.py`, `build_driver.l0` | Use `/Fe:` for MSVC (Tier 2, prep only)              |
 | `-L`/`-l` for runtime lib        | `l0c.py`               | Use MSVC link syntax (Tier 2, prep only)                  |
 | Test fixture hardcodes GCC flags | `conftest.py`          | Make flag selection family-aware                          |
 | Shell test scripts (`.sh`)       | `stage2_l0/tests/*.sh` | Skip when bash not available                              |
@@ -103,12 +103,18 @@ Replace the bash `l0c` wrapper with a cross-platform Python entry point.
    ```
 2. `compiler/stage1_py/l0c.py` — ensure `main()` is callable as an entry point (verify `sys.argv` handling, add
    `if __name__ == "__main__"` guard if missing).
-3. Create `l0c.cmd` at the repo root as a minimal Windows batch fallback:
+3. Create `scripts/l0c.cmd` as a minimal Windows batch fallback:
    ```cmd
-   @python -m compiler.stage1_py.l0c %*
+   @echo off
+   for %%I in ("%~dp0..") do set "REPO_ROOT=%%~fI"
+   if not defined L0_HOME set "L0_HOME=%REPO_ROOT%\compiler"
+   python "%L0_HOME%\stage1_py\l0c.py" %*
    ```
+   Keep it under `scripts/`, not the repo root: the root-level `l0c` name previously caused confusion with the
+   selected repo-local or installed `l0c` command, so the source-tree fallback should stay alongside `scripts/l0c`.
 
-**Validation:** `python -m compiler.stage1_py.l0c -P examples --check hello` works on both platforms.
+**Validation:** `./scripts/l0c -P examples --check hello` works on POSIX, and `scripts\l0c.cmd -P examples --check hello`
+works on Windows.
 
 ### Phase 2: Platform-Aware Executable Naming
 
@@ -201,7 +207,7 @@ follow-up lands.
 
 1. This plan document (you are reading it).
 2. `docs/reference/project-status.md` — update platform support section to list Windows (MinGW-w64) as supported.
-3. `CLAUDE.md` — add Windows setup instructions (MinGW-w64 via MSYS2, env vars, `l0c.cmd`).
+3. `CLAUDE.md` — add Windows setup instructions (MinGW-w64 via MSYS2, env vars, `scripts/l0c.cmd`).
 
 ## Verification Criteria
 

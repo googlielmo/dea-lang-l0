@@ -17,7 +17,15 @@ import subprocess
 import sys
 import tempfile
 
-from test_runner_common import REPO_ROOT, SCRIPT_DIR, discover_l0_tests, first_lines, require_repo_stage2_test_env, resolve_job_count
+from test_runner_common import (
+    REPO_ROOT,
+    SCRIPT_DIR,
+    discover_l0_tests,
+    first_lines,
+    require_repo_stage2_test_env,
+    resolve_job_count,
+    source_tree_l0c_command,
+)
 
 TRACE_CHECKER = SCRIPT_DIR / "check_trace_log.py"
 
@@ -92,7 +100,7 @@ def run_one(
     with out_path.open("w", encoding="utf-8") as stdout_file, trace_path.open("w", encoding="utf-8") as stderr_file:
         run_result = subprocess.run(
             [
-                "./scripts/l0c",
+                *source_tree_l0c_command(),
                 "--trace-memory",
                 "--trace-arc",
                 "-P",
