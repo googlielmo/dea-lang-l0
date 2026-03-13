@@ -29,6 +29,8 @@ The initial rollout is intentionally narrow:
 - trigger on `pull_request`
 - trigger on `workflow_dispatch`
 - do not trigger automatically on `push`
+- default non-manual runs to `gcc`
+- allow manual runs to choose `gcc` or `clang`
 
 The workflow should include a commented-out `push` section so automatic branch builds can be enabled later without
 restructuring the file. Windows CI remains a follow-up and is tracked in the separate Windows build support plan.
@@ -69,6 +71,8 @@ Add one Linux job:
 - Python setup via `actions/setup-python@v5` with `python-version: "3.14"`
 - `uv` setup via `astral-sh/setup-uv@v6`
 - install Linux native build prerequisites with `apt-get`
+- expose a manual `workflow_dispatch` compiler choice input
+- use `gcc` for non-manual runs
 - execute `make test-all`
 
 ### Windows follow-up alignment
@@ -82,7 +86,7 @@ extension of `.github/workflows/ci.yml`.
 1. `.github/workflows/ci.yml` is valid YAML.
 2. The workflow triggers on `pull_request` and `workflow_dispatch`.
 3. The workflow does not trigger on `push`, aside from the commented-out future block.
-4. The Linux job installs the required toolchain and runs `make test-all`.
+4. The Linux job installs the required toolchain, defaults non-manual runs to `gcc`, and runs `make test-all`.
 5. The Windows support plan reflects Linux-first CI rollout.
 
 ## Risks and Notes

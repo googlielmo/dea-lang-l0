@@ -6,6 +6,15 @@ name: CI
 on:
   pull_request:
   workflow_dispatch:
+    inputs:
+      c_compiler:
+        description: C compiler to use for the Linux validation run
+        required: true
+        default: gcc
+        type: choice
+        options:
+          - gcc
+          - clang
   # push:
   #   branches:
   #     - main
@@ -13,8 +22,6 @@ on:
 jobs:
   test-all-linux:
     runs-on: ubuntu-latest
-    env:
-      L0_CC: clang
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -32,5 +39,16 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y build-essential clang make
 
+      - name: Select Linux C compiler
+        id: select-cc
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "value=${{ inputs.c_compiler }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=gcc" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Run full validation suite
+        env:
+          L0_CC: ${{ steps.select-cc.outputs.value }}
         run: make test-all
