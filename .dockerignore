@@ -1,0 +1,14 @@
+.venv/
+.git/
+.github/
+.idea/
+.claude/
+build/
+.pytest_cache/
+temp/
+*.o
+*.dSYM
+__pycache__/
+.DS_Store
+a.out
+a.exe

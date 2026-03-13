@@ -130,8 +130,24 @@ Clone this repository and `cd` into it. Then create a virtual environment and in
 make venv                # create or reuse local .venv; prefers uv when available
 ```
 
-If you prefer to manage the environment manually, `uv sync` is the recommended direct command; a plain
+If you prefer to manage the environment manually, `uv sync --group dev --group docs` is the recommended direct command; a plain
 `python3 -m venv .venv` workflow also works.
+
+For a reproducible Linux test environment without changing the host toolchain, the repository also ships a root
+`Dockerfile` plus an explicit `make docker` wrapper:
+
+```shell
+make docker CMD=test-all
+```
+
+This Docker workflow is opt-in. No normal `make` target shells out to Docker automatically, and the blessed command is
+the explicit wrapper above rather than `docker run` directly.
+
+If you need to force a compiler inside the container, use `DOCKER_L0_CC`, not the host-side `L0_CC`:
+
+```shell
+make docker CMD=test-all DOCKER_L0_CC=gcc
+```
 
 For normal developer use, install the repo-local switchable `l0c` alias, choose the stage you want, and source the
 generated environment script:

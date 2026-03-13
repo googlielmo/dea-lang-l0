@@ -46,8 +46,8 @@ Also see: `CONTRIBUTING.md`, `SECURITY.md`.
 - **Virtual Environment:** Always check for a local `.venv` and/or `uv` availability. Prefer `make venv` for the
   repo-managed developer setup; it reuses `.venv` if present, otherwise uses `uv` when available and falls back to a
   plain `python3 -m venv` workflow.
-- **Manual Environment Setup:** If you are not using `make venv`, prefer `uv sync --group dev` (uses `pyproject.toml`
-  and `uv.lock`) or fall back to `python3 -m venv .venv && source .venv/bin/activate && pip install -e . "pytest>=9.0.2" "pytest-xdist>=3.5"`.
+- **Manual Environment Setup:** If you are not using `make venv`, prefer `uv sync --group dev --group docs` (uses `pyproject.toml`
+  and `uv.lock`) or fall back to `python3 -m venv .venv && source .venv/bin/activate && pip install -e . "pytest>=9.0.2" "pytest-xdist>=3.5" "jinja2>=3.1.6" "PyYAML>=6.0.2" "pygments>=2.19.2"`.
 - **Environment Variables:** Source `build/dea/bin/l0-env.sh` only for the repo-local Dea build workflow. For an installed
   Stage 2 prefix, source `<PREFIX>/bin/l0-env.sh`. For source-tree usage, invoke `./scripts/l0c` directly; it derives
   `L0_HOME` on its own.
@@ -83,6 +83,8 @@ tooling, and Stage 1-focused testing:
 ./scripts/gen-docs.sh --pdf-fast  # faster preview PDF build (single pdflatex pass)
 make help                         # show the repo-local developer workflow targets
 make venv                         # create or reuse the local .venv
+make docker CMD=test-all         # explicitly run a make target inside the repo-owned Linux test container
+make docker CMD=test-all DOCKER_L0_CC=gcc
 ```
 
 Verbosity: `-v` (info), `-vvv` (debug).
@@ -144,6 +146,11 @@ These Make targets are self-contained repo-local workflows: they ensure `./.venv
 
 `run_trace_tests.py` is an important finalization gate because it validates ARC/memory traces and leak triage across
 all Stage 2 tests.
+
+The root `Dockerfile` is a supported Linux test environment, but Docker use is always explicit. Prefer
+`make docker CMD=test-all` when you want the containerized workflow; do not add Docker as an implicit dependency of the
+default host-side `make` targets. If the container needs a specific compiler, pass `DOCKER_L0_CC=...`; do not reuse
+the host `L0_CC` setting automatically.
 
 For Stage 1 ownership-sensitive changes (ARC lowering, `drop` behavior, container ownership paths), run targeted ARC
 trace tests from `compiler/stage1_py/tests/backend/test_trace_arc.py` and prefer the full file when touching shared

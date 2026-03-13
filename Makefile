@@ -2,6 +2,7 @@
 
 PYTHON ?= $(if $(wildcard ./.venv/bin/python),./.venv/bin/python,python3)
 DEA_BUILD_DIR ?= build/dea
+DOCKER_IMAGE ?= l0-test
 
 .PHONY: \
 	help \
@@ -43,6 +44,9 @@ help:
 		'  test-stage2-trace  Validate Stage 2 ARC and memory tracing behavior.' \
 		'  triple-test        Run the Stage 2 triple-bootstrap check on its own.' \
 		'' \
+		'Docker:' \
+		'  docker             Explicitly run a target in the repo-owned Linux Docker container (CMD=<target>).' \
+		'' \
 		'Documentation targets:' \
 		'  docs               Generate the project documentation.' \
 		'  docs-pdf           Generate the project documentation, including the PDF manual.' \
@@ -57,16 +61,24 @@ help:
 		'                     Example: make PREFIX=/opt/dea install' \
 		'  DEA_BUILD_DIR=build/dea' \
 		'                     Repo-local build root. Must stay inside the repository.' \
-		'                     Example: make DEA_BUILD_DIR=build/dev-dea install-dev-stages'
+		'                     Example: make DEA_BUILD_DIR=build/dev-dea install-dev-stages' \
+		'  DOCKER_IMAGE=l0-test' \
+		'                     Docker image tag used by `make docker`.' \
+		'  DOCKER_L0_CC=<compiler>' \
+		'                     Optional C compiler passed into the Docker run as `L0_CC` (`gcc` or `clang`).'
 
 venv:
-	@if [ -x ./.venv/bin/python ]; then \
-		printf '%s\n' 'make venv: reusing existing .venv'; \
-	elif command -v uv >/dev/null 2>&1; then \
-		uv sync --group dev; \
+	@if command -v uv >/dev/null 2>&1; then \
+		if [ -x ./.venv/bin/python ]; then \
+			printf '%s\n' 'make venv: syncing existing .venv with uv'; \
+		fi; \
+		uv sync --group dev --group docs; \
+	elif [ -x ./.venv/bin/python ]; then \
+		printf '%s\n' 'make venv: refreshing existing .venv with pip'; \
+		./.venv/bin/python -m pip install -e . "pytest>=9.0.2" "pytest-xdist>=3.5" "jinja2>=3.1.6" "PyYAML>=6.0.2" "pygments>=2.19.2"; \
 	else \
 		$(PYTHON) -m venv .venv; \
-		./.venv/bin/python -m pip install -e . "pytest>=9.0.2" "pytest-xdist>=3.5"; \
+		./.venv/bin/python -m pip install -e . "pytest>=9.0.2" "pytest-xdist>=3.5" "jinja2>=3.1.6" "PyYAML>=6.0.2" "pygments>=2.19.2"; \
 	fi
 
 install-dev-stage1:
@@ -132,3 +144,12 @@ clean:
 
 clean-dea-build:
 	$(PYTHON) ./scripts/gen_dist_tools.py clean-dea-build --dea-build-dir "$(DEA_BUILD_DIR)"
+
+docker:
+	@if [ -z "$(CMD)" ]; then \
+		echo "Usage: make docker CMD=<target>"; \
+		echo "Example: make docker CMD=test-all"; \
+		exit 2; \
+	else \
+		docker build -t "$(DOCKER_IMAGE)" . && docker run --rm $(if $(strip $(DOCKER_L0_CC)),-e L0_CC=$(DOCKER_L0_CC)) "$(DOCKER_IMAGE)" make $(CMD); \
+	fi
