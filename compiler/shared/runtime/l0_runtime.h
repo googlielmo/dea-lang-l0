@@ -1577,28 +1577,6 @@ static l0_bool rt_write_file_all(l0_string path, l0_string data) {
  * Check if a file exists at the given path.
  * 
  * @param path File path.
- * @return 1 if exists, 0 otherwise.
- *
- * L0 signature: `extern func rt_file_exists(path: string) -> bool;` 
- */
-static l0_bool rt_file_exists(l0_string path) {
-    char *c = _rt_string_bytes(path);
-#if defined(_WIN32)
-    struct _stat64 st;
-    if (_stat64(c, &st) != 0) {
-        return 0;
-    }
-    return (st.st_mode & _S_IFREG) ? 1 : 0;
-#else
-    struct stat st;
-    if (stat(c, &st) != 0) {
-        return 0;
-    }
-    return S_ISREG(st.st_mode) ? 1 : 0;
-#endif
-}
-
-/**
  * Return basic metadata for a path.
  * 
  * @param path File path.

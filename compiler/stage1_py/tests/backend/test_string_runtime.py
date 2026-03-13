@@ -143,14 +143,15 @@ def test_std_io_stale_errno_does_not_cause_false_failures(
         f"""
         module std_io_errno_probe;
 
+        import std.fs;
         import std.io;
         import std.string;
         import sys.rt;
 
         func main() -> int {{
-            // Seed errno with a failing file probe before std.io calls.
-            let missing = rt_file_exists("{missing_path}");
-            if (missing) {{
+            // Seed errno with a failing file probe before std.fs calls.
+            let missing = rt_file_info("{missing_path}");
+            if (missing.exists) {{
                 return 11;
             }}
 

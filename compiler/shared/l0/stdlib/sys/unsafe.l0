@@ -96,3 +96,30 @@ extern func rt_memcmp(a: void*, b: void*, bytes: int) -> int;
  * @return A pointer to the requested element.
  */
 extern func rt_array_element(array_data: void*, element_size: int, index: int) -> void*;
+
+/**
+ * Read up to `capacity` bytes from standard input into `buf`.
+ *
+ * @param buf Destination buffer.
+ * @param capacity Maximum number of bytes to read.
+ * @return Bytes read, `0` on EOF, or `-1` on error.
+ */
+extern func rt_stdin_read(buf: byte*, capacity: int) -> int;
+
+/**
+ * Write up to `len` bytes from `buf` to standard output.
+ *
+ * @param buf Source buffer.
+ * @param len Maximum number of bytes to write.
+ * @return Bytes written, or `-1` on error.
+ */
+extern func rt_stdout_write(buf: byte*, len: int) -> int;
+
+/**
+ * Write up to `len` bytes from `buf` to standard error.
+ *
+ * @param buf Source buffer.
+ * @param len Maximum number of bytes to write.
+ * @return Bytes written, or `-1` on error.
+ */
+extern func rt_stderr_write(buf: byte*, len: int) -> int;

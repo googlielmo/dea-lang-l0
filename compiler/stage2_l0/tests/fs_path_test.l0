@@ -37,6 +37,7 @@ func test_std_fs_helpers() {
     let missing = stat("/tmp/l0_stage2_std_fs_missing_probe_20260312.txt");
     assert(!missing.exists, "missing path should report exists=false");
 
+    assert(exists("."), "current directory should count as an existing path");
     assert(is_dir("."), "current directory should be reported as a directory");
     assert(!is_file("."), "current directory should not be reported as a file");
 
@@ -45,7 +46,7 @@ func test_std_fs_helpers() {
 
     let wrote = write_file(path, "abc");
     assert(wrote != null, "write_file should create the probe file");
-    assert(file_exists(path), "file_exists should report created file");
+    assert(exists(path), "exists should report created file");
 
     let info = stat(path);
     assert(info.exists, "created file should exist");
@@ -67,7 +68,7 @@ func test_std_fs_helpers() {
 
     let deleted = delete_file(path);
     assert(deleted != null, "delete_file should remove the probe file");
-    assert(!file_exists(path), "deleted file should no longer exist");
+    assert(!exists(path), "deleted file should no longer exist");
 }
 
 /**

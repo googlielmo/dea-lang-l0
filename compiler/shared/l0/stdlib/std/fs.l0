@@ -7,6 +7,8 @@ module std.fs;
 
 import sys.rt;
 
+import std.unit;
+
 /**
  * Shared file metadata wrapper around `sys.rt::RtFileInfo`.
  */
@@ -37,6 +39,16 @@ func _fs_from_rt(info: RtFileInfo) -> FileInfo {
  */
 func stat(path: string) -> FileInfo {
     return _fs_from_rt(rt_file_info(path));
+}
+
+/**
+ * Return whether any filesystem object exists at a path.
+ *
+ * @param path Filesystem path to inspect.
+ * @return `true` when the path exists.
+ */
+func exists(path: string) -> bool {
+    return stat(path).exists;
 }
 
 /**
@@ -79,4 +91,46 @@ func file_size(path: string) -> int? {
  */
 func mtime_sec(path: string) -> int? {
     return stat(path).mtime_sec;
+}
+
+/**
+ * Delete the file at the given path.
+ *
+ * @param path File path to remove.
+ * @return present() on success, or null on error.
+ */
+func delete_file(path: string) -> Unit? {
+    if (!rt_delete_file(path)) {
+        return null;
+    }
+    return present();
+}
+
+/**
+ * Read the entire content of a file.
+ *
+ * @param path File path to read.
+ * @return File contents, or null on error.
+ */
+func read_file(path: string) -> string? {
+    let rd_opt = rt_read_file_all(path);
+    if (rd_opt == null) {
+        return null;
+    }
+    return rd_opt;
+}
+
+/**
+ * Write the entire content of a file.
+ *
+ * @param path File path to write.
+ * @param data String content to write.
+ * @return present() on success, or null on error.
+ */
+func write_file(path: string, data: string) -> Unit? {
+    let ok = rt_write_file_all(path, data);
+    if (!ok) {
+        return null;
+    }
+    return present();
 }

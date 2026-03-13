@@ -1,200 +1,168 @@
 # Feature Plan
 
-## Expand shared stdlib/runtime bootstrap APIs for filesystem, path, metadata, and raw byte stdio
+## Expand shared stdlib/runtime bootstrap APIs for filesystem, path, metadata, and safe raw byte stdio
 
 - Date: 2026-03-09
 - Status: Closed (implemented)
-- Title: Add shared stdlib/runtime bootstrap APIs for filesystem helpers, path utilities, file metadata, and raw byte
-  stdio
+- Title: Add shared stdlib/runtime bootstrap APIs for filesystem helpers, path utilities, file metadata, and safe raw
+  byte stdio
 - Kind: Feature
 - Severity: High
 - Stage: Shared
 - Subsystem: Standard library and runtime
 - Modules:
+    - `compiler/shared/l0/stdlib/std/array.l0`
     - `compiler/shared/l0/stdlib/std/io.l0`
     - `compiler/shared/l0/stdlib/std/fs.l0`
     - `compiler/shared/l0/stdlib/std/path.l0`
     - `compiler/shared/l0/stdlib/sys/rt.l0`
+    - `compiler/shared/l0/stdlib/sys/unsafe.l0`
     - `compiler/shared/runtime/l0_runtime.h`
     - `compiler/stage2_l0/src/source_paths.l0`
     - `compiler/stage2_l0/src/util/path.l0`
 - Test modules:
     - `compiler/stage1_py/tests/backend/test_stdlib_fs_path_raw_io.py`
     - `compiler/stage2_l0/tests/fs_path_test.l0`
+    - `compiler/stage2_l0/tests/byte_array_test.l0`
     - `compiler/stage2_l0/tests/source_paths_test.l0`
-    - `compiler/stage2_l0/tests/l0c_stage2_install_prefix_test.sh`
 
 ## Summary
 
-Add a first shared-stdlib/runtime expansion phase focused on bootstrap-critical APIs:
+This plan keeps the landed shared filesystem and path work, but reopens the byte-stdio portion to restore a clearer
+safe/unsafe boundary.
 
-- ergonomic filesystem wrappers at the `std.*` layer for primitives already exposed in `sys.rt`,
-- a shared `std.path` module promoted from the Stage 2-only `util.path` helpers,
-- file metadata/stat support,
-- raw byte-oriented stdin/stdout/stderr APIs suitable for `Content-Length` framed LSP traffic.
+`std.fs`, `std.path`, and `RtFileInfo` remain part of the public shared surface. The change in direction is that raw
+`byte*` stream entrypoints should not remain exposed through `std.io`. Pointer-based stdin/stdout/stderr operations move
+to `sys.unsafe`, while `std.io` is rebuilt on a bounds-checked fixed `ByteArray` abstraction in `std.array`.
 
-This phase intentionally does not implement directory traversal, file watching, subprocess spawning, or URI/path
-conversion helpers. Those are follow-on phases after the bootstrap-critical surface lands and stabilizes.
+The portability model stays the same: public L0 APIs remain portable, platform-specific details remain inside the C
+runtime, and richer traversal/process/watch helpers remain deferred.
 
-The portability model is locked as: public L0 APIs remain portable, while the runtime may use C stdlib where possible
-and platform-specific POSIX/Windows shims where strict C99 is insufficient.
+The pending stdlib boundary cleanup in
+`docs/plans/refactors/closed/2026-03-13-stdlib-fs-io-boundary-cleanup-noref.md` is part of the landing criteria for this
+feature. The safe byte-stdio surface and the `std.fs` / `std.io` path-helper split must ship together.
 
 ## Public Interfaces / Types
 
-1. New shared module: `std.fs`.
-2. New shared module: `std.path`.
-3. New `sys.rt` struct:
-   `RtFileInfo { exists: bool; is_file: bool; is_dir: bool; size: int?; mtime_sec: int?; mtime_nsec: int?; }`
-4. New `sys.rt` functions:
-    - `rt_file_info(path: string) -> RtFileInfo`
+1. Shared modules that remain public:
+    - `std.fs`
+    - `std.path`
+2. Shared metadata type that remains public:
+   `sys.rt::RtFileInfo { exists: bool; is_file: bool; is_dir: bool; size: int?; mtime_sec: int?; mtime_nsec: int?; }`
+3. New shared fixed-size buffer type:
+   `std.array::ByteArray { storage: ArrayBase*; }`
+4. New `std.array` API:
+    - `ba_create(length: int) -> ByteArray*`
+    - `ba_capacity(self: ByteArray*) -> int`
+    - `ba_get(self: ByteArray*, index: int) -> byte`
+    - `ba_set(self: ByteArray*, index: int, value: byte) -> void`
+    - `ba_zap(self: ByteArray*, index: int) -> void`
+    - `ba_free(self: ByteArray*) -> void`
+5. Raw byte stream APIs move to `sys.unsafe` only:
     - `rt_stdin_read(buf: byte*, capacity: int) -> int`
     - `rt_stdout_write(buf: byte*, len: int) -> int`
     - `rt_stderr_write(buf: byte*, len: int) -> int`
-5. New `std.io` wrappers:
-    - `file_exists(path: string) -> bool`
-    - `delete_file(path: string) -> Unit?`
-    - `read_stdin_some(buf: byte*, capacity: int) -> int?`
-    - `write_stdout_some(buf: byte*, len: int) -> int?`
-    - `write_stderr_some(buf: byte*, len: int) -> int?`
-    - `write_stdout_all(buf: byte*, len: int) -> Unit?`
-    - `write_stderr_all(buf: byte*, len: int) -> Unit?`
-6. New `std.fs` wrappers:
-    - `stat(path: string) -> FileInfo`
-    - `is_file(path: string) -> bool`
-    - `is_dir(path: string) -> bool`
-    - `file_size(path: string) -> int?`
-    - `mtime_sec(path: string) -> int?`
-7. New `std.path` API:
-    - `is_sep(c: byte) -> bool`
-    - `is_absolute(path: string) -> bool`
-    - `has_parent(path: string) -> bool`
-    - `basename(path: string) -> string`
-    - `parent(path: string) -> string`
-    - `stem(path: string) -> string`
-    - `join(root: string, rel: string) -> string`
-    - `has_extension(path: string, ext: string) -> bool`
+6. `std.io` safe byte API becomes:
+    - `read_stdin_some(buf: ByteArray*, start: int, count: int) -> int?`
+    - `write_stdout_some(buf: ByteArray*, start: int, count: int) -> int?`
+    - `write_stderr_some(buf: ByteArray*, start: int, count: int) -> int?`
+    - `write_stdout_all(buf: ByteArray*, start: int, count: int) -> Unit?`
+    - `write_stderr_all(buf: ByteArray*, start: int, count: int) -> Unit?`
 
 ## Detailed Behavior
 
-### 1. Filesystem and metadata
+### 1. Filesystem and path helpers
 
-1. Add `rt_file_info` as the low-level metadata entrypoint instead of separate `sys.rt` calls for each field.
-2. `RtFileInfo` must always return `exists`, `is_file`, and `is_dir`.
-3. Size and modification time fields are nullable when unavailable or inapplicable.
-4. First phase excludes symlink-specific APIs, permission bits, ownership fields, and directory-entry iteration.
+1. Keep the current `std.fs`, `std.path`, and `RtFileInfo` design.
+2. Do not reopen the scope of this plan to add traversal, URI conversion, file watching, or subprocess APIs.
+3. Keep the current Stage 2 migration to shared `std.path`, including the narrow `util.path` compatibility shim.
 
-### 2. Shared path module
+### 2. Unsafe boundary for raw byte stdio
 
-1. Promote the Stage 2 `util.path` logic into shared stdlib as `std.path`.
-2. Migrate Stage 2 callers, especially source-path resolution, to the shared module.
-3. Preserve current cross-platform separator handling:
-    - `/` and `\\` both count as separators,
-    - POSIX absolute paths remain supported,
-    - Windows drive-rooted absolute paths remain supported.
-4. Do not add normalization, canonicalization, or cwd/realpath semantics in this phase.
-5. After migration, either remove `compiler/stage2_l0/src/util/path.l0` or keep only a narrow compatibility shim until
-   all Stage 2 imports are updated.
-
-**Existing implementation base** (`compiler/stage2_l0/src/util/path.l0`):
-
-| Planned `std.path` API                     | `util.path` function | Lift status                                         |
-|--------------------------------------------|----------------------|-----------------------------------------------------|
-| `is_sep(c: byte)`                          | `up_is_sep`          | Direct lift                                         |
-| `is_absolute(path: string)`                | `up_is_absolute`     | Direct lift                                         |
-| `has_parent(path: string)`                 | `up_has_parent`      | Direct lift                                         |
-| `basename(path: string)`                   | `up_basename`        | Direct lift                                         |
-| `parent(path: string)`                     | `up_parent`          | Direct lift                                         |
-| `join(root: string, rel: string)`          | `up_join`            | Direct lift                                         |
-| `stem(path: string)`                       | `up_stem`            | Generalize: currently hardcoded to strip `.l0` only |
-| `has_extension(path: string, ext: string)` | `up_is_l0_file`      | Generalize: currently `.l0`-only check              |
-
-6 of 8 planned functions are directly liftable. `up_stem` and `up_is_l0_file` need generalization to handle arbitrary
-extensions. The helper `up_find_last_sep` is an internal utility that may or may not be promoted to public API.
-
-### 3. Raw byte stdio
-
-1. Raw stream APIs operate on `byte*` plus explicit lengths/counts.
-2. Return contract for `sys.rt` byte APIs:
+1. Raw stream APIs remain runtime-backed C entrypoints, but their L0 declarations move from `sys.rt` to `sys.unsafe`.
+2. `std.io` must not expose any `byte*`-taking stream API after this refactor.
+3. The raw transfer contract stays unchanged:
     - positive value: bytes transferred,
-    - `0`: EOF for stdin,
+    - `0`: EOF for stdin or zero-length transfer,
     - `-1`: error.
-3. The `sys.rt` byte APIs must support partial transfers; they are not all-or-nothing interfaces.
-4. `std.io` should provide both `*_some` wrappers and `*_all` convenience functions for callers that need full writes.
-5. Higher-level owned-buffer helpers may be layered above this later. Phase 1 should remain compatible with a future
-   `CharBuffer`-style abstraction without requiring it now.
+4. Keep support for partial transfers at the runtime level.
 
-### 4. Runtime portability policy
+### 3. `ByteArray`
 
-1. Use standard C stream APIs for raw stdin/stdout/stderr where sufficient.
-2. Implement file metadata in `l0_runtime.h` behind platform branches:
-    - POSIX `stat` on POSIX hosts,
-    - Windows filesystem APIs on Windows hosts.
-3. Keep platform-specific logic quarantined inside the runtime boundary.
-4. Do not constrain this feature to strict pure C99, because robust metadata and later traversal/process/watch APIs are
-   not realistically supportable under that constraint alone.
+1. `ByteArray` is fixed-size in this phase. It is not a growable buffer and does not track a logical used-length.
+2. Implement `ByteArray` as a byte-specialized wrapper over `ArrayBase`, not as a type alias.
+3. `ba_get`, `ba_set`, and `ba_zap` use the existing `std.array` bounds checks.
+4. `ByteArray` owns its backing `ArrayBase*` and `ba_free` frees both wrapper and storage.
+5. Do not add generic byte conversions, slicing helpers, append APIs, or dynamic byte-buffer behavior in this phase.
 
-### 5. Explicit deferrals
+### 4. Safe `std.io` byte API
 
-This phase does not implement:
-
-- directory listing or recursive workspace traversal,
-- URI/path conversion helpers,
-- file watching,
-- subprocess spawning with explicit stdin/stdout/stderr pipe control.
-
-Record those as follow-on work:
-
-1. Phase 2: directory listing and non-recursive traversal.
-2. Phase 3: subprocess API with explicit pipe control.
-3. Phase 4: file watching.
-4. URI/path conversion after `std.path` semantics are stable enough to avoid premature policy lock-in.
+1. `std.io` byte operations accept `ByteArray*` plus explicit `start` and `count`.
+2. `std.io` validates ranges with assertion-style programmer-error checks, not nullable runtime-style failures:
+    - `start >= 0`
+    - `count >= 0`
+    - `start <= ba_capacity(buf)`
+    - `count <= ba_capacity(buf) - start`
+3. `read_stdin_some` returns:
+    - positive count on success,
+    - `0` on EOF,
+    - `null` on I/O error.
+4. `write_*_some` return:
+    - positive or zero count on success,
+    - `null` on I/O error.
+5. `write_*_all` loop on `*_some` until all requested bytes are written, and return `null` on I/O error or
+   zero-progress write.
+6. Zero-length `std.io` operations remain valid.
 
 ## Implementation Sequence
 
-1. Extend `sys.rt` declarations with `RtFileInfo` and raw byte stdio function signatures.
-2. Implement the corresponding runtime functions in `l0_runtime.h`.
-3. Add `std.path` in shared stdlib by promoting the current Stage 2 `util.path` behavior.
-4. Update Stage 2 source-path consumers to import and use `std.path`.
-5. Add `std.fs` for metadata wrappers and extend `std.io` with file existence/delete and raw byte I/O helpers.
-6. Update standard-library reference docs and project-status docs.
-7. Add targeted Stage 1 and Stage 2 tests for the shared runtime/stdlib behavior.
+1. Add `ByteArray` plus `ba_*` helpers to `std.array`.
+2. Move the raw byte stream declarations from `sys.rt` to `sys.unsafe`.
+3. Rewrite `std.io` byte operations around `ByteArray` range-checked wrappers.
+4. Update Stage 1 and Stage 2 tests to use the safe `std.io` surface and to validate direct unsafe raw access where
+   needed.
+5. Update the standard-library docs to reflect the new safe/unsafe split and `ByteArray` API.
+6. Land the pending `std.fs` / `std.io` path-helper refactor in
+   `docs/plans/refactors/closed/2026-03-13-stdlib-fs-io-boundary-cleanup-noref.md` in the same change set.
+7. Keep this plan document in sync with the reopened design while the refactor is landing.
 
 ## Test Cases and Scenarios
 
-1. File lifecycle:
-    - missing path reports `file_exists == false`,
-    - create file, verify `file_exists == true`,
-    - delete file, verify removal through wrapper APIs.
-2. Metadata:
-    - missing file returns `exists == false`,
-    - regular file reports `is_file == true`,
-    - directory reports `is_dir == true`,
-    - file size is populated for a known-size file,
-    - modification time fields are either populated or null without crashing.
-3. Path utilities:
-    - separator recognition for `/` and `\\`,
-    - basename/parent/stem behavior with trailing separators,
-    - absolute-path detection for POSIX and Windows-drive forms,
-    - join behavior with and without trailing root separator.
-4. Raw stdio:
-    - stdin byte read handles EOF correctly,
-    - stdout/stderr byte writes preserve exact byte sequences including `\\0`,
+1. Filesystem/path regression:
+    - existing `std.fs` and `std.path` behavior still passes unchanged.
+2. `ByteArray`:
+    - create fixed-size byte array,
+    - get/set/zap bytes within bounds,
+    - free buffer cleanly.
+3. Safe `std.io`:
+    - stdin byte read into `ByteArray` handles EOF correctly,
+    - stdout/stderr writes through `ByteArray` preserve exact byte sequences, including `\\0`,
+    - zero-length reads/writes succeed,
     - partial-write paths are handled by `write_*_all`.
-5. Integration:
-    - Stage 2 source-path resolution still passes after migration to `std.path`,
-    - an LSP-style framed I/O test can read headers/body using byte APIs.
+4. Unsafe raw APIs:
+    - direct `sys.unsafe` raw byte stream calls still compile and work.
+5. Negative/public-surface checks:
+    - old `std.io` raw-pointer call sites no longer type-check.
 
 ## Documentation Updates
 
-1. Update `docs/reference/standard-library.md` with the new `std.io`, `std.fs`, `std.path`, and `sys.rt` APIs.
-2. Update `docs/reference/project-status.md` to list new shared modules.
-3. Keep the plan document in sync with the actual landed API surface if naming changes during implementation review.
+1. Update `docs/reference/standard-library.md` with the new `std.array`, `std.io`, `sys.rt`, and `sys.unsafe` APIs.
+2. Do not describe `std.io` as exposing raw `byte*` stream operations after this refactor.
+3. Keep the historical Stage 2 milestone references pointing at this reopened plan path.
+
+## Definition of Done
+
+1. `ByteArray`, safe raw byte stdio, shared `std.fs`, and shared `std.path` are all implemented and documented.
+2. The `std.fs` / `std.io` boundary cleanup in
+   `docs/plans/refactors/closed/2026-03-13-stdlib-fs-io-boundary-cleanup-noref.md` is implemented in the same landing.
+3. No raw `byte*` APIs remain public in `std.io`, and no path-based file helpers remain public in `std.io`.
+4. Stage 1 and Stage 2 tests cover the final safe/unsafe byte-stdio split and the final `std.fs` filesystem API.
 
 ## Assumptions and Defaults
 
-1. Shared stdlib is the correct home for promoted path helpers, not Stage 2-only utility modules.
-2. `byte*` plus explicit lengths is the correct low-level I/O shape for LSP framing and other binary-safe stream use.
-3. Rich traversal, process, watch, and URI-conversion APIs are intentionally deferred to keep the first phase small and
-   bootstrap-focused.
-4. Environment scripts should set only `L0_HOME`; `L0_SYSTEM` and `L0_RUNTIME_INCLUDE` are explicit user overrides and
-   compiler defaults must derive stdlib/runtime paths from `L0_HOME` when those overrides are unset.
+1. The safe public binary-I/O surface should use `ByteArray`, not raw pointers.
+2. `sys.unsafe` is the correct public home for pointer-based stream I/O because the caller must supply valid raw
+   buffers.
+3. A fixed-size buffer is sufficient for this phase; callers track the meaningful byte count separately.
+4. L0 does not provide hard field privacy, so `ByteArray` is a safer public abstraction rather than a perfect
+   encapsulation barrier.

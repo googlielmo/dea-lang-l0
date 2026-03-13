@@ -102,6 +102,7 @@ def run_one(
             ],
             cwd=REPO_ROOT,
             env=repo_env,
+            stdin=subprocess.DEVNULL,
             stdout=stdout_file,
             stderr=stderr_file,
             check=False,

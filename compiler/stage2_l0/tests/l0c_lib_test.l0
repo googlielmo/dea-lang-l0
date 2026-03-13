@@ -7,8 +7,9 @@ module l0c_lib_test;
 
 import sys.rt;
 
-import std.io;
 import std.assert;
+import std.fs;
+import std.io;
 import std.string;
 import std.vector;
 
@@ -247,8 +248,8 @@ func test_default_build_mode_succeeds() {
         assert(rc == 0, "default build mode should succeed for ok_main");
     }
 
-    assert(file_exists(out_path), "built executable should exist");
-    assert(file_exists(c_path), "kept generated C should exist for build");
+    assert(exists(out_path), "built executable should exist");
+    assert(exists(c_path), "kept generated C should exist for build");
 
     rt_delete_file(out_path);
     rt_delete_file(c_path);
@@ -291,7 +292,7 @@ func test_run_keep_c_output_file() {
         assert(rc == 0, "--run --keep-c should succeed for ok_main");
     }
 
-    assert(file_exists(c_path), "--run --keep-c should retain the generated C file");
+    assert(exists(c_path), "--run --keep-c should retain the generated C file");
 
     rt_delete_file(out_path);
     rt_delete_file(c_path);

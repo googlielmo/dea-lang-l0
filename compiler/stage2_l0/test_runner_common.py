@@ -222,6 +222,7 @@ def run_combined_output(command: list[str], *, env: dict[str, str] | None = None
         command,
         cwd=REPO_ROOT,
         env=env,
+        stdin=subprocess.DEVNULL,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         check=False,

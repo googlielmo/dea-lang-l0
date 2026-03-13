@@ -7,8 +7,8 @@ module driver;
 
 import sys.rt;
 
+import std.fs;
 import std.string;
-import std.io;
 import std.text;
 import std.vector;
 import util.diag;

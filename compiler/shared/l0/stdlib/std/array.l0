@@ -31,6 +31,13 @@ struct ArrayBase {
 }
 
 /**
+ * Byte-specialized fixed-size array wrapper.
+ */
+struct ByteArray {
+    storage: ArrayBase*;
+}
+
+/**
  * Creates a new ArrayBase with the specified element size and length.
  *
  * @param element_size The size of each element in bytes.
@@ -121,5 +128,72 @@ func arr_zap(self: ArrayBase*, index: int) {
  */
 func arr_free(self: ArrayBase*) {
     rt_free(self.data);
+    drop self;
+}
+
+/* ---------------------------------
+   ByteArray specialization
+   --------------------------------- */
+
+/**
+ * Create a fixed-size byte array.
+ *
+ * @param length Number of bytes to allocate.
+ * @return New byte array wrapper.
+ */
+func ba_create(length: int) -> ByteArray* {
+    return new ByteArray(arr_create(sizeof(byte), length));
+}
+
+/**
+ * Return the capacity of a byte array.
+ *
+ * @param self Byte array to inspect.
+ * @return Number of byte slots.
+ */
+func ba_capacity(self: ByteArray*) -> int {
+    return self.storage.capacity;
+}
+
+/**
+ * Return one byte from the array.
+ *
+ * @param self Byte array to inspect.
+ * @param index Byte index to read.
+ * @return Byte value at `index`.
+ */
+func ba_get(self: ByteArray*, index: int) -> byte {
+    return *(arr_get(self.storage, index) as byte*);
+}
+
+/**
+ * Store one byte into the array.
+ *
+ * @param self Byte array to update.
+ * @param index Byte index to write.
+ * @param value Byte value to store.
+ */
+func ba_set(self: ByteArray*, index: int, value: byte) {
+    let dest = arr_get(self.storage, index) as byte*;
+    *dest = value;
+}
+
+/**
+ * Zero one byte slot in the array.
+ *
+ * @param self Byte array to update.
+ * @param index Byte index to clear.
+ */
+func ba_zap(self: ByteArray*, index: int) {
+    arr_zap(self.storage, index);
+}
+
+/**
+ * Free a byte array and its backing storage.
+ *
+ * @param self Byte array to free.
+ */
+func ba_free(self: ByteArray*) {
+    arr_free(self.storage);
     drop self;
 }

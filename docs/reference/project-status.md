@@ -111,7 +111,7 @@ Common supported options:
 - Build/codegen: `-NLD/--no-line-directives`, `--trace-arc`, `--trace-memory`, `-c/--c-compiler`, `-C/--c-options`,
   `-I/--runtime-include`,
   `-L/--runtime-lib`, `-o/--output`, `--keep-c`
-  - C compiler flags can also be provided via `$L0_CFLAGS`; effective order is `$L0_CFLAGS` first, then `--c-options`.
+    - C compiler flags can also be provided via `$L0_CFLAGS`; effective order is `$L0_CFLAGS` first, then `--c-options`.
 - Dumps: `-a/--all-modules` for `tok|ast|sym|type`, `-I/--include-eof` for `tok`
 
 CLI identity/help behavior:
@@ -262,4 +262,5 @@ Near-term project direction, consistent with current docs/code:
 
 1. Add Windows build support, with MinGW-w64 as the primary target and CI validation for Stage 1 and Stage 2 workflows.
 2. Define a shared CLI contract spec so Stage 1 and Stage 2 parity has one stable normative source.
-3. Embed build-provenance metadata in installed and repo-local Stage 2 binaries without perturbing triple-bootstrap stability.
+3. Embed build-provenance metadata in installed and repo-local Stage 2 binaries without perturbing triple-bootstrap
+   stability.

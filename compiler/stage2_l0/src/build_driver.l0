@@ -9,7 +9,6 @@ import sys.rt;
 
 import std.fs;
 import std.hashmap;
-import std.io;
 import std.path;
 import std.string;
 import std.system;
@@ -265,11 +264,11 @@ func bd_temp_stem(tag: string) -> string {
             sb_append(sb, "-");
             sb_append_int(sb, attempt);
             let temp_stem = join(root, sb_to_string(sb));
-            if (!file_exists(temp_stem) &&
-                !file_exists(concat_s(temp_stem, ".c")) &&
-                !file_exists(concat_s(temp_stem, ".out")) &&
-                !file_exists(concat_s(temp_stem, ".stdout")) &&
-                !file_exists(concat_s(temp_stem, ".stderr")))
+            if (!exists(temp_stem) &&
+                !exists(concat_s(temp_stem, ".c")) &&
+                !exists(concat_s(temp_stem, ".out")) &&
+                !exists(concat_s(temp_stem, ".stdout")) &&
+                !exists(concat_s(temp_stem, ".stderr")))
             {
                 return temp_stem;
             }
@@ -285,7 +284,7 @@ func bd_temp_stem(tag: string) -> string {
  * @param path File path to remove.
  */
 func bd_delete_if_present(path: string) {
-    if (file_exists(path)) {
+    if (exists(path)) {
         delete_file(path);
     }
 }
@@ -526,10 +525,10 @@ func bd_validate_runtime_lib(runtime_lib_path: string, diags: DiagCollector*) ->
         return false;
     }
 
-    let has_runtime = file_exists(join(runtime_lib_path, "libl0runtime.a")) ||
-        file_exists(join(runtime_lib_path, "libl0runtime.so")) ||
-        file_exists(join(runtime_lib_path, "libl0runtime.dylib")) ||
-        file_exists(join(runtime_lib_path, "l0runtime.lib"));
+    let has_runtime = exists(join(runtime_lib_path, "libl0runtime.a")) ||
+        exists(join(runtime_lib_path, "libl0runtime.so")) ||
+        exists(join(runtime_lib_path, "libl0runtime.dylib")) ||
+        exists(join(runtime_lib_path, "l0runtime.lib"));
     if (!has_runtime) {
         diag_error(
             diags,

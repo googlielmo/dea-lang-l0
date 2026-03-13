@@ -6,7 +6,7 @@
 /**
  * Standard I/O module
  *
- * Provides functions for file I/O, standard input reading,
+ * Provides functions for standard input reading, byte-stream I/O,
  * output flushing, and printing to stdout and stderr.
  */
 module std.io;
@@ -14,63 +14,9 @@ module std.io;
 import sys.rt;
 import sys.unsafe;
 
+import std.array;
+import std.assert;
 import std.unit;
-
-/* ---------------------------------
-   File I/O
-   --------------------------------- */
-
-/**
- * Check if a file exists at the given path.
- *
- * @param path The file path.
- * @return True if it exists, false otherwise.
- */
-func file_exists(path: string) -> bool {
-    return rt_file_exists(path);
-}
-
-/**
- * Delete the file at the given path.
- *
- * @param path The file path.
- * @return present() if deleted, or null on error.
- */
-func delete_file(path: string) -> Unit? {
-    if (!rt_delete_file(path)) {
-        return null;
-    }
-    return present();
-}
-
-/**
- * Read the entire content of a file as a string optional.
- *
- * @param path The path to the file.
- * @return The content of the file, or null on error.
- */
-func read_file(path: string) -> string? {
-    let rd_opt = rt_read_file_all(path);
-    if (rd_opt == null) {
-        return null;
-    }
-    return rd_opt;
-}
-
-/**
- * Write a string as the entire content of a file.
- *
- * @param path The path to the file.
- * @param data The string content to write.
- * @return present() on success, or null on error.
- */
-func write_file(path: string, data: string) -> Unit? {
-    let ok = rt_write_file_all(path, data);
-    if (!ok) {
-        return null;
-    }
-    return present();
-}
 
 /* ---------------------------------
    Input
@@ -119,14 +65,35 @@ func read_char_or_eof() -> int {
 }
 
 /**
- * Read up to `capacity` raw bytes from standard input.
+ * Validate one byte-array subrange before raw I/O.
+ *
+ * @param buf Byte array to inspect.
+ * @param start Start offset within the array.
+ * @param count Number of bytes in range.
+ */
+func _io_check_byte_range(buf: ByteArray*, start: int, count: int) {
+    let cap = ba_capacity(buf);
+    assert(start >= 0, "byte range start must be non-negative");
+    assert(count >= 0, "byte range count must be non-negative");
+    assert(start <= cap, "byte range start must not exceed capacity");
+    assert(count <= cap - start, "byte range must fit within capacity");
+}
+
+/**
+ * Read up to `count` raw bytes from standard input into one byte-array subrange.
  *
  * @param buf Destination buffer.
- * @param capacity Maximum number of bytes to read.
+ * @param start Start offset within the buffer.
+ * @param count Maximum number of bytes to read.
  * @return Bytes read, `0` on EOF, or null on error.
  */
-func read_stdin_some(buf: byte*, capacity: int) -> int? {
-    let n = rt_stdin_read(buf, capacity);
+func read_stdin_some(buf: ByteArray*, start: int, count: int) -> int? {
+    _io_check_byte_range(buf, start, count);
+    if (count == 0) {
+        return 0 as int?;
+    }
+
+    let n = rt_stdin_read(arr_get(buf.storage, start) as byte*, count);
     if (n == -1) {
         return null;
     }
@@ -134,14 +101,20 @@ func read_stdin_some(buf: byte*, capacity: int) -> int? {
 }
 
 /**
- * Write up to `len` raw bytes to standard output.
+ * Write up to `count` raw bytes from one byte-array subrange to standard output.
  *
  * @param buf Source buffer.
- * @param len Maximum number of bytes to write.
+ * @param start Start offset within the buffer.
+ * @param count Maximum number of bytes to write.
  * @return Bytes written, or null on error.
  */
-func write_stdout_some(buf: byte*, len: int) -> int? {
-    let n = rt_stdout_write(buf, len);
+func write_stdout_some(buf: ByteArray*, start: int, count: int) -> int? {
+    _io_check_byte_range(buf, start, count);
+    if (count == 0) {
+        return 0 as int?;
+    }
+
+    let n = rt_stdout_write(arr_get(buf.storage, start) as byte*, count);
     if (n == -1) {
         return null;
     }
@@ -149,14 +122,20 @@ func write_stdout_some(buf: byte*, len: int) -> int? {
 }
 
 /**
- * Write up to `len` raw bytes to standard error.
+ * Write up to `count` raw bytes from one byte-array subrange to standard error.
  *
  * @param buf Source buffer.
- * @param len Maximum number of bytes to write.
+ * @param start Start offset within the buffer.
+ * @param count Maximum number of bytes to write.
  * @return Bytes written, or null on error.
  */
-func write_stderr_some(buf: byte*, len: int) -> int? {
-    let n = rt_stderr_write(buf, len);
+func write_stderr_some(buf: ByteArray*, start: int, count: int) -> int? {
+    _io_check_byte_range(buf, start, count);
+    if (count == 0) {
+        return 0 as int?;
+    }
+
+    let n = rt_stderr_write(arr_get(buf.storage, start) as byte*, count);
     if (n == -1) {
         return null;
     }
@@ -164,20 +143,18 @@ func write_stderr_some(buf: byte*, len: int) -> int? {
 }
 
 /**
- * Write exactly `len` raw bytes to standard output.
+ * Write exactly `count` raw bytes from one byte-array subrange to standard output.
  *
  * @param buf Source buffer.
- * @param len Exact number of bytes to write.
+ * @param start Start offset within the buffer.
+ * @param count Exact number of bytes to write.
  * @return present() on success, or null on error.
  */
-func write_stdout_all(buf: byte*, len: int) -> Unit? {
-    if (len < 0) {
-        return null;
-    }
-
+func write_stdout_all(buf: ByteArray*, start: int, count: int) -> Unit? {
+    _io_check_byte_range(buf, start, count);
     let written = 0;
-    while (written < len) {
-        let chunk_opt = write_stdout_some(rt_array_element(buf as void*, 1, written) as byte*, len - written);
+    while (written < count) {
+        let chunk_opt = write_stdout_some(buf, start + written, count - written);
         if (chunk_opt == null) {
             return null;
         }
@@ -192,20 +169,18 @@ func write_stdout_all(buf: byte*, len: int) -> Unit? {
 }
 
 /**
- * Write exactly `len` raw bytes to standard error.
+ * Write exactly `count` raw bytes from one byte-array subrange to standard error.
  *
  * @param buf Source buffer.
- * @param len Exact number of bytes to write.
+ * @param start Start offset within the buffer.
+ * @param count Exact number of bytes to write.
  * @return present() on success, or null on error.
  */
-func write_stderr_all(buf: byte*, len: int) -> Unit? {
-    if (len < 0) {
-        return null;
-    }
-
+func write_stderr_all(buf: ByteArray*, start: int, count: int) -> Unit? {
+    _io_check_byte_range(buf, start, count);
     let written = 0;
-    while (written < len) {
-        let chunk_opt = write_stderr_some(rt_array_element(buf as void*, 1, written) as byte*, len - written);
+    while (written < count) {
+        let chunk_opt = write_stderr_some(buf, start + written, count - written);
         if (chunk_opt == null) {
             return null;
         }

@@ -5,6 +5,7 @@
 
 module l0c_lib;
 
+import std.fs;
 import std.hashmap;
 import std.io;
 import std.string;
