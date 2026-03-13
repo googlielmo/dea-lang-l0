@@ -15,8 +15,8 @@ import sys.rt;
  * Tests test_stale_errno_does_not_break_std_fs_file_io.
  */
 func test_stale_errno_does_not_break_std_fs_file_io() {
-    let missing_path = "/tmp/l0_io_errno_missing_probe_20260225.txt";
-    let target_path = "/tmp/l0_io_errno_probe_20260225.txt";
+    let missing_path = "build/l0_io_errno_missing_probe_20260313.txt";
+    let target_path = "build/l0_io_errno_probe_20260313.txt";
 
     // Seed errno with a failing syscall path before std.fs wrappers.
     let missing = rt_file_info(missing_path);

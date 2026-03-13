@@ -12,7 +12,49 @@ BOOTSTRAP_PARENT="$REPO_ROOT/build/tests"
 BOOTSTRAP_DIR=""
 ALT_DEA_BUILD=""
 PROBE_ROOT=""
+mkdir -p "$REPO_ROOT/build/tests"
+# This path intentionally lives outside the repo tree to test rejection logic.
 OUTSIDE_DEA_BUILD="$(mktemp -d /tmp/l0_stage2_outside_dea_build.XXXXXX)"
+COND_OUTPUT="$REPO_ROOT/build/tests/l0_stage2_bootstrap_cond_$$.out"
+LOGIC_OUTPUT="$REPO_ROOT/build/tests/l0_stage2_bootstrap_logic_$$.out"
+GEN_OUTPUT="$REPO_ROOT/build/tests/l0_stage2_bootstrap_gen_$$.c"
+HELLO_OUTPUT="$REPO_ROOT/build/tests/l0_stage2_bootstrap_hello_$$"
+RUN_OUTPUT="$REPO_ROOT/build/tests/l0_stage2_bootstrap_run_$$.out"
+OUTSIDE_LOG="$REPO_ROOT/build/tests/l0_stage2_bootstrap_outside_$$.log"
+REPO_ROOT_LOG="$REPO_ROOT/build/tests/l0_stage2_bootstrap_repo_root_$$.log"
+
+is_windows_host() {
+    case "$(uname -s)" in
+        CYGWIN*|MINGW*|MSYS*) return 0 ;;
+    esac
+    return 1
+}
+
+native_path() {
+    local path="$1"
+    if is_windows_host; then
+        cygpath -w "$path"
+    else
+        printf '%s\n' "$path"
+    fi
+}
+
+stage2_launcher_path() {
+    local base="$1"
+    if is_windows_host && [ -f "$base.cmd" ]; then
+        native_path "$base.cmd"
+    else
+        printf '%s\n' "$base"
+    fi
+}
+
+clean_env_run() {
+    if is_windows_host; then
+        env -i PATH="$PATH" SYSTEMROOT="${SYSTEMROOT:-}" COMSPEC="${COMSPEC:-}" WINDIR="${WINDIR:-}" OS="${OS:-}" "$@"
+    else
+        env -i PATH="$PATH" "$@"
+    fi
+}
 
 # This is the full end-to-end regression for one Stage 2 compiler artifact built
 # into an isolated repo-local test Dea build under `build/tests/...`.
@@ -40,6 +82,7 @@ cleanup() {
         rm -rf "$PROBE_ROOT"
     fi
     rm -rf "$OUTSIDE_DEA_BUILD"
+    rm -f "$COND_OUTPUT" "$LOGIC_OUTPUT" "$GEN_OUTPUT" "$HELLO_OUTPUT" "$HELLO_OUTPUT.c" "$HELLO_OUTPUT.out" "$RUN_OUTPUT" "$OUTSIDE_LOG" "$REPO_ROOT_LOG"
 }
 trap cleanup EXIT
 
@@ -68,14 +111,15 @@ cd "$REPO_ROOT"
 mkdir -p "$BOOTSTRAP_PARENT"
 BOOTSTRAP_DIR="$(mktemp -d "$BOOTSTRAP_PARENT/l0_stage2_bootstrap.XXXXXX")"
 DEA_BUILD_DIR="${BOOTSTRAP_DIR#$REPO_ROOT/}" ./scripts/build-stage2-l0c.sh >/dev/null
+STAGE2_L0C="$(stage2_launcher_path "$BOOTSTRAP_DIR/bin/l0c-stage2")"
 
 assert_file "$BOOTSTRAP_DIR/bin/l0c-stage2"
 assert_file "$BOOTSTRAP_DIR/bin/l0c-stage2.native"
 assert_no_file "$BOOTSTRAP_DIR/bin/l0c-stage2.c"
 
-env -i PATH="$PATH" "$BOOTSTRAP_DIR/bin/l0c-stage2" --check -P examples hello >/dev/null
-env -i PATH="$PATH" "$BOOTSTRAP_DIR/bin/l0c-stage2" --check -P examples newdrop >/dev/null
-env -i PATH="$PATH" "$BOOTSTRAP_DIR/bin/l0c-stage2" --check -P examples hamurabi >/dev/null
+clean_env_run "$STAGE2_L0C" --check -P examples hello >/dev/null
+clean_env_run "$STAGE2_L0C" --check -P examples newdrop >/dev/null
+clean_env_run "$STAGE2_L0C" --check -P examples hamurabi >/dev/null
 PROBE_ROOT="$(mktemp -d "$BOOTSTRAP_PARENT/l0_stage2_probe.XXXXXX")"
 cat > "$PROBE_ROOT/qualified_expr.l0" <<'EOF'
 module qualified_expr;
@@ -148,33 +192,35 @@ func main() -> int {
     return 0;
 }
 EOF
-env -i PATH="$PATH" "$BOOTSTRAP_DIR/bin/l0c-stage2" --check -P "$PROBE_ROOT" qualified_expr >/dev/null
-env -i PATH="$PATH" "$BOOTSTRAP_DIR/bin/l0c-stage2" --run -P "$PROBE_ROOT" control_flow_cond > /tmp/l0_stage2_bootstrap_cond_$$.out
-assert_contains "/tmp/l0_stage2_bootstrap_cond_$$.out" "0"
-assert_contains "/tmp/l0_stage2_bootstrap_cond_$$.out" "1"
-if grep -x "2" /tmp/l0_stage2_bootstrap_cond_$$.out >/dev/null; then
+clean_env_run "$STAGE2_L0C" --check -P "$(native_path "$PROBE_ROOT")" qualified_expr >/dev/null
+clean_env_run "$STAGE2_L0C" --run -P "$(native_path "$PROBE_ROOT")" control_flow_cond > "$COND_OUTPUT"
+assert_contains "$COND_OUTPUT" "0"
+assert_contains "$COND_OUTPUT" "1"
+if grep -x "2" "$COND_OUTPUT" >/dev/null; then
     fail "expected control_flow_cond loop to stop after i=1"
 fi
-env -i PATH="$PATH" "$BOOTSTRAP_DIR/bin/l0c-stage2" --run -P "$PROBE_ROOT" logical_expr > /tmp/l0_stage2_bootstrap_logic_$$.out
-assert_contains "/tmp/l0_stage2_bootstrap_logic_$$.out" "9"
-assert_contains "/tmp/l0_stage2_bootstrap_logic_$$.out" "10"
-assert_contains "/tmp/l0_stage2_bootstrap_logic_$$.out" "2"
-if grep -x "7" /tmp/l0_stage2_bootstrap_logic_$$.out >/dev/null; then
+clean_env_run "$STAGE2_L0C" --run -P "$(native_path "$PROBE_ROOT")" logical_expr > "$LOGIC_OUTPUT"
+assert_contains "$LOGIC_OUTPUT" "9"
+assert_contains "$LOGIC_OUTPUT" "10"
+assert_contains "$LOGIC_OUTPUT" "2"
+if grep -x "7" "$LOGIC_OUTPUT" >/dev/null; then
     fail "expected logical_expr to short-circuit false && RHS"
 fi
-if grep -x "8" /tmp/l0_stage2_bootstrap_logic_$$.out >/dev/null; then
+if grep -x "8" "$LOGIC_OUTPUT" >/dev/null; then
     fail "expected logical_expr to short-circuit true || RHS"
 fi
-env -i PATH="$PATH" "$BOOTSTRAP_DIR/bin/l0c-stage2" --gen --no-line-directives -P examples hello > /tmp/l0_stage2_bootstrap_gen_$$.c
-rm -f /tmp/l0_stage2_bootstrap_gen_$$.c
-env -i PATH="$PATH" "$BOOTSTRAP_DIR/bin/l0c-stage2" --build --keep-c -P examples -o /tmp/l0_stage2_bootstrap_hello_$$ hello >/dev/null
-assert_file "/tmp/l0_stage2_bootstrap_hello_$$"
-assert_file "/tmp/l0_stage2_bootstrap_hello_$$.c"
-"/tmp/l0_stage2_bootstrap_hello_$$" > /tmp/l0_stage2_bootstrap_hello_$$.out
-assert_contains "/tmp/l0_stage2_bootstrap_hello_$$.out" "Hello, World!"
-env -i PATH="$PATH" "$BOOTSTRAP_DIR/bin/l0c-stage2" --run -P examples hello > /tmp/l0_stage2_bootstrap_run_$$.out
-assert_contains "/tmp/l0_stage2_bootstrap_run_$$.out" "Hello, World!"
-rm -f /tmp/l0_stage2_bootstrap_cond_$$.out /tmp/l0_stage2_bootstrap_logic_$$.out /tmp/l0_stage2_bootstrap_hello_$$ /tmp/l0_stage2_bootstrap_hello_$$.c /tmp/l0_stage2_bootstrap_hello_$$.out /tmp/l0_stage2_bootstrap_run_$$.out
+clean_env_run "$STAGE2_L0C" --gen --no-line-directives -P examples hello > "$GEN_OUTPUT"
+rm -f "$GEN_OUTPUT"
+if is_windows_host; then
+    HELLO_OUTPUT="$HELLO_OUTPUT.exe"
+fi
+clean_env_run "$STAGE2_L0C" --build --keep-c -P examples -o "$(native_path "$HELLO_OUTPUT")" hello >/dev/null
+assert_file "$HELLO_OUTPUT"
+assert_file "${HELLO_OUTPUT%.*}.c"
+"$HELLO_OUTPUT" > "$HELLO_OUTPUT.out"
+assert_contains "$HELLO_OUTPUT.out" "Hello, World!"
+clean_env_run "$STAGE2_L0C" --run -P examples hello > "$RUN_OUTPUT"
+assert_contains "$RUN_OUTPUT" "Hello, World!"
 
 ALT_DEA_BUILD="$(mktemp -d "$BOOTSTRAP_PARENT/l0_stage2_bootstrap_keepc.XXXXXX")"
 DEA_BUILD_DIR="${ALT_DEA_BUILD#$REPO_ROOT/}" KEEP_C=1 ./scripts/build-stage2-l0c.sh >/dev/null
@@ -183,16 +229,16 @@ assert_file "$ALT_DEA_BUILD/bin/l0c-stage2"
 assert_file "$ALT_DEA_BUILD/bin/l0c-stage2.native"
 assert_file "$ALT_DEA_BUILD/bin/l0c-stage2.c"
 
-if DEA_BUILD_DIR="$OUTSIDE_DEA_BUILD" ./scripts/build-stage2-l0c.sh >/tmp/l0_stage2_bootstrap_outside_$$.log 2>&1; then
-    rm -f /tmp/l0_stage2_bootstrap_outside_$$.log
+if DEA_BUILD_DIR="$OUTSIDE_DEA_BUILD" ./scripts/build-stage2-l0c.sh >"$OUTSIDE_LOG" 2>&1; then
+    rm -f "$OUTSIDE_LOG"
     fail "expected outside-repo DEA_BUILD_DIR rejection"
 fi
-rm -f /tmp/l0_stage2_bootstrap_outside_$$.log
+rm -f "$OUTSIDE_LOG"
 
-if DEA_BUILD_DIR="." ./scripts/build-stage2-l0c.sh >/tmp/l0_stage2_bootstrap_repo_root_$$.log 2>&1; then
-    rm -f /tmp/l0_stage2_bootstrap_repo_root_$$.log
+if DEA_BUILD_DIR="." ./scripts/build-stage2-l0c.sh >"$REPO_ROOT_LOG" 2>&1; then
+    rm -f "$REPO_ROOT_LOG"
     fail "expected repo-root DEA_BUILD_DIR rejection"
 fi
-rm -f /tmp/l0_stage2_bootstrap_repo_root_$$.log
+rm -f "$REPO_ROOT_LOG"
 
 echo "l0c_stage2_bootstrap_test: PASS"

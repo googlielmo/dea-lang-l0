@@ -92,10 +92,14 @@ venv:
 install-dev-stage1:
 	$(PYTHON) ./scripts/gen_dist_tools.py write-stage1-wrapper --dea-build-dir "$(DEA_BUILD_DIR)"
 	$(PYTHON) ./scripts/gen_dist_tools.py write-env-script --dea-build-dir "$(DEA_BUILD_DIR)"
+	@printf 'Repo-local Stage 1 compiler version:\n'
+	@"$(DEA_BUILD_DIR)/bin/l0c-stage1" --version
 
 install-dev-stage2:
 	DEA_BUILD_DIR="$(DEA_BUILD_DIR)" ./scripts/build-stage2-l0c.sh
 	$(PYTHON) ./scripts/gen_dist_tools.py write-env-script --dea-build-dir "$(DEA_BUILD_DIR)"
+	@printf 'Repo-local Stage 2 compiler version:\n'
+	@"$(DEA_BUILD_DIR)/bin/l0c-stage2" --version
 
 install-dev-stages: install-dev-stage1 install-dev-stage2
 
@@ -105,20 +109,34 @@ install:
 		exit 2; \
 	fi
 	$(PYTHON) ./scripts/gen_dist_tools.py install-prefix --prefix "$(PREFIX)"
+	@printf 'Installed Stage 2 compiler version:\n'
+	@"$(PREFIX)/bin/l0c-stage2" --version
 	@printf '\n------------------------------------------------------------------------------\n'
+ifeq ($(OS),Windows_NT)
+	@printf 'Dea/L0 compiler installed at %s/bin/l0c.\nTo add the installed compiler to your current PATH:\n\nIn an MSYS2 bash shell:\n\n    source %s/bin/l0-env.sh\n\nIn CMD:\n\n    set "PATH=%s\\bin;%%PATH%%"\n\nSee README.md for more information.' "$(PREFIX)" "$(PREFIX)" "$(PREFIX)"
+else
 	@printf 'Dea/L0 compiler installed at %s/bin/l0c.\nTo add the installed compiler to your current PATH in this shell, run:\n\n    source %s/bin/l0-env.sh\n\nSee README.md for more information.' "$(PREFIX)" "$(PREFIX)"
+endif
 	@printf '\n------------------------------------------------------------------------------\n'
 
 use-dev-stage1: install-dev-stage1
 	$(PYTHON) ./scripts/gen_dist_tools.py set-alias --dea-build-dir "$(DEA_BUILD_DIR)" --stage stage1
 	@printf '\n------------------------------------------------------------------------------\n'
+ifeq ($(OS),Windows_NT)
+	@printf 'To activate the selected l0c stage in this shell:\n\nIn an MSYS2 bash shell:\n\n    source %s/bin/l0-env.sh\n\nIn CMD:\n\n    set "PATH=%%cd%%\\%s\\bin;%%PATH%%"\n\nThis adds %s/bin to your current PATH, so `l0c` invokes the selected compiler. See README.md for more information.' "$(DEA_BUILD_DIR)" "$(DEA_BUILD_DIR)" "$(DEA_BUILD_DIR)"
+else
 	@printf 'To activate the selected l0c stage in this shell, run:\n\n    source %s/bin/l0-env.sh\n\nThis adds %s/bin to your current PATH, so `l0c` invokes the selected compiler. See README.md for more information.' "$(DEA_BUILD_DIR)" "$(DEA_BUILD_DIR)"
+endif
 	@printf '\n------------------------------------------------------------------------------\n'
 
 use-dev-stage2: install-dev-stage2
 	$(PYTHON) ./scripts/gen_dist_tools.py set-alias --dea-build-dir "$(DEA_BUILD_DIR)" --stage stage2
 	@printf '\n------------------------------------------------------------------------------\n'
+ifeq ($(OS),Windows_NT)
+	@printf 'To activate the selected l0c stage in this shell:\n\nIn an MSYS2 bash shell:\n\n    source %s/bin/l0-env.sh\n\nIn CMD:\n\n    set "PATH=%%cd%%\\%s\\bin;%%PATH%%"\n\nThis adds %s/bin to your current PATH, so `l0c` invokes the selected compiler. See README.md for more information.' "$(DEA_BUILD_DIR)" "$(DEA_BUILD_DIR)" "$(DEA_BUILD_DIR)"
+else
 	@printf 'To activate the selected l0c stage in this shell, run:\n\n    source %s/bin/l0-env.sh\n\nThis adds %s/bin to your current PATH, so `l0c` invokes the selected compiler. See README.md for more information.' "$(DEA_BUILD_DIR)" "$(DEA_BUILD_DIR)"
+endif
 	@printf '\n------------------------------------------------------------------------------\n'
 
 test-stage1: venv

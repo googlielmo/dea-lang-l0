@@ -414,6 +414,56 @@ func bd_shell_quote(arg: string) -> string {
 }
 
 /**
+ * Return whether one Windows shell token can remain unquoted.
+ *
+ * @param arg Raw token.
+ * @return `true` when cmd.exe-safe token text needs no surrounding quotes.
+ */
+func bd_windows_token_is_plain(arg: string) -> bool {
+    if (is_empty_s(arg)) {
+        return false;
+    }
+    for (let i = 0; i < len_s(arg); i = i + 1) {
+        let c = char_at_s(arg, i);
+        if (c == ' ' || c == '\t' || c == '"' || c == '&' || c == '(' || c == ')' ||
+            c == '<' || c == '>' || c == '|' || c == '^')
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
+/**
+ * Normalize one Windows executable token for `cmd.exe`.
+ *
+ * Relative `./...` command paths are valid under POSIX shells but `cmd.exe`
+ * interprets the leading `./` as a command named `.`. Rewriting the slash
+ * separators to `.\...` keeps repo-local temp executables runnable when the
+ * temp-root fallback is the current directory.
+ *
+ * @param arg Raw executable token.
+ * @return Command token with cmd.exe-safe relative separators.
+ */
+func bd_windows_exec_token(arg: string) -> string {
+    if (!starts_with_s(arg, ".")) {
+        return arg;
+    }
+
+    with (let sb = sb_create() => sb_free(sb)) {
+        for (let i = 0; i < len_s(arg); i = i + 1) {
+            let c = char_at_s(arg, i);
+            if (c == '/') {
+                sb_append(sb, "\\");
+            } else {
+                sb_append_byte(sb, c);
+            }
+        }
+        return sb_to_string(sb);
+    }
+}
+
+/**
  * Join command words into one shell command line.
  *
  * @param words Command words to quote and join.
@@ -425,7 +475,15 @@ func bd_join_shell_words(words: VectorString*) -> string {
             if (i > 0) {
                 sb_append(sb, " ");
             }
-            sb_append(sb, bd_shell_quote(vs_get(words, i)));
+            let word = vs_get(words, i);
+            if (bd_is_windows() && i == 0) {
+                word = bd_windows_exec_token(word);
+            }
+            if (bd_is_windows() && i == 0 && bd_windows_token_is_plain(word)) {
+                sb_append(sb, word);
+            } else {
+                sb_append(sb, bd_shell_quote(word));
+            }
         }
         return sb_to_string(sb);
     }

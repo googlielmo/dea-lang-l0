@@ -48,8 +48,21 @@ func test_join_shell_words_quotes_every_token() {
         vs_push(words, "rock'n'roll");
 
         let joined = bd_join_shell_words(words);
-        assert(eq_s(joined, "'alpha' 'two words' 'rock'\\''n'\\''roll'"), "joined shell command mismatch");
+        if (bd_is_windows()) {
+            assert(eq_s(joined, "alpha \"two words\" \"rock'n'roll\""), "joined shell command mismatch");
+        } else {
+            assert(eq_s(joined, "'alpha' 'two words' 'rock'\\''n'\\''roll'"), "joined shell command mismatch");
+        }
     }
+}
+
+/**
+ * Tests test_windows_exec_token_rewrites_relative_slashes.
+ */
+func test_windows_exec_token_rewrites_relative_slashes() {
+    assert(eq_s(bd_windows_exec_token("./temp.exe"), ".\\temp.exe"), "dot-relative executable path mismatch");
+    assert(eq_s(bd_windows_exec_token("../bin/temp.exe"), "..\\bin\\temp.exe"), "parent-relative executable path mismatch");
+    assert(eq_s(bd_windows_exec_token("clang"), "clang"), "plain command should remain unchanged");
 }
 
 /**
@@ -157,6 +170,7 @@ func main() {
     test_shell_quote_posix_handles_spaces_and_quotes();
     test_shell_quote_windows_handles_spaces_and_quotes();
     test_join_shell_words_quotes_every_token();
+    test_windows_exec_token_rewrites_relative_slashes();
     test_join_display_words_matches_stage1_logging();
     test_format_word_list_matches_stage1_logging();
     test_compiler_flag_family_detection();

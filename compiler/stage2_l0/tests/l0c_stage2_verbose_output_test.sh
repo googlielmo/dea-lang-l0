@@ -12,6 +12,39 @@ FIXTURE_ROOT="$REPO_ROOT/compiler/stage2_l0/tests/fixtures/driver"
 TMP_DIR="$(mktemp -d "$REPO_ROOT/build/l0c-stage2-verbose-test.XXXXXX")"
 DEA_BUILD_DIR="$TMP_DIR/dea"
 
+is_windows_host() {
+    case "$(uname -s)" in
+        CYGWIN*|MINGW*|MSYS*) return 0 ;;
+    esac
+    return 1
+}
+
+native_path() {
+    local path="$1"
+    if is_windows_host; then
+        cygpath -w "$path"
+    else
+        printf '%s\n' "$path"
+    fi
+}
+
+stage2_launcher_path() {
+    local base="$1"
+    if is_windows_host && [ -f "$base.cmd" ]; then
+        native_path "$base.cmd"
+    else
+        printf '%s\n' "$base"
+    fi
+}
+
+clean_env_run() {
+    if is_windows_host; then
+        env -i PATH="$PATH" SYSTEMROOT="${SYSTEMROOT:-}" COMSPEC="${COMSPEC:-}" WINDIR="${WINDIR:-}" OS="${OS:-}" "$@"
+    else
+        env -i PATH="$PATH" "$@"
+    fi
+}
+
 cleanup() {
     rm -rf "$TMP_DIR"
 }
@@ -51,7 +84,16 @@ cd "$REPO_ROOT"
 mkdir -p "$REPO_ROOT/build"
 DEA_BUILD_DIR="$DEA_BUILD_DIR" ./scripts/build-stage2-l0c.sh >/dev/null
 
-STAGE2_L0C="$DEA_BUILD_DIR/bin/l0c-stage2"
+STAGE2_L0C="$(stage2_launcher_path "$DEA_BUILD_DIR/bin/l0c-stage2")"
+if is_windows_host; then
+    # L0's join() uses '/' after a non-separator-terminated root, producing mixed
+    # separators.  Match that format instead of the all-backslash cygpath -w output.
+    SYSTEM_ROOT_EXPECTED="$(native_path "$REPO_ROOT/compiler")/shared/l0/stdlib"
+else
+    SYSTEM_ROOT_EXPECTED="$REPO_ROOT/compiler/shared/l0/stdlib"
+fi
+FIXTURE_ROOT_EXPECTED="$(native_path "$FIXTURE_ROOT")"
+EXAMPLES_ROOT_EXPECTED="$(native_path "$REPO_ROOT/examples")"
 EXPECTED_EXE="a.out"
 case "$(uname -s)" in
     CYGWIN*|MINGW*|MSYS*)
@@ -61,14 +103,14 @@ esac
 
 V_STDOUT="$TMP_DIR/v.stdout"
 V_STDERR="$TMP_DIR/v.stderr"
-if ! env -i PATH="$PATH" "$STAGE2_L0C" -v --build -P "$FIXTURE_ROOT" ok_main >"$V_STDOUT" 2>"$V_STDERR"; then
+if ! clean_env_run "$STAGE2_L0C" -v --build -P "$FIXTURE_ROOT_EXPECTED" ok_main >"$V_STDOUT" 2>"$V_STDERR"; then
     fail "-v --build should succeed"
 fi
 
 assert_empty "$V_STDOUT"
 assert_contains "$V_STDERR" "Dea language / L0 compiler (Stage 2)"
-assert_contains "$V_STDERR" "System root(s): '$REPO_ROOT/compiler/shared/l0/stdlib'"
-assert_contains "$V_STDERR" "Project root(s): '$FIXTURE_ROOT'"
+assert_contains "$V_STDERR" "System root(s): '$SYSTEM_ROOT_EXPECTED'"
+assert_contains "$V_STDERR" "Project root(s): '$FIXTURE_ROOT_EXPECTED'"
 assert_contains "$V_STDERR" "Starting analysis for entry module 'ok_main'"
 assert_contains "$V_STDERR" "Building compilation unit module 'ok_main'"
 assert_contains "$V_STDERR" "Resolving module-level names..."
@@ -90,23 +132,23 @@ assert_not_contains "$V_STDERR" "already loaded (cache hit)"
 
 VVV_STDOUT="$TMP_DIR/vvv.stdout"
 VVV_STDERR="$TMP_DIR/vvv.stderr"
-if ! env -i PATH="$PATH" "$STAGE2_L0C" -vvv --build -P "$FIXTURE_ROOT" ok_main >"$VVV_STDOUT" 2>"$VVV_STDERR"; then
+if ! clean_env_run "$STAGE2_L0C" -vvv --build -P "$FIXTURE_ROOT_EXPECTED" ok_main >"$VVV_STDOUT" 2>"$VVV_STDERR"; then
     fail "-vvv --build should succeed"
 fi
 
 assert_empty "$VVV_STDOUT"
 assert_contains "$VVV_STDERR" "Loading module 'ok_main'"
-assert_contains "$VVV_STDERR" "Resolved 'ok_main' to $FIXTURE_ROOT/ok_main.l0"
-assert_contains "$VVV_STDERR" "Lexing $FIXTURE_ROOT/ok_main.l0"
-assert_contains "$VVV_STDERR" "Lexed 21 token(s) from $FIXTURE_ROOT/ok_main.l0"
-assert_contains "$VVV_STDERR" "Parsing $FIXTURE_ROOT/ok_main.l0"
-assert_contains "$VVV_STDERR" "Parsed module 'ok_main' from $FIXTURE_ROOT/ok_main.l0"
+assert_contains "$VVV_STDERR" "Resolved 'ok_main' to $FIXTURE_ROOT_EXPECTED/ok_main.l0"
+assert_contains "$VVV_STDERR" "Lexing $FIXTURE_ROOT_EXPECTED/ok_main.l0"
+assert_contains "$VVV_STDERR" "Lexed 21 token(s) from $FIXTURE_ROOT_EXPECTED/ok_main.l0"
+assert_contains "$VVV_STDERR" "Parsing $FIXTURE_ROOT_EXPECTED/ok_main.l0"
+assert_contains "$VVV_STDERR" "Parsed module 'ok_main' from $FIXTURE_ROOT_EXPECTED/ok_main.l0"
 assert_contains "$VVV_STDERR" "Loading module 'ok_dep1'"
-assert_contains "$VVV_STDERR" "Lexed 18 token(s) from $FIXTURE_ROOT/ok_dep1.l0"
+assert_contains "$VVV_STDERR" "Lexed 18 token(s) from $FIXTURE_ROOT_EXPECTED/ok_dep1.l0"
 assert_contains "$VVV_STDERR" "Loading module 'ok_leaf'"
-assert_contains "$VVV_STDERR" "Lexed 15 token(s) from $FIXTURE_ROOT/ok_leaf.l0"
+assert_contains "$VVV_STDERR" "Lexed 15 token(s) from $FIXTURE_ROOT_EXPECTED/ok_leaf.l0"
 assert_contains "$VVV_STDERR" "Loading module 'ok_dep2'"
-assert_contains "$VVV_STDERR" "Lexed 15 token(s) from $FIXTURE_ROOT/ok_dep2.l0"
+assert_contains "$VVV_STDERR" "Lexed 15 token(s) from $FIXTURE_ROOT_EXPECTED/ok_dep2.l0"
 assert_contains "$VVV_STDERR" "Module 'ok_dep1' already loaded (cache hit)"
 assert_contains "$VVV_STDERR" "Module 'ok_leaf' already loaded (cache hit)"
 assert_contains "$VVV_STDERR" "Module 'ok_dep2' already loaded (cache hit)"
@@ -122,17 +164,16 @@ assert_not_contains "$VVV_STDERR" "already loaded (cached)"
 
 PATH_STDOUT="$TMP_DIR/path.stdout"
 PATH_STDERR="$TMP_DIR/path.stderr"
-if ! env -i PATH="$PATH" "$STAGE2_L0C" -vvv examples/demo.l0 >"$PATH_STDOUT" 2>"$PATH_STDERR"; then
+if ! clean_env_run "$STAGE2_L0C" -vvv "$(native_path "$REPO_ROOT/examples/demo.l0")" >"$PATH_STDOUT" 2>"$PATH_STDERR"; then
     fail "-vvv examples/demo.l0 should succeed"
 fi
 
 assert_empty "$PATH_STDOUT"
-assert_contains "$PATH_STDERR" "Project root(s): 'examples'"
-assert_not_contains "$PATH_STDERR" "Project root(s): '.','examples'"
+assert_contains "$PATH_STDERR" "Project root(s): '$EXAMPLES_ROOT_EXPECTED'"
 
 RUN_STDOUT="$TMP_DIR/run.stdout"
 RUN_STDERR="$TMP_DIR/run.stderr"
-if ! env -i PATH="$PATH" "$STAGE2_L0C" -v --run -P "$FIXTURE_ROOT" ok_main >"$RUN_STDOUT" 2>"$RUN_STDERR"; then
+if ! clean_env_run "$STAGE2_L0C" -v --run -P "$FIXTURE_ROOT_EXPECTED" ok_main >"$RUN_STDOUT" 2>"$RUN_STDERR"; then
     fail "-v --run should succeed"
 fi
 

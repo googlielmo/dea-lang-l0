@@ -473,11 +473,21 @@ def write_executable(path: Path, text: str) -> None:
 
 
 def write_relative_symlink(path: Path, target_name: str) -> None:
-    """Write one sibling-relative symlink."""
+    """Write one sibling-relative symlink, falling back to copy on Windows."""
 
     if path.exists() or path.is_symlink():
         path.unlink()
-    path.symlink_to(target_name)
+    if is_windows_host():
+        # Symlinks require elevated privileges on Windows; copy instead.
+        target_path = path.parent / target_name
+        # Try .cmd wrapper first for Windows batch dispatch.
+        cmd_target = path.parent / f"{target_name}.cmd"
+        if cmd_target.exists():
+            shutil.copy2(cmd_target, path.parent / f"{path.name}.cmd")
+        if target_path.exists():
+            shutil.copy2(target_path, path)
+    else:
+        path.symlink_to(target_name)
 
 
 def remove_dea_build_tree(layout: DeaBuildLayout) -> None:
@@ -550,11 +560,33 @@ exec "${{script_dir}}/l0c-stage2.native" "$@"
 """
 
 
-def render_stage2_cmd_wrapper(native_name: str = "l0c-stage2.native") -> str:
-    """Return the Windows batch Stage 2 launcher."""
+def render_stage2_cmd_wrapper(
+    layout: DeaBuildLayout, native_name: str = "l0c-stage2.native"
+) -> str:
+    """Return the repo-local Windows batch Stage 2 launcher."""
+
+    # Convert POSIX-style relative path (../../..) to batch-style (..\..\..)
+    bat_rel = layout.repo_relative_from_bin.replace("/", "\\")
+    return f"""@echo off
+set "SCRIPT_DIR=%~dp0"
+set "SCRIPT_DIR=%SCRIPT_DIR:~0,-1%"
+for %%I in ("%SCRIPT_DIR%\\{bat_rel}") do set "REPO_ROOT=%%~fI"
+if "%L0_HOME%"=="" set "L0_HOME=%REPO_ROOT%\\compiler"
+"%SCRIPT_DIR%\\{native_name}" %*
+"""
+
+
+def render_prefix_stage2_cmd_wrapper(
+    native_name: str = "l0c-stage2.native",
+) -> str:
+    """Return the prefix-install Windows batch Stage 2 launcher."""
 
     return f"""@echo off
-"%~dp0{native_name}" %*
+set "SCRIPT_DIR=%~dp0"
+set "SCRIPT_DIR=%SCRIPT_DIR:~0,-1%"
+for %%I in ("%SCRIPT_DIR%\\..") do set "PREFIX_ROOT=%%~fI"
+if "%L0_HOME%"=="" set "L0_HOME=%PREFIX_ROOT%"
+"%SCRIPT_DIR%\\{native_name}" %*
 """
 
 
@@ -697,7 +729,9 @@ def write_stage2_wrapper(layout: DeaBuildLayout) -> Path:
     path = layout.bin_dir / "l0c-stage2"
     write_executable(path, render_stage2_wrapper(layout))
     if is_windows_host():
-        (layout.bin_dir / "l0c-stage2.cmd").write_text(render_stage2_cmd_wrapper(), encoding="utf-8")
+        (layout.bin_dir / "l0c-stage2.cmd").write_text(
+            render_stage2_cmd_wrapper(layout), encoding="utf-8"
+        )
     return path
 
 
@@ -717,7 +751,9 @@ def write_prefix_stage2_wrapper(layout: PrefixLayout) -> Path:
     path = layout.bin_dir / "l0c-stage2"
     write_executable(path, render_prefix_stage2_wrapper())
     if is_windows_host():
-        (layout.bin_dir / "l0c-stage2.cmd").write_text(render_stage2_cmd_wrapper(), encoding="utf-8")
+        (layout.bin_dir / "l0c-stage2.cmd").write_text(
+            render_prefix_stage2_cmd_wrapper(), encoding="utf-8"
+        )
     return path
 
 

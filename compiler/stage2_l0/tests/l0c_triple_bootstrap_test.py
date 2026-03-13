@@ -69,6 +69,14 @@ def stage2_wrapper_command(wrapper_path: Path) -> list[str]:
     return [str(wrapper_path)]
 
 
+def stage2_bootstrap_build_command() -> list[str]:
+    """Return the command used to build the repo-local bootstrap Stage 2 artifact."""
+
+    if os.name == "nt":
+        return [sys.executable, str(REPO_ROOT / "scripts" / "build_stage2_l0c.py")]
+    return ["./scripts/build-stage2-l0c.sh"]
+
+
 def first_lines(text: str, limit: int) -> str:
     """Return at most `limit` lines from `text`."""
 
@@ -157,6 +165,8 @@ def deterministic_linker_flags(compiler_text: str) -> list[str]:
     if sys.platform == "darwin":
         return ["-Wl,-no_uuid"]
     if sys.platform.startswith("linux"):
+        return ["-Wl,--build-id=none"]
+    if sys.platform == "win32":
         return ["-Wl,--build-id=none"]
     raise TripleBootstrapFailure(f"unsupported host platform for native identity check: {sys.platform}")
 
@@ -301,8 +311,29 @@ def resolve_strip_command() -> list[str] | None:
 def normalized_native_artifact(path: Path, artifact_dir: Path) -> Path:
     """Return one normalized native artifact path for byte-identity comparison."""
 
-    if not sys.platform.startswith("linux"):
+    if not sys.platform.startswith("linux") and sys.platform != "win32":
         return path
+
+    if sys.platform == "win32":
+        # MinGW-w64 strip removes PE timestamps and debug sections.
+        strip_command = resolve_strip_command()
+        if strip_command is None:
+            return path
+        normalized = artifact_dir / f"{path.name}.stripped"
+        completed = subprocess.run(
+            [*strip_command, "-o", str(normalized), str(path)],
+            cwd=REPO_ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            check=False,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
+        if completed.returncode != 0:
+            # If strip fails on Windows, fall back to raw comparison.
+            return path
+        return normalized
 
     strip_command = resolve_strip_command()
     if strip_command is None:
@@ -429,7 +460,7 @@ def main() -> int:
         notice("building compiler 1/3: trusted Stage 1 -> first Stage 2 compiler")
         _, first_build_elapsed = run_logged(
             "first_build",
-            ["./scripts/build-stage2-l0c.sh"],
+            stage2_bootstrap_build_command(),
             env=first_build_env,
             artifact_dir=artifact_dir,
         )

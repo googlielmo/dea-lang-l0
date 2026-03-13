@@ -10,10 +10,36 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 FIXTURE_ROOT="$SCRIPT_DIR/fixtures/backend_golden"
 REFRESH_SCRIPT="$REPO_ROOT/scripts/refresh_stage2_backend_goldens.py"
-ARTIFACT_DIR="$(mktemp -d /tmp/l0_stage2_codegen_tests.XXXXXX)"
+mkdir -p "$REPO_ROOT/build/tests"
+ARTIFACT_DIR="$(mktemp -d "$REPO_ROOT/build/tests/l0_stage2_codegen_tests.XXXXXX")"
 BOOTSTRAP_PARENT="$REPO_ROOT/build/tests"
 BOOTSTRAP_DIR=""
 KEEP_ARTIFACTS="${KEEP_ARTIFACTS:-0}"
+
+is_windows_host() {
+    case "$(uname -s)" in
+        CYGWIN*|MINGW*|MSYS*) return 0 ;;
+    esac
+    return 1
+}
+
+native_path() {
+    local path="$1"
+    if is_windows_host; then
+        cygpath -w "$path"
+    else
+        printf '%s\n' "$path"
+    fi
+}
+
+stage2_launcher_path() {
+    local base="$1"
+    if is_windows_host && [ -f "$base.cmd" ]; then
+        native_path "$base.cmd"
+    else
+        printf '%s\n' "$base"
+    fi
+}
 
 cleanup() {
     if [ "$KEEP_ARTIFACTS" -eq 0 ]; then
@@ -82,7 +108,7 @@ compile_generated_c() {
 normalize_text_file() {
     local src="$1"
     local dst="$2"
-    "$PYTHON_BIN" - "$src" "$dst" <<'PY'
+    "$PYTHON_BIN" - "$(native_path "$src")" "$(native_path "$dst")" <<'PY'
 from pathlib import Path
 import sys
 
@@ -101,7 +127,7 @@ PYTHON_BIN="$(resolve_python)"
 mkdir -p "$BOOTSTRAP_PARENT"
 BOOTSTRAP_DIR="$(mktemp -d "$BOOTSTRAP_PARENT/l0_stage2_codegen.XXXXXX")"
 DEA_BUILD_DIR="${BOOTSTRAP_DIR#$REPO_ROOT/}" ./scripts/build-stage2-l0c.sh >/dev/null
-STAGE2_L0C="$BOOTSTRAP_DIR/bin/l0c-stage2"
+STAGE2_L0C="$(stage2_launcher_path "$BOOTSTRAP_DIR/bin/l0c-stage2")"
 
 compiler=""
 if find "$FIXTURE_ROOT" -name '*.expected.out' -print -quit | grep -q .; then
@@ -133,7 +159,7 @@ for entry_file in "$FIXTURE_ROOT"/*/entry_module.txt; do
     normalized_expected="$ARTIFACT_DIR/${case_name}.expected.normalized.c"
     expected="$case_dir/${case_name}.golden.c"
 
-    if ! "$STAGE2_L0C" --gen --no-line-directives -P "$case_dir" "$entry_module" > "$generated"; then
+    if ! "$STAGE2_L0C" --gen --no-line-directives -P "$(native_path "$case_dir")" "$entry_module" > "$generated"; then
         echo "$case_name: GEN_FAIL" >&2
         status=1
         continue
