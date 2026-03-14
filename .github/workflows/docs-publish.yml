@@ -44,21 +44,25 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.14"
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v6
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-suffix: docs-publish-py3.14
 
       - name: Install docs and TeX toolchain
         run: |
           sudo apt-get update
           sudo apt-get install -y \
             doxygen \
+            graphviz \
             make \
             texlive-latex-recommended \
             texlive-latex-extra \
@@ -163,7 +167,7 @@ jobs:
       PAGE_URL: ${{ needs.deploy-pages.outputs.page_url }}
     steps:
       - name: Check out source repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Validate blog sync configuration
         run: |
@@ -177,7 +181,7 @@ jobs:
           fi
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.14"
 
@@ -188,7 +192,7 @@ jobs:
           path: build/docs/markdown
 
       - name: Check out blog repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: ${{ vars.BLOG_REPO }}
           ref: ${{ vars.BLOG_BRANCH || 'main' }}
