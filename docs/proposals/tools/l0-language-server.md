@@ -120,12 +120,12 @@ Pros:
 - directly reuses the existing Stage 1 compiler and semantic tables,
 - fastest route to a working diagnostics server,
 - JSON-RPC framing and message handling are straightforward,
-- low implementation risk while Stage 2 backend/self-hosting remains incomplete,
+- low implementation risk while the editor/runtime integration surface is still separate from the self-hosted compiler,
 - no need to invent a second compiler embedding boundary.
 
 Cons:
 
-- not self-hosting,
+- not implemented in L0,
 - requires Python in the editor integration environment,
 - may create some throwaway adapter code if the server later moves into L0.
 

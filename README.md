@@ -5,9 +5,9 @@
 **L0 (Level Zero)** is a small systems language that compiles to C99. It is the foundational subset and first bootstrap
 stage of the **Dea** language family.
 
-Dea employs a staged compiler bootstrapping architecture (Level 0, Level 1, ..., Level N). Once the Dea/L0 compiler is
-fully self-hosted, it will be used to compile L1. L1 will subsequently self-host to build L2, and the process will
-repeat for successive levels.
+Dea employs a staged compiler bootstrapping architecture (Level 0, Level 1, ..., Level N). Dea/L0 is now self-hosted;
+it is the compiler base that will be used to compile L1. L1 will subsequently self-host to build L2, and the process
+will repeat for successive levels.
 
 The design is conservative by choice: a small, precisely specified language whose semantics leave no room for undefined
 behavior. Operations are either well-defined or rejected - at compile time or with a named runtime error.
@@ -39,7 +39,7 @@ the rest of the semantics are enforced by L0 itself.
 
 ## Project status and directions
 
-L0 is currently at a quite exciting phase: **The Stage 2 Bootstrap**.
+L0 is currently in its first self-hosted Stage 2 phase.
 
 * Stage 1: complete and usable.
 
@@ -60,8 +60,8 @@ L0 is currently at a quite exciting phase: **The Stage 2 Bootstrap**.
 
 * Stage 2 triple-bootstrap regression: available directly via `make triple-test`.
 
-Today, Stage 2 has feature parity with Stage 1 for the analysis-oriented commands `--check`, `--type`, and `--sym`,
-and also implements deterministic `--gen` plus direct `--build` / `--run`.
+Today, Stage 2 implements `--check`, `--tok`, `--sym`, `--type`, deterministic `--gen`, and direct `--build` /
+`--run`. The remaining public CLI gap is `--ast`, which is still NYI in Stage 2.
 
 * **Built-in Observability:** Language developers need to know what memory is doing. L0 ships with native compiler flags
   to trace ARC events and allocations directly to stderr. Today these are fully usable through the Stage 1 driver and
@@ -133,23 +133,13 @@ make venv                # create or reuse local .venv; prefers uv when availabl
 For Windows-specific setup, generated launchers, MSYS2 bash usage, and native-shell (`cmd.exe` / PowerShell) usage,
 see [README-WINDOWS.md](README-WINDOWS.md).
 
-If you prefer to manage the environment manually, `uv sync --group dev --group docs` is the recommended direct command; a plain
-`python3 -m venv .venv` workflow also works.
+If you prefer to manage the environment manually, `uv sync --group dev --group docs` is the recommended direct command;
+a plain `python3 -m venv .venv` workflow also works.
 
-For a reproducible Linux test environment without changing the host toolchain, the repository also ships a root
-`Dockerfile` plus an explicit `make docker` wrapper:
+For an optional reproducible Linux test environment, use the explicit Docker wrapper:
 
 ```shell
 make docker CMD=test-all
-```
-
-This Docker workflow is opt-in. No normal `make` target shells out to Docker automatically, and the blessed command is
-the explicit wrapper above rather than `docker run` directly.
-
-If you need to force a compiler inside the container, use `DOCKER_L0_CC`, not the host-side `L0_CC`:
-
-```shell
-make docker CMD=test-all DOCKER_L0_CC=gcc
 ```
 
 For normal developer use, install the repo-local switchable `l0c` alias, choose the stage you want, and source the
@@ -200,8 +190,7 @@ l0c --version                           # print the active compiler stage identi
 ```
 
 `--help` and `--version` print the active stage identity (`Dea language / L0 compiler (Stage 1)` or
-`Dea language / L0 compiler (Stage 2)`). `-v` also emits that identity line on stderr through the normal verbose log
-path, even when the command later fails with usage such as `l0c -v`.
+`Dea language / L0 compiler (Stage 2)`). `-v` also emits that identity line through the normal verbose log path.
 
 ### Multi-module projects
 
@@ -211,28 +200,10 @@ l0c --run -P ./src -P ./lib main        # -P adds a project root to search for m
 
 The compiler resolves modules from system roots (stdlib) then project roots in order.
 
-<details>
-<summary>Environment variables</summary>
-<p>
-
-| Variable             | Default value if not set    | Purpose                                  |
-|----------------------|-----------------------------|------------------------------------------|
-| `L0_HOME`            | auto-detected*              | Compiler root                            |
-| `L0_SYSTEM`          | `$L0_HOME/shared/l0/stdlib` | Standard library roots (colon-separated) |
-| `L0_RUNTIME_INCLUDE` | `$L0_HOME/shared/runtime`   | Runtime header path                      |
-| `L0_RUNTIME_LIB`     | _(unset)_                   | Runtime library ath                      |
-| `L0_CFLAGS`          | _(unset)_                   | Extra C compiler options (prepended)     |
-| `L0_CC`              | auto-detected               | Override C compiler                      |
-
-<small>
-
-\* The default `L0_HOME` value is determined by the specific `l0c` driver script at runtime. If `./scripts/l0c` is used,
-`L0_HOME` is set to `./compiler` relative to the repository root. The same is true for repo-local stage 1 and stage 2
-artifacts built with `make install-dev-stages` and `make use-dev-stage1` / `make use-dev-stage2`. For a Stage 2-only
-install prefix, `L0_HOME` is set to the installation root.
-
-</small>
-</details>
+Environment-variable defaults and launcher-specific path behavior are documented in
+[compiler/stage2_l0/README.md](compiler/stage2_l0/README.md),
+[docs/reference/project-status.md](docs/reference/project-status.md), and
+[README-WINDOWS.md](README-WINDOWS.md).
 
 ### Examples
 
@@ -389,67 +360,10 @@ postfix `?` operator and `as` casts.
 
 ## Compiler implementation architecture
 
-Stage 1 follows a conventional pipeline: lexer → parser → semantic analysis → backend orchestrator → C99 codegen.
+Stage 1 follows a conventional pipeline from lexer to semantic analysis to C99 code generation. Stage 2 mirrors the
+same pipeline in L0 itself, with separate lexer, parser, AST, type-checking, backend, and driver modules.
 
-The generated C includes a small, trusted, header-only C kernel that encapsulates all platform-specific behavior.
-
-Stage 2 follows the same high-level pipeline with a more modular implementation in L0 itself. The lexer, parser, AST,
-name resolution, type checking, backend, and C emitter are separate components with well-defined interfaces.
-Current Stage 2 implements the analysis/dump modes, deterministic `--gen`, and direct `--build` / `--run`.
-
-For normal development, pick which compiler `l0c` should refer to:
-
-```shell
-make install-dev-stages
-make use-dev-stage1      # switch `l0c` to Stage 1
-# or: make use-dev-stage2
-source build/dea/bin/l0-env.sh
-```
-
-You can also bootstrap a repo-local Stage 2 compiler artifact directly:
-
-```shell
-./scripts/build-stage2-l0c.sh
-./build/dea/bin/l0c-stage2 --check -P examples hello
-./build/dea/bin/l0c-stage2 --gen -P examples hello
-./build/dea/bin/l0c-stage2 --build -P examples hello
-./build/dea/bin/l0c-stage2 --run -P examples hello
-```
-
-For a repo-independent Stage 2-only install prefix:
-
-```shell
-make PREFIX=/tmp/l0-install install
-source /tmp/l0-install/bin/l0-env.sh
-l0c --check -P examples hello
-```
-
-For the strict Stage 2 triple-bootstrap regression:
-
-```shell
-make DEA_BUILD_DIR=build/dev-dea triple-test
-```
-
-The Stage 2 test Make targets are self-contained repo-local workflows: they ensure `./.venv`, prepare the Stage 2
-artifact under `DEA_BUILD_DIR`, and scrub installed-prefix `L0_*` env leakage before running.
-
-For a repo-local developer workflow with a switchable `l0c` alias:
-
-```shell
-make install-dev-stages
-make use-dev-stage1      # switch `l0c` to Stage 1
-# or: make use-dev-stage2
-source build/dea/bin/l0-env.sh
-l0c --check -P examples hello
-```
-
-`DEA_BUILD_DIR` may be overridden, but it must stay inside the repository. For example:
-
-```shell
-make DEA_BUILD_DIR=build/dev-dea install-dev-stages
-make DEA_BUILD_DIR=build/dev-dea use-dev-stage2
-source build/dev-dea/bin/l0-env.sh
-```
+For the full compiler workflow, bootstrap/install layout, test targets, and current Stage 2 command surface, use:
 
 References:
 
@@ -461,35 +375,8 @@ References:
 ## CLI
 
 The recommended developer-facing CLI is `l0c` after selecting a stage with `make use-dev-stage1` or
-`make use-dev-stage2` and sourcing `build/dea/bin/l0-env.sh`.
-
-The source-tree `./scripts/l0c` wrapper is Stage 1 only. It remains useful for bootstrap mechanics, internal tooling,
-and Stage 1-focused testing, but it is not the recommended general developer entrypoint.
-
-To set up the switchable repo-local `l0c` alias:
-
-```shell
-make install-dev-stages
-make use-dev-stage1      # or `make use-dev-stage2`
-source build/dea/bin/l0-env.sh
-```
-
-Today:
-
-- `l0c` after `make use-dev-stage1` points at `build/dea/bin/l0c-stage1`.
-- `l0c` after `make use-dev-stage2` points at `build/dea/bin/l0c-stage2`.
-- `make PREFIX=/tmp/l0-install install` installs a separate Stage 2-only `l0c` under `/tmp/l0-install/bin`.
-- `./scripts/l0c` always runs the source-tree Stage 1 wrapper directly.
-- Stage 2 currently implements analysis/dump modes plus `--gen`, `--build`, and `--run`.
-
-For direct Stage 2 artifact usage from a repo checkout:
-
-```shell
-./scripts/build-stage2-l0c.sh
-./build/dea/bin/l0c-stage2 --check -P examples hello
-./build/dea/bin/l0c-stage2 --build -P examples hello
-./build/dea/bin/l0c-stage2 --run -P examples hello
-```
+`make use-dev-stage2` and sourcing `build/dea/bin/l0-env.sh`. The source-tree `./scripts/l0c` wrapper is Stage 1 only
+and remains useful mainly for bootstrap mechanics and Stage 1-focused testing.
 
 ```shell
 l0c [mode] [options] <target>
@@ -499,16 +386,16 @@ l0c [mode] [options] <target>
 
 Global identity and logging options include `--help`, `--version`, `-v/--verbose`, and `-l/--log`.
 
-| Mode           | Action                      |
-|----------------|-----------------------------|
-| `--build`      | Compile to binary (default) |
-| `--run` / `-r` | Compile and execute         |
-| `--gen` / `-g` | Emit C99                    |
-| `--check`      | Analyze only                |
-| `--ast`        | Dump AST                    |
-| `--sym`        | Dump module symbols         |
-| `--type`       | Dump resolved types         |
-| `--tok`        | Dump token stream           |
+| Mode           | Action                          |
+|----------------|---------------------------------|
+| `--build`      | Compile to binary (default)     |
+| `--run` / `-r` | Compile and execute             |
+| `--gen` / `-g` | Emit C99                        |
+| `--check`      | Analyze only                    |
+| `--ast`        | Dump AST (Stage 1; Stage 2 NYI) |
+| `--sym`        | Dump module symbols             |
+| `--type`       | Dump resolved types             |
+| `--tok`        | Dump token stream               |
 
 ```shell
 l0c --build --keep-c hello.l0             # retain the generated C
@@ -518,6 +405,10 @@ l0c -c clang -C "-Og -DDEBUG" hello.l0    # use a specific C compiler with custo
 ```
 
 Trace output contract: [docs/specs/runtime/trace.md](docs/specs/runtime/trace.md).
+
+Detailed CLI identity, version, verbose, and stage-specific workflow behavior is tracked in
+[docs/plans/features/2026-03-12-shared-cli-contract-spec.md](docs/plans/features/2026-03-12-shared-cli-contract-spec.md)
+until the shared CLI spec is split out under `docs/specs/`.
 
 ## Project status
 

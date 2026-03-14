@@ -1,6 +1,6 @@
 # L0 Project Status
 
-Version: 2026-03-13
+Version: 2026-03-14
 
 This document summarizes what is implemented in this repository today and what remains open.
 
@@ -150,7 +150,8 @@ Current std/sys modules in tree:
 
 ## Stage 2 Compiler (L0-in-L0) - Current State
 
-Stage 2 lives in `compiler/stage2_l0` and is in active development.
+Stage 2 lives in `compiler/stage2_l0` and is now self-hosted, with ongoing parity and documentation work around the
+current public surface.
 
 Current implemented assets:
 
@@ -264,7 +265,9 @@ These remain true in Stage 1:
 
 Current Stage 2 limitations:
 
-1. Some language constraints intentionally remain staged in parser diagnostics (for example, array types and
+1. Stage 2 `l0c --ast` is still NYI; the implemented public CLI modes are `--check`, `--tok`, `--sym`, `--type`,
+   `--gen`, `--build`, and `--run`.
+2. Some language constraints intentionally remain staged in parser diagnostics (for example, array types and
    bitwise/shift operators).
 
 ## Short Roadmap

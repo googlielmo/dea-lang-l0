@@ -1,9 +1,10 @@
 # Stage 2 Dea/L0 Language Compiler
 
-This directory contains the Stage 2 compiler for the L0 programming language, currently in development.
+This directory contains the self-hosted Stage 2 compiler for the L0 programming language.
 It includes source code, tests, and utilities for the compiler and its runtime traces.
 
 Like the Stage 1 compiler, it compiles L0 source code to C99, but is itself implemented in L0.
+The main remaining user-facing CLI gap is `--ast`, which is still not implemented in Stage 2.
 
 ## Bootstrap artifact
 
@@ -22,8 +23,8 @@ Optional builder environment variables:
 - `DEA_BUILD_DIR=build/dea-alt` writes the same artifact layout under a different repo-local output root.
 - `KEEP_C=1` retains `l0c-stage2.c` alongside the wrapper and native binary.
 
-Phase 1 `DEA_BUILD_DIR` values must resolve to a strict subdirectory inside the repository. The generated launcher derives
-the repo root relative to itself and sets `L0_HOME` automatically when unset.
+`DEA_BUILD_DIR` values must resolve to a subdirectory inside the repository. The generated launcher derives the repo
+root relative to itself and sets `L0_HOME` automatically when unset.
 
 ## Repo-local Dea build workflow
 
@@ -32,15 +33,16 @@ point at:
 
 ```bash
 make install-dev-stages
-make use-dev-stage1      # or: make use-dev-stage2
+make use-dev-stage2      # or: make use-dev-stage1
 source build/dea/bin/l0-env.sh
 l0c --check -P examples hello
 l0c --version
 ```
 
-The generated `build/dea/bin/l0-env.sh` keeps `L0_HOME` repo-relative, activates `.venv` if present, prepends `build/dea/bin`
-to `PATH`, and leaves `L0_SYSTEM` unset. `make use-dev-stage2` switches `build/dea/bin/l0c` and prints the exact `source`
-command to run next. `DEA_BUILD_DIR` may be overridden, but it must remain inside the repository.
+The generated `build/dea/bin/l0-env.sh` keeps `L0_HOME` repo-relative, activates `.venv` if present, prepends
+`build/dea/bin` to `PATH`, and leaves `L0_SYSTEM` unset.
+
+The `make use-*` targets switch `build/dea/bin/l0c` and print the `source` command to run next.
 
 ## Install prefix
 
@@ -67,21 +69,11 @@ initial Stage 1-built artifact. The installed prefix contains:
 The installed wrapper derives `L0_HOME` from `PREFIX` at runtime. The installed `l0-env.sh` sets `L0_HOME="$PREFIX"`
 only; the compiler then derives stdlib and runtime defaults from `L0_HOME` unless you explicitly override them.
 
-The Stage 2 CLI also supports `--help` and `--version`.
-
-- `--help` stays on the static Stage 2 identity text `Dea language / L0 compiler (Stage 2)`.
-- `--version` prints the same first line plus embedded build provenance for repo-local and install-prefix artifacts built
-  through `./scripts/build-stage2-l0c.sh`, `make install-dev-stage2`, `make install-dev-stages`, and `make install`.
-  The report uses `build:`, `build time:`, `commit:`, `host:`, and `compiler:` lines.
-- `commit:` appends `+dirty` only when the repository tree was dirty at build time.
-- `build time:` is rendered in UTC as `YYYY-MM-DD HH:MM:SS+00:00`.
-- `host:` is the compact kernel triplet from `uname -s`, `uname -r`, and `uname -m`.
-- `compiler:` is the first line of `<compiler> --version`; the compiler command itself is not printed separately.
-- Direct `l0c-stage2.native --version` works the same way because the provenance is compiled into the binary itself.
-- Verbose mode (`-v`) still emits only the static identity line on stderr through the normal info-level log path,
-  including CLI usage failures such as `l0c -v` without a target.
-- Raw self-hosted compiler 2 / compiler 3 binaries in the strict triple-bootstrap regression intentionally remain on
-  the static fallback `--version` output so bootstrap identity stays byte-stable.
+The Stage 2 CLI also supports `--help`, `--version`, and `-v`.
+Built repo-local and installed Stage 2 artifacts embed extra `--version` provenance, while raw compiler 2 / compiler 3
+triple-bootstrap artifacts intentionally stay on the fallback identity-only path.
+The detailed identity/version/verbose contract is tracked in
+`docs/plans/features/2026-03-12-shared-cli-contract-spec.md`.
 
 The source-tree `./scripts/l0c` entrypoint is Stage 1 only and is mainly useful for bootstrap mechanics, internal
 tooling, and Stage 1-focused testing.
