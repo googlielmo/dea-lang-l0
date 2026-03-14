@@ -48,7 +48,7 @@ help:
 		'  use-dev-stage2     Switch the repo-local `l0c` alias to Stage 2.' \
 		'  test-all           Run the full Stage 1 and Stage 2 validation suite.' \
 		'  test-stage1        Validate the Stage 1 Python compiler test suite.' \
-		'  test-stage2        Validate the Stage 2 compiler test suite, including triple-bootstrap.' \
+		'  test-stage2        Validate the Stage 2 compiler test suite; pass TESTS="name1 name2" to run selected cases.' \
 		'  test-stage2-trace  Validate Stage 2 ARC and memory tracing behavior.' \
 		'  triple-test        Run the Stage 2 triple-bootstrap check on its own.' \
 		'' \
@@ -70,6 +70,9 @@ help:
 		'  DEA_BUILD_DIR=build/dea' \
 		'                     Repo-local build root. Must stay inside the repository.' \
 		'                     Example: make DEA_BUILD_DIR=build/dev-dea install-dev-stages' \
+		'  TESTS=""' \
+		'                     Optional Stage 2 test names for `test-stage2`; blank runs the full suite.' \
+		'                     Example: make test-stage2 TESTS="driver_test l0c_build_run_test"' \
 		'  DOCKER_IMAGE=l0-test' \
 		'                     Docker image tag used by `make docker`.' \
 		'  DOCKER_L0_CC=<compiler>' \
@@ -123,7 +126,7 @@ use-dev-stage1: install-dev-stage1
 	$(PYTHON) ./scripts/gen_dist_tools.py set-alias --dea-build-dir "$(DEA_BUILD_DIR)" --stage stage1
 	@printf '\n------------------------------------------------------------------------------\n'
 ifeq ($(OS),Windows_NT)
-	@printf 'To activate the selected l0c stage in this shell:\n\nIn an MSYS2 bash shell:\n\n    source %s/bin/l0-env.sh\n\nIn CMD:\n\n    set "PATH=%%cd%%\\%s\\bin;%%PATH%%"\n\nThis adds %s/bin to your current PATH, so `l0c` invokes the selected compiler. See README.md for more information.' "$(DEA_BUILD_DIR)" "$(DEA_BUILD_DIR)" "$(DEA_BUILD_DIR)"
+	@printf 'To use the repo-local Stage 1 compiler on Windows:\n\nIn an MSYS2 bash shell:\n\n    source %s/bin/l0-env.sh\n\nIn CMD:\n\n    %%cd%%\\scripts\\l0c.cmd --help\n\nIn PowerShell:\n\n    & "$$PWD\\scripts\\l0c.cmd" --help\n\nThe repo-local `l0c` alias under %s/bin is Bash-only for Stage 1 today. Use `scripts\\l0c.cmd` in native Windows shells. See README-WINDOWS.md for more information.' "$(DEA_BUILD_DIR)" "$(DEA_BUILD_DIR)"
 else
 	@printf 'To activate the selected l0c stage in this shell, run:\n\n    source %s/bin/l0-env.sh\n\nThis adds %s/bin to your current PATH, so `l0c` invokes the selected compiler. See README.md for more information.' "$(DEA_BUILD_DIR)" "$(DEA_BUILD_DIR)"
 endif
@@ -143,7 +146,7 @@ test-stage1: venv
 	"$(VENV_PYTHON)" -m pytest -n auto
 
 test-stage2: venv install-dev-stage2
-	DEA_BUILD_DIR="$(DEA_BUILD_DIR)" "$(VENV_PYTHON)" ./compiler/stage2_l0/run_tests.py
+	DEA_BUILD_DIR="$(DEA_BUILD_DIR)" "$(VENV_PYTHON)" ./compiler/stage2_l0/run_tests.py $(TESTS)
 
 test-stage2-trace: venv install-dev-stage2
 	DEA_BUILD_DIR="$(DEA_BUILD_DIR)" "$(VENV_PYTHON)" ./compiler/stage2_l0/run_trace_tests.py

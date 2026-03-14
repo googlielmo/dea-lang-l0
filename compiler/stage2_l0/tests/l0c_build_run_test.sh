@@ -21,6 +21,29 @@ is_windows_host() {
     return 1
 }
 
+prepare_windows_runtime_bin() {
+    local dst="$1"
+    local compiler_path=""
+    local toolchain_bin=""
+
+    if ! is_windows_host; then
+        return 0
+    fi
+
+    for candidate in gcc clang cc tcc; do
+        if compiler_path="$(command -v "$candidate" 2>/dev/null)"; then
+            toolchain_bin="$(dirname "$compiler_path")"
+            break
+        fi
+    done
+
+    [ -n "$toolchain_bin" ] || fail "expected a host C compiler on PATH while preparing Windows runtime DLLs"
+
+    # Keep only runtime DLLs available so the native launcher still starts after
+    # we hide the toolchain executables from PATH for the no-compiler probe.
+    cp "$toolchain_bin"/*.dll "$dst"/ 2>/dev/null || true
+}
+
 native_path() {
     local path="$1"
     if is_windows_host; then
@@ -36,6 +59,16 @@ stage2_launcher_path() {
         native_path "$base.cmd"
     else
         printf '%s\n' "$base"
+    fi
+}
+
+normalize_diff_input() {
+    local src="$1"
+    local dst="$2"
+    if is_windows_host; then
+        tr -d '\r' <"$src" >"$dst"
+    else
+        cp "$src" "$dst"
     fi
 }
 
@@ -80,6 +113,45 @@ assert_text_equals() {
     [ "$actual" = "$expected" ] || fail "unexpected content in $path"
 }
 
+dump_text_file() {
+    local path="$1"
+    if [ -f "$path" ]; then
+        echo "l0c_build_run_test: ----- $path -----" >&2
+        sed -n '1,200p' "$path" >&2 || true
+    else
+        echo "l0c_build_run_test: missing file for debug dump: $path" >&2
+    fi
+}
+
+debug_no_cc_probe() {
+    local isolated_bin="$WORK_DIR/empty-bin"
+
+    echo "l0c_build_run_test: no-compiler probe diagnostics:" >&2
+    echo "l0c_build_run_test: stage2_native=$STAGE2_NATIVE" >&2
+    echo "l0c_build_run_test: isolated_bin=$isolated_bin" >&2
+    if [ -d "$isolated_bin" ]; then
+        echo "l0c_build_run_test: isolated bin listing:" >&2
+        ls -la "$isolated_bin" >&2 || true
+    fi
+
+    if is_windows_host; then
+        echo "l0c_build_run_test: SYSTEMROOT=${SYSTEMROOT:-}" >&2
+        echo "l0c_build_run_test: COMSPEC=${COMSPEC:-}" >&2
+        echo "l0c_build_run_test: WINDIR=${WINDIR:-}" >&2
+        echo "l0c_build_run_test: OS=${OS:-}" >&2
+        echo "l0c_build_run_test: copied runtime DLLs:" >&2
+        find "$isolated_bin" -maxdepth 1 -name '*.dll' -print >&2 || true
+        if command -v where.exe >/dev/null 2>&1; then
+            for candidate in gcc clang cc tcc; do
+                echo "l0c_build_run_test: where.exe $candidate" >&2
+                env -u L0_CC -u CC -u Path PATH="$isolated_bin" SYSTEMROOT="${SYSTEMROOT:-}" COMSPEC="${COMSPEC:-}" WINDIR="${WINDIR:-}" OS="${OS:-}" where.exe "$candidate" >&2 || true
+            done
+        fi
+    fi
+
+    dump_text_file "$WORK_DIR/no_cc.log"
+}
+
 cd "$REPO_ROOT"
 mkdir -p "$BOOTSTRAP_PARENT"
 BOOTSTRAP_DIR="$(mktemp -d "$BOOTSTRAP_PARENT/l0_stage2_buildrun.XXXXXX")"
@@ -106,13 +178,16 @@ two words
 rock'n'roll
 EOF
 tail -n 3 "$WORK_DIR/argv.out" >"$WORK_DIR/argv.tail"
-if ! diff -u "$WORK_DIR/argv.expected" "$WORK_DIR/argv.tail" >"$WORK_DIR/argv.diff"; then
+normalize_diff_input "$WORK_DIR/argv.tail" "$WORK_DIR/argv.tail.normalized"
+if ! diff -u "$WORK_DIR/argv.expected" "$WORK_DIR/argv.tail.normalized" >"$WORK_DIR/argv.diff"; then
     echo "l0c_build_run_test: argv diff:" >&2
     cat "$WORK_DIR/argv.diff" >&2
     echo "l0c_build_run_test: argv raw output (sed -n l):" >&2
     sed -n 'l' "$WORK_DIR/argv.out" >&2
     echo "l0c_build_run_test: argv tail raw output (sed -n l):" >&2
     sed -n 'l' "$WORK_DIR/argv.tail" >&2
+    echo "l0c_build_run_test: argv normalized tail (sed -n l):" >&2
+    sed -n 'l' "$WORK_DIR/argv.tail.normalized" >&2
     echo "l0c_build_run_test: argv tail bytes (od -An -tx1 -c):" >&2
     od -An -tx1 -c "$WORK_DIR/argv.tail" >&2
     fail "argv forwarding output mismatch"
@@ -139,10 +214,28 @@ assert_contains "$WORK_DIR/run_warn.log" "L0C-0017"
 assert_no_file "$WORK_DIR/ignored-output"
 
 mkdir "$WORK_DIR/empty-bin"
-if env -u L0_CC -u CC PATH="$WORK_DIR/empty-bin" "$STAGE2_NATIVE" --build -P "$(native_path "$FIXTURE_ROOT")" ok_main >"$WORK_DIR/no_cc.log" 2>&1; then
-    fail "expected no-compiler build to fail"
+prepare_windows_runtime_bin "$WORK_DIR/empty-bin"
+# On Windows runners, the inherited environment may expose the search path as `Path`
+# even when this shell only mutates `PATH`. Clear both spellings before probing the
+# native launcher so the no-compiler branch is exercised reliably. On Windows we
+# preserve SYSTEMROOT/COMSPEC/WINDIR/OS and copy only runtime DLLs into the empty
+# PATH directory so the native executable still starts without exposing compiler
+# executables to `where.exe`.
+if is_windows_host; then
+    if env -u L0_CC -u CC -u Path PATH="$WORK_DIR/empty-bin" SYSTEMROOT="${SYSTEMROOT:-}" COMSPEC="${COMSPEC:-}" WINDIR="${WINDIR:-}" OS="${OS:-}" "$STAGE2_NATIVE" --build -P "$(native_path "$FIXTURE_ROOT")" ok_main >"$WORK_DIR/no_cc.log" 2>&1; then
+        debug_no_cc_probe
+        fail "expected no-compiler build to fail"
+    fi
+else
+    if env -u L0_CC -u CC -u Path PATH="$WORK_DIR/empty-bin" "$STAGE2_NATIVE" --build -P "$(native_path "$FIXTURE_ROOT")" ok_main >"$WORK_DIR/no_cc.log" 2>&1; then
+        debug_no_cc_probe
+        fail "expected no-compiler build to fail"
+    fi
 fi
-assert_contains "$WORK_DIR/no_cc.log" "L0C-0009"
+if ! grep -F "L0C-0009" "$WORK_DIR/no_cc.log" >/dev/null; then
+    debug_no_cc_probe
+    fail "expected 'L0C-0009' in $WORK_DIR/no_cc.log"
+fi
 
 if "$STAGE2_L0C" --build --c-compiler false -P "$(native_path "$FIXTURE_ROOT")" ok_main >"$WORK_DIR/compile_fail.log" 2>&1; then
     fail "expected explicit failing compiler to fail"

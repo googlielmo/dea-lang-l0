@@ -11,7 +11,7 @@
 - Subsystem: Build workflow / CI
 - Modules:
     - `.github/workflows/ci.yml`
-    - `docs/plans/features/2026-03-11-windows-build-support.md`
+    - `docs/plans/features/closed/2026-03-11-windows-build-support.md`
 - Test modules:
     - `Makefile`
     - `compiler/stage1_py/tests/`
@@ -98,6 +98,6 @@ extension of `.github/workflows/ci.yml`.
 
 ## Related Documents
 
-- [Windows build support](../2026-03-11-windows-build-support.md)
+- [Windows build support](2026-03-11-windows-build-support.md)
 - [Project status](../../../reference/project-status.md)
 - [Architecture](../../../reference/architecture.md)

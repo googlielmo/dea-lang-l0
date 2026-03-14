@@ -3,7 +3,7 @@
 ## Windows Build Support
 
 - Date: 2026-03-11
-- Status: Draft
+- Status: Closed (implemented)
 - Title: Windows Build Support (MinGW-w64 Tier 1, MSVC Tier 2)
 - Kind: Feature
 - Severity: Medium
@@ -25,14 +25,11 @@
 
 ## Summary
 
-L0 currently builds and runs exclusively on POSIX systems (macOS, Linux). While the Python code is largely
-cross-platform (`pathlib`, `shutil.which`, `subprocess` without `shell=True`), several shell scripts and hardcoded
-assumptions block Windows support. The C runtime (`l0_runtime.h`) already has `_WIN32` guards and MSVC flag handling
-exists in the driver.
+This plan is closed. Windows build and test support landed with **MinGW-w64 as Tier 1** under MSYS2 `MINGW64`, while
+`MSVC` remains partial/Tier 2 support with compiler-family handling but no equivalent CI validation path.
 
-This plan adds Windows build support using **MinGW-w64 as Tier 1** (GCC flags, GNU Make, MSYS2 bash all work
-unchanged) and **MSVC as Tier 2** (basic flag-family support exists, full native link-model support deferred). Linux CI validation now lands
-first via `.github/workflows/ci.yml`; Windows runner validation remains a follow-up extension of that workflow.
+The implemented work covered the source-tree Stage 1 fallback launcher, Windows-aware Stage 1 and Stage 2 build/run
+behavior, Stage 2 shell-test bash detection, and GitHub Actions Windows CI alongside the Linux workflow.
 
 ## Goals
 
@@ -70,23 +67,23 @@ The following already work or have Windows code paths:
 
 ## Blockers
 
-| Blocker                          | Location               | Fix                                                       |
-|----------------------------------|------------------------|-----------------------------------------------------------|
-| `l0c` is a bash script           | `./scripts/l0c`        | Python `console_scripts` entry point + `scripts/l0c.cmd` fallback |
-| `l0-env.sh` is bash/zsh only     | `./l0-env.sh`          | Out of scope — env setup via Makefile or manual           |
-| `build-stage2-l0c.sh` is bash    | `scripts/`             | Runs via MSYS2 bash from MinGW-w64; no rewrite needed     |
-| `gen-docs.sh` is bash            | `scripts/`             | Out of scope — docs build stays Linux/macOS-only          |
-| `l0c-stage2` is a POSIX launcher | `build/dea/bin/`       | Generate `.cmd` launcher alongside on Windows             |
-| Default output `a.out`           | `l0c.py`               | Use `a.exe` on Windows                                    |
-| Temp exe has no `.exe` suffix    | `l0c.py`               | Add `.exe` suffix on Windows                              |
-| Output flag for MSVC            | `l0c.py`, `build_driver.l0` | Use `/Fe:` for MSVC (Tier 2, prep only)              |
-| `-L`/`-l` for runtime lib        | `l0c.py`               | Use MSVC link syntax (Tier 2, prep only)                  |
-| Test fixture hardcodes GCC flags | `conftest.py`          | Make flag selection family-aware                          |
-| Shell test scripts (`.sh`)       | `stage2_l0/tests/*.sh` | Skip when bash not available                              |
-| Stage 2 POSIX shell quoting      | `build_driver.l0`      | Add Windows quoting path                                  |
-| `command -v` probe in Stage 2    | `build_driver.l0`      | Use `where.exe` on Windows                                |
-| `Makefile` targets use shell     | `Makefile` (upcoming)  | GNU Make from MinGW-w64 + MSYS2 bash                      |
-| CI is Linux-only today           | `.github/workflows/`   | Extend `ci.yml` with a Windows job or matrix              |
+| Blocker                          | Location                    | Fix                                                               |
+|----------------------------------|-----------------------------|-------------------------------------------------------------------|
+| `l0c` is a bash script           | `./scripts/l0c`             | Python `console_scripts` entry point + `scripts/l0c.cmd` fallback |
+| `l0-env.sh` is bash/zsh only     | `./l0-env.sh`               | Out of scope — env setup via Makefile or manual                   |
+| `build-stage2-l0c.sh` is bash    | `scripts/`                  | Runs via MSYS2 bash from MinGW-w64; no rewrite needed             |
+| `gen-docs.sh` is bash            | `scripts/`                  | Out of scope — docs build stays Linux/macOS-only                  |
+| `l0c-stage2` is a POSIX launcher | `build/dea/bin/`            | Generate `.cmd` launcher alongside on Windows                     |
+| Default output `a.out`           | `l0c.py`                    | Use `a.exe` on Windows                                            |
+| Temp exe has no `.exe` suffix    | `l0c.py`                    | Add `.exe` suffix on Windows                                      |
+| Output flag for MSVC             | `l0c.py`, `build_driver.l0` | Use `/Fe:` for MSVC (Tier 2, prep only)                           |
+| `-L`/`-l` for runtime lib        | `l0c.py`                    | Use MSVC link syntax (Tier 2, prep only)                          |
+| Test fixture hardcodes GCC flags | `conftest.py`               | Make flag selection family-aware                                  |
+| Shell test scripts (`.sh`)       | `stage2_l0/tests/*.sh`      | Skip when bash not available                                      |
+| Stage 2 POSIX shell quoting      | `build_driver.l0`           | Add Windows quoting path                                          |
+| `command -v` probe in Stage 2    | `build_driver.l0`           | Use `where.exe` on Windows                                        |
+| `Makefile` targets use shell     | `Makefile` (upcoming)       | GNU Make from MinGW-w64 + MSYS2 bash                              |
+| CI is Linux-only today           | `.github/workflows/`        | Extend `ci.yml` with a Windows job or matrix                      |
 
 ## Implementation Phases
 
@@ -113,7 +110,8 @@ Replace the bash `l0c` wrapper with a cross-platform Python entry point.
    Keep it under `scripts/`, not the repo root: the root-level `l0c` name previously caused confusion with the
    selected repo-local or installed `l0c` command, so the source-tree fallback should stay alongside `scripts/l0c`.
 
-**Validation:** `./scripts/l0c -P examples --check hello` works on POSIX, and `scripts\l0c.cmd -P examples --check hello`
+**Validation:** `./scripts/l0c -P examples --check hello` works on POSIX, and
+`scripts\l0c.cmd -P examples --check hello`
 works on Windows.
 
 ### Phase 2: Platform-Aware Executable Naming

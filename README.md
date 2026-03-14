@@ -130,6 +130,9 @@ Clone this repository and `cd` into it. Then create a virtual environment and in
 make venv                # create or reuse local .venv; prefers uv when available
 ```
 
+For Windows-specific setup, generated launchers, MSYS2 bash usage, and native-shell (`cmd.exe` / PowerShell) usage,
+see [README-WINDOWS.md](README-WINDOWS.md).
+
 If you prefer to manage the environment manually, `uv sync --group dev --group docs` is the recommended direct command; a plain
 `python3 -m venv .venv` workflow also works.
 

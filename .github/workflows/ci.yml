@@ -29,15 +29,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.14"
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v6
+        uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
           cache-suffix: linux-py3.14
@@ -70,19 +70,30 @@ jobs:
           L0_CC: ${{ steps.select-cc.outputs.value }}
         run: make ${{ steps.select-make-target.outputs.value }}
 
+      - name: Upload workdir artifact
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: workdir-${{ runner.os }}
+          path: |
+            .
+            !.git/**
+          if-no-files-found: warn
+          retention-days: 2
+
   test-all-windows:
     runs-on: windows-latest
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.14"
 
       - name: Set up MSYS2 MinGW-w64 toolchain
-        uses: msys2/setup-msys2@v2
+        uses: msys2/setup-msys2@v2 # Still on Node 20 upstream; watch for updates.
         with:
           msystem: MINGW64
           path-type: inherit
@@ -91,7 +102,7 @@ jobs:
             mingw-w64-x86_64-gcc
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v6
+        uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
           cache-suffix: windows-py3.14
@@ -111,3 +122,14 @@ jobs:
         env:
           L0_CC: gcc
         run: make ${{ steps.select-make-target.outputs.value }}
+
+      - name: Upload workdir artifact
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: workdir-${{ runner.os }}
+          path: |
+            .
+            !.git/**
+          if-no-files-found: warn
+          retention-days: 2

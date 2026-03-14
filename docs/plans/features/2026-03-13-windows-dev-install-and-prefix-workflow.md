@@ -23,29 +23,31 @@
 
 ## Summary
 
-Windows build and test support is now far enough along that `make install-dev-stage2` and `make install` can produce
-usable Stage 2 binaries under MSYS2/MinGW-w64. That is not yet the same as a complete Windows developer workflow.
+Windows build and test support is now far enough along that `make install-dev-stage2`, `make use-dev-stage2`, and
+`make install` all produce usable Stage 2 launchers under MSYS2/MinGW-w64 and native Windows shells. That still does
+not provide a complete Windows developer workflow.
 
-The current gaps are all around activation and selected-command UX:
+The remaining gaps are narrower and mostly around activation parity and Stage 1 ergonomics:
 
-1. Repo-local and install-prefix environment activation still assumes `source .../l0-env.sh`.
-2. The selected `l0c` command is still modeled as a POSIX-style symlink, which is not a reliable Windows-native
-   workflow.
-3. `install-dev-*` and `install` produce Windows-capable stage wrappers, but the Makefile help text, activation
-   guidance, and validation flow still describe only the POSIX shell path.
+1. Repo-local and install-prefix activation still rely on manual `PATH` updates outside MSYS2/bash because only
+   `l0-env.sh` is generated today.
+2. Repo-local Stage 1 still lacks a matching `build/.../bin/l0c.cmd`, so native shells must use `scripts\\l0c.cmd`
+   instead of the selected alias.
+3. Windows CI validates the main workflow, but it does not yet exercise a dedicated native-shell activation artifact
+   such as `l0-env.cmd` or `l0-env.ps1`.
 
 This follow-up plan makes the generated tool layout and Makefile workflow usable on Windows as a development and
 installation surface, not just as a CI/bootstrap substrate.
 
 ## Goals
 
-1. `make install-dev-stage1` and `make install-dev-stage2` produce a repo-local tool layout that is directly usable on
-   Windows.
-2. `make use-dev-stage1` and `make use-dev-stage2` select the active `l0c` command on Windows without relying on POSIX
-   symlink behavior.
-3. `make install PREFIX=...` produces an installed prefix with a Windows-native `l0c` entrypoint and activation path.
-4. Windows users have a documented activation story for both MSYS2 bash and native shells.
-5. Windows CI can exercise at least one dev-install or install-prefix workflow target directly.
+1. Repo-local and install-prefix workflows expose a Windows-native activation helper instead of requiring manual `PATH`
+   edits outside MSYS2/bash.
+2. Repo-local Stage 1 gains a native-shell path with parity closer to the Stage 2 `l0c.cmd` alias flow.
+3. `make install PREFIX=...` keeps its working installed `l0c.cmd` entrypoint while gaining the same activation helper
+   story.
+4. Windows users keep a documented activation story for both MSYS2 bash and native shells.
+5. Windows CI exercises at least one workflow path that consumes the generated native-shell activation artifacts.
 
 ## Non-Goals
 
@@ -58,9 +60,12 @@ installation surface, not just as a CI/bootstrap substrate.
 
 - Repo-local Stage 2 wrapper generation already writes `l0c-stage2.cmd` on Windows.
 - Install-prefix Stage 2 wrapper generation already writes `l0c-stage2.cmd` on Windows.
+- `make use-dev-stage2` already writes both `l0c` and `l0c.cmd` for the selected repo-local Stage 2 alias.
+- `make install PREFIX=...` already installs both `l0c` and `l0c.cmd` for the selected Stage 2 compiler.
 - Repo-local and install-prefix activation still only generate `l0-env.sh`.
-- Alias selection still uses sibling-relative symlinks for `l0c`.
-- The Makefile still tells users to `source .../l0-env.sh` after `use-dev-stage1`, `use-dev-stage2`, and `install`.
+- Repo-local Stage 1 still has no generated `build/.../bin/l0c.cmd`; native shells must use `scripts\\l0c.cmd`.
+- The Makefile already prints Windows guidance for `use-dev-stage1`, `use-dev-stage2`, and `install`, but the native
+  path still relies on manual `PATH` setup instead of a generated activation helper.
 
 ## Implementation
 
@@ -69,10 +74,10 @@ installation surface, not just as a CI/bootstrap substrate.
 Document the intended Windows behavior before changing the generators:
 
 1. Repo-local build roots under `DEA_BUILD_DIR/bin/` should expose:
-   - stage-specific wrappers (`l0c-stage1`, `l0c-stage2`, plus `.cmd` companions on Windows)
-   - one selected `l0c` command that works on Windows
-   - one Windows-native activation path for `cmd.exe`
-   - optionally one Windows-native activation path for PowerShell
+    - stage-specific wrappers (`l0c-stage1`, `l0c-stage2`, plus `.cmd` companions on Windows)
+    - one selected `l0c` command that works on Windows
+    - one Windows-native activation path for `cmd.exe`
+    - optionally one Windows-native activation path for PowerShell
 2. Installed prefixes under `PREFIX/bin/` should expose the same shape for the selected Stage 2 compiler.
 3. The Windows-native workflow should not require `source .../l0-env.sh` outside MSYS2/bash.
 
@@ -98,11 +103,11 @@ Extend `scripts/dist_tools_lib.py` and `scripts/gen_dist_tools.py` to emit Windo
 Expected outputs:
 
 1. Repo-local build:
-   - `bin/l0-env.cmd`
-   - optionally `bin/l0-env.ps1`
+    - `bin/l0-env.cmd`
+    - optionally `bin/l0-env.ps1`
 2. Install prefix:
-   - `bin/l0-env.cmd`
-   - optionally `bin/l0-env.ps1`
+    - `bin/l0-env.cmd`
+    - optionally `bin/l0-env.ps1`
 
 Expected behavior:
 
@@ -117,11 +122,11 @@ Update `Makefile` so help text and post-target guidance match the host workflow.
 
 Required changes:
 
-1. `install`, `use-dev-stage1`, and `use-dev-stage2` should print Windows instructions when the host is Windows.
+1. `install`, `use-dev-stage1`, and `use-dev-stage2` should keep printing Windows instructions when the host is Windows.
 2. The Windows guidance should prefer:
-   - `call <path>\\l0-env.cmd` for `cmd.exe`
-   - a PowerShell equivalent if `l0-env.ps1` is implemented
-   - `source .../l0-env.sh` only for MSYS2/bash users
+    - `call <path>\\l0-env.cmd` for `cmd.exe`
+    - a PowerShell equivalent if `l0-env.ps1` is implemented
+    - `source .../l0-env.sh` only for MSYS2/bash users
 3. `install-dev-stage2` and `install` should print the Windows companion launchers they create when useful, so the
    generated `.cmd` surface is visible in CI logs.
 
@@ -132,11 +137,11 @@ installation directly.
 
 Minimum acceptance:
 
-1. `make install-dev-stage2` on `windows-latest` produces a working repo-local Stage 2 launcher plus Windows-native
-   activation artifacts.
-2. `make use-dev-stage2` selects a working `l0c` command on Windows.
-3. `make install PREFIX=...` produces a working installed `l0c` command on Windows, at least under the supported shell
-   environment.
+1. `make install-dev-stage2` on `windows-latest` produces a working repo-local Stage 2 launcher plus the new
+   Windows-native activation artifacts.
+2. `make use-dev-stage2` keeps selecting a working `l0c` command on Windows.
+3. `make install PREFIX=...` keeps producing a working installed `l0c` command on Windows, now with matching
+   activation artifacts for the supported shell environment.
 
 The exact workflow target can be staged if `test-all` remains too broad while the activation surface is still moving.
 
@@ -165,12 +170,12 @@ make PREFIX=build/prefix-win install
 Expected:
 
 1. The generated repo-local and install-prefix layouts include Windows-native launchers for the selected compiler.
-2. The selected `l0c` command works on Windows without relying on POSIX symlink semantics.
-3. Native-shell activation no longer depends on `l0-env.sh`.
+2. The selected Stage 2 `l0c` command continues to work on Windows without relying on POSIX symlink semantics.
+3. Native-shell activation no longer depends on manual `PATH` edits alone.
 4. MSYS2/bash workflows continue to work unchanged.
 
 ## Related Documents
 
-- [Windows build support](2026-03-11-windows-build-support.md)
+- [Windows build support](closed/2026-03-11-windows-build-support.md)
 - [Bootstrap plan](closed/2026-03-09-stage2-bootstrap-compiler-artifact-noref.md)
 - [Project status](../../reference/project-status.md)
