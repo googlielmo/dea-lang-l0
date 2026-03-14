@@ -77,6 +77,7 @@ func bd_log_effective_roots(cfg: LogConfig*, sys_roots: VectorString*, project_r
  *
  * @param opts Parsed CLI options.
  * @param diags Diagnostic collector for normalization failures.
+ * @param cfg Logging configuration.
  * @return Prepared input bundle, or `null` on failure.
  */
 func bd_prepare_input(opts: CliOptions*, diags: DiagCollector*, cfg: LogConfig*) -> BuildPreparedInput*? {

@@ -90,6 +90,7 @@ func l0c_log_effective_roots(cfg: LogConfig*, sys_roots: VectorString*, project_
  *
  * @param opts Parsed CLI options.
  * @param diags Diagnostic collector for normalization errors.
+ * @param cfg Logging configuration.
  * @return Prepared input bundle, or `null` if normalization fails.
  */
 func l0c_prepare_input(opts: CliOptions*, diags: DiagCollector*, cfg: LogConfig*) -> PreparedInput*? {

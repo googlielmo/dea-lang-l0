@@ -1563,9 +1563,6 @@ static l0_bool rt_write_file_all(l0_string path, l0_string data) {
 }
 
 /**
- * Check if a file exists at the given path.
- * 
- * @param path File path.
  * Return basic metadata for a path.
  * 
  * @param path File path.

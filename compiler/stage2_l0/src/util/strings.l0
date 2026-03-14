@@ -94,8 +94,6 @@ func us_split_chars2_non_empty(s: string, sep1: byte, sep2: byte) -> VectorStrin
  * Split a string on space characters, dropping empty fields.
  *
  * @param s String to split.
- * @param sep1 First separator byte.
- * @param sep2 Second separator byte.
  * @return Vector of non-empty split parts.
  * @see std.string::is_space for the definition of space characters.
  */

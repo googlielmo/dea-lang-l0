@@ -791,7 +791,6 @@ func be_int_type_size(ty: Type*) -> int {
 /**
  * Convert a lowered expression to an expected type when required.
  *
- * @param self Backend state to inspect.
  * @param c_expr Lowered source expression.
  * @param natural_ty Natural source type.
  * @param expected Expected destination type.
