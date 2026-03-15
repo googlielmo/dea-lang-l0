@@ -9,3 +9,11 @@ repos:
         entry: python3 .github/workflows/check_copyright_headers.py
         language: system
         pass_filenames: false
+  - repo: https://github.com/executablebooks/mdformat
+    rev: 1.0.0
+    hooks:
+      - id: mdformat
+        additional_dependencies:
+          - mdformat-gfm
+          - mdformat-frontmatter
+          - mdformat-pyproject

@@ -14,19 +14,31 @@ dependencies = []
 l0c = "l0c:main"
 
 [dependency-groups]
-dev = ["pre-commit>=4.5.0", "pytest>=9.0.2", "pytest-xdist>=3.5"]
+dev = [
+    "pre-commit>=4.5.0",
+    "pytest>=9.0.2",
+    "pytest-xdist>=3.5",
+    "mdformat>=1.0.0",
+    "mdformat-gfm>=0.3",
+    "mdformat-frontmatter>=2.0",
+    "mdformat-pyproject",
+]
 docs = [
     "jinja2>=3.1.6",
     "PyYAML>=6.0.2",
     "pygments>=2.19.2",
 ]
 
+[tool.mdformat]
+wrap = 120
+number = true
+
 [tool.pytest.ini_options]
 addopts = "-n auto"
 testpaths = ["compiler/stage1_py/tests"]
 
 [tool.setuptools]
-package-dir = {"" = "compiler/stage1_py"}
+package-dir = { "" = "compiler/stage1_py" }
 packages = []
 py-modules = [
     "l0c",
