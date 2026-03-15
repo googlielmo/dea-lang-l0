@@ -6,6 +6,7 @@ This document is the compact Stage 1 contract and navigation index.
 
 Canonical ownership:
 
+- Shared CLI contract (mode flags, options, targets, identity, exit codes): [cli-contract.md](cli-contract.md)
 - Architecture and pass flow: [reference/architecture.md](../../reference/architecture.md)
 - C backend behavior and lowering details: [reference/c-backend-design.md](../../reference/c-backend-design.md)
 - Language/runtime rationale and future evolution: [reference/design-decisions.md](../../reference/design-decisions.md)
@@ -35,55 +36,14 @@ The end-to-end flow is:
 
 Entry point: `compiler/stage1_py/l0c.py`
 
-Primary mode flags:
+The shared CLI surface — mode flags, global options, mode-scoped options, target rules, identity strings, and exit codes
+— is normatively defined in [cli-contract.md](cli-contract.md).
 
-- `--run` (short: `-r`)
-- `--build` (default mode when omitted)
-- `--gen` (short: `-g`; alias flag: `--codegen`)
-- `--check` (alias flag: `--analyze`)
-- `--tok` (alias flag: `--tokens`)
-- `--ast`
-- `--sym` (alias flag: `--symbols`)
-- `--type` (alias flag: `--types`)
+Stage 1-specific notes:
 
-Mode selection uses flags only:
-
-- Legacy command words such as `run`, `build`, `gen`, `check`, `tok`, `ast`, `sym`, and `type` are not accepted.
-- `--run` expects runtime program arguments after `--`.
-
-Global options:
-
-- `--version`
-- `-v` / `--verbose` (counted)
-- `-l` / `--log`
-- `-P` / `--project-root`
-- `-S` / `--sys-root`
-
-Mode-scoped options (enforced by CLI argument validation):
-
-- `-o` / `--output` for `build|gen|run` (`run` uses it only for kept C filename with `--keep-c`; otherwise warns)
-- `--keep-c` for `build|run` (`run` writes `./a.c` by default, or `<output>.c` with `-o`)
-- `-c` / `--c-compiler` for `build|run`
-- `-C` / `--c-options` for `build|run`
-  - C compiler options are merged as: `$L0_CFLAGS` first, then `--c-options`.
-- `-I` / `--runtime-include` for `build|run`
-- `-L` / `--runtime-lib` for `build|run`
-- `-NLD` / `--no-line-directives` for `build|run|gen`
-- `--trace-arc` for `build|run|gen`
-- `--trace-memory` for `build|run|gen`
-
-Debug-dump options:
-
-- `--all-modules` / `-a` for `tok|ast|sym|type`
-- `--include-eof` for `tok`
-
-Exit behavior:
-
-- `--version` prints `Dea language / L0 compiler (Stage 1)` and exits `0`,
-- `-v` includes the same compiler identity text in info-level stderr output, including CLI usage failures such as a
-  missing target,
-- analysis or C-compilation failures return non-zero from CLI modes,
-- `--run` returns the executed program's process exit code (`KeyboardInterrupt` -> `130`).
+- Debug-dump options `--all-modules` / `-a` and `--include-eof` apply to `tok`, `ast`, `sym`, and `type` modes as
+  defined in the shared contract.
+- `--keep-c` with `--run` writes `./a.c` by default, or `<output>.c` when `-o` is also given.
 
 ### 2.2 Source/module contract
 
@@ -95,8 +55,8 @@ Exit behavior:
 ### 2.3 Backend output contract
 
 - Stage 1 emits a single C99 translation unit.
-- When trace flags are enabled, generated C emits `L0_TRACE_ARC` and/or `L0_TRACE_MEMORY` defines before
-  including `l0_runtime.h`.
+- When trace flags are enabled, generated C emits `L0_TRACE_ARC` and/or `L0_TRACE_MEMORY` defines before including
+  `l0_runtime.h`.
 - Backend details are canonical in [reference/c-backend-design.md](../../reference/c-backend-design.md).
 - Trace details are canonical in [specs/runtime/trace.md](../runtime/trace.md).
 
@@ -113,8 +73,7 @@ These names are externally relevant for contributors; details live in code.
 - `line`
 - `column`
 
-Token kind enum: `TokenKind`.
-Important current names include:
+Token kind enum: `TokenKind`. Important current names include:
 
 - punctuation/operators: `SEMI`, `EQ`, `EQEQ`, `NE`, `MODULO`, `ARROW_FUNC`, `ARROW_MATCH`, `DOUBLE_COLON`
 - logical operators: `ANDAND`, `OROR`, `BANG`
@@ -165,7 +124,6 @@ Use the narrowest canonical document for each question:
   [reference/architecture.md](../../reference/architecture.md)
 - Lowering policy, generated C layout, ARC/cleanup behavior, runtime calls:
   [reference/c-backend-design.md](../../reference/c-backend-design.md)
-- Trace flags and runtime trace behavior:
-  [specs/runtime/trace.md](../runtime/trace.md)
+- Trace flags and runtime trace behavior: [specs/runtime/trace.md](../runtime/trace.md)
 - Pointer/nullability model rationale, integer model rationale, stage-2 design direction:
   [reference/design-decisions.md](../../reference/design-decisions.md)

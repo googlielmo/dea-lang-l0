@@ -1,10 +1,10 @@
 # Stage 2 Dea/L0 Language Compiler
 
-This directory contains the self-hosted Stage 2 compiler for the L0 programming language.
-It includes source code, tests, and utilities for the compiler and its runtime traces.
+This directory contains the self-hosted Stage 2 compiler for the L0 programming language. It includes source code,
+tests, and utilities for the compiler and its runtime traces.
 
-Like the Stage 1 compiler, it compiles L0 source code to C99, but is itself implemented in L0.
-The main remaining user-facing CLI gap is `--ast`, which is still not implemented in Stage 2.
+Like the Stage 1 compiler, it compiles L0 source code to C99, but is itself implemented in L0. The main remaining
+user-facing CLI gap is `--ast`, which is still not implemented in Stage 2.
 
 ## Bootstrap artifact
 
@@ -56,8 +56,8 @@ l0c --check -P examples hello
 
 `make install` requires an explicit `PREFIX=...`; there is no implicit default install root.
 
-`install` installs the self-hosted Stage 2 compiler (`Compiler 2` from the triple-bootstrap chain), not the
-initial Stage 1-built artifact. The installed prefix contains:
+`install` installs the self-hosted Stage 2 compiler (`Compiler 2` from the triple-bootstrap chain), not the initial
+Stage 1-built artifact. The installed prefix contains:
 
 - `bin/l0c-stage2`
 - `bin/l0c-stage2.native`
@@ -69,11 +69,8 @@ initial Stage 1-built artifact. The installed prefix contains:
 The installed wrapper derives `L0_HOME` from `PREFIX` at runtime. The installed `l0-env.sh` sets `L0_HOME="$PREFIX"`
 only; the compiler then derives stdlib and runtime defaults from `L0_HOME` unless you explicitly override them.
 
-The Stage 2 CLI also supports `--help`, `--version`, and `-v`.
-Built repo-local and installed Stage 2 artifacts embed extra `--version` provenance, while raw compiler 2 / compiler 3
-triple-bootstrap artifacts intentionally stay on the fallback identity-only path.
-The detailed identity/version/verbose contract is tracked in
-`docs/plans/features/2026-03-12-shared-cli-contract-spec.md`.
+The full CLI contract — mode flags, options, identity strings, `--version` provenance, and exit codes — is documented in
+`docs/specs/compiler/cli-contract.md`.
 
 The source-tree `./scripts/l0c` entrypoint is Stage 1 only and is mainly useful for bootstrap mechanics, internal
 tooling, and Stage 1-focused testing.
@@ -148,9 +145,9 @@ L0_CC=clang KEEP_ARTIFACTS=1 python3 compiler/stage2_l0/tests/l0c_triple_bootstr
 
 The test performs, in order:
 
-1. trusted Stage 1 -> first Stage 2 build with retained C enabled
-2. first Stage 2 compiler -> second self-built Stage 2 compiler
-3. second self-built Stage 2 compiler -> third self-built Stage 2 compiler
+1. trusted Stage 1 → first Stage 2 build with retained C enabled
+2. first Stage 2 compiler → second self-built Stage 2 compiler
+3. second self-built Stage 2 compiler → third self-built Stage 2 compiler
 4. byte-for-byte comparison of second-build vs third-build retained C
 5. byte-for-byte comparison of second-build vs third-build native compiler binaries, unless the host compiler is `tcc`
 6. smoke run through the third self-built compiler

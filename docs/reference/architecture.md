@@ -2,15 +2,15 @@
 
 Version: 2026-03-14
 
-This is the canonical architecture document for the current compiler pipeline.
-Stage 1 remains the reference implementation and Stage 2 mirrors the same pass structure through code generation and
-driver execution.
+This is the canonical architecture document for the current compiler pipeline. Stage 1 remains the reference
+implementation and Stage 2 mirrors the same pass structure through code generation and driver execution.
 
 Related canonical docs:
 
 - Backend lowering and generated C details: [reference/c-backend-design.md](c-backend-design.md)
 - Language/runtime rationale and future evolution: [reference/design-decisions.md](design-decisions.md)
 - Compact contract/index: [specs/compiler/stage1-contract.md](../specs/compiler/stage1-contract.md)
+- Shared CLI contract: [specs/compiler/cli-contract.md](../specs/compiler/cli-contract.md)
 
 ## 1. High-Level Pipeline
 
@@ -79,20 +79,16 @@ build_driver.l0 -> host C compiler invocation (`--build` / `--run`)
 Executable launch (`--run`)
 ```
 
-Current Stage 2 CLI entry point: `compiler/stage2_l0/src/l0c.l0`.
-Recommended developer-facing workflow: `make install-dev-stages`, choose `make use-dev-stage1` or
-`make use-dev-stage2`, then `source build/dea/bin/l0-env.sh`.
+Current Stage 2 CLI entry point: `compiler/stage2_l0/src/l0c.l0`. Recommended developer-facing workflow:
+`make install-dev-stages`, choose `make use-dev-stage1` or `make use-dev-stage2`, then `source build/dea/bin/l0-env.sh`.
 Repo-independent Stage 2 install workflow: `make PREFIX=/tmp/l0-install install`, then
-`source /tmp/l0-install/bin/l0-env.sh`.
-`make install` requires an explicit `PREFIX=...`; there is no implicit install destination.
-Source-tree execution path: `./scripts/l0c -P compiler/stage2_l0/src --run l0c -- ...` (`./scripts/l0c` is the
-Stage 1 source-tree wrapper).
-Repo-local bootstrap artifact path: `./scripts/build-stage2-l0c.sh`, then `./build/dea/bin/l0c-stage2 ...`.
-Triple-bootstrap fixed-point regression: `make triple-test`.
-`make install` installs the self-hosted Stage 2 compiler (`S1 -> S2`, then `S2 -> S2`) plus copied shared
-stdlib/runtime assets under `PREFIX`.
-The implemented Stage 2 CLI modes are `--check`, `--tok`, `--sym`, `--type`, `--gen`, `--build`, and `--run`;
-`--ast` is still NYI.
+`source /tmp/l0-install/bin/l0-env.sh`. `make install` requires an explicit `PREFIX=...`; there is no implicit install
+destination. Source-tree execution path: `./scripts/l0c -P compiler/stage2_l0/src --run l0c -- ...` (`./scripts/l0c` is
+the Stage 1 source-tree wrapper). Repo-local bootstrap artifact path: `./scripts/build-stage2-l0c.sh`, then
+`./build/dea/bin/l0c-stage2 ...`. Triple-bootstrap fixed-point regression: `make triple-test`. `make install` installs
+the self-hosted Stage 2 compiler (`S1 -> S2`, then `S2 -> S2`) plus copied shared stdlib/runtime assets under `PREFIX`.
+The implemented Stage 2 CLI modes are `--check`, `--tok`, `--sym`, `--type`, `--gen`, `--build`, and `--run`; `--ast` is
+still NYI.
 
 ## 2. Pass Responsibilities
 
@@ -120,10 +116,10 @@ The implemented Stage 2 CLI modes are `--check`, `--tok`, `--sym`, `--type`, `--
 
 - Resolves top-level type references.
 - Populates:
-    - `func_types`
-    - `struct_infos`
-    - `enum_infos`
-    - `let_types`
+  - `func_types`
+  - `struct_infos`
+  - `enum_infos`
+  - `let_types`
 - Detects alias cycles and value-type dependency cycles.
 
 ### 2.5 Local Scope Resolver (`l0_locals.py`)

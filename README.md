@@ -5,9 +5,9 @@
 **L0 (Level Zero)** is a small systems language that compiles to C99. It is the foundational subset and first bootstrap
 stage of the **Dea** language family.
 
-Dea employs a staged compiler bootstrapping architecture (Level 0, Level 1, ..., Level N). Dea/L0 is now self-hosted;
-it is the compiler base that will be used to compile L1. L1 will subsequently self-host to build L2, and the process
-will repeat for successive levels.
+Dea employs a staged compiler bootstrapping architecture (Level 0, Level 1, ..., Level N). Dea/L0 is now self-hosted; it
+is the compiler base that will be used to compile L1. L1 will subsequently self-host to build L2, and the process will
+repeat for successive levels.
 
 The design is conservative by choice: a small, precisely specified language whose semantics leave no room for undefined
 behavior. Operations are either well-defined or rejected - at compile time or with a named runtime error.
@@ -20,50 +20,49 @@ _Tertium non datur._
 ## Motivation
 
 Writing a compiler is a systems programming task. You need to manage memory, represent complex data structures, and have
-precise control over performance characteristics.
-Many modern languages either remove that kind of control or bury it under runtime machinery.
+precise control over performance characteristics. Many modern languages either remove that kind of control or bury it
+under runtime machinery.
 
-Dea/L0 instead keeps a small, explicit core aimed at bootstrap-friendly implementation work.
-The objective is a small, UB-free systems language sufficient to host its own compiler.
+Dea/L0 instead keeps a small, explicit core aimed at bootstrap-friendly implementation work. The objective is a small,
+UB-free systems language sufficient to host its own compiler.
 
-That constrains the design considerably. The type system needs sum types and pattern matching - a compiler
-without them is fighting its own data. It needs explicit nullable types, because implicit null is a
-specification gap. It needs deterministic resource management without requiring a garbage-collected runtime.
-It needs pointers without UB. It does not need much else.
+That constrains the design considerably. The type system needs sum types and pattern matching - a compiler without them
+is fighting its own data. It needs explicit nullable types, because implicit null is a specification gap. It needs
+deterministic resource management without requiring a garbage-collected runtime. It needs pointers without UB. It does
+not need much else.
 
-The surface syntax is C-family deliberately: operator precedence, braces, explicit types, `return`.
-Familiarity is load-bearing when the language is also the implementation vehicle.
+The surface syntax is C-family deliberately: operator precedence, braces, explicit types, `return`. Familiarity is
+load-bearing when the language is also the implementation vehicle.
 
-The C99 backend is a bootstrap convenience. The trusted C kernel isolates all platform-dependent behavior;
-the rest of the semantics are enforced by L0 itself.
+The C99 backend is a bootstrap convenience. The trusted C kernel isolates all platform-dependent behavior; the rest of
+the semantics are enforced by L0 itself.
 
 ## Project status and directions
 
 L0 is currently in its first self-hosted Stage 2 phase.
 
-* Stage 1: complete and usable.
+- Stage 1: complete and usable.
 
-* Stage 2: lexer, parser, AST, name resolution, top-level signature resolution, local scope construction,
+- Stage 2: lexer, parser, AST, name resolution, top-level signature resolution, local scope construction,
   expression/statement type checking, backend lowering, C emission, and direct `--build` / `--run` execution are
   implemented.
 
-* Stage 2 `--gen`: implemented and parity-tested against Stage 1 on a committed golden corpus.
+- Stage 2 `--gen`: implemented and parity-tested against Stage 1 on a committed golden corpus.
 
-* Stage 2 bootstrap artifact: buildable today under `build/dea/bin` via `./scripts/build-stage2-l0c.sh`.
+- Stage 2 bootstrap artifact: buildable today under `build/dea/bin` via `./scripts/build-stage2-l0c.sh`.
 
-* Stage 2 repo-local Dea build workflow: available under `build/dea/bin` via `make install-dev-stages`;
-  `make use-dev-stage2`
-  prints the exact `source build/dea/bin/l0-env.sh` command after switching the alias.
+- Stage 2 repo-local Dea build workflow: available under `build/dea/bin` via `make install-dev-stages`;
+  `make use-dev-stage2` prints the exact `source build/dea/bin/l0-env.sh` command after switching the alias.
 
-* Stage 2 install prefix: available via `make PREFIX=/tmp/l0-install install`; this installs the self-hosted
-  Stage 2 compiler (`S1 -> S2`, then `S2 -> S2`) plus copied `shared/l0/stdlib` and `shared/runtime` assets.
+- Stage 2 install prefix: available via `make PREFIX=/tmp/l0-install install`; this installs the self-hosted Stage 2
+  compiler (`S1 -> S2`, then `S2 -> S2`) plus copied `shared/l0/stdlib` and `shared/runtime` assets.
 
-* Stage 2 triple-bootstrap regression: available directly via `make triple-test`.
+- Stage 2 triple-bootstrap regression: available directly via `make triple-test`.
 
-Today, Stage 2 implements `--check`, `--tok`, `--sym`, `--type`, deterministic `--gen`, and direct `--build` /
-`--run`. The remaining public CLI gap is `--ast`, which is still NYI in Stage 2.
+Today, Stage 2 implements `--check`, `--tok`, `--sym`, `--type`, deterministic `--gen`, and direct `--build` / `--run`.
+The remaining public CLI gap is `--ast`, which is still NYI in Stage 2.
 
-* **Built-in Observability:** Language developers need to know what memory is doing. L0 ships with native compiler flags
+- **Built-in Observability:** Language developers need to know what memory is doing. L0 ships with native compiler flags
   to trace ARC events and allocations directly to stderr. Today these are fully usable through the Stage 1 driver and
   are already wired through Stage 2 `--gen`, `--build`, and `--run`:
 
@@ -74,17 +73,16 @@ l0c --run --trace-arc --trace-memory app.l0
 ## Design highlights
 
 - `match` pattern-matches on enum variants, binding payload fields by name.
-- `T?` is an explicit optional type. `expr?` short-circuits: if the expression is null, the enclosing
-  `T?`-returning function returns null immediately.
+- `T?` is an explicit optional type. `expr?` short-circuits: if the expression is null, the enclosing `T?`-returning
+  function returns null immediately.
 - No exceptions.
-- No `defer`: L0 uses `with` and `cleanup` blocks instead.
-  Cleanup runs when the `with` body exits, the scoping is explicit, and there is nothing to
-  reason about at a distance.
+- No `defer`: L0 uses `with` and `cleanup` blocks instead. Cleanup runs when the `with` body exits, the scoping is
+  explicit, and there is nothing to reason about at a distance.
 - No `goto`.
 - `ptr.field` auto-dereferences; `->` is not a dereference operator (it is used for return type annotations).
 - `=` is a statement. `if (x = 0)` is a type error.
-- `case` dispatches on constant values (including strings): `"foobar" => stmt`, or `else stmt` for the
-  default. No implicit fallthrough. Strings are valid case keys.
+- `case` dispatches on constant values (including strings): `"foobar" => stmt`, or `else stmt` for the default. No
+  implicit fallthrough. Strings are valid case keys.
 - `;` is not a valid empty statement. Use `null;` or an empty block if you need an explicit no-op.
 - Widening conversions are implicit (`byte` to `int`, `T` to `T?`). Narrowing is always explicit and checked both
   statically and at runtime: `300 as byte` is a compiler error, `my_opt_str as string` panics on null. Use
@@ -118,8 +116,8 @@ MSVC is supported by setting `$L0_CC` to point to `CL.EXE`, but it has not been 
 Specific versions of `gcc` and `clang` whose names include version numbers (e.g. `gcc-14`, `clang-22`) are not probed by
 default but can be used by setting `$L0_CC` accordingly and will be recognized as such.
 
-Tiny C Compiler (`tcc`) is the default if available, as it is fast and supports all required C99 features.
-It is recommended to clone and build `tcc` from source if it is not available on your system, as some platform package
+Tiny C Compiler (`tcc`) is the default if available, as it is fast and supports all required C99 features. It is
+recommended to clone and build `tcc` from source if it is not available on your system, as some platform package
 managers provide outdated versions.
 
 ### Install
@@ -130,8 +128,8 @@ Clone this repository and `cd` into it. Then create a virtual environment and in
 make venv                # create or reuse local .venv; prefers uv when available
 ```
 
-For Windows-specific setup, generated launchers, MSYS2 bash usage, and native-shell (`cmd.exe` / PowerShell) usage,
-see [README-WINDOWS.md](README-WINDOWS.md).
+For Windows-specific setup, generated launchers, MSYS2 bash usage, and native-shell (`cmd.exe` / PowerShell) usage, see
+[README-WINDOWS.md](README-WINDOWS.md).
 
 If you prefer to manage the environment manually, `uv sync --group dev --group docs` is the recommended direct command;
 a plain `python3 -m venv .venv` workflow also works.
@@ -166,8 +164,8 @@ l0c --version
 
 `make install` requires an explicit `PREFIX=...`; there is no implicit default install root.
 
-`install` installs the self-hosted Stage 2 compiler (`Compiler 2` from the triple-bootstrap chain), not the
-initial Stage 1-built bootstrap artifact.
+`install` installs the self-hosted Stage 2 compiler (`Compiler 2` from the triple-bootstrap chain), not the initial
+Stage 1-built bootstrap artifact.
 
 ### First program
 
@@ -189,9 +187,6 @@ l0c --check hello.l0                    # analyze only, no output (use `-v`/`-vv
 l0c --version                           # print the active compiler stage identity and exit
 ```
 
-`--help` and `--version` print the active stage identity (`Dea language / L0 compiler (Stage 1)` or
-`Dea language / L0 compiler (Stage 2)`). `-v` also emits that identity line through the normal verbose log path.
-
 ### Multi-module projects
 
 ```shell
@@ -202,8 +197,7 @@ The compiler resolves modules from system roots (stdlib) then project roots in o
 
 Environment-variable defaults and launcher-specific path behavior are documented in
 [compiler/stage2_l0/README.md](compiler/stage2_l0/README.md),
-[docs/reference/project-status.md](docs/reference/project-status.md), and
-[README-WINDOWS.md](README-WINDOWS.md).
+[docs/reference/project-status.md](docs/reference/project-status.md), and [README-WINDOWS.md](README-WINDOWS.md).
 
 ### Examples
 
@@ -306,8 +300,7 @@ func main() -> int {
 
 </details>
 
-This program is available in [examples/demo.l0](examples/demo.l0).
-You can run it from the repository root as follows:
+This program is available in [examples/demo.l0](examples/demo.l0). You can run it from the repository root as follows:
 
 ```shell
 l0c examples/demo.l0 -o demo
@@ -318,12 +311,11 @@ It will parse the expression `mul 6 add 5 2` as a tree, evaluate it to `6 * (5 +
 
 ## Language overview
 
-**Types:**
-`int`, `bool`, `string`, `byte`, structs, enums with payloads, pointers (`T*`, `T**`),
-nullable pointers (`T*?`), optional values (`T?`), type aliases.
+**Types:** `int`, `bool`, `string`, `byte`, structs, enums with payloads, pointers (`T*`, `T**`), nullable pointers
+(`T*?`), optional values (`T?`), type aliases.
 
-`string` is a convenient, small value type: you can assign it, pass it, and return it cheaply.
-String memory (where the expensive data is stored) is managed automatically via reference counting.
+`string` is a convenient, small value type: you can assign it, pass it, and return it cheaply. String memory (where the
+expensive data is stored) is managed automatically via reference counting.
 
 Manual heap allocation of structs and other data in the language is explicit (`new`/`drop`) and delegated to the
 programmer (no GC).
@@ -331,37 +323,35 @@ programmer (no GC).
 `sizeof()` and `ord()` are language intrinsics that return the size of a type in bytes and the ordinal value of an enum
 variant, respectively.
 
-**Modules:** one file, one module. Dotted names (`std.io`). No forward declarations - all
-top-level symbols in a module are visible throughout it. Symbols are qualified as `module::Symbol`
-where disambiguation is needed.
+**Modules:** one file, one module. Dotted names (`std.io`). No forward declarations - all top-level symbols in a module
+are visible throughout it. Symbols are qualified as `module::Symbol` where disambiguation is needed.
 
-**Pointers:** `T*` is non-null. `T*?` is nullable. No `&` address-of operator in current stages.
-No pointer arithmetic in Stage 1. Field access auto-dereferences.
+**Pointers:** `T*` is non-null. `T*?` is nullable. No `&` address-of operator in current stages. No pointer arithmetic
+in Stage 1. Field access auto-dereferences.
 
-**Null safety:** `T?` for optional values; `null` for the empty case. `T` widens to `T?` implicitly.
-`T? as T` narrows with a runtime panic on null; use `unwrap_or_*` variants when null is a valid case.
-`expr?` propagates null from the enclosing function.
+**Null safety:** `T?` for optional values; `null` for the empty case. `T` widens to `T?` implicitly. `T? as T` narrows
+with a runtime panic on null; use `unwrap_or_*` variants when null is a valid case. `expr?` propagates null from the
+enclosing function.
 
-**No UB:** every operation is defined, rejected at compile time, or produces a named runtime failure.
-No implicit narrowing conversions. No assignment-as-expression.
+**No UB:** every operation is defined, rejected at compile time, or produces a named runtime failure. No implicit
+narrowing conversions. No assignment-as-expression.
 
 **Extern:** `extern` functions interface directly with the C kernel.
 
-**Control flow:** `if`/`else`, `while`, C-style `for`, `return`, `break`, `continue`, `match` (enum
-variant dispatch), `case` (literal dispatch), `with`/`cleanup` (scoped resource management), `expr?`
-(null propagation).
+**Control flow:** `if`/`else`, `while`, C-style `for`, `return`, `break`, `continue`, `match` (enum variant dispatch),
+`case` (literal dispatch), `with`/`cleanup` (scoped resource management), `expr?` (null propagation).
 
 ## Grammar
 
 The authoritative grammar is in [docs/reference/grammar/l0.md](docs/reference/grammar/l0.md).
 
-Types compose as: `T*`, `T**`, `T?`, `T*?`. Expressions follow C precedence, extended with the
-postfix `?` operator and `as` casts.
+Types compose as: `T*`, `T**`, `T?`, `T*?`. Expressions follow C precedence, extended with the postfix `?` operator and
+`as` casts.
 
 ## Compiler implementation architecture
 
-Stage 1 follows a conventional pipeline from lexer to semantic analysis to C99 code generation. Stage 2 mirrors the
-same pipeline in L0 itself, with separate lexer, parser, AST, type-checking, backend, and driver modules.
+Stage 1 follows a conventional pipeline from lexer to semantic analysis to C99 code generation. Stage 2 mirrors the same
+pipeline in L0 itself, with separate lexer, parser, AST, type-checking, backend, and driver modules.
 
 For the full compiler workflow, bootstrap/install layout, test targets, and current Stage 2 command surface, use:
 
@@ -371,6 +361,7 @@ References:
 - [Design decisions](docs/reference/design-decisions.md)
 - [Ownership and memory management](docs/reference/ownership.md)
 - [Stage 1 contract](docs/specs/compiler/stage1-contract.md)
+- [Shared CLI contract](docs/specs/compiler/cli-contract.md)
 
 ## CLI
 
@@ -387,7 +378,7 @@ l0c [mode] [options] <target>
 Global identity and logging options include `--help`, `--version`, `-v/--verbose`, and `-l/--log`.
 
 | Mode           | Action                          |
-|----------------|---------------------------------|
+| -------------- | ------------------------------- |
 | `--build`      | Compile to binary (default)     |
 | `--run` / `-r` | Compile and execute             |
 | `--gen` / `-g` | Emit C99                        |
@@ -406,9 +397,8 @@ l0c -c clang -C "-Og -DDEBUG" hello.l0    # use a specific C compiler with custo
 
 Trace output contract: [docs/specs/runtime/trace.md](docs/specs/runtime/trace.md).
 
-Detailed CLI identity, version, verbose, and stage-specific workflow behavior is tracked in
-[docs/plans/features/2026-03-12-shared-cli-contract-spec.md](docs/plans/features/2026-03-12-shared-cli-contract-spec.md)
-until the shared CLI spec is split out under `docs/specs/`.
+Full CLI contract — mode flags, options, targets, identity strings, exit codes, and stage-specific differences:
+[docs/specs/compiler/cli-contract.md](docs/specs/compiler/cli-contract.md).
 
 ## Project status
 
