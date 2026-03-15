@@ -1,6 +1,6 @@
 # L0 Compiler Architecture
 
-Version: 2026-03-14
+Version: 2026-03-15
 
 This is the canonical architecture document for the current compiler pipeline. Stage 1 remains the reference
 implementation and Stage 2 mirrors the same pass structure through code generation and driver execution.
@@ -87,8 +87,8 @@ destination. Source-tree execution path: `./scripts/l0c -P compiler/stage2_l0/sr
 the Stage 1 source-tree wrapper). Repo-local bootstrap artifact path: `./scripts/build-stage2-l0c.sh`, then
 `./build/dea/bin/l0c-stage2 ...`. Triple-bootstrap fixed-point regression: `make triple-test`. `make install` installs
 the self-hosted Stage 2 compiler (`S1 -> S2`, then `S2 -> S2`) plus copied shared stdlib/runtime assets under `PREFIX`.
-The implemented Stage 2 CLI modes are `--check`, `--tok`, `--sym`, `--type`, `--gen`, `--build`, and `--run`; `--ast` is
-still NYI.
+The implemented Stage 2 CLI modes are `--check`, `--tok`, `--sym`, `--type`, `--ast`, `--gen`, `--build`, and `--run`;
+Stage 2 public CLI parity with Stage 1 is complete for the current public surface.
 
 ## 2. Pass Responsibilities
 

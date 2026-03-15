@@ -146,6 +146,49 @@ func test_version_flag_short_circuits_validation() {
 }
 
 /**
+ * Tests that `--ast` is accepted as a valid mode.
+ */
+func test_ast_mode_accepted() {
+    with (let argv = vs_create(2) => vs_free(argv)) {
+        vs_push(argv, "--ast");
+        vs_push(argv, "app.main");
+
+        let parsed = cli_parse(argv);
+        assert(!diag_has_errors(parsed.diags), "expected --ast parse success");
+        assert(parsed.options != null, "expected parsed options for --ast");
+
+        let opts = parsed.options as CliOptions*;
+        assert(ord(opts.mode) == ord(CM_AST), "expected CM_AST mode");
+        assert(opts.entry_target != null, "expected entry target");
+        assert(eq_s(opts.entry_target as string, "app.main"), "expected app.main target");
+        assert(!opts.all_modules, "all_modules should default to false");
+
+        cli_parse_result_free(parsed);
+    }
+}
+
+/**
+ * Tests that `--ast --all-modules` is accepted.
+ */
+func test_ast_all_modules_accepted() {
+    with (let argv = vs_create(4) => vs_free(argv)) {
+        vs_push(argv, "--ast");
+        vs_push(argv, "--all-modules");
+        vs_push(argv, "app.main");
+
+        let parsed = cli_parse(argv);
+        assert(!diag_has_errors(parsed.diags), "expected --ast --all-modules parse success");
+        assert(parsed.options != null, "expected parsed options");
+
+        let opts = parsed.options as CliOptions*;
+        assert(ord(opts.mode) == ord(CM_AST), "expected CM_AST mode");
+        assert(opts.all_modules, "all_modules must be true");
+
+        cli_parse_result_free(parsed);
+    }
+}
+
+/**
  * Tests test_no_legacy_command_rewrite.
  */
 func test_no_legacy_command_rewrite() {
@@ -171,5 +214,7 @@ func main() {
     test_help_flag_short_circuits_validation();
     test_version_flag_short_circuits_validation();
     test_no_legacy_command_rewrite();
+    test_ast_mode_accepted();
+    test_ast_all_modules_accepted();
     printl_s("cli_args_test: all tests passed");
 }

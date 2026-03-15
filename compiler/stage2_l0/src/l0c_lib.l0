@@ -31,6 +31,7 @@ import name_resolver;
 import types;
 import symbols;
 import signatures;
+import ast_printer;
 
 /**
  * Represents the PreparedInput structure.
@@ -619,6 +620,99 @@ func l0c_collect_c_option_words(opts: CliOptions*) -> VectorString* {
 }
 
 /**
+ * Execute Stage 2 `--ast` mode.
+ *
+ * Without `--all-modules`, prints the AST for the entry module only.
+ * With `--all-modules`, prints all modules in the compilation unit in sorted
+ * order, separated by `=== Module <name> ===` headers.
+ *
+ * @param opts Parsed CLI options.
+ * @param cfg Logging configuration.
+ * @return Process-style status code.
+ */
+func l0c_cmd_ast(opts: CliOptions*, cfg: LogConfig*) -> int {
+    with (let diags = diag_create() => diag_free(diags)) {
+        let prepared = l0c_prepare_input(opts, diags, cfg);
+        if (prepared == null) {
+            dp_print_collector(diags);
+            return 1;
+        }
+        let prep = prepared as PreparedInput*;
+
+        let result = driver_analyze_entry(prep.search_paths, prep.entry_module, cfg);
+        prepared_input_free(prep);
+        prepared = null;
+
+        if (driver_has_errors(result)) {
+            dp_print_collector_with_sources(result.diags, result.source_names, result.source_texts);
+            driver_state_free(result);
+            return 1;
+        }
+
+        if (opts.all_modules) {
+            with (let names = driver_module_names_sorted(result) => vs_free(names)) {
+                for (let i = 0; i < vs_size(names); i = i + 1) {
+                    let name = vs_get(names, i);
+                    let unit_opt = driver_find_unit(result, name);
+                    if (unit_opt == null) {
+                        continue;
+                    }
+                    let unit = unit_opt as DriverUnit*;
+                    if (unit.parse_result.root_module == null) {
+                        continue;
+                    }
+                    printl_s(concat3_s("=== Module ", name, " ==="));
+                    ap_print_module(unit.parse_result.root_module as Module*, unit.parse_result);
+                    printl_s("");
+                }
+            }
+            driver_state_free(result);
+            return 0;
+        }
+
+        let entry_opt = driver_find_unit(result, result.entry_module);
+        if (entry_opt == null) {
+            diag_error(
+                diags,
+                "l0c",
+                "L0C-0070",
+                concat3_s("Module '", result.entry_module, "' not found in compilation unit"),
+                "",
+                0,
+                0,
+                0,
+                0
+            );
+            dp_print_collector(diags);
+            driver_state_free(result);
+            return 1;
+        }
+
+        let entry = entry_opt as DriverUnit*;
+        if (entry.parse_result.root_module == null) {
+            diag_error(
+                diags,
+                "l0c",
+                "L0C-0070",
+                concat3_s("Entry module '", result.entry_module, "' has no parsed AST"),
+                "",
+                0,
+                0,
+                0,
+                0
+            );
+            dp_print_collector(diags);
+            driver_state_free(result);
+            return 1;
+        }
+
+        ap_print_module(entry.parse_result.root_module as Module*, entry.parse_result);
+        driver_state_free(result);
+        return 0;
+    }
+}
+
+/**
  * Report that a requested CLI mode is not implemented in Stage 2 yet.
  *
  * @param mode Requested CLI mode.
@@ -699,7 +793,7 @@ func run_with_argv(argv: VectorString*) -> int {
                 rc = l0c_cmd_gen(opts, cfg);
             }
             CM_AST => {
-                rc = l0c_cmd_nyi(opts.mode, cfg);
+                rc = l0c_cmd_ast(opts, cfg);
             }
             CM_SYM => {
                 rc = l0c_cmd_sym(opts, cfg);

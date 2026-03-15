@@ -3,8 +3,8 @@
 This directory contains the self-hosted Stage 2 compiler for the L0 programming language. It includes source code,
 tests, and utilities for the compiler and its runtime traces.
 
-Like the Stage 1 compiler, it compiles L0 source code to C99, but is itself implemented in L0. The main remaining
-user-facing CLI gap is `--ast`, which is still not implemented in Stage 2.
+Like the Stage 1 compiler, it compiles L0 source code to C99, but is itself implemented in L0. Stage 2 implements the
+full current public CLI surface: `--check`, `--tok`, `--sym`, `--type`, `--ast`, `--gen`, `--build`, and `--run`.
 
 ## Bootstrap artifact
 

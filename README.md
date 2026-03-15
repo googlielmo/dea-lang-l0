@@ -59,8 +59,8 @@ L0 is currently in its first self-hosted Stage 2 phase.
 
 - Stage 2 triple-bootstrap regression: available directly via `make triple-test`.
 
-Today, Stage 2 implements `--check`, `--tok`, `--sym`, `--type`, deterministic `--gen`, and direct `--build` / `--run`.
-The remaining public CLI gap is `--ast`, which is still NYI in Stage 2.
+Stage 2 implements the full current public CLI surface: `--check`, `--tok`, `--sym`, `--type`, `--ast`, deterministic
+`--gen`, and direct `--build` / `--run`.
 
 - **Built-in Observability:** Language developers need to know what memory is doing. L0 ships with native compiler flags
   to trace ARC events and allocations directly to stderr. Today these are fully usable through the Stage 1 driver and
@@ -377,16 +377,16 @@ l0c [mode] [options] <target>
 
 Global identity and logging options include `--help`, `--version`, `-v/--verbose`, and `-l/--log`.
 
-| Mode           | Action                          |
-| -------------- | ------------------------------- |
-| `--build`      | Compile to binary (default)     |
-| `--run` / `-r` | Compile and execute             |
-| `--gen` / `-g` | Emit C99                        |
-| `--check`      | Analyze only                    |
-| `--ast`        | Dump AST (Stage 1; Stage 2 NYI) |
-| `--sym`        | Dump module symbols             |
-| `--type`       | Dump resolved types             |
-| `--tok`        | Dump token stream               |
+| Mode           | Action                      |
+| -------------- | --------------------------- |
+| `--build`      | Compile to binary (default) |
+| `--run` / `-r` | Compile and execute         |
+| `--gen` / `-g` | Emit C99                    |
+| `--check`      | Analyze only                |
+| `--ast`        | Dump AST                    |
+| `--sym`        | Dump module symbols         |
+| `--type`       | Dump resolved types         |
+| `--tok`        | Dump token stream           |
 
 ```shell
 l0c --build --keep-c hello.l0             # retain the generated C

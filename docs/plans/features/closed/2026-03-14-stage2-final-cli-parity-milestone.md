@@ -3,24 +3,24 @@
 ## Final Stage 2 public CLI parity and milestone closeout
 
 - Date: 2026-03-14
-- Status: Draft
+- Status: Implemented
 - Title: Implement the remaining Stage 2 public CLI parity gap (`--ast`) and close the Stage 2 parity milestone
 - Kind: Feature
 - Severity: Medium
 - Stage: 2
 - Subsystem: CLI / AST inspection / milestone closeout
 - Modules:
-    - `compiler/stage2_l0/src/l0c_lib.l0`
-    - `compiler/stage2_l0/src/ast.l0`
-    - `compiler/stage2_l0/src/driver.l0`
-    - `docs/reference/project-status.md`
-    - `docs/reference/architecture.md`
-    - `README.md`
+  - `compiler/stage2_l0/src/l0c_lib.l0`
+  - `compiler/stage2_l0/src/ast.l0`
+  - `compiler/stage2_l0/src/driver.l0`
+  - `docs/reference/project-status.md`
+  - `docs/reference/architecture.md`
+  - `README.md`
 - Test modules:
-    - `compiler/stage2_l0/tests/cli_args_test.l0`
-    - `compiler/stage2_l0/tests/l0c_stage2_help_output_test.sh`
-    - `compiler/stage2_l0/tests/l0c_stage2_verbose_output_test.sh`
-    - `compiler/stage2_l0/tests/l0c_ast_test.sh`
+  - `compiler/stage2_l0/tests/cli_args_test.l0`
+  - `compiler/stage2_l0/tests/l0c_stage2_help_output_test.sh`
+  - `compiler/stage2_l0/tests/l0c_stage2_verbose_output_test.sh`
+  - `compiler/stage2_l0/tests/l0c_ast_test.sh`
 - Repro: `./build/dea/bin/l0c-stage2 --ast -P examples hello`
 
 ## Summary
@@ -60,11 +60,11 @@ Required shape:
    only if that keeps ownership and dependencies simple.
 2. The formatter must render the parsed Stage 2 AST, not typed semantic tables.
 3. The output contract should match Stage 1 at the behavior level:
-    - node kind on the header line,
-    - simple scalar fields inline,
-    - child nodes nested under labeled sections,
-    - source-span annotations preserved where Stage 2 AST stores them,
-    - deterministic field and child ordering.
+   - node kind on the header line,
+   - simple scalar fields inline,
+   - child nodes nested under labeled sections,
+   - source-span annotations preserved where Stage 2 AST stores them,
+   - deterministic field and child ordering.
 4. Prefer Stage 1’s `l0_ast_printer.py` structure as the oracle for layout and traversal, but translate it into normal
    Stage 2 L0 code using explicit per-node formatting instead of Python reflection.
 5. Keep the initial formatter scope limited to node kinds that can appear in the current Stage 2 parser surface; no
@@ -74,17 +74,17 @@ Required shape:
 
 1. Add `l0c_cmd_ast(opts: CliOptions*, cfg: LogConfig*) -> int` in `l0c_lib.l0`.
 2. Follow Stage 1 command structure:
-    - build search paths from CLI input,
-    - build the compilation unit through the existing driver path,
-    - print diagnostics and return `1` on build/parse/load failure,
-    - print AST text and return `0` on success.
+   - build search paths from CLI input,
+   - build the compilation unit through the existing driver path,
+   - print diagnostics and return `1` on build/parse/load failure,
+   - print AST text and return `0` on success.
 3. Use the same entry-module and `--all-modules` semantics as Stage 1:
-    - without `--all-modules`, print only the entry module,
-    - with `--all-modules`, sort module names and print all modules.
+   - without `--all-modules`, print only the entry module,
+   - with `--all-modules`, sort module names and print all modules.
 4. For `--all-modules`, preserve Stage 1-style per-module headers:
-    - `=== Module <name> ===`
-    - formatted AST
-    - one trailing blank line between modules
+   - `=== Module <name> ===`
+   - formatted AST
+   - one trailing blank line between modules
 5. Replace the `CM_AST -> l0c_cmd_nyi(...)` dispatch in `run_with_argv()` with the new handler.
 
 ### 3. Match Stage 1 failure behavior closely
@@ -103,11 +103,11 @@ Required shape:
 1. Extend `compiler/stage2_l0/tests/cli_args_test.l0` with a positive parse/dispatch-shape test for `--ast` and
    `--all-modules` acceptance.
 2. Add a new end-to-end regression, `compiler/stage2_l0/tests/l0c_ast_test.sh`, covering:
-    - `--ast` success for a single-module fixture,
-    - `--ast --all-modules` success for a multi-module fixture,
-    - stable module header ordering for `--all-modules`,
-    - absence of `L0C-9510` in successful `--ast` output,
-    - at least one failure-path diagnostic for a bad target or missing module.
+   - `--ast` success for a single-module fixture,
+   - `--ast --all-modules` success for a multi-module fixture,
+   - stable module header ordering for `--all-modules`,
+   - absence of `L0C-9510` in successful `--ast` output,
+   - at least one failure-path diagnostic for a bad target or missing module.
 3. Update any existing Stage 2 help/verbose shell tests if they currently assume `--ast` is not implemented or if their
    expected help wording needs to change.
 4. If the Stage 2 AST output can be made text-identical to Stage 1 for representative fixtures at reasonable cost,
@@ -120,18 +120,18 @@ Required shape:
 After code and tests are green, update current-state docs in the same change:
 
 1. `README.md`
-    - remove the “remaining public CLI gap is `--ast`” wording,
-    - state that Stage 2 implements the full current public CLI surface.
+   - remove the “remaining public CLI gap is `--ast`” wording,
+   - state that Stage 2 implements the full current public CLI surface.
 2. `docs/reference/project-status.md`
-    - remove `--ast` from the Stage 2 limitations list,
-    - describe Stage 2 CLI parity with Stage 1 as complete for the current public modes.
+   - remove `--ast` from the Stage 2 limitations list,
+   - describe Stage 2 CLI parity with Stage 1 as complete for the current public modes.
 3. `docs/reference/architecture.md`
-    - remove the “`--ast` is still NYI” note and list `--ast` among the implemented Stage 2 CLI modes.
+   - remove the “`--ast` is still NYI” note and list `--ast` among the implemented Stage 2 CLI modes.
 4. `compiler/stage2_l0/README.md`
-    - remove the intro caveat that `--ast` is still missing.
+   - remove the intro caveat that `--ast` is still missing.
 5. `docs/plans/features/2026-03-12-shared-cli-contract-spec.md`
-    - keep it open unless the shared spec also ships in the same work,
-    - but remove or update any wording that still treats `--ast` as a remaining implementation mismatch.
+   - keep it open unless the shared spec also ships in the same work,
+   - but remove or update any wording that still treats `--ast` as a remaining implementation mismatch.
 
 ## Verification
 
