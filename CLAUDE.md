@@ -8,8 +8,7 @@ Dea/L0 is a small, safe, C-family systems language compiling to C99.
 
 - **Core principle:** No undefined behavior in the language itself.
 - **Stage 1:** Compiler pipeline in Python (lexer → parser → AST → semantic passes → C codegen).
-- **Stage 2:** Self-hosting compiler (L0-in-L0) with frontend, backend, `--gen`, `--build`, and `--run`
-  implemented.
+- **Stage 2:** Self-hosting compiler (L0-in-L0) with frontend, backend, `--gen`, `--build`, and `--run` implemented.
 - **Subsystems:** Grammar/semantics, backend/codegen, driver/build/module layout, and stdlib.
 
 ## Documentation — Read On Demand
@@ -18,7 +17,7 @@ Detailed information lives in `docs/`. **Before answering questions about gramma
 implementation status, read the relevant doc file(s).**
 
 | Doc file                                   | Covers                                                        |
-|--------------------------------------------|---------------------------------------------------------------|
+| ------------------------------------------ | ------------------------------------------------------------- |
 | `docs/reference/architecture.md`           | Compiler pipeline, passes, data flow, file layout             |
 | `docs/specs/compiler/diagnostic-format.md` | Normative diagnostic output format (header, snippet, gutter)  |
 | `docs/specs/compiler/stage1-contract.md`   | Stage 1 compact contract, interfaces, guarantees, doc routing |
@@ -46,15 +45,19 @@ Also see: `CONTRIBUTING.md`, `SECURITY.md`.
 - **Virtual Environment:** Always check for a local `.venv` and/or `uv` availability. Prefer `make venv` for the
   repo-managed developer setup; it reuses `.venv` if present, otherwise uses `uv` when available and falls back to a
   plain `python3 -m venv` workflow.
-- **Manual Environment Setup:** If you are not using `make venv`, prefer `uv sync --group dev --group docs` (uses `pyproject.toml`
-  and `uv.lock`) or fall back to `python3 -m venv .venv && source .venv/bin/activate && pip install -e . "pytest>=9.0.2" "pytest-xdist>=3.5" "jinja2>=3.1.6" "PyYAML>=6.0.2" "pygments>=2.19.2"`.
+- **Manual Environment Setup:** If you are not using `make venv`, prefer `uv sync --group dev --group docs` (uses
+  `pyproject.toml` and `uv.lock`) or fall back to
+  `python3 -m venv .venv && source .venv/bin/activate && pip install -e . "pytest>=9.0.2" "pytest-xdist>=3.5" "jinja2>=3.1.6" "PyYAML>=6.0.2" "pygments>=2.19.2"`.
 - **Windows Host Setup:** For Windows validation, use an MSYS2 `MINGW64` shell with MinGW-w64 GCC and GNU Make on
   `PATH`. Source-tree Stage 1 usage is available through `./scripts/l0c.cmd`, while repo-local Make targets use the
-  normal `./scripts/l0c` and `./scripts/build-stage2-l0c.sh` entrypoints from within MSYS2 bash. Keep the fallback
-  under `scripts/`: the root-level `l0c` name is reserved for the selected dev or installed compiler command.
-- **Environment Variables:** Source `build/dea/bin/l0-env.sh` only for the repo-local Dea build workflow. For an installed
-  Stage 2 prefix, source `<PREFIX>/bin/l0-env.sh`. For source-tree usage, invoke `./scripts/l0c` directly; it derives
-  `L0_HOME` on its own.
+  normal `./scripts/l0c` and `./scripts/build-stage2-l0c.sh` entrypoints from within MSYS2 bash. Keep the fallback under
+  `scripts/`: the root-level `l0c` name is reserved for the selected dev or installed compiler command.
+- **Environment Variables:** Source `build/dea/bin/l0-env.sh` only for the repo-local Dea build workflow. For an
+  installed Stage 2 prefix, source `<PREFIX>/bin/l0-env.sh`. For source-tree usage, invoke `./scripts/l0c` directly; it
+  derives `L0_HOME` on its own.
+- **Pre-commit hooks:** Install with `pre-commit install` after `make venv`. Two hooks run on every commit: `mdformat`
+  (auto-reformats `.md` files; config in `pyproject.toml`) and `copyright-headers` (validates source file copyright
+  notices). If mdformat reformats a file, stage the changes and re-commit.
 
 ## Commands
 
@@ -93,8 +96,8 @@ make docker CMD=test-all DOCKER_L0_CC=gcc
 
 Verbosity: `-v` (info), `-vvv` (debug).
 
-C compiler selection: `-c <compiler>`. Auto-detection order (used by `l0c` and Stage 1 tests): `$L0_CC`, then
-`tcc`, `gcc`, `clang`, `cc` from PATH, then `$CC`.
+C compiler selection: `-c <compiler>`. Auto-detection order (used by `l0c` and Stage 1 tests): `$L0_CC`, then `tcc`,
+`gcc`, `clang`, `cc` from PATH, then `$CC`.
 
 Trace toggles (codegen/build/run): `--trace-arc`, `--trace-memory`.
 
@@ -115,15 +118,14 @@ make triple-test # run the strict stage2/stage3 triple-bootstrap regression
 
 Stage 2 currently implements analysis/dump modes plus `--gen`, `--build`, and `--run`.
 
-Generated API documentation is written under `build/docs/` and is not part of the hand-authored `docs/` tree.
-Native Doxygen LaTeX output is generated under `build/docs/doxygen/latex/`; use `./scripts/gen-docs.sh --pdf`
-to build `refman.pdf` and copy it into `build/docs/pdf/` if a local TeX toolchain is installed.
-For faster local previews, `./scripts/gen-docs.sh --pdf-fast --latex-only` performs a single-pass PDF build.
-After each successful docs run, generated artifacts are mirrored to a stable preview tree under `build/preview/`
-(`html/`, `markdown/`, `pdf/`), which is overwritten by the next successful run.
-Use `-v` / `--verbose` with `scripts/gen-docs.sh` to show m.css warnings and LaTeX build output directly.
-Release/manual publishing is handled by `.github/workflows/docs-publish.yml`; PR validation is handled by
-`.github/workflows/docs-validate.yml`.
+Generated API documentation is written under `build/docs/` and is not part of the hand-authored `docs/` tree. Native
+Doxygen LaTeX output is generated under `build/docs/doxygen/latex/`; use `./scripts/gen-docs.sh --pdf` to build
+`refman.pdf` and copy it into `build/docs/pdf/` if a local TeX toolchain is installed. For faster local previews,
+`./scripts/gen-docs.sh --pdf-fast --latex-only` performs a single-pass PDF build. After each successful docs run,
+generated artifacts are mirrored to a stable preview tree under `build/preview/` (`html/`, `markdown/`, `pdf/`), which
+is overwritten by the next successful run. Use `-v` / `--verbose` with `scripts/gen-docs.sh` to show m.css warnings and
+LaTeX build output directly. Release/manual publishing is handled by `.github/workflows/docs-publish.yml`; PR validation
+is handled by `.github/workflows/docs-validate.yml`.
 
 ### Testing
 
@@ -148,22 +150,22 @@ make DEA_BUILD_DIR=build/dev-dea triple-test
 These Make targets are self-contained repo-local workflows: they ensure `./.venv`, prepare the Stage 2 artifact under
 `DEA_BUILD_DIR`, and scrub installed-prefix `L0_*` env leakage before running.
 
-`run_trace_tests.py` is an important finalization gate because it validates ARC/memory traces and leak triage across
-all Stage 2 tests.
+`run_trace_tests.py` is an important finalization gate because it validates ARC/memory traces and leak triage across all
+Stage 2 tests.
 
 The root `Dockerfile` is a supported Linux test environment, but Docker use is always explicit. Prefer
 `make docker CMD=test-all` when you want the containerized workflow; do not add Docker as an implicit dependency of the
-default host-side `make` targets. If the container needs a specific compiler, pass `DOCKER_L0_CC=...`; do not reuse
-the host `L0_CC` setting automatically.
+default host-side `make` targets. If the container needs a specific compiler, pass `DOCKER_L0_CC=...`; do not reuse the
+host `L0_CC` setting automatically.
 
 For Stage 1 ownership-sensitive changes (ARC lowering, `drop` behavior, container ownership paths), run targeted ARC
-trace tests from `compiler/stage1_py/tests/backend/test_trace_arc.py` and prefer the full file when touching shared
-ARC pathways.
+trace tests from `compiler/stage1_py/tests/backend/test_trace_arc.py` and prefer the full file when touching shared ARC
+pathways.
 
 When adding or moving tests, follow `compiler/stage1_py/tests/README.md` for placement and naming rules.
 
-Requires pytest >= 9.0.2, pytest-xdist >= 3.5, and a C compiler.
-Compiler auto-detection follows the logic defined in the Commands section.
+Requires pytest >= 9.0.2, pytest-xdist >= 3.5, and a C compiler. Compiler auto-detection follows the logic defined in
+the Commands section.
 
 ## Critical Constraints
 
@@ -194,8 +196,8 @@ Format: `[XXX-NNNN]` (e.g., `[TYP-0158]`). Before adding a new code, confirm it 
 rg -n 'XXX-NNNN' compiler/stage1_py compiler/stage2_l0 docs
 ```
 
-- Equivalent Stage 2 conditions MUST reuse the exact Stage 1 code, not just the same family. This includes
-  user-facing diagnostics and `ICE-xxxx`.
+- Equivalent Stage 2 conditions MUST reuse the exact Stage 1 code, not just the same family. This includes user-facing
+  diagnostics and `ICE-xxxx`.
 - Never reuse a Stage 1 code with a different meaning in Stage 2.
 - New codes are allowed only for Stage 2-only conditions with no Stage 1 equivalent.
 - When porting Stage 1 behavior, treat Stage 1 code meaning as the oracle and preserve the same numeric code for the

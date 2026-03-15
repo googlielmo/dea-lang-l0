@@ -43,24 +43,17 @@ L0 is currently in its first self-hosted Stage 2 phase.
 
 - Stage 1: complete and usable.
 
-- Stage 2: lexer, parser, AST, name resolution, top-level signature resolution, local scope construction,
-  expression/statement type checking, backend lowering, C emission, and direct `--build` / `--run` execution are
-  implemented.
+- Stage 2: self-hosted and parity-tested against Stage 1 on a committed golden corpus.
 
-- Stage 2 `--gen`: implemented and parity-tested against Stage 1 on a committed golden corpus.
+  - Bootstrap artifact: buildable today under `build/dea/bin` via `./scripts/build-stage2-l0c.sh`.
 
-- Stage 2 bootstrap artifact: buildable today under `build/dea/bin` via `./scripts/build-stage2-l0c.sh`.
+  - Repo-local Dea build workflow: available under `build/dea/bin` via `make install-dev-stages`; `make use-dev-stage2`
+    selects the Stage 2 compiler and environment for development use.
 
-- Stage 2 repo-local Dea build workflow: available under `build/dea/bin` via `make install-dev-stages`;
-  `make use-dev-stage2` prints the exact `source build/dea/bin/l0-env.sh` command after switching the alias.
+  - Install available via `make PREFIX=/tmp/l0-install install`; this installs the self-hosted Stage 2 compiler (
+    `S1 -> S2`, then `S2 -> S2`) plus copied `shared/l0/stdlib` and `shared/runtime` assets.
 
-- Stage 2 install prefix: available via `make PREFIX=/tmp/l0-install install`; this installs the self-hosted Stage 2
-  compiler (`S1 -> S2`, then `S2 -> S2`) plus copied `shared/l0/stdlib` and `shared/runtime` assets.
-
-- Stage 2 triple-bootstrap regression: available directly via `make triple-test`.
-
-Stage 2 implements the full current public CLI surface: `--check`, `--tok`, `--sym`, `--type`, `--ast`, deterministic
-`--gen`, and direct `--build` / `--run`.
+  - Triple-bootstrap verified: the compiler reproducibly compiles itself.
 
 - **Built-in Observability:** Language developers need to know what memory is doing. L0 ships with native compiler flags
   to trace ARC events and allocations directly to stderr. Today these are fully usable through the Stage 1 driver and
@@ -375,18 +368,14 @@ l0c [mode] [options] <target>
 # ./scripts/l0c [mode] [options] <target>
 ```
 
-Global identity and logging options include `--help`, `--version`, `-v/--verbose`, and `-l/--log`.
+Global identity and logging options include `--help`, `--version`, `-v/--verbose`, and `-l/--log`. The main mode flags
+are as follows:
 
 | Mode           | Action                      |
 | -------------- | --------------------------- |
 | `--build`      | Compile to binary (default) |
-| `--run` / `-r` | Compile and execute         |
-| `--gen` / `-g` | Emit C99                    |
 | `--check`      | Analyze only                |
-| `--ast`        | Dump AST                    |
-| `--sym`        | Dump module symbols         |
-| `--type`       | Dump resolved types         |
-| `--tok`        | Dump token stream           |
+| `--run` / `-r` | Compile and execute         |
 
 ```shell
 l0c --build --keep-c hello.l0             # retain the generated C
@@ -395,10 +384,10 @@ l0c --run --trace-arc --trace-memory app  # trace ARC and allocation to stderr
 l0c -c clang -C "-Og -DDEBUG" hello.l0    # use a specific C compiler with custom flags
 ```
 
-Trace output contract: [docs/specs/runtime/trace.md](docs/specs/runtime/trace.md).
-
 Full CLI contract — mode flags, options, targets, identity strings, exit codes, and stage-specific differences:
 [docs/specs/compiler/cli-contract.md](docs/specs/compiler/cli-contract.md).
+
+Trace output contract: [docs/specs/runtime/trace.md](docs/specs/runtime/trace.md).
 
 ## Project status
 

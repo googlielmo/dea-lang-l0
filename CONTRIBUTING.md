@@ -27,6 +27,21 @@ source build/dea/bin/l0-env.sh
 The source-tree `./scripts/l0c` entrypoint is Stage 1 only and is mainly useful for bootstrap mechanics, internal
 tooling, and Stage 1-focused testing.
 
+### Pre-commit hooks
+
+After running `make venv`, install the hooks once:
+
+```bash
+pre-commit install
+```
+
+Two hooks run on every commit:
+
+- **mdformat** — auto-formats all `.md` files (line wrap 120, GFM). If it reformats a file, stage the changes and commit
+  again.
+- **copyright-headers** — checks that tracked `.c`, `.h`, `.l0`, `.py`, `.sh` files have a copyright notice in the first
+  80 lines.
+
 ### Running tests
 
 From the repository root:
@@ -95,26 +110,26 @@ l0c -vvv -P examples --check hello   # debug-level logging
 
 - **Python:** Use Google Style docstrings (include `Args`, `Returns`, `Raises` sections).
 - **C (.h/.c) & L0 (.l0):**
-    - **Doxygen:** Use Javadoc format (`/** ... */` with `@param`, `@return` tags). Omit the `@brief` tag; rely on the
-      first sentence for the brief description.
-    - **License Headers:** Keep `SPDX-License-Identifier` and copyright headers in standard C block comments
-      (`/* ... */`) at the top of the file, distinct from Doxygen blocks.
-    - **Section Separators:**
-        - **C/C++:** Banners must fit within a **79-character maximum line width**. For standard block comment
-          separators, use exactly 73 equals signs (`=`):
-          ```c
-          /* =========================================================================
-           * Section name
-           * ========================================================================= */
-          ```
-        - **L0:** Use a shorter format to fit within a 40-character line width, with exactly 33 equals (`=`) or
-          hyphen ( `-`) signs. The title should stay within 33 characters (introduce a newline if longer).
-          ```
-          /* =================================
-             Section Name
-             ================================= */
-          ```
-          Notice the closing line has exactly 3 leading spaces and 33 signs before the `*/`.
+  - **Doxygen:** Use Javadoc format (`/** ... */` with `@param`, `@return` tags). Omit the `@brief` tag; rely on the
+    first sentence for the brief description.
+  - **License Headers:** Keep `SPDX-License-Identifier` and copyright headers in standard C block comments (`/* ... */`)
+    at the top of the file, distinct from Doxygen blocks.
+  - **Section Separators:**
+    - **C/C++:** Banners must fit within a **79-character maximum line width**. For standard block comment separators,
+      use exactly 73 equals signs (`=`):
+      ```c
+      /* =========================================================================
+       * Section name
+       * ========================================================================= */
+      ```
+    - **L0:** Use a shorter format to fit within a 40-character line width, with exactly 33 equals (`=`) or hyphen (
+      `-`) signs. The title should stay within 33 characters (introduce a newline if longer).
+      ```
+      /* =================================
+         Section Name
+         ================================= */
+      ```
+      Notice the closing line has exactly 3 leading spaces and 33 signs before the `*/`.
 
 ### Commit messages
 
@@ -138,15 +153,14 @@ consistent with the repository LICENSE files.
 ## AI-Assisted Contributions Policy
 
 The use of AI or other automated tools to assist in writing code, documentation, or other project materials is
-**encouraged** in order to experiment, iterate rapidly, and explore solutions more efficiently.
-Contributors remain fully responsible for the correctness, rights to contribute and license, licensing compatibility,
-and security of their contributions, regardless of the tools used.
+**encouraged** in order to experiment, iterate rapidly, and explore solutions more efficiently. Contributors remain
+fully responsible for the correctness, rights to contribute and license, licensing compatibility, and security of their
+contributions, regardless of the tools used.
 
 **All contributions must comply with the project’s licensing, contribution guidelines, and quality standards.**
 
 ## Code of Conduct
 
-Assume good faith, be kind, and focus on technical substance.
-Abusive or harassing content will be removed.
+Assume good faith, be kind, and focus on technical substance. Abusive or harassing content will be removed.
 
 Report concerns to: googlielmo@gmail.com
