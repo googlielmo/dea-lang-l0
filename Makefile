@@ -19,11 +19,13 @@ DOCKER_IMAGE ?= l0-test
 	install-dev-stage2 \
 	install-dev-stages \
 	install \
+	dist \
 	use-dev-stage1 \
 	use-dev-stage2 \
 	test-stage1 \
 	test-stage2 \
 	test-stage2-trace \
+	test-dist \
 	triple-test \
 	test-all \
 	print-dea-build-dir \
@@ -38,6 +40,7 @@ help:
 		'' \
 		'Targets:' \
 		'  install            Install the self-hosted Stage 2 compiler under PREFIX.' \
+		'  dist               Build a relocatable Stage 2 `dist/` tree under `build/` and archive it.' \
 		'' \
 		'Development targets:' \
 		'  venv               Create the local `.venv` (prefer `uv`, fall back to `python -m venv`).' \
@@ -46,10 +49,11 @@ help:
 		'  install-dev-stage2 Build and install the repo-local Stage 2 launcher.' \
 		'  use-dev-stage1     Switch the repo-local `l0c` alias to Stage 1.' \
 		'  use-dev-stage2     Switch the repo-local `l0c` alias to Stage 2.' \
-		'  test-all           Run the full Stage 1 and Stage 2 validation suite.' \
+		'  test-all           Run the full Stage 1, Stage 2, and distribution validation suite.' \
 		'  test-stage1        Validate the Stage 1 Python compiler test suite.' \
 		'  test-stage2        Validate the Stage 2 compiler test suite; pass TESTS="name1 name2" to run selected cases.' \
 		'  test-stage2-trace  Validate Stage 2 ARC and memory tracing behavior.' \
+		'  test-dist          Validate the `make dist` packaging workflow end to end.' \
 		'  triple-test        Run the Stage 2 triple-bootstrap check on its own.' \
 		'' \
 		'Docker:' \
@@ -61,7 +65,7 @@ help:
 		'' \
 		'Other targets:' \
 		'  help               Show this help text.' \
-		'  clean              Remove all repo-local build artifacts under `build/*`, temporary test files, and default executables.' \
+		'  clean              Remove all repo-local build artifacts under `build/*` (including temporary `dist` trees and archives), temporary test files, and default executables.' \
 		'  clean-dea-build    Remove the repo-local Dea build tree (override with `DEA_BUILD_DIR`, see below).' \
 		'' \
 		'Variables:' \
@@ -122,6 +126,9 @@ else
 endif
 	@printf '\n------------------------------------------------------------------------------\n'
 
+dist: venv
+	$(PYTHON) ./scripts/gen_dist_tools.py make-dist
+
 use-dev-stage1: install-dev-stage1
 	$(PYTHON) ./scripts/gen_dist_tools.py set-alias --dea-build-dir "$(DEA_BUILD_DIR)" --stage stage1
 	@printf '\n------------------------------------------------------------------------------\n'
@@ -151,7 +158,10 @@ test-stage2: venv install-dev-stage2
 test-stage2-trace: venv install-dev-stage2
 	DEA_BUILD_DIR="$(DEA_BUILD_DIR)" "$(VENV_PYTHON)" ./compiler/stage2_l0/run_trace_tests.py
 
-test-all: test-stage1 test-stage2 test-stage2-trace
+test-dist: venv
+	"$(VENV_PYTHON)" ./tests/test_make_dist_workflow.py
+
+test-all: test-stage1 test-stage2 test-stage2-trace test-dist
 
 triple-test: venv install-dev-stage2
 	DEA_BUILD_DIR="$(DEA_BUILD_DIR)" "$(VENV_PYTHON)" ./compiler/stage2_l0/tests/l0c_triple_bootstrap_test.py

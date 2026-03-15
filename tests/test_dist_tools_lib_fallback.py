@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 import os
 from pathlib import Path
 import subprocess
@@ -21,7 +22,12 @@ SCRIPTS_DIR = REPO_ROOT / "scripts"
 if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
-from dist_tools_lib import collect_stage2_build_provenance, render_stage2_build_info_module
+from dist_tools_lib import (
+    collect_stage2_build_provenance,
+    distribution_archive_basename,
+    distribution_archive_target,
+    render_stage2_build_info_module,
+)
 
 
 def fail(message: str) -> None:
@@ -67,6 +73,8 @@ def main() -> int:
         fail(f"expected UTC offset build time, got {provenance.build_time!r}")
     if provenance.host != "Darwin 24.6.0 x86_64":
         fail(f"unexpected host text: {provenance.host!r}")
+    if distribution_archive_target(provenance.host) != "darwin-x86_64":
+        fail(f"unexpected archive target: {distribution_archive_target(provenance.host)!r}")
     if provenance.compiler_banner != "gcc-15 (Homebrew GCC 15.2.0_1) 15.2.0":
         fail(f"unexpected compiler banner: {provenance.compiler_banner!r}")
     if not provenance.has_embedded_version:
@@ -82,6 +90,10 @@ def main() -> int:
         fail("expected rendered build_info module to embed the compact host triplet")
     if 'func build_info_compiler() -> string {\n    return "gcc-15 (Homebrew GCC 15.2.0_1) 15.2.0";\n}' not in rendered:
         fail("expected rendered build_info module to embed the compiler banner")
+    if distribution_archive_basename(datetime.fromisoformat("2026-03-16 08:31:20+00:00"), provenance.host) != (
+        "dea-l0-lang_darwin-x86_64_20260316-083120"
+    ):
+        fail("unexpected archive basename")
 
     print("test_dist_tools_lib_fallback: PASS")
     return 0

@@ -157,6 +157,16 @@ l0c --version
 
 `make install` requires an explicit `PREFIX=...`; there is no implicit default install root.
 
+For a relocatable distribution archive under `build/`:
+
+```shell
+make dist
+```
+
+`make dist` creates one temporary `dea-l0/` tree under `build/` plus a host-native archive named
+`dea-l0-lang_<os>-<arch>_YYYYMMDD-HHMMSS.tar.gz` on POSIX or `dea-l0-lang_<os>-<arch>_YYYYMMDD-HHMMSS.zip` on Windows,
+using the lower-case OS/architecture from the recorded build host plus the UTC build timestamp in the archive name.
+
 `install` installs the self-hosted Stage 2 compiler (`Compiler 2` from the triple-bootstrap chain), not the initial
 Stage 1-built bootstrap artifact.
 

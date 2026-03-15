@@ -243,6 +243,10 @@ Stage 2 backend/codegen status:
   the self-hosted Stage 2 compiler (`Compiler 2` from the bootstrap chain), not the initial Stage 1-built bootstrap
   artifact. `make install` requires an explicit `PREFIX=...`. Compiler 2 / compiler 3 inside the strict triple-bootstrap
   regression intentionally remain on the static fallback `--version` path.
+- A relocatable distribution archive is now available via `make dist`, which assembles the same independent Stage 2
+  runtime layout under a temporary `build/.../dea-l0` tree and archives it as
+  `dea-l0-lang_<os>-<arch>_YYYYMMDD-HHMMSS.tar.gz` on POSIX hosts or `dea-l0-lang_<os>-<arch>_YYYYMMDD-HHMMSS.zip` on
+  Windows.
 - The strict stage2/stage3 fixed-point bootstrap regression is available directly via `make triple-test`.
 - Stage 2 backend lowering now covers the Stage 1 language surface, including ownership-sensitive lowering for `new`,
   `drop`, `try`, `with`, `match`, `case`, `break`, `continue`, and ARC cleanup.

@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import argparse
+from datetime import datetime, timezone
 import os
 from pathlib import Path
 import shlex
@@ -19,6 +20,9 @@ import tempfile
 
 from build_stage2_l0c import build_stage2_artifact
 from dist_tools_lib import (
+    create_stage2_distribution,
+    distribution_archive_basename,
+    distribution_root_dir_name,
     install_prefix_stage2,
     normalize_dea_build_dir,
     normalize_prefix_dir,
@@ -30,6 +34,23 @@ from dist_tools_lib import (
     write_stage1_wrapper,
     write_stage2_wrapper,
 )
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+
+
+def parse_build_time_utc(build_time_text: str) -> datetime:
+    """Parse one recorded UTC build-time string back into a datetime."""
+
+    return datetime.strptime(build_time_text, "%Y-%m-%d %H:%M:%S+00:00").replace(tzinfo=timezone.utc)
+
+
+def render_display_path(path: Path) -> str:
+    """Render one path relative to the repo root when possible."""
+
+    try:
+        return str(path.relative_to(REPO_ROOT))
+    except ValueError:
+        return str(path)
 
 
 def print_progress(message: str) -> None:
@@ -100,6 +121,11 @@ def parse_args() -> argparse.Namespace:
     )
     add_prefix_arg(install_prefix)
 
+    subparsers.add_parser(
+        "make-dist",
+        help="Build compiler 2 (self-hosted Stage 2) into one temporary `dist/` tree and archive it.",
+    )
+
     return parser.parse_args()
 
 
@@ -154,6 +180,68 @@ def main() -> int:
                     return 0
             finally:
                 shutil.rmtree(temp_dist, ignore_errors=True)
+
+        if args.command == "make-dist":
+            build_root = REPO_ROOT / "build"
+            build_root.mkdir(parents=True, exist_ok=True)
+            temp_root = Path(tempfile.mkdtemp(prefix="stage2_dist.", dir=build_root))
+            try:
+                bootstrap_layout = normalize_dea_build_dir(str(temp_root / "bootstrap"))
+                with stage2_build_info_overlay(REPO_ROOT, os.environ.copy(), temp_parent=build_root) as overlay:
+                    dist_layout = normalize_prefix_dir(str(temp_root / distribution_root_dir_name()))
+                    print_toolchain_env(overlay.build_env)
+                    print_progress(
+                        f"stage 1/4: building bootstrap Stage 2 compiler under {render_display_path(bootstrap_layout.dea_build_dir)}"
+                    )
+                    stage2_wrapper, _, _ = build_stage2_artifact(
+                        bootstrap_layout,
+                        keep_c=False,
+                        extra_project_roots=[str(overlay.overlay_root)],
+                        extra_env=overlay.build_env,
+                    )
+                    self_hosted_native = temp_root / "l0c-stage2-selfhosted.native"
+                    self_build_env = overlay.build_env.copy()
+                    self_build_env["L0_HOME"] = str(REPO_ROOT / "compiler")
+                    self_build_env.pop("L0_SYSTEM", None)
+                    self_build_env.pop("L0_RUNTIME_INCLUDE", None)
+                    self_build_env.pop("L0_RUNTIME_LIB", None)
+                    print_progress(f"stage 2/4: self-hosting Stage 2 compiler into {render_display_path(self_hosted_native)}")
+                    subprocess.run(
+                        [
+                            *stage2_wrapper_command(stage2_wrapper),
+                            "--build",
+                            "-P",
+                            str(overlay.overlay_root),
+                            "-P",
+                            "compiler/stage2_l0/src",
+                            "-o",
+                            str(self_hosted_native),
+                            "l0c",
+                        ],
+                        cwd=REPO_ROOT,
+                        env=self_build_env,
+                        check=True,
+                    )
+                    print_progress(
+                        f"stage 3/4: assembling relocatable distribution under {render_display_path(dist_layout.prefix_dir)}"
+                    )
+                    distribution = create_stage2_distribution(
+                        dist_layout,
+                        self_hosted_native,
+                        distribution_archive_basename(
+                            parse_build_time_utc(overlay.provenance.build_time),
+                            overlay.provenance.host,
+                        ),
+                    )
+                    print_progress(f"stage 4/4: wrote distribution archive at {render_display_path(distribution.archive_path)}")
+                    print_progress(f"created distribution directory at {render_display_path(distribution.dist_dir)}")
+                    print("-------------------------------------------------------------------------------")
+                    print(f"created distribution archive at {render_display_path(distribution.archive_path)}")
+                    print("-------------------------------------------------------------------------------")
+                    return 0
+            except ValueError as exc:
+                print(f"gen-dea-build-tools: {exc}", file=sys.stderr)
+                return 1
 
         layout = normalize_dea_build_dir(args.dea_build_dir)
         if args.command == "write-stage1-wrapper":

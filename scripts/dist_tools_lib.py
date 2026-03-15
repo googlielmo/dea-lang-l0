@@ -99,6 +99,14 @@ class Stage2BuildInfoOverlay:
     provenance: Stage2BuildProvenance
 
 
+@dataclass(frozen=True)
+class DistributionArchive:
+    """One generated distribution tree plus its archive path."""
+
+    dist_dir: Path
+    archive_path: Path
+
+
 def normalize_dea_build_dir(dea_build_dir_text: str) -> DeaBuildLayout:
     """Return the normalized repo-local Dea build layout."""
 
@@ -795,6 +803,63 @@ def copy_prefix_shared_assets(layout: PrefixLayout) -> None:
     copy_tree(REPO_ROOT / "compiler" / "shared" / "runtime", layout.runtime_dir)
 
 
+def distribution_archive_format() -> str:
+    """Return the host-appropriate archive format name."""
+
+    return "zip" if is_windows_host() else "gztar"
+
+
+def distribution_archive_suffix() -> str:
+    """Return the host-appropriate distribution archive suffix."""
+
+    return ".zip" if is_windows_host() else ".tar.gz"
+
+
+def distribution_root_dir_name() -> str:
+    """Return the fixed top-level directory name used inside distribution archives."""
+
+    return "dea-l0"
+
+
+def distribution_archive_target(host_text: str) -> str:
+    """Return the normalized `os-arch` token derived from one recorded host line."""
+
+    words = host_text.split()
+    if len(words) < 2:
+        return "unknown-unknown"
+    os_name = _sanitize_build_id_component(words[0].lower())
+    arch = _sanitize_build_id_component(words[-1].lower())
+    return f"{os_name}-{arch}"
+
+
+def distribution_archive_basename(build_timestamp: datetime, host_text: str) -> str:
+    """Return the timestamped archive basename for one distribution build."""
+
+    return (
+        "dea-l0-lang_"
+        f"{distribution_archive_target(host_text)}_"
+        f"{build_timestamp.astimezone(timezone.utc).strftime('%Y%m%d-%H%M%S')}"
+    )
+
+
+def create_distribution_archive(dist_dir: Path, archive_base_name: str) -> Path:
+    """Archive one prepared distribution tree next to itself."""
+
+    archive_base = dist_dir.parent / archive_base_name
+    archive_path = Path(
+        shutil.make_archive(
+            str(archive_base),
+            distribution_archive_format(),
+            root_dir=dist_dir.parent,
+            base_dir=dist_dir.name,
+        )
+    )
+    expected_suffix = distribution_archive_suffix()
+    if not str(archive_path).endswith(expected_suffix):
+        archive_path = Path(f"{archive_base}{expected_suffix}")
+    return archive_path
+
+
 def install_prefix_stage2(layout: PrefixLayout, stage2_native_source: Path) -> Path:
     """Install the Stage 2 compiler and shared assets into one prefix."""
 
@@ -805,3 +870,15 @@ def install_prefix_stage2(layout: PrefixLayout, stage2_native_source: Path) -> P
     write_prefix_env_script(layout)
     set_prefix_alias(layout)
     return layout.bin_dir / "l0c-stage2.native"
+
+
+def create_stage2_distribution(
+    layout: PrefixLayout,
+    stage2_native_source: Path,
+    archive_base_name: str,
+) -> DistributionArchive:
+    """Create one relocatable distribution tree plus a host-native archive."""
+
+    install_prefix_stage2(layout, stage2_native_source)
+    archive_path = create_distribution_archive(layout.prefix_dir, archive_base_name)
+    return DistributionArchive(dist_dir=layout.prefix_dir, archive_path=archive_path)

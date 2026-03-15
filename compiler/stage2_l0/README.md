@@ -56,6 +56,16 @@ l0c --check -P examples hello
 
 `make install` requires an explicit `PREFIX=...`; there is no implicit default install root.
 
+To package the same relocatable layout into a temporary distribution tree and archive:
+
+```bash
+make dist
+```
+
+`make dist` creates `build/.../dea-l0` and archives it as `dea-l0-lang_<os>-<arch>_YYYYMMDD-HHMMSS.tar.gz` on POSIX
+hosts or `dea-l0-lang_<os>-<arch>_YYYYMMDD-HHMMSS.zip` on Windows, using the lower-case OS/architecture from the
+recorded build host plus the UTC build timestamp in the archive name.
+
 `install` installs the self-hosted Stage 2 compiler (`Compiler 2` from the triple-bootstrap chain), not the initial
 Stage 1-built artifact. The installed prefix contains:
 
