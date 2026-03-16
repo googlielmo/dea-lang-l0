@@ -72,6 +72,19 @@ normalize_diff_input() {
     fi
 }
 
+c_output_path() {
+    local output_path="$1"
+    local dir_path
+    local file_name
+    dir_path="$(dirname "$output_path")"
+    file_name="$(basename "$output_path")"
+    case "$file_name" in
+        *.*) file_name="${file_name%.*}.c" ;;
+        *) file_name="${file_name}.c" ;;
+    esac
+    printf '%s/%s\n' "$dir_path" "$file_name"
+}
+
 cleanup() {
     rm -rf "$WORK_DIR"
     if [ -n "$BOOTSTRAP_DIR" ]; then
@@ -167,7 +180,7 @@ fi
 
 "$STAGE2_L0C" --build --keep-c -P "$(native_path "$FIXTURE_ROOT")" -o "$(native_path "$OK_MAIN_BIN")" ok_main >"$WORK_DIR/build_ok.log" 2>&1
 assert_file "$OK_MAIN_BIN"
-assert_file "${OK_MAIN_BIN%.*}.c"
+assert_file "$(c_output_path "$OK_MAIN_BIN")"
 "$OK_MAIN_BIN" >"$WORK_DIR/ok_main.stdout" 2>"$WORK_DIR/ok_main.stderr"
 assert_text_equals "$WORK_DIR/ok_main.stdout" ""
 
@@ -261,6 +274,6 @@ assert_contains "$WORK_DIR/no_main.log" "L0C-0012"
 "$STAGE2_L0C" --build --keep-c -P "$(native_path "$FIXTURE_ROOT")" -o "$(native_path "$BYTE_MAIN_BIN")" byte_main >"$WORK_DIR/byte_main.log" 2>&1
 assert_contains "$WORK_DIR/byte_main.log" "L0C-0013"
 assert_file "$BYTE_MAIN_BIN"
-assert_file "${BYTE_MAIN_BIN%.*}.c"
+assert_file "$(c_output_path "$BYTE_MAIN_BIN")"
 
 echo "l0c_build_run_test: PASS"

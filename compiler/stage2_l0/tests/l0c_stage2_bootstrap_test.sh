@@ -56,6 +56,19 @@ clean_env_run() {
     fi
 }
 
+c_output_path() {
+    local output_path="$1"
+    local dir_path
+    local file_name
+    dir_path="$(dirname "$output_path")"
+    file_name="$(basename "$output_path")"
+    case "$file_name" in
+        *.*) file_name="${file_name%.*}.c" ;;
+        *) file_name="${file_name}.c" ;;
+    esac
+    printf '%s/%s\n' "$dir_path" "$file_name"
+}
+
 # This is the full end-to-end regression for one Stage 2 compiler artifact built
 # into an isolated repo-local test Dea build under `build/tests/...`.
 #
@@ -216,7 +229,7 @@ if is_windows_host; then
 fi
 clean_env_run "$STAGE2_L0C" --build --keep-c -P examples -o "$(native_path "$HELLO_OUTPUT")" hello >/dev/null
 assert_file "$HELLO_OUTPUT"
-assert_file "${HELLO_OUTPUT%.*}.c"
+assert_file "$(c_output_path "$HELLO_OUTPUT")"
 "$HELLO_OUTPUT" > "$HELLO_OUTPUT.out"
 assert_contains "$HELLO_OUTPUT.out" "Hello, World!"
 clean_env_run "$STAGE2_L0C" --run -P examples hello > "$RUN_OUTPUT"
