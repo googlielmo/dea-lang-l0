@@ -31,6 +31,90 @@ def is_windows_host() -> bool:
     return os.name == "nt"
 
 
+def _env_value(env: dict[str, str], *names: str) -> str | None:
+    for name in names:
+        value = env.get(name)
+        if value:
+            return value
+    return None
+
+
+def _format_candidate_resolution(env: dict[str, str]) -> str:
+    path_value = _env_value(env, "PATH", "Path")
+    lines = ["candidate resolution:"]
+    for candidate in ("gcc", "clang", "cc", "tcc"):
+        resolved = shutil.which(candidate, path=path_value)
+        lines.append(f"  {candidate}: {resolved or '<missing>'}")
+    return "\n".join(lines)
+
+
+def _format_file_context(path: Path) -> str:
+    lines = [
+        f"path exists: {path.exists()}",
+        f"path is_file: {path.is_file()}",
+        f"path parent: {path.parent}",
+    ]
+    if path.parent.exists():
+        siblings = sorted(child.name for child in path.parent.iterdir())
+        lines.append(f"path parent entries: {siblings}")
+    if path.is_file():
+        try:
+            text = path.read_text(encoding="utf-8", errors="replace")
+        except OSError as exc:
+            lines.append(f"path read failed: {exc}")
+        else:
+            lines.append("path contents:")
+            lines.extend(f"  {line}" for line in text.splitlines())
+    return "\n".join(lines)
+
+
+def debug_context(command: list[str], env: dict[str, str] | None) -> str:
+    actual_env = os.environ.copy() if env is None else env
+    lines = [
+        f"cwd: {REPO_ROOT}",
+        f"host os.name: {os.name}",
+        f"host sys.platform: {sys.platform}",
+        "selected env:",
+    ]
+    for name in (
+        "PATH",
+        "Path",
+        "PATHEXT",
+        "SYSTEMROOT",
+        "SystemRoot",
+        "COMSPEC",
+        "ComSpec",
+        "WINDIR",
+        "OS",
+        "MSYSTEM",
+        "L0_CC",
+        "CC",
+    ):
+        lines.append(f"  {name}={actual_env.get(name, '<unset>')}")
+
+    path_value = _env_value(actual_env, "PATH", "Path")
+    if path_value is not None:
+        lines.append(f"selected PATH entries: {path_value.split(os.pathsep)}")
+
+    if is_windows_host():
+        system_root = _env_value(actual_env, "SYSTEMROOT", "SystemRoot")
+        where_path = Path(system_root) / "System32" / "where.exe" if system_root else None
+        if where_path is not None:
+            lines.append(f"system where.exe: {where_path} exists={where_path.exists()}")
+
+    lines.append(_format_candidate_resolution(actual_env))
+
+    command_path = Path(command[0])
+    if command_path.suffix.lower() == ".cmd":
+        lines.append("launcher context:")
+        lines.append(_format_file_context(command_path))
+        native_path = command_path.with_suffix(".native")
+        lines.append("native context:")
+        lines.append(_format_file_context(native_path))
+
+    return "\n".join(lines)
+
+
 def run_checked(command: list[str], *, env: dict[str, str] | None = None) -> str:
     proc = subprocess.run(
         command,
@@ -44,7 +128,8 @@ def run_checked(command: list[str], *, env: dict[str, str] | None = None) -> str
         fail(
             f"command failed ({proc.returncode}): {' '.join(command)}\n"
             f"stdout:\n{proc.stdout}\n"
-            f"stderr:\n{proc.stderr}"
+            f"stderr:\n{proc.stderr}\n"
+            f"context:\n{debug_context(command, env)}"
         )
     return proc.stdout + proc.stderr
 
@@ -67,9 +152,15 @@ def assert_not_contains(path: Path, needle: str) -> None:
 
 
 def clean_env() -> dict[str, str]:
-    env = {"PATH": os.environ.get("PATH", "")}
+    env: dict[str, str] = {}
+    for name in ("PATH", "Path"):
+        value = os.environ.get(name)
+        if value is not None:
+            env[name] = value
+    if "PATH" not in env and "Path" not in env:
+        env["PATH"] = ""
     if is_windows_host():
-        for name in ("SYSTEMROOT", "COMSPEC", "WINDIR"):
+        for name in ("PATHEXT", "SYSTEMROOT", "SystemRoot", "COMSPEC", "ComSpec", "WINDIR", "OS", "MSYSTEM"):
             value = os.environ.get(name)
             if value:
                 env[name] = value

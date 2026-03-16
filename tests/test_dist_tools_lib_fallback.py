@@ -27,6 +27,7 @@ from dist_tools_lib import (
     distribution_archive_basename,
     distribution_archive_target,
     render_stage2_build_info_module,
+    resolve_host_c_compiler,
 )
 
 
@@ -52,6 +53,12 @@ def fake_subprocess_run(command: list[str], **_: object) -> SimpleNamespace:
             stderr="",
         )
     fail(f"unexpected subprocess command: {command!r}")
+
+
+def fake_which(tool: str, path: str | None = None) -> str | None:
+    if tool == "gcc" and path == "C:\\msys64\\ucrt64\\bin":
+        return f"{path}\\gcc.exe"
+    return None
 
 
 def main() -> int:
@@ -94,6 +101,14 @@ def main() -> int:
         "dea-l0-lang_darwin-x86_64_20260316-083120"
     ):
         fail("unexpected archive basename")
+
+    path_env = os.environ.copy()
+    path_env.pop("PATH", None)
+    path_env["Path"] = "C:\\msys64\\ucrt64\\bin"
+    with patch("dist_tools_lib.shutil.which", side_effect=fake_which):
+        resolved_from_path = resolve_host_c_compiler(path_env)
+    if resolved_from_path != "gcc":
+        fail(f"expected Windows Path fallback to resolve 'gcc', got {resolved_from_path!r}")
 
     print("test_dist_tools_lib_fallback: PASS")
     return 0

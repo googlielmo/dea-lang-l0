@@ -177,6 +177,8 @@ def resolve_host_c_compiler(env: dict[str, str]) -> str | None:
         return from_env
 
     path_text = env.get("PATH")
+    if path_text is None:
+        path_text = env.get("Path")
     for candidate in ("tcc", "gcc", "clang", "cc"):
         if shutil.which(candidate, path=path_text):
             return candidate
