@@ -137,6 +137,10 @@ jobs:
               if not version_path.is_file():
                   raise SystemExit(f"missing VERSION file in {dist_root}")
 
+              for expected in ["README.md", "examples", "docs/reference"]:
+                  if not (dist_root / expected).exists():
+                      raise SystemExit(f"missing expected path in dist: {dist_root / expected}")
+
               launcher = dist_root / "bin" / "l0c"
               if os.name == "nt":
                   launcher = launcher.with_suffix(".cmd")

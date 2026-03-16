@@ -829,6 +829,22 @@ def copy_distribution_version_file(layout: PrefixLayout) -> None:
         copy_file(version_path, layout.prefix_dir / "VERSION")
 
 
+def copy_distribution_extras(layout: PrefixLayout) -> None:
+    """Copy README, examples, and reference docs into the distribution tree."""
+
+    readme = REPO_ROOT / "README.md"
+    if readme.is_file():
+        copy_file(readme, layout.prefix_dir / "README.md")
+
+    examples_src = REPO_ROOT / "examples"
+    if examples_src.is_dir():
+        copy_tree(examples_src, layout.prefix_dir / "examples")
+
+    ref_src = REPO_ROOT / "docs" / "reference"
+    if ref_src.is_dir():
+        copy_tree(ref_src, layout.prefix_dir / "docs" / "reference")
+
+
 def distribution_archive_format() -> str:
     """Return the host-appropriate archive format name."""
 
@@ -907,5 +923,6 @@ def create_stage2_distribution(
 
     install_prefix_stage2(layout, stage2_native_source)
     copy_distribution_version_file(layout)
+    copy_distribution_extras(layout)
     archive_path = create_distribution_archive(layout.prefix_dir, archive_base_name)
     return DistributionArchive(dist_dir=layout.prefix_dir, archive_path=archive_path)

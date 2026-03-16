@@ -23,8 +23,9 @@
 
 `make install` and `make dist` now produce a relocatable self-hosted Stage 2 compiler archive. This plan adds the CI
 infrastructure to publish those archives as GitHub Releases, covering tag-triggered releases, manual-dispatch snapshots,
-multi-platform binary matrix, auto-generated release notes, `VERSION` file injection into binary archives, and SHA-256
-checksums.
+multi-platform binary matrix, auto-generated release notes, `VERSION` file injection into binary archives, SHA-256
+checksums, and bundling of `README.md`, `examples/`, and `docs/reference/` so users have orientation material and a
+language reference without going online.
 
 ## Goals
 
@@ -72,6 +73,31 @@ Release archives are built with the platform's system compiler (gcc on Linux/Win
 defaults to `L0_CFLAGS=-O2`, so the `l0c-stage2.native` binary is optimized in both local and CI builds. This compiler
 and optimization level are used only to produce the compiler binary itself. End users independently choose their own C
 compiler (tcc, gcc, clang, etc.) and flags for compiling L0 programs via `--build` and `--run`.
+
+## Archive Contents
+
+Each binary distribution archive unpacks to a `dea-l0/` root with the following layout:
+
+```
+dea-l0/
+  bin/              l0c launcher, l0c-stage2.native, l0-env.sh
+  shared/           stdlib and runtime shared assets
+  VERSION           machine-readable version string (injected by CI)
+  README.md         top-level project README
+  examples/         all bundled .l0 example programs
+  docs/
+    reference/      normative user-facing language documentation
+      architecture.md
+      c-backend-design.md
+      design-decisions.md
+      grammar/
+        l0.md
+      ownership.md
+      project-status.md
+      standard-library.md
+```
+
+Development plans (`docs/plans/`), specs, proposals, attic docs, and contributor docs are not included.
 
 ## Phases
 
@@ -199,6 +225,14 @@ Each matrix job, after `make dist`, extracts the archive into a temporary direct
 ```bash
 ./dea-l0/bin/l0c --version
 test -f ./dea-l0/VERSION
+```
+
+The smoke test also asserts presence of the bundled extras:
+
+```python
+for expected in ["README.md", "examples", "docs/reference"]:
+    if not (dist_root / expected).exists():
+        raise SystemExit(f"missing expected path in dist: {dist_root / expected}")
 ```
 
 This catches packaging regressions before the archive reaches the release. On Windows, the smoke test uses `l0c.cmd`.
