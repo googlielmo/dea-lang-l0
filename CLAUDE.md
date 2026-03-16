@@ -205,7 +205,8 @@ rg -n 'XXX-NNNN' compiler/stage1_py compiler/stage2_l0 docs
 
 ## Git Conventions
 
-- Multiline commits: sentence-case summary with period, then factual body as bullets with "- " prefix, no wrapping.
+- Multiline commits: sentence-case summary with period, then factual body as bullets with "- " prefix, sentence-case,
+  ending with a period, no wrapping.
 - For multiline commit messages, write the message to a temporary file and use `git commit -F <file>` to avoid shell
   escaping issues (especially with backticks).
 - When writing shell helpers around `git commit` or other multi-step commands, avoid assigning to `zsh` special
