@@ -225,10 +225,10 @@ def assert_stable_native_toolchain(compiler_text: str, cflags_text: str, artifac
 
     family = recognized_compiler_family(compiler_text)
     if family == "tcc":
-        notice("skipping native stability probe for known tcc command (no stable binary guarantee)")
+        notice("skipping native stability probe for known tcc compiler (no stable binary guarantee)")
         return
     if family in {"gcc", "clang"}:
-        notice(f"skipping native stability probe for known {family} command")
+        notice(f"skipping native stability probe for known {family} compiler")
         return
 
     probe_source = artifact_dir / "native_stability_probe.c"

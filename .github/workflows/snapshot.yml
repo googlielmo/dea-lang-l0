@@ -203,7 +203,7 @@ jobs:
           PY
 
       - name: Upload distribution artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: dist-${{ matrix.os }}-${{ matrix.arch }}
           path: ${{ env.DIST_ARCHIVE_PATH }}
@@ -221,7 +221,7 @@ jobs:
           ref: ${{ needs.prepare-snapshot.outputs.snapshot_ref }}
 
       - name: Download distribution artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           pattern: dist-*
           merge-multiple: true

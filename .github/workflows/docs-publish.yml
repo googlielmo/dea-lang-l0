@@ -84,18 +84,18 @@ jobs:
           touch build/docs/pages-site/.nojekyll
 
       - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v4
         with:
           path: build/docs/pages-site
 
       - name: Upload generated Markdown artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: docs-markdown
           path: build/docs/markdown
 
       - name: Upload generated PDF artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: docs-pdf
           path: build/docs/pdf/refman.pdf
@@ -112,7 +112,7 @@ jobs:
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v6
 
   upload-release-pdf:
     needs: build-docs
@@ -120,7 +120,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download PDF artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           name: docs-pdf
           path: build/docs/pdf
@@ -186,7 +186,7 @@ jobs:
           python-version: "3.14"
 
       - name: Download generated Markdown
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           name: docs-markdown
           path: build/docs/markdown
