@@ -66,6 +66,10 @@ make dist
 hosts or `dea-l0-lang_<os>-<arch>_YYYYMMDD-HHMMSS.zip` on Windows, using the lower-case OS/architecture from the
 recorded build host plus the UTC build timestamp in the archive name.
 
+If a repo-root `VERSION` file exists when `make dist` runs, it is copied into the top level of the packaged `dea-l0/`
+tree. The file should contain the release version string without a leading `v`. `make dist` also defaults `L0_CFLAGS` to
+`-O2` unless you override it explicitly on the command line.
+
 `install` installs the self-hosted Stage 2 compiler (`Compiler 2` from the triple-bootstrap chain), not the initial
 Stage 1-built artifact. The installed prefix contains:
 

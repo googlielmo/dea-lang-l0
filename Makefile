@@ -127,7 +127,7 @@ endif
 	@printf '\n------------------------------------------------------------------------------\n'
 
 dist: venv
-	$(PYTHON) ./scripts/gen_dist_tools.py make-dist
+	L0_CFLAGS="$${L0_CFLAGS:--O2}" $(PYTHON) ./scripts/gen_dist_tools.py make-dist
 
 use-dev-stage1: install-dev-stage1
 	$(PYTHON) ./scripts/gen_dist_tools.py set-alias --dea-build-dir "$(DEA_BUILD_DIR)" --stage stage1

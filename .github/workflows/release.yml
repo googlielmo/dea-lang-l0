@@ -1,0 +1,209 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+# Copyright (c) 2026 gwz
+
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build-dist:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            os: linux
+            arch: x86_64
+            c_compiler: gcc
+          - runner: macos-15-intel
+            os: darwin
+            arch: x86_64
+            c_compiler: clang
+          - runner: macos-latest
+            os: darwin
+            arch: arm64
+            c_compiler: clang
+          - runner: windows-latest
+            os: windows
+            arch: x86_64
+            c_compiler: gcc
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-suffix: release-${{ matrix.os }}-${{ matrix.arch }}-py3.14
+
+      - name: Install Linux build toolchain
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential clang make
+
+      - name: Set up MSYS2 MinGW-w64 toolchain
+        if: runner.os == 'Windows'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          path-type: inherit
+          install: >-
+            make
+            mingw-w64-x86_64-gcc
+
+      - name: Build distribution archive
+        if: runner.os != 'Windows'
+        env:
+          L0_CC: ${{ matrix.c_compiler }}
+          DEA_BUILD_ID: gha-${{ github.run_id }}.${{ github.run_attempt }}-release-${{ matrix.os }}-${{ matrix.arch }}
+          RELEASE_VERSION: ${{ github.ref_name }}
+        run: |
+          mkdir -p build
+          printf '%s\n' "${RELEASE_VERSION#v}" > VERSION
+          make dist | tee build/dist.log
+
+      - name: Build distribution archive
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        env:
+          L0_CC: ${{ matrix.c_compiler }}
+          DEA_BUILD_ID: gha-${{ github.run_id }}.${{ github.run_attempt }}-release-${{ matrix.os }}-${{ matrix.arch }}
+          RELEASE_VERSION: ${{ github.ref_name }}
+        run: |
+          mkdir -p build
+          printf '%s\n' "${RELEASE_VERSION#v}" > VERSION
+          make dist | tee build/dist.log
+
+      - name: Resolve distribution archive path
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import os
+          import re
+
+          log_path = Path("build/dist.log")
+          text = log_path.read_text(encoding="utf-8")
+          match = re.search(r"created distribution archive at (.+)", text)
+          if match is None:
+              raise SystemExit(f"could not parse distribution archive from {log_path}")
+          archive_path = Path(match.group(1).strip())
+          github_env = Path(os.environ["GITHUB_ENV"])
+          with github_env.open("a", encoding="utf-8") as handle:
+              handle.write(f"DIST_ARCHIVE_PATH={archive_path.as_posix()}\n")
+              handle.write(f"DIST_ARCHIVE_NAME={archive_path.name}\n")
+          PY
+
+      - name: Smoke-test distribution archive
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import os
+          import subprocess
+          import sys
+          import tarfile
+          import tempfile
+          import zipfile
+
+          archive_path = Path(os.environ["DIST_ARCHIVE_PATH"])
+          if not archive_path.is_file():
+              raise SystemExit(f"missing archive: {archive_path}")
+
+          smoke_root = Path(tempfile.mkdtemp(prefix="release-smoke.", dir="build"))
+          try:
+              if archive_path.suffix == ".zip":
+                  with zipfile.ZipFile(archive_path) as archive:
+                      archive.extractall(smoke_root)
+              else:
+                  with tarfile.open(archive_path, "r:gz") as archive:
+                      archive.extractall(smoke_root)
+
+              dist_root = smoke_root / "dea-l0"
+              version_path = dist_root / "VERSION"
+              if not version_path.is_file():
+                  raise SystemExit(f"missing VERSION file in {dist_root}")
+
+              launcher = dist_root / "bin" / "l0c"
+              if os.name == "nt":
+                  launcher = launcher.with_suffix(".cmd")
+              completed = subprocess.run(
+                  [str(launcher), "--version"],
+                  check=False,
+                  stdout=subprocess.PIPE,
+                  stderr=subprocess.STDOUT,
+                  text=True,
+                  encoding="utf-8",
+                  errors="replace",
+              )
+              if completed.returncode != 0:
+                  raise SystemExit(completed.stdout)
+              sys.stdout.write(completed.stdout)
+          finally:
+              pass
+          PY
+
+      - name: Upload distribution artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ matrix.os }}-${{ matrix.arch }}
+          path: ${{ env.DIST_ARCHIVE_PATH }}
+
+  publish-release:
+    needs: build-dist
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Download distribution artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: dist-*
+          merge-multiple: true
+          path: build/release-assets
+
+      - name: Generate checksums
+        run: |
+          cd build/release-assets
+          sha256sum *.tar.gz *.zip > SHA256SUMS
+
+      - name: Generate release notes
+        env:
+          CURRENT_TAG: ${{ github.ref_name }}
+        run: |
+          prev_tag="$(git tag --merged HEAD --sort=-v:refname | grep '^v' | grep -Fxv "$CURRENT_TAG" | head -n 1 || true)"
+          if [ -n "$prev_tag" ]; then
+            git log --pretty=format:'- %s (%h)' "$prev_tag..$CURRENT_TAG" > build/release-notes.md
+          else
+            git log --pretty=format:'- %s (%h)' "$CURRENT_TAG" > build/release-notes.md
+          fi
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CURRENT_TAG: ${{ github.ref_name }}
+        run: |
+          if gh release view "$CURRENT_TAG" >/dev/null 2>&1; then
+            gh release upload "$CURRENT_TAG" build/release-assets/* --clobber
+            gh release edit "$CURRENT_TAG" --title "$CURRENT_TAG" --notes-file build/release-notes.md
+          else
+            gh release create "$CURRENT_TAG" build/release-assets/* --title "$CURRENT_TAG" --notes-file build/release-notes.md
+          fi

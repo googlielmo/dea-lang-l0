@@ -26,6 +26,7 @@ from dist_tools_lib import (
     collect_stage2_build_provenance,
     distribution_archive_basename,
     distribution_archive_target,
+    format_commit_for_version,
     render_stage2_build_info_module,
     resolve_host_c_compiler,
 )
@@ -109,6 +110,20 @@ def main() -> int:
         resolved_from_path = resolve_host_c_compiler(path_env)
     if resolved_from_path != "gcc":
         fail(f"expected Windows Path fallback to resolve 'gcc', got {resolved_from_path!r}")
+
+    with patch(
+        "dist_tools_lib._git_output",
+        side_effect=[
+            "0123456789abcdef0123456789abcdef01234567",
+            "0123456",
+            "?? VERSION",
+        ],
+    ):
+        clean_version_only, _ = collect_stage2_build_provenance(REPO_ROOT, env)
+    if clean_version_only.tree_state != "clean":
+        fail(f"expected VERSION-only dirty state to be ignored, got {clean_version_only.tree_state!r}")
+    if format_commit_for_version(clean_version_only.commit_full, clean_version_only.tree_state).endswith("+dirty"):
+        fail("did not expect a workflow-injected VERSION file to mark the commit dirty")
 
     print("test_dist_tools_lib_fallback: PASS")
     return 0

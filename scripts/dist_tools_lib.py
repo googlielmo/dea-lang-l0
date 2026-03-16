@@ -235,6 +235,22 @@ def _git_output(repo_root: Path, env: dict[str, str], *args: str) -> str | None:
     return completed.stdout.strip()
 
 
+def _git_status_output(repo_root: Path, env: dict[str, str]) -> str | None:
+    """Return normalized git status output while ignoring workflow-injected `VERSION`."""
+
+    status_output = _git_output(repo_root, env, "status", "--porcelain", "--untracked-files=normal")
+    if status_output is None:
+        return None
+
+    filtered_lines: list[str] = []
+    for line in status_output.splitlines():
+        path_text = line[3:].strip()
+        if path_text == "VERSION":
+            continue
+        filtered_lines.append(line)
+    return "\n".join(filtered_lines)
+
+
 def format_host_triplet(kernel_name: str, kernel_release: str, machine: str) -> str:
     """Format the compact host triplet used by the Stage 2 `--version` output."""
 
@@ -337,7 +353,7 @@ def collect_stage2_build_provenance(repo_root: Path, env: dict[str, str]) -> tup
     commit_full = _git_output(repo_root, git_env, "rev-parse", "HEAD") or "unknown"
     commit_short = _git_output(repo_root, git_env, "rev-parse", "--short", "HEAD") or "unknown"
 
-    status_output = _git_output(repo_root, git_env, "status", "--porcelain", "--untracked-files=normal")
+    status_output = _git_status_output(repo_root, git_env)
     if status_output is None:
         tree_state = "unknown"
     elif status_output == "":
@@ -805,6 +821,14 @@ def copy_prefix_shared_assets(layout: PrefixLayout) -> None:
     copy_tree(REPO_ROOT / "compiler" / "shared" / "runtime", layout.runtime_dir)
 
 
+def copy_distribution_version_file(layout: PrefixLayout) -> None:
+    """Copy the optional repo-root `VERSION` file into one distribution tree."""
+
+    version_path = REPO_ROOT / "VERSION"
+    if version_path.is_file():
+        copy_file(version_path, layout.prefix_dir / "VERSION")
+
+
 def distribution_archive_format() -> str:
     """Return the host-appropriate archive format name."""
 
@@ -882,5 +906,6 @@ def create_stage2_distribution(
     """Create one relocatable distribution tree plus a host-native archive."""
 
     install_prefix_stage2(layout, stage2_native_source)
+    copy_distribution_version_file(layout)
     archive_path = create_distribution_archive(layout.prefix_dir, archive_base_name)
     return DistributionArchive(dist_dir=layout.prefix_dir, archive_path=archive_path)
