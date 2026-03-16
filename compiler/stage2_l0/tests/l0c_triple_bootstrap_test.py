@@ -167,7 +167,9 @@ def deterministic_linker_flags(compiler_text: str) -> list[str]:
     if sys.platform.startswith("linux"):
         return ["-Wl,--build-id=none"]
     if sys.platform == "win32":
-        return ["-Wl,--build-id=none"]
+        # --no-insert-timestamp prevents ld from writing the current time into the
+        # COFF PE header TimeDateStamp field, which strip -s does not remove.
+        return ["-Wl,--build-id=none", "-Wl,--no-insert-timestamp"]
     raise TripleBootstrapFailure(f"unsupported host platform for native identity check: {sys.platform}")
 
 
@@ -315,7 +317,7 @@ def normalized_native_artifact(path: Path, artifact_dir: Path) -> Path:
         return path
 
     if sys.platform == "win32":
-        # MinGW-w64 strip removes PE timestamps and debug sections.
+        # MinGW-w64 strip removes debug sections; --no-insert-timestamp handles the COFF header timestamp.
         strip_command = resolve_strip_command()
         if strip_command is None:
             return path
