@@ -24,6 +24,7 @@ from dist_tools_lib import (
     distribution_archive_basename,
     distribution_root_dir_name,
     install_prefix_stage2,
+    list_installed_files,
     normalize_dea_build_dir,
     normalize_prefix_dir,
     remove_dea_build_tree,
@@ -126,6 +127,12 @@ def parse_args() -> argparse.Namespace:
         help="Build compiler 2 (self-hosted Stage 2) into one temporary `dist/` tree and archive it.",
     )
 
+    list_installed = subparsers.add_parser(
+        "list-installed",
+        help="List files installed by `make install` under one prefix.",
+    )
+    add_prefix_arg(list_installed)
+
     return parser.parse_args()
 
 
@@ -180,6 +187,12 @@ def main() -> int:
                     return 0
             finally:
                 shutil.rmtree(temp_dist, ignore_errors=True)
+
+        if args.command == "list-installed":
+            prefix_layout = normalize_prefix_dir(args.prefix)
+            for path in list_installed_files(prefix_layout):
+                print(path)
+            return 0
 
         if args.command == "make-dist":
             build_root = REPO_ROOT / "build"

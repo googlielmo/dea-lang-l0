@@ -914,6 +914,29 @@ def install_prefix_stage2(layout: PrefixLayout, stage2_native_source: Path) -> P
     return layout.bin_dir / "l0c-stage2.native"
 
 
+def list_installed_files(layout: PrefixLayout) -> list[Path]:
+    """Return sorted paths of all Dea/L0 files installed under one prefix."""
+
+    files: list[Path] = []
+    # bin/ entries
+    for name in ("l0c", "l0c-stage2", "l0c-stage2.native", "l0-env.sh"):
+        p = layout.bin_dir / name
+        if p.exists() or p.is_symlink():
+            files.append(p)
+    if is_windows_host():
+        for name in ("l0c-stage2.cmd", "l0c.cmd"):
+            p = layout.bin_dir / name
+            if p.exists():
+                files.append(p)
+    # shared/ trees
+    for tree_root in (layout.stdlib_dir, layout.runtime_dir):
+        if tree_root.is_dir():
+            for child in sorted(tree_root.rglob("*")):
+                if child.is_file():
+                    files.append(child)
+    return sorted(files)
+
+
 def create_stage2_distribution(
     layout: PrefixLayout,
     stage2_native_source: Path,

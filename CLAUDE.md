@@ -65,14 +65,15 @@ Also see: `CONTRIBUTING.md`, `SECURITY.md`.
 All commands run from the repository root. For normal development, prefer the repo-local switchable `l0c` alias:
 
 ```bash
-make install-dev-stages
-make use-dev-stage1 # or `make use-dev-stage2`
+make use-dev-stage2 # or `make use-dev-stage1`; each builds and installs the launcher automatically
 source build/dea/bin/l0-env.sh
 make PREFIX=/tmp/l0-install install
 source /tmp/l0-install/bin/l0-env.sh
 ```
 
-`make install` requires an explicit `PREFIX=...`; it does not default to a repo-local install root.
+`make install` requires an explicit `PREFIX=...`; it does not default to a repo-local install root. Both `install` and
+`dist` default to `L0_CFLAGS=-O2` when the variable is unset; `install-dev-stage*` targets do not, for fast iteration.
+Use `make list-installed PREFIX=...` to list files placed by a previous `make install`.
 
 The source-tree `./scripts/l0c` entrypoint is Stage 1 only and is mainly useful for bootstrap mechanics, internal
 tooling, and Stage 1-focused testing:
@@ -109,8 +110,7 @@ For direct Stage 2 artifact usage, use:
 ./build/dea/bin/l0c-stage2 --check -P examples hello # run the stage 2 compiler directly
 ./build/dea/bin/l0c-stage2 --build -P examples hello # build directly with the stage 2 compiler
 ./build/dea/bin/l0c-stage2 --run -P examples hello # build and run directly with the stage 2 compiler
-make install-dev-stages # install repo-local stage-specific launchers under build/dea/bin
-make use-dev-stage2 # point build/dea/bin/l0c at the Stage 2 launcher and print the source command
+make use-dev-stage2 # build, install, and select the Stage 2 launcher under build/dea/bin
 source build/dea/bin/l0-env.sh # activate the repo-local Dea build workflow in your shell
 make PREFIX=/tmp/l0-install install # install the self-hosted Stage 2 compiler under one prefix
 make test-all # run the full Stage 1 + Stage 2 validation suite
@@ -131,8 +131,7 @@ is handled by `.github/workflows/docs-validate.yml`.
 ### Testing
 
 ```bash
-make install-dev-stages                                # recommended developer-facing `l0c` setup
-make use-dev-stage1
+make use-dev-stage1                                   # builds and switches the repo-local `l0c` to Stage 1
 source build/dea/bin/l0-env.sh
 make test-stage1                                      # recommended Stage 1 test entrypoint
 ./.venv/bin/python -m pytest -n auto compiler/stage1_py/tests
@@ -146,6 +145,20 @@ For Stage 2 (`compiler/stage2_l0`) changes, finalization checks should include:
 make DEA_BUILD_DIR=build/dev-dea test-stage2
 make DEA_BUILD_DIR=build/dev-dea test-stage2-trace
 make DEA_BUILD_DIR=build/dev-dea triple-test
+```
+
+For workflow and distribution tooling validation:
+
+```bash
+make test-dea-build                                   # validate Make build and install-prefix workflows
+make test-dist-fallback                               # validate provenance fallback without Git
+make test-workflows                                   # run all workflow and distribution tests
+```
+
+To regenerate Stage 2 backend golden C fixtures from Stage 1:
+
+```bash
+make refresh-goldens                                  # regenerate Stage 2 backend golden C fixtures
 ```
 
 These Make targets are self-contained repo-local workflows: they ensure `./.venv`, prepare the Stage 2 artifact under

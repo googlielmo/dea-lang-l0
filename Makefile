@@ -33,6 +33,11 @@ PIP_DEPS_CMD = import tomllib,pathlib;\
 	test-stage2-trace \
 	test-dist \
 	triple-test \
+	test-dea-build \
+	test-dist-fallback \
+	test-workflows \
+	refresh-goldens \
+	list-installed \
 	test-all \
 	print-dea-build-dir \
 	docs \
@@ -46,21 +51,24 @@ help:
 		'' \
 		'Targets:' \
 		'  install            Install the self-hosted Stage 2 compiler under PREFIX.' \
-		'  dist               Build a relocatable Stage 2 `dist/` tree under `build/` and archive it.' \
+		'  dist               Create a relocatable Stage 2 distribution archive under `build/`.' \
 		'' \
 		'Development targets:' \
 		'  venv               Create the local `.venv` (prefer `uv`, fall back to `python -m venv`).' \
+		'  use-dev-stage1     Install and switch the repo-local `l0c` alias to Stage 1.' \
+		'  use-dev-stage2     Build and switch the repo-local `l0c` alias to Stage 2.' \
 		'  install-dev-stages Prepare both Stage 1 and Stage 2 launchers under DEA_BUILD_DIR.' \
-		'  install-dev-stage1 Install the repo-local Stage 1 launcher and environment script.' \
-		'  install-dev-stage2 Build and install the repo-local Stage 2 launcher.' \
-		'  use-dev-stage1     Switch the repo-local `l0c` alias to Stage 1.' \
-		'  use-dev-stage2     Switch the repo-local `l0c` alias to Stage 2.' \
 		'  test-all           Run the full Stage 1, Stage 2, and distribution validation suite.' \
 		'  test-stage1        Validate the Stage 1 Python compiler test suite.' \
 		'  test-stage2        Validate the Stage 2 compiler test suite; pass TESTS="name1 name2" to run selected cases.' \
 		'  test-stage2-trace  Validate Stage 2 ARC and memory tracing behavior.' \
-		'  test-dist          Validate the `make dist` packaging workflow end to end.' \
 		'  triple-test        Run the Stage 2 triple-bootstrap check on its own.' \
+		'' \
+		'Workflow testing:' \
+		'  test-dist          Validate the `make dist` packaging workflow end to end.' \
+		'  test-dea-build     Validate the Make Dea build and install-prefix workflows.' \
+		'  test-dist-fallback Validate Stage 2 provenance fallback without Git.' \
+		'  test-workflows     Run all workflow and distribution tests.' \
 		'' \
 		'Docker:' \
 		'  docker             Explicitly run a target in the repo-owned Linux Docker container (CMD=<target>).' \
@@ -70,6 +78,8 @@ help:
 		'  docs-pdf           Generate the project documentation, including the PDF manual.' \
 		'' \
 		'Other targets:' \
+		'  refresh-goldens    Regenerate Stage 2 backend golden C fixtures from Stage 1.' \
+		'  list-installed     List files installed by `make install` under PREFIX.' \
 		'  help               Show this help text.' \
 		'  clean              Remove all repo-local build artifacts under `build/*` (including temporary `dist` trees and archives), temporary test files, and default executables.' \
 		'  clean-dea-build    Remove the repo-local Dea build tree (override with `DEA_BUILD_DIR`, see below).' \
@@ -126,7 +136,7 @@ install:
 		printf '%s\n' 'make install: PREFIX is required; example: make PREFIX=/tmp/l0-install L0_CC=gcc install' >&2; \
 		exit 2; \
 	fi
-	$(PYTHON) ./scripts/gen_dist_tools.py install-prefix --prefix "$(PREFIX)"
+	L0_CFLAGS="$${L0_CFLAGS:--O2}" $(PYTHON) ./scripts/gen_dist_tools.py install-prefix --prefix "$(PREFIX)"
 	@printf 'Installed Stage 2 compiler version:\n'
 	@"$(PREFIX)/bin/l0c-stage2" --version
 	@printf '\n------------------------------------------------------------------------------\n'
@@ -136,6 +146,13 @@ else
 	@printf 'Dea/L0 compiler installed at %s/bin/l0c.\nTo add the installed compiler to your current PATH in this shell, run:\n\n    source %s/bin/l0-env.sh\n\nSee README.md for more information.' "$(PREFIX)" "$(PREFIX)"
 endif
 	@printf '\n------------------------------------------------------------------------------\n'
+
+list-installed:
+	@if [ -z "$(strip $(PREFIX))" ]; then \
+		printf '%s\n' 'make list-installed: PREFIX is required; example: make PREFIX=/usr/local list-installed' >&2; \
+		exit 2; \
+	fi
+	@$(PYTHON) ./scripts/gen_dist_tools.py list-installed --prefix "$(PREFIX)"
 
 dist: venv
 	L0_CFLAGS="$${L0_CFLAGS:--O2}" $(PYTHON) ./scripts/gen_dist_tools.py make-dist
@@ -176,6 +193,17 @@ test-all: test-stage1 test-stage2 test-stage2-trace test-dist
 
 triple-test: venv install-dev-stage2
 	DEA_BUILD_DIR="$(DEA_BUILD_DIR)" "$(VENV_PYTHON)" ./compiler/stage2_l0/tests/l0c_triple_bootstrap_test.py
+
+test-dea-build: venv
+	"$(VENV_PYTHON)" ./tests/test_make_dea_build_workflow.py
+
+test-dist-fallback: venv
+	"$(VENV_PYTHON)" ./tests/test_dist_tools_lib_fallback.py
+
+test-workflows: test-dist test-dea-build test-dist-fallback
+
+refresh-goldens: venv
+	"$(VENV_PYTHON)" ./scripts/refresh_stage2_backend_goldens.py
 
 print-dea-build-dir:
 	@printf '%s\n' "$(DEA_BUILD_DIR)"

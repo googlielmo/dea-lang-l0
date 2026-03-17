@@ -56,7 +56,6 @@ For day-to-day development, MSYS2 bash is the recommended shell.
 ### Work on Stage 2
 
 ```bash
-make install-dev-stages
 make use-dev-stage2
 source build/dea/bin/l0-env.sh
 l0c --version
@@ -65,7 +64,6 @@ l0c --version
 ### Work on Stage 1
 
 ```bash
-make install-dev-stages
 make use-dev-stage1
 source build/dea/bin/l0-env.sh
 l0c --version
@@ -86,7 +84,7 @@ layout in detail.
 ### Supported workflow
 
 | Scenario                                                    | Recommended entry point on Windows                                                  |
-|-------------------------------------------------------------|-------------------------------------------------------------------------------------|
+| ----------------------------------------------------------- | ----------------------------------------------------------------------------------- |
 | Source-tree Stage 1 from MSYS2 bash                         | `./scripts/l0c`                                                                     |
 | Source-tree Stage 1 from `cmd.exe` / PowerShell             | `scripts\\l0c.cmd`                                                                  |
 | Repo-local Stage 2 dev launcher from MSYS2 bash             | `build/dea/bin/l0c-stage2` or selected `l0c` after `make use-dev-stage2`            |
@@ -131,8 +129,8 @@ Important current behavior:
 
 This runs both `install-dev-stage1` and `install-dev-stage2`.
 
-After this target, you have both stage-specific launchers, but you still do not have a selected `l0c` command until
-you run `make use-dev-stage1` or `make use-dev-stage2`.
+After this target, you have both stage-specific launchers, but you still do not have a selected `l0c` command until you
+run `make use-dev-stage1` or `make use-dev-stage2`.
 
 ### `make use-dev-stage1`
 
@@ -186,7 +184,6 @@ There is no Stage 1 install-prefix workflow. `make install` installs Stage 2 onl
 Repo-local Stage 2:
 
 ```bash
-make install-dev-stages
 make use-dev-stage2
 source build/dea/bin/l0-env.sh
 l0c --version
@@ -195,7 +192,6 @@ l0c --version
 Repo-local Stage 1:
 
 ```bash
-make install-dev-stages
 make use-dev-stage1
 source build/dea/bin/l0-env.sh
 l0c --version
@@ -233,8 +229,8 @@ Windows shells.
 
 ### Repo-local Stage 2 in `cmd.exe`
 
-After you have already run `make install-dev-stage2` and `make use-dev-stage2` from MSYS2 bash or another shell with
-GNU Make available:
+After you have already run `make install-dev-stage2` and `make use-dev-stage2` from MSYS2 bash or another shell with GNU
+Make available:
 
 ```cmd
 set "PATH=%CD%\build\dea\bin;%PATH%"
@@ -281,8 +277,8 @@ directory on `PATH`.
 
 ### Repo-local Stage 2 in PowerShell
 
-After you have already run `make install-dev-stage2` and `make use-dev-stage2` from MSYS2 bash or another shell with
-GNU Make available:
+After you have already run `make install-dev-stage2` and `make use-dev-stage2` from MSYS2 bash or another shell with GNU
+Make available:
 
 ```powershell
 $env:PATH = "$PWD\build\dea\bin;$env:PATH"
@@ -343,8 +339,8 @@ The Windows-specific difference is implementation, not intent:
 
 ## Native-shell command resolution
 
-In `cmd.exe` and PowerShell, bare `l0c` works by resolving `l0c.cmd` via the normal Windows executable-extension
-lookup rules (`PATHEXT`).
+In `cmd.exe` and PowerShell, bare `l0c` works by resolving `l0c.cmd` via the normal Windows executable-extension lookup
+rules (`PATHEXT`).
 
 That is why there is no `l0c.exe` wrapper in the generated layout:
 

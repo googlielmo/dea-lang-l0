@@ -80,8 +80,8 @@ Executable launch (`--run`)
 ```
 
 Current Stage 2 CLI entry point: `compiler/stage2_l0/src/l0c.l0`. Recommended developer-facing workflow:
-`make install-dev-stages`, choose `make use-dev-stage1` or `make use-dev-stage2`, then `source build/dea/bin/l0-env.sh`.
-Repo-independent Stage 2 install workflow: `make PREFIX=/tmp/l0-install install`, then
+`make use-dev-stage1` or `make use-dev-stage2` (each builds and installs the launcher automatically), then
+`source build/dea/bin/l0-env.sh`. Repo-independent Stage 2 install workflow: `make PREFIX=/tmp/l0-install install`, then
 `source /tmp/l0-install/bin/l0-env.sh`. Repo-independent Stage 2 distribution workflow: `make dist`, which emits a
 temporary `build/.../dea-l0` tree plus a host-native `dea-l0-lang_<os>-<arch>_YYYYMMDD-HHMMSS` archive for that same
 relocatable layout. `make install` requires an explicit `PREFIX=...`; there is no implicit install destination.

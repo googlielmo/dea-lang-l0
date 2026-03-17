@@ -47,8 +47,8 @@ L0 is currently in its first self-hosted Stage 2 phase.
 
   - Bootstrap artifact: buildable today under `build/dea/bin` via `./scripts/build-stage2-l0c.sh`.
 
-  - Repo-local Dea build workflow: available under `build/dea/bin` via `make install-dev-stages`; `make use-dev-stage2`
-    selects the Stage 2 compiler and environment for development use.
+  - Repo-local Dea build workflow: `make use-dev-stage2` builds, installs, and selects the Stage 2 compiler under
+    `build/dea/bin` for development use.
 
   - Install available via `make PREFIX=/tmp/l0-install install`; this installs the self-hosted Stage 2 compiler (
     `S1 -> S2`, then `S2 -> S2`) plus copied `shared/l0/stdlib` and `shared/runtime` assets.
@@ -137,7 +137,6 @@ For normal developer use, install the repo-local switchable `l0c` alias, choose 
 generated environment script:
 
 ```shell
-make install-dev-stages
 make use-dev-stage1      # or: make use-dev-stage2
 source build/dea/bin/l0-env.sh
 l0c --help

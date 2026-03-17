@@ -192,8 +192,6 @@ def main() -> int:
     try:
         help_output = run_checked(["make", "help"])
         for target in (
-            "install-dev-stage1",
-            "install-dev-stage2",
             "install-dev-stages",
             "install",
             "dist",

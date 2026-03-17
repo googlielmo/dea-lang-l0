@@ -49,18 +49,19 @@ Two hooks run on every commit:
 
 ### Building the compiler(s)
 
-Run `make install-dev-stages` to build both Stage 1 and Stage 2 compiler launchers under the repo-local `build/dea`
-directory (you can override this location by setting the `DEA_BUILD_DIR` environment variable).
-
-After that, select the repo-local switchable `l0c` alias (either Stage 1 or Stage 2) so you can use `l0c` in your
-terminal to test the intended compiler stage. For example, to use the Stage 2 L0 compiler:
+Select the repo-local switchable `l0c` alias (either Stage 1 or Stage 2) so you can use `l0c` in your terminal to test
+the intended compiler stage. Each `use-dev-stage*` target builds and installs the corresponding launcher automatically.
+For example, to use the Stage 2 L0 compiler:
 
 ```bash
 make venv
-make install-dev-stages   # or just `make install-dev-stage2` if you only want the Stage 2 compiler launcher
-make use-dev-stage2       # use `make use-dev-stage1` to switch back to the Stage 1 Python compiler
+make use-dev-stage2       # use `make use-dev-stage1` to switch to the Stage 1 Python compiler
 source build/dea/bin/l0-env.sh
 ```
+
+If you need both launchers at once (without selecting one), run `make install-dev-stages`. You can override the build
+location by setting `DEA_BUILD_DIR`. Dev launchers are built without optimization flags; `make install` and `make dist`
+default to `L0_CFLAGS=-O2`.
 
 Note that there is also an internal `./scripts/l0c` entrypoint, which is source-tree Stage 1 only and is used by the
 bootstrap mechanics, internal tooling, and Stage 1-focused test scripts. Unless you are working on these specific areas,

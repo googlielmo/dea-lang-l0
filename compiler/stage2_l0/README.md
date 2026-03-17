@@ -28,11 +28,10 @@ root relative to itself and sets `L0_HOME` automatically when unset.
 
 ## Repo-local Dea build workflow
 
-For normal development, install both stage-specific launchers under `build/dea/bin`, then select which one `l0c` should
-point at:
+For normal development, select which stage `l0c` should point at (each `use-dev-stage*` target builds and installs the
+launcher automatically):
 
 ```bash
-make install-dev-stages
 make use-dev-stage2      # or: make use-dev-stage1
 source build/dea/bin/l0-env.sh
 l0c --check -P examples hello
