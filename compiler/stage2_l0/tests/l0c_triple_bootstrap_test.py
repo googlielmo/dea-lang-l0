@@ -161,7 +161,7 @@ def deterministic_c_flags(compiler_text: str) -> list[str]:
     """Return deterministic C compiler and linker flags required for native comparison.
 
     Covers both codegen-level reproducibility (``-frandom-seed``) and
-    linker-level non-determinism (UUIDs, build-ids, PE timestamps).
+    linker-level non-determinism (UUIDs, ad hoc signatures, build-ids, PE timestamps).
     """
 
     if uses_tcc(compiler_text):
@@ -172,7 +172,7 @@ def deterministic_c_flags(compiler_text: str) -> list[str]:
     flags: list[str] = ["-frandom-seed=l0c-stage2"]
 
     if sys.platform == "darwin":
-        flags.append("-Wl,-no_uuid")
+        flags.extend(["-Wl,-no_uuid", "-Wl,-no_adhoc_codesign"])
     elif sys.platform.startswith("linux"):
         flags.append("-Wl,--build-id=none")
     elif sys.platform == "win32":
@@ -354,6 +354,35 @@ def _run_strip(strip_command: list[str], path: Path, output: Path) -> subprocess
     )
 
 
+def _remove_darwin_code_signature(path: Path) -> None:
+    """Remove one Darwin code signature when present."""
+
+    codesign = shutil.which("codesign")
+    if codesign is None:
+        return
+
+    completed = subprocess.run(
+        [codesign, "--remove-signature", str(path)],
+        cwd=REPO_ROOT,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        check=False,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    if completed.returncode != 0:
+        raise TripleBootstrapFailure(
+            "\n".join(
+                [
+                    "failed to remove Darwin code signature from normalized artifact",
+                    f"path={path}",
+                    completed.stdout.rstrip(),
+                ]
+            ).rstrip()
+        )
+
+
 def normalized_native_artifact(path: Path, artifact_dir: Path) -> Path:
     """Return one normalized native artifact path for byte-identity comparison.
 
@@ -362,23 +391,49 @@ def normalized_native_artifact(path: Path, artifact_dir: Path) -> Path:
     """
 
     strip_command = resolve_strip_command()
+    normalized = artifact_dir / f"{path.name}.stripped"
+
+    if sys.platform == "darwin":
+        if strip_command is None:
+            raise TripleBootstrapFailure("no strip tool found for native identity comparison")
+        shutil.copy2(path, normalized)
+        _remove_darwin_code_signature(normalized)
+        completed = subprocess.run(
+            [*strip_command, "-x", str(normalized)],
+            cwd=REPO_ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            check=False,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
+        if completed.returncode != 0:
+            raise TripleBootstrapFailure(
+                "\n".join(
+                    [
+                        f"failed to normalize native artifact with {' '.join(strip_command)}",
+                        f"path={path}",
+                        completed.stdout.rstrip(),
+                    ]
+                ).rstrip()
+            )
+        return normalized
 
     if sys.platform == "win32":
         # MinGW-w64 strip removes debug sections; --no-insert-timestamp handles the COFF header timestamp.
         if strip_command is None:
             return path
-        normalized = artifact_dir / f"{path.name}.stripped"
         completed = _run_strip(strip_command, path, normalized)
         if completed.returncode != 0:
             # If strip fails on Windows, fall back to raw comparison.
             return path
         return normalized
 
-    # Darwin and Linux: strip is required for deterministic comparison.
+    # Linux: strip is required for deterministic comparison.
     if strip_command is None:
         raise TripleBootstrapFailure("no strip tool found for native identity comparison")
 
-    normalized = artifact_dir / f"{path.name}.stripped"
     completed = _run_strip(strip_command, path, normalized)
     if completed.returncode != 0:
         raise TripleBootstrapFailure(

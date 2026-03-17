@@ -145,7 +145,7 @@ Useful environment overrides:
 - `KEEP_ARTIFACTS=1` keeps the generated temp directory under `build/tests/l0_stage2_triple_bootstrap.*` for inspection.
 - `L0_CC=<compiler>` pins the exact host C compiler used for all self-builds.
 - `L0_CFLAGS="..."` appends extra C compiler flags; the test still adds deterministic linker flags required for native
-  identity checks.
+  identity checks, including Darwin UUID and ad hoc code-signature suppression.
 - When `L0_CC` resolves to `tcc`, the test still compares retained C outputs but skips the native-binary identity check
   because `tcc` does not currently guarantee stable binaries across identical builds.
 
@@ -173,15 +173,19 @@ If you want to run the same flow manually step by step, keep one compiler and on
 
 ```bash
 export L0_CC=clang
-export L0_CFLAGS="-Wl,-no_uuid"         # macOS
+export L0_CFLAGS="-Wl,-no_uuid -Wl,-no_adhoc_codesign"  # macOS
 # export L0_CFLAGS="-Wl,--build-id=none"  # Linux
 
 DEA_BUILD_DIR=build/tests/triple-manual KEEP_C=1 ./scripts/build-stage2-l0c.sh
 L0_HOME="$PWD/compiler" ./build/tests/triple-manual/bin/l0c-stage2 --build --keep-c -P compiler/stage2_l0/src -o build/tests/triple-manual/l0c-stage2-second.native l0c
 L0_HOME="$PWD/compiler" ./build/tests/triple-manual/l0c-stage2-second.native --build --keep-c -P compiler/stage2_l0/src -o build/tests/triple-manual/l0c-stage2-third.native l0c
 cmp build/tests/triple-manual/l0c-stage2-second.c build/tests/triple-manual/l0c-stage2-third.c
-strip -s -o build/tests/triple-manual/l0c-stage2-second.stripped build/tests/triple-manual/l0c-stage2-second.native
-strip -s -o build/tests/triple-manual/l0c-stage2-third.stripped build/tests/triple-manual/l0c-stage2-third.native
+cp build/tests/triple-manual/l0c-stage2-second.native build/tests/triple-manual/l0c-stage2-second.stripped
+cp build/tests/triple-manual/l0c-stage2-third.native build/tests/triple-manual/l0c-stage2-third.stripped
+codesign --remove-signature build/tests/triple-manual/l0c-stage2-second.stripped 2>/dev/null || true
+codesign --remove-signature build/tests/triple-manual/l0c-stage2-third.stripped 2>/dev/null || true
+strip -x build/tests/triple-manual/l0c-stage2-second.stripped
+strip -x build/tests/triple-manual/l0c-stage2-third.stripped
 cmp build/tests/triple-manual/l0c-stage2-second.stripped build/tests/triple-manual/l0c-stage2-third.stripped
 L0_HOME="$PWD/compiler" ./build/tests/triple-manual/l0c-stage2-third.native --run -P examples hello
 ```
