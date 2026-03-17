@@ -157,24 +157,36 @@ def resolve_host_c_compiler(env: dict[str, str]) -> str:
     raise TripleBootstrapFailure("no host C compiler found; set L0_CC or CC")
 
 
-def deterministic_linker_flags(compiler_text: str) -> list[str]:
-    """Return the deterministic linker flags required for native comparison."""
+def deterministic_c_flags(compiler_text: str) -> list[str]:
+    """Return deterministic C compiler and linker flags required for native comparison.
+
+    Covers both codegen-level reproducibility (``-frandom-seed``) and
+    linker-level non-determinism (UUIDs, build-ids, PE timestamps).
+    """
 
     if uses_tcc(compiler_text):
         return []
+
+    # -frandom-seed makes GCC/Clang internal symbol generation deterministic
+    # regardless of ASLR or invocation environment.
+    flags: list[str] = ["-frandom-seed=l0c-stage2"]
+
     if sys.platform == "darwin":
-        return ["-Wl,-no_uuid"]
-    if sys.platform.startswith("linux"):
-        return ["-Wl,--build-id=none"]
-    if sys.platform == "win32":
+        flags.append("-Wl,-no_uuid")
+    elif sys.platform.startswith("linux"):
+        flags.append("-Wl,--build-id=none")
+    elif sys.platform == "win32":
         # --no-insert-timestamp prevents ld from writing the current time into the
         # COFF PE header TimeDateStamp field, which strip -s does not remove.
-        return ["-Wl,--build-id=none", "-Wl,--no-insert-timestamp"]
-    raise TripleBootstrapFailure(f"unsupported host platform for native identity check: {sys.platform}")
+        flags.extend(["-Wl,--build-id=none", "-Wl,--no-insert-timestamp"])
+    else:
+        raise TripleBootstrapFailure(f"unsupported host platform for native identity check: {sys.platform}")
+
+    return flags
 
 
 def merge_cflags(existing: str, extra_flags: list[str]) -> str:
-    """Preserve user flags while appending deterministic linker flags once."""
+    """Preserve user flags while appending deterministic C/linker flags once."""
 
     words = existing.split()
     for flag in extra_flags:
@@ -306,24 +318,21 @@ def resolve_strip_command() -> list[str] | None:
     for candidate in ("strip", "llvm-strip"):
         resolved = shutil.which(candidate)
         if resolved:
-            return [resolved, "-s"]
+            return [resolved]
     return None
 
 
-def normalized_native_artifact(path: Path, artifact_dir: Path) -> Path:
-    """Return one normalized native artifact path for byte-identity comparison."""
+def _run_strip(strip_command: list[str], path: Path, output: Path) -> subprocess.CompletedProcess[str]:
+    """Run strip to produce a normalized copy of one native artifact.
 
-    if not sys.platform.startswith("linux") and sys.platform != "win32":
-        return path
+    On macOS, ``strip`` does not support ``-o``; we copy-then-strip-in-place.
+    GNU/MinGW ``strip`` supports ``-o`` for direct output.
+    """
 
-    if sys.platform == "win32":
-        # MinGW-w64 strip removes debug sections; --no-insert-timestamp handles the COFF header timestamp.
-        strip_command = resolve_strip_command()
-        if strip_command is None:
-            return path
-        normalized = artifact_dir / f"{path.name}.stripped"
-        completed = subprocess.run(
-            [*strip_command, "-o", str(normalized), str(path)],
+    if sys.platform == "darwin":
+        shutil.copy2(path, output)
+        return subprocess.run(
+            [*strip_command, "-x", str(output)],
             cwd=REPO_ROOT,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
@@ -332,18 +341,9 @@ def normalized_native_artifact(path: Path, artifact_dir: Path) -> Path:
             encoding="utf-8",
             errors="replace",
         )
-        if completed.returncode != 0:
-            # If strip fails on Windows, fall back to raw comparison.
-            return path
-        return normalized
 
-    strip_command = resolve_strip_command()
-    if strip_command is None:
-        raise TripleBootstrapFailure("no strip tool found for Linux native identity comparison")
-
-    normalized = artifact_dir / f"{path.name}.stripped"
-    completed = subprocess.run(
-        [*strip_command, "-o", str(normalized), str(path)],
+    return subprocess.run(
+        [*strip_command, "-s", "-o", str(output), str(path)],
         cwd=REPO_ROOT,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
@@ -352,6 +352,34 @@ def normalized_native_artifact(path: Path, artifact_dir: Path) -> Path:
         encoding="utf-8",
         errors="replace",
     )
+
+
+def normalized_native_artifact(path: Path, artifact_dir: Path) -> Path:
+    """Return one normalized native artifact path for byte-identity comparison.
+
+    Strips debug symbols and local symbols on all platforms to remove
+    non-deterministic metadata (DWARF paths, code signatures, section timestamps).
+    """
+
+    strip_command = resolve_strip_command()
+
+    if sys.platform == "win32":
+        # MinGW-w64 strip removes debug sections; --no-insert-timestamp handles the COFF header timestamp.
+        if strip_command is None:
+            return path
+        normalized = artifact_dir / f"{path.name}.stripped"
+        completed = _run_strip(strip_command, path, normalized)
+        if completed.returncode != 0:
+            # If strip fails on Windows, fall back to raw comparison.
+            return path
+        return normalized
+
+    # Darwin and Linux: strip is required for deterministic comparison.
+    if strip_command is None:
+        raise TripleBootstrapFailure("no strip tool found for native identity comparison")
+
+    normalized = artifact_dir / f"{path.name}.stripped"
+    completed = _run_strip(strip_command, path, normalized)
     if completed.returncode != 0:
         raise TripleBootstrapFailure(
             "\n".join(
@@ -439,7 +467,7 @@ def main() -> int:
     try:
         _, _, _, repo_env = require_repo_stage2_test_env("l0c_triple_bootstrap_test.py")
         compiler_text = resolve_host_c_compiler(repo_env)
-        merged_cflags = merge_cflags(repo_env.get("L0_CFLAGS", ""), deterministic_linker_flags(compiler_text))
+        merged_cflags = merge_cflags(repo_env.get("L0_CFLAGS", ""), deterministic_c_flags(compiler_text))
         notice(f"using host C compiler: {compiler_text}")
         notice(f"using host C flags: {merged_cflags or '(none)'}")
         assert_stable_native_toolchain(compiler_text, merged_cflags, artifact_dir)
@@ -542,10 +570,7 @@ def main() -> int:
         else:
             native_left = normalized_native_artifact(second_native, artifact_dir)
             native_right = normalized_native_artifact(third_native, artifact_dir)
-            if sys.platform.startswith("linux"):
-                notice("comparing stripped second and third self-built native compiler binaries")
-            else:
-                notice("comparing second and third self-built native compiler binaries")
+            notice("comparing stripped second and third self-built native compiler binaries")
             assert_same_bytes(
                 "native binary (stage2 vs stage3)",
                 native_left,

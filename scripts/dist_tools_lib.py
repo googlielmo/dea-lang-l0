@@ -546,9 +546,7 @@ set -eu
 script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)
 repo_root=$(CDPATH= cd -- "${{script_dir}}/{layout.repo_relative_from_bin}" && pwd -P)
 
-if [ -z "${{L0_HOME:-}}" ]; then
-    export L0_HOME="${{repo_root}}/compiler"
-fi
+export L0_HOME="${{repo_root}}/compiler"
 
 python_bin="${{PYTHON:-}}"
 if [ -z "${{python_bin}}" ] && [ -x "${{repo_root}}/.venv/bin/python" ]; then
@@ -565,7 +563,7 @@ if [ -z "${{python_bin}}" ]; then
     fi
 fi
 
-exec "${{python_bin}}" "${{L0_HOME}}/stage1_py/l0c.py" "$@"
+exec "${{python_bin}}" "${{repo_root}}/compiler/stage1_py/l0c.py" "$@"
 """
 
 
@@ -578,9 +576,7 @@ set -eu
 script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)
 repo_root=$(CDPATH= cd -- "${{script_dir}}/{layout.repo_relative_from_bin}" && pwd -P)
 
-if [ -z "${{L0_HOME:-}}" ]; then
-    export L0_HOME="${{repo_root}}/compiler"
-fi
+export L0_HOME="${{repo_root}}/compiler"
 
 exec "${{script_dir}}/l0c-stage2.native" "$@"
 """
@@ -597,7 +593,7 @@ def render_stage2_cmd_wrapper(
 set "SCRIPT_DIR=%~dp0"
 set "SCRIPT_DIR=%SCRIPT_DIR:~0,-1%"
 for %%I in ("%SCRIPT_DIR%\\{bat_rel}") do set "REPO_ROOT=%%~fI"
-if "%L0_HOME%"=="" set "L0_HOME=%REPO_ROOT%\\compiler"
+set "L0_HOME=%REPO_ROOT%\\compiler"
 "%SCRIPT_DIR%\\{native_name}" %*
 """
 
