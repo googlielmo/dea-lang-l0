@@ -1,33 +1,36 @@
 # Contributing to Dea/L0
 
-Thanks for contributing.
+Thanks for contributing! This document provides guidelines for contributing to the Dea/L0 project, including development
+setup, coding conventions, and testing.
 
 ## Scope and status
 
-L0 is experimental. The language, compiler CLI, and runtime APIs may change without notice.
+Dea/L0 is experimental. The language, compiler CLI, and runtime APIs may change without notice.
+
+At this point of the Dea/L0 project, we are focused on building a solid foundation for the compiler and language design.
+This means that internal refactors, API changes, and design iterations are expected and welcome. However, we are not yet
+concerned with building a stable public API or ensuring backward compatibility.
+
+The focus is on correctness, maintainability, and code quality over performance optimizations or feature completeness.
 
 ## Development setup
 
 Prerequisites:
 
+- A C99 compiler (e.g., GCC) for codegen tests and running compiled programs
+- `make` (the primary developer workflow entrypoint)
 - Python 3.14+
-- A C99 compiler (GCC or Clang) for codegen tests and running compiled programs
-- `make` (the primary developer workflow entrypoint; `make venv` validates the Python version, creates the `.venv`, and
-  installs all dev + docs dependencies from `pyproject.toml`)
 - [`uv`](https://github.com/astral-sh/uv) is recommended, but not required (the `make venv` target uses it automatically
   when available, and falls back to plain `pip`)
 
-For normal development, use `make venv` then the repo-local switchable `l0c` alias:
+For day-to-day development, the `tcc` C compiler is sufficient and fast for codegen tests. Build it from the
+[mob development branch](https://repo.or.cz/tinycc.git) (`./configure && make && make install`) if you want to use it,
+as distribution packages tend to ship an outdated version.
 
-```bash
-make venv
-make install-dev-stages
-make use-dev-stage1      # or `make use-dev-stage2`
-source build/dea/bin/l0-env.sh
-```
+### Setting up the development environment
 
-The source-tree `./scripts/l0c` entrypoint is Stage 1 only and is mainly useful for bootstrap mechanics, internal
-tooling, and Stage 1-focused testing.
+For normal development, start with `make venv`: it validates the Python version, creates the Python virtual environment
+under `.venv`, and installs all dev + docs dependencies from `pyproject.toml`.
 
 ### Pre-commit hooks
 
@@ -39,41 +42,77 @@ pre-commit install
 
 Two hooks run on every commit:
 
-- **mdformat** — auto-formats all `.md` files (line wrap 120, GFM). If it reformats a file, stage the changes and commit
-  again.
-- **copyright-headers** — checks that tracked `.c`, `.h`, `.l0`, `.py`, `.sh` files have a copyright notice in the first
-  80 lines.
+- **mdformat** -- auto-formats all `.md` files (line wrap 120, numbered lists, GitHub Flavored Markdown). If it
+  reformats a file, stage the changes and commit again.
+- **copyright-headers** -- checks that tracked `.c`, `.h`, `.l0`, `.py`, `.sh` files have a copyright notice in the
+  first 80 lines.
+
+### Building the compiler(s)
+
+Run `make install-dev-stages` to build both Stage 1 and Stage 2 compiler launchers under the repo-local `build/dea`
+directory (you can override this location by setting the `DEA_BUILD_DIR` environment variable).
+
+After that, select the repo-local switchable `l0c` alias (either Stage 1 or Stage 2) so you can use `l0c` in your
+terminal to test the intended compiler stage. For example, to use the Stage 2 L0 compiler:
+
+```bash
+make venv
+make install-dev-stages   # or just `make install-dev-stage2` if you only want the Stage 2 compiler launcher
+make use-dev-stage2       # use `make use-dev-stage1` to switch back to the Stage 1 Python compiler
+source build/dea/bin/l0-env.sh
+```
+
+Note that there is also an internal `./scripts/l0c` entrypoint, which is source-tree Stage 1 only and is used by the
+bootstrap mechanics, internal tooling, and Stage 1-focused test scripts. Unless you are working on these specific areas,
+prefer the `l0c` alias after `make use-dev-stage*` to ensure you are testing the intended compiler stage.
+
+To override the automatic C compiler selection (e.g., to use `gcc` instead of `tcc` if you have both installed), set the
+`L0_CC` environment variable at any time. For example:
+
+```bash
+L0_CC=gcc make test-stage2
+```
 
 ### Running tests
 
 From the repository root:
 
 ```bash
-make venv
-make test-stage1
+make test-stage1  # runs the Stage 1 test suite (Python compiler)
+make test-stage2  # runs the Stage 2 test suite (L0 compiler)
+```
+
+For Stage 1 (`compiler/stage1_py`) changes, you can also run specific tests with `pytest`:
+
+```bash
 ./.venv/bin/python -m pytest compiler/stage1_py/tests/lexer/test_lexer.py
 ./.venv/bin/python -m pytest -k "test_name" compiler/stage1_py/tests
 ```
 
-For Stage 2 (`compiler/stage2_l0`) changes, run:
+For Stage 2 (`compiler/stage2_l0`) changes, run one of the following Make targets depending on your needs:
 
 ```bash
-make DEA_BUILD_DIR=build/dev-dea test-stage2
-make DEA_BUILD_DIR=build/dev-dea test-stage2-trace
-make DEA_BUILD_DIR=build/dev-dea triple-test
+make test-stage2  # runs the full Stage 2 test suite, including the triple-bootstrap test
+make test-stage2 TESTS="driver_test l0c_build_run_test" # runs a specific subset of Stage 2 tests
+make test-stage2-trace  # runs the Stage 2 L0-based tests with trace collection and leak triage
+make triple-test  # runs only the triple-bootstrap test
 ```
 
 These Make targets are self-contained repo-local workflows: they ensure `./.venv`, prepare the Stage 2 artifact under
-`DEA_BUILD_DIR`, and ignore any previously sourced installed-prefix `L0_*` env.
+`DEA_BUILD_DIR` (defaults to `./build/dea`), and ignore any previously sourced installed-prefix `L0_*` env.
 
-`run_trace_tests.py` is an important finalization gate for Stage 2 changes because it checks runtime trace health
+`make test-stage2-trace` is an important finalization gate for Stage 2 changes because it checks runtime trace health
 (including leak triage) across the full Stage 2 test suite.
+
+`make triple-test` is a focused test for the triple-bootstrap process, which is a critical end-to-end validation of the
+compiler's ability to build itself and produce a stable artifact.
 
 ### Smoke test
 
 Verify the compiler works end-to-end:
 
 ```bash
+l0c --version # ensure the expected version is printed
 l0c -P examples --run hello    # build and run hello.l0
 l0c -P examples --check hello  # parse and type-check only
 ```
@@ -83,8 +122,8 @@ l0c -P examples --check hello  # parse and type-check only
 Use verbose flags to see compilation stages:
 
 ```bash
-l0c -v -P examples --check hello     # info-level logging
-l0c -vvv -P examples --check hello   # debug-level logging
+l0c -v -P examples --check hello     # info-level
+l0c -vvv -P examples --check hello   # debug-level
 ```
 
 ## Making changes
@@ -97,16 +136,20 @@ l0c -vvv -P examples --check hello   # debug-level logging
 ## Project structure
 
 - `compiler/stage1_py/` — Stage 1 compiler (Python). This is the bootstrap implementation.
-- `compiler/stage2_l0/` — Stage 2 compiler (L0). Self-hosted compiler in development.
+- `compiler/stage2_l0/` — Stage 2 compiler (L0). This is the self-hosted implementation.
+- `compiler/shared/runtime/` — Runtime library code written in C.
+- `compiler/shared/l0/stdlib/` — Dea/L0 standard library code.
 - `examples/` — Example L0 programs.
-- `docs/` — Design documents, grammar specification, architecture notes.
+- `docs/` — Design documents, grammar specification, architecture notes, and other documentation.
+- `scripts/` — Utility scripts for development, testing, and maintenance.
+- `tests/` — End-to-end tests that may involve both compiler stages or external tools.
 
 ## Coding conventions
 
 - Prefer explicit, simple implementations over cleverness.
 - Preserve existing grammar/AST shapes unless the change is staged and justified.
 - Error handling: return structured diagnostics (`Diagnostic` objects); avoid silent failures.
-- See `docs/design_decisions.md` for rationale behind key language and compiler choices.
+- See `docs/reference/design-decisions.md` for rationale behind key language and compiler choices.
 
 ### Documentation and styling standards
 
