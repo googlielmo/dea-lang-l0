@@ -34,7 +34,7 @@ jobs:
         run: |
           short_hash="$(git rev-parse --short HEAD)"
           stamp="$(date -u +%Y%m%d-%H%M)"
-          snapshot_version="snapshot-${short_hash}-${stamp}"
+          snapshot_version="snapshot-${stamp}-${short_hash}"
           snapshot_tag="snapshot/${snapshot_version}"
 
           if git rev-parse -q --verify "refs/tags/${snapshot_tag}" >/dev/null 2>&1; then

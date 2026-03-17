@@ -4,6 +4,10 @@
 name: CI
 
 on:
+  push:
+    branches:
+      - main
+      - dea-dev
   pull_request:
   workflow_dispatch:
     inputs:
@@ -16,17 +20,34 @@ on:
           - gcc
           - clang
       make_target:
-        description: Make target to run on both Linux and Windows
+        description: Make target to run
         required: true
         default: test-all
         type: string
-  # push:
-  #   branches:
-  #     - main
 
 jobs:
-  test-all-linux:
-    runs-on: ubuntu-latest
+  test-all:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            os: linux
+            arch: x86_64
+            c_compiler: gcc
+          - runner: macos-15-intel
+            os: darwin
+            arch: x86_64
+            c_compiler: clang
+          - runner: macos-latest
+            os: darwin
+            arch: arm64
+            c_compiler: clang
+          - runner: windows-latest
+            os: windows
+            arch: x86_64
+            c_compiler: gcc
+    runs-on: ${{ matrix.runner }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
@@ -40,24 +61,37 @@ jobs:
         uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
-          cache-suffix: linux-py3.14
+          cache-suffix: ci-${{ matrix.os }}-${{ matrix.arch }}-py3.14
 
       - name: Install Linux build toolchain
+        if: matrix.os == 'linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential clang make
 
-      - name: Select Linux C compiler
+      - name: Set up MSYS2 MinGW-w64 toolchain
+        if: matrix.os == 'windows'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          path-type: inherit
+          install: >-
+            make
+            mingw-w64-x86_64-gcc
+
+      - name: Select C compiler
         id: select-cc
+        shell: bash
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ matrix.os }}" = "linux" ]; then
             echo "value=${{ inputs.c_compiler }}" >> "$GITHUB_OUTPUT"
           else
-            echo "value=gcc" >> "$GITHUB_OUTPUT"
+            echo "value=${{ matrix.c_compiler }}" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Select Make target
         id: select-make-target
+        shell: bash
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "value=${{ inputs.make_target }}" >> "$GITHUB_OUTPUT"
@@ -66,6 +100,14 @@ jobs:
           fi
 
       - name: Run Make target
+        if: matrix.os != 'windows'
+        env:
+          L0_CC: ${{ steps.select-cc.outputs.value }}
+        run: make ${{ steps.select-make-target.outputs.value }}
+
+      - name: Run Make target
+        if: matrix.os == 'windows'
+        shell: msys2 {0}
         env:
           L0_CC: ${{ steps.select-cc.outputs.value }}
         run: make ${{ steps.select-make-target.outputs.value }}
@@ -74,60 +116,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v6
         with:
-          name: workdir-${{ runner.os }}
-          path: |
-            .
-            !.git/**
-          if-no-files-found: warn
-          retention-days: 2
-
-  test-all-windows:
-    runs-on: windows-latest
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v6
-
-      - name: Set up Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: "3.14"
-
-      - name: Set up MSYS2 MinGW-w64 toolchain
-        uses: msys2/setup-msys2@v2 # Still on Node 20 upstream; watch for updates.
-        with:
-          msystem: MINGW64
-          path-type: inherit
-          install: >-
-            make
-            mingw-w64-x86_64-gcc
-
-      - name: Set up uv
-        uses: astral-sh/setup-uv@v7
-        with:
-          enable-cache: true
-          cache-suffix: windows-py3.14
-
-      - name: Select Make target
-        id: select-make-target
-        shell: msys2 {0}
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "value=${{ inputs.make_target }}" >> "$GITHUB_OUTPUT"
-          else
-            echo "value=test-all" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Run Make target
-        shell: msys2 {0}
-        env:
-          L0_CC: gcc
-        run: make ${{ steps.select-make-target.outputs.value }}
-
-      - name: Upload workdir artifact
-        if: always()
-        uses: actions/upload-artifact@v6
-        with:
-          name: workdir-${{ runner.os }}
+          name: workdir-${{ matrix.os }}-${{ matrix.arch }}
           path: |
             .
             !.git/**
