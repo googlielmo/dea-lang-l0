@@ -3,7 +3,7 @@
 ## GitHub release workflow
 
 - Date: 2026-03-16
-- Status: Draft
+- Status: Implemented
 - Title: Add tag-triggered GitHub Release workflow with multi-platform binary archives
 - Kind: Feature
 - Severity: Medium

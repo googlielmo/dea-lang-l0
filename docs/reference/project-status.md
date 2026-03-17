@@ -1,6 +1,6 @@
 # L0 Project Status
 
-Version: 2026-03-15
+Version: 2026-03-17
 
 This document summarizes what is implemented in this repository today and what remains open.
 
@@ -14,6 +14,8 @@ Use this file as a status snapshot. For implementation details, use:
 - [specs/runtime/trace.md](../specs/runtime/trace.md) for tracing flags and runtime trace semantics.
 - [reference/grammar/l0.md](grammar/l0.md) for accepted concrete syntax.
 - [reference/standard-library.md](standard-library.md) for current std/sys module APIs.
+- [specs/compiler/cli-contract.md](../specs/compiler/cli-contract.md) for the shared CLI contract across stages.
+- [specs/compiler/stage2-contract.md](../specs/compiler/stage2-contract.md) for Stage 2 contract and provenance.
 
 ## Stage 1 Compiler (Python) - Current Implementation
 
@@ -121,6 +123,14 @@ CLI identity/help behavior:
 - `-v` also emits the same identity text on stderr through the normal info-level logging path, including CLI usage
   failures such as invoking `l0c -v` without a target.
 
+Build and distribution:
+
+- `make dist` produces relocatable timestamped distribution archives (`.tar.gz` on POSIX, `.zip` on Windows).
+- `make install` requires an explicit `PREFIX=...`; there is no default install root.
+- `make list-installed PREFIX=...` lists files placed by a previous install.
+- `make venv` is the primary developer setup entrypoint (setuptools packaging has been removed).
+- Both `install` and `dist` default to `L0_CFLAGS=-O2` when the variable is unset.
+
 Platform support:
 
 - Linux and macOS remain supported host platforms for Stage 1 and Stage 2 workflows.
@@ -149,8 +159,7 @@ Current std/sys modules in tree:
 
 ## Stage 2 Compiler (L0-in-L0) - Current State
 
-Stage 2 lives in `compiler/stage2_l0` and is now self-hosted, with ongoing parity and documentation work around the
-current public surface.
+Stage 2 lives in `compiler/stage2_l0` and is self-hosted with full CLI parity with Stage 1.
 
 Current implemented assets:
 
@@ -253,6 +262,10 @@ Stage 2 backend/codegen status:
 - Exact-text parity for `--gen --no-line-directives` is enforced against a committed curated Stage 1 golden corpus via
   `compiler/stage2_l0/tests/l0c_codegen_test.sh`.
 - Stage 2 trace validation is green for the current test suite via `compiler/stage2_l0/run_trace_tests.py`.
+- Generated C file headers now identify the `l0c` stage and version that produced them and include a notice discouraging
+  manual edits.
+- GitHub release packaging workflows are implemented: `.github/workflows/release.yml` (tag-triggered multi-platform
+  binary releases) and `.github/workflows/snapshot.yml` (manual-dispatch pre-release snapshots).
 
 ## Known Limitations and Constraints
 
@@ -264,8 +277,8 @@ These remain true in Stage 1:
 4. No generics, traits, or macros.
 5. Reserved/future keywords and operators are lexed for diagnostics and staged evolution.
 
-Stage 2 public CLI parity with Stage 1 is now complete for the current public modes: `--check`, `--tok`, `--sym`,
-`--type`, `--ast`, `--gen`, `--build`, and `--run`.
+Stage 2 has full public CLI parity with Stage 1 across all modes: `--check`, `--tok`, `--sym`, `--type`, `--ast`,
+`--gen`, `--build`, and `--run`.
 
 Current Stage 2 limitations:
 
@@ -276,6 +289,4 @@ Current Stage 2 limitations:
 
 Near-term project direction, consistent with current docs/code:
 
-1. Define a shared CLI contract spec so Stage 1 and Stage 2 parity has one stable normative source.
-2. Add a release-oriented source-revision override for Stage 2 provenance so source archives can embed packaged revision
-   metadata without requiring git history.
+1. Windows developer activation workflow: streamline `make use-dev-*` and `make install` on Windows/MSYS2 hosts.
