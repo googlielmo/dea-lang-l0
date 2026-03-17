@@ -205,6 +205,8 @@ def test_build_uses_a_exe_by_default_on_windows(tmp_path, monkeypatch):
 
     monkeypatch.setattr("l0c._is_windows_host", lambda: True)
     monkeypatch.setattr("l0c.subprocess.run", _fake_run)
+    monkeypatch.delenv("L0_RUNTIME_INCLUDE", raising=False)
+    monkeypatch.delenv("L0_RUNTIME_LIB", raising=False)
 
     rc = cmd_build(_build_args(tmp_path, "main", c_compiler="gcc", output=None))
 

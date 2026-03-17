@@ -8,15 +8,15 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from pathlib import Path
-from typing import Iterable
 import os
 import shutil
 import subprocess
 import sys
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Iterable
 
-DEFAULT_MAX_JOBS = 9
+DEFAULT_MAX_JOBS = 12
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parent.parent
 TESTS_DIR = SCRIPT_DIR / "tests"

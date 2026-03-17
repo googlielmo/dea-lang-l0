@@ -8,18 +8,14 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
-DEFAULT_DEA_BUILD="$REPO_ROOT/build/dea"
-BACKUP_ROOT=""
-BACKUP_DEA_BUILD=""
+
+# Use an isolated temp directory instead of moving/clobbering the real
+# build/dea, which races with other parallel tests that depend on it.
+mkdir -p "$REPO_ROOT/build/tests"
+TEST_DEA_BUILD="$(mktemp -d "$REPO_ROOT/build/tests/l0_stage2_default_dea_build.XXXXXX")"
 
 cleanup() {
-    rm -rf "$DEFAULT_DEA_BUILD"
-    if [ -n "$BACKUP_DEA_BUILD" ] && [ -e "$BACKUP_DEA_BUILD" ]; then
-        mv "$BACKUP_DEA_BUILD" "$DEFAULT_DEA_BUILD"
-    fi
-    if [ -n "$BACKUP_ROOT" ]; then
-        rm -rf "$BACKUP_ROOT"
-    fi
+    rm -rf "$TEST_DEA_BUILD"
 }
 trap cleanup EXIT
 
@@ -39,20 +35,13 @@ assert_no_file() {
 }
 
 cd "$REPO_ROOT"
-if [ -e "$DEFAULT_DEA_BUILD" ]; then
-    mkdir -p "$REPO_ROOT/build/tests"
-    BACKUP_ROOT="$(mktemp -d "$REPO_ROOT/build/tests/l0_stage2_default_dea_backup.XXXXXX")"
-    BACKUP_DEA_BUILD="$BACKUP_ROOT/dea"
-    mv "$DEFAULT_DEA_BUILD" "$BACKUP_DEA_BUILD"
-fi
-rm -rf "$DEFAULT_DEA_BUILD"
 
-./scripts/build-stage2-l0c.sh >/dev/null
+DEA_BUILD_DIR="$TEST_DEA_BUILD" ./scripts/build-stage2-l0c.sh >/dev/null
 
-assert_file "$DEFAULT_DEA_BUILD/bin/l0c-stage2"
-assert_file "$DEFAULT_DEA_BUILD/bin/l0c-stage2.native"
-assert_no_file "$DEFAULT_DEA_BUILD/bin/l0c-stage2.c"
+assert_file "$TEST_DEA_BUILD/bin/l0c-stage2"
+assert_file "$TEST_DEA_BUILD/bin/l0c-stage2.native"
+assert_no_file "$TEST_DEA_BUILD/bin/l0c-stage2.c"
 
-env -i PATH="$PATH" "$DEFAULT_DEA_BUILD/bin/l0c-stage2" --check -P examples hello >/dev/null
+env -i PATH="$PATH" "$TEST_DEA_BUILD/bin/l0c-stage2" --check -P examples hello >/dev/null
 
 echo "l0c_stage2_default_dea_build_test: PASS"
