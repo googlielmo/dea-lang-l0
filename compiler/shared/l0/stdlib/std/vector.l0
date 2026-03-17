@@ -187,6 +187,26 @@ func vec_push_byte(self: VectorBase*, val: byte) {
 }
 
 /**
+ * Bulk-push `count` bytes from `src` into a byte-element vector.
+ * Reserves capacity in one step and copies with `rt_memcpy`.
+ *
+ * @param self The pointer to the VectorBase (must have element_size == 1).
+ * @param src Pointer to the source bytes.
+ * @param count Number of bytes to push.
+ */
+func vec_push_bytes(self: VectorBase*, src: byte*, count: int) {
+    assert(self.arr.element_size == sizeof(byte), "Element size mismatch in vec_push_bytes");
+    if (count <= 0) {
+        return;
+    }
+    let needed = self.length + count;
+    vec_reserve(self, needed);
+    let dest = rt_array_element(self.arr.data, 1, self.length);
+    rt_memcpy(dest, src as void*, count);
+    self.length = needed;
+}
+
+/**
  * Pushes a boolean onto the vector.
  *
  * @param self The pointer to the VectorBase.

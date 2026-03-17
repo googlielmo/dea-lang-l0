@@ -28,6 +28,8 @@ struct CCodeBuilder {
     lines: VectorString*;
     indent_level: int;
     indent_str: string;
+    cached_prefix: string;
+    cached_level: int;
 }
 
 /**
@@ -102,7 +104,7 @@ func cem_opt_wrapper_map_free(items: StringPtrMap*) {
  * @return New builder with four-space indentation.
  */
 func ccb_create() -> CCodeBuilder* {
-    return new CCodeBuilder(vs_create(32), 0, "    ");
+    return new CCodeBuilder(vs_create(32), 0, "    ", "", 0);
 }
 
 /**
@@ -142,11 +144,16 @@ func ccb_dedent(self: CCodeBuilder*) {
  * @return Indentation string for the current level.
  */
 func ccb_prefix(self: CCodeBuilder*) -> string {
+    if (self.indent_level == self.cached_level) {
+        return self.cached_prefix;
+    }
     with (let sb = sb_create() => sb_free(sb)) {
         for (let i = 0; i < self.indent_level; i = i + 1) {
             sb_append(sb, self.indent_str);
         }
-        return sb_to_string(sb);
+        self.cached_prefix = sb_to_string(sb);
+        self.cached_level = self.indent_level;
+        return self.cached_prefix;
     }
 }
 

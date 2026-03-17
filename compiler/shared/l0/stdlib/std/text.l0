@@ -5,6 +5,9 @@
 
 module std.text;
 
+import sys.rt;
+import sys.unsafe;
+
 import std.string;
 import std.math;
 import std.assert;
@@ -173,9 +176,9 @@ func cb_append(self: CharBuffer*, c: byte) {
  * @param s The string to append.
  */
 func cb_append_s(self: CharBuffer*, s: string) {
-    for (let i: int = 0; i < len_s(s); i = i + 1) {
-        let c = char_at_s(s, i);
-        cb_append(self, c);
+    let n = len_s(s);
+    if (n > 0) {
+        vec_push_bytes(self.chars, rt_string_bytes_ptr(s), n);
     }
 }
 
@@ -188,10 +191,14 @@ func cb_append_s(self: CharBuffer*, s: string) {
  * @param length The number of characters to append.
  */
 func cb_append_slice(self: CharBuffer*, s: string, start: int, length: int) {
-    for (let i: int = 0; i < length; i = i + 1) {
-        let c = char_at_s(s, start + i);
-        cb_append(self, c);
+    if (length <= 0) {
+        return;
     }
+    let slen = len_s(s);
+    assert(start >= 0 && start + length <= slen, "cb_append_slice: range out of bounds");
+    let src = rt_string_bytes_ptr(s);
+    let offset_src = rt_array_element(src as void*, 1, start) as byte*;
+    vec_push_bytes(self.chars, offset_src, length);
 }
 
 /**

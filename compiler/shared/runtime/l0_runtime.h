@@ -841,6 +841,18 @@ static l0_byte rt_string_get(l0_string a, l0_int index) {
 }
 
 /**
+ * Return a pointer to the raw byte data of a string.
+ *
+ * @param s L0 string.
+ * @return Pointer to the first byte.
+ *
+ * L0 signature: `extern func rt_string_bytes_ptr(s: string) -> byte*;`
+ */
+static l0_byte *rt_string_bytes_ptr(l0_string s) {
+    return (l0_byte*)_rt_string_bytes(s);
+}
+
+/**
  * Check if two strings are equal.
  * 
  * @param a First string.
@@ -2333,18 +2345,103 @@ static void *rt_array_element(void *array_data, l0_int element_size, l0_int inde
  * ========================================================================= */
 
 /**
- * @struct _rt_alloc_node
  * Internal allocation tracker for `new` / `drop`.
  *
- * The goal is to make misuse of `drop` (double-free / invalid pointer) a defined
- * runtime panic instead of C undefined behavior.
+ * Uses an open-addressing hash table of `void*` pointers for O(1) amortized
+ * insert/lookup/remove.  The goal is to make misuse of `drop` (double-free /
+ * invalid pointer) a defined runtime panic instead of C undefined behavior.
  */
-typedef struct _rt_alloc_node {
-    void *ptr;
-    struct _rt_alloc_node *next;
-} _rt_alloc_node;
 
-static _rt_alloc_node *_rt_alloc_list = NULL;
+/** Sentinel value for a deleted slot (tombstone). */
+#define _RT_ALLOC_TOMBSTONE ((void*)(uintptr_t)1)
+
+/** Initial hash-table capacity (must be a power of two). */
+#define _RT_ALLOC_INIT_CAP 256
+
+static void  **_rt_alloc_table     = NULL;
+static size_t  _rt_alloc_table_cap = 0;
+static size_t  _rt_alloc_table_cnt = 0; /* live (non-tombstone) entries */
+
+/**
+ * Hash a pointer value to a table index (self-contained MurmurHash3 fmix).
+ */
+static inline size_t _rt_alloc_hash(void *ptr, size_t cap) {
+    uint64_t v = (uint64_t)(uintptr_t)ptr;
+    uint32_t x = (uint32_t)(v ^ (v >> 32));
+    x ^= x >> 16; x *= 0x85ebca6bu;
+    x ^= x >> 13; x *= 0xc2b2ae35u;
+    x ^= x >> 16;
+    return (size_t)(x & (uint32_t)(cap - 1));
+}
+
+/**
+ * Grow the allocation hash table by 2x and re-insert all live entries.
+ */
+static void _rt_alloc_table_grow(void) {
+    size_t old_cap = _rt_alloc_table_cap;
+    void **old_tbl = _rt_alloc_table;
+    size_t new_cap = old_cap == 0 ? _RT_ALLOC_INIT_CAP : old_cap * 2;
+
+    void **new_tbl = (void**)calloc(new_cap, sizeof(void*));
+    if (new_tbl == NULL) {
+        _rt_panic("new: out of memory (alloc tracker grow)");
+    }
+
+    /* Re-insert live entries (skip NULL and TOMBSTONE). */
+    for (size_t i = 0; i < old_cap; i++) {
+        void *p = old_tbl[i];
+        if (p != NULL && p != _RT_ALLOC_TOMBSTONE) {
+            size_t idx = _rt_alloc_hash(p, new_cap);
+            while (new_tbl[idx] != NULL) {
+                idx = (idx + 1) & (new_cap - 1);
+            }
+            new_tbl[idx] = p;
+        }
+    }
+
+    free(old_tbl);
+    _rt_alloc_table     = new_tbl;
+    _rt_alloc_table_cap = new_cap;
+}
+
+/**
+ * Insert a pointer into the allocation hash table.
+ */
+static void _rt_alloc_table_insert(void *ptr) {
+    /* Grow if load factor exceeds ~70%. */
+    if (_rt_alloc_table_cap == 0 ||
+        (_rt_alloc_table_cnt + 1) * 10 > _rt_alloc_table_cap * 7) {
+        _rt_alloc_table_grow();
+    }
+
+    size_t idx = _rt_alloc_hash(ptr, _rt_alloc_table_cap);
+    while (_rt_alloc_table[idx] != NULL &&
+           _rt_alloc_table[idx] != _RT_ALLOC_TOMBSTONE) {
+        idx = (idx + 1) & (_rt_alloc_table_cap - 1);
+    }
+    _rt_alloc_table[idx] = ptr;
+    _rt_alloc_table_cnt++;
+}
+
+/**
+ * Remove a pointer from the allocation hash table.
+ *
+ * @return 1 if found and removed, 0 if not found.
+ */
+static int _rt_alloc_table_remove(void *ptr) {
+    if (_rt_alloc_table_cap == 0) return 0;
+
+    size_t idx = _rt_alloc_hash(ptr, _rt_alloc_table_cap);
+    while (_rt_alloc_table[idx] != NULL) {
+        if (_rt_alloc_table[idx] == ptr) {
+            _rt_alloc_table[idx] = _RT_ALLOC_TOMBSTONE;
+            _rt_alloc_table_cnt--;
+            return 1;
+        }
+        idx = (idx + 1) & (_rt_alloc_table_cap - 1);
+    }
+    return 0;
+}
 
 /**
  * Allocate a single zero-initialized object for L0 `new`.
@@ -2366,13 +2463,7 @@ static void *_rt_alloc_obj_impl(l0_int bytes, const char *_loc_file, int _loc_li
         _rt_panic("new: out of memory");
     }
 
-    _rt_alloc_node *node = (_rt_alloc_node*)malloc(sizeof(_rt_alloc_node));
-    if (node == NULL) {
-        _rt_panic("new: out of memory (tracker)");
-    }
-    node->ptr = ptr;
-    node->next = _rt_alloc_list;
-    _rt_alloc_list = node;
+    _rt_alloc_table_insert(ptr);
 
     _RT_TRACE_MEM("op=new_alloc bytes=%d ptr=%p action=ok loc=\"%s\":%d", (int)bytes, ptr, _loc_file, _loc_line);
     return ptr;
@@ -2391,13 +2482,7 @@ static void *_rt_alloc_obj(l0_int bytes) {
         _rt_panic("new: out of memory");
     }
 
-    _rt_alloc_node *node = (_rt_alloc_node*)malloc(sizeof(_rt_alloc_node));
-    if (node == NULL) {
-        _rt_panic("new: out of memory (tracker)");
-    }
-    node->ptr = ptr;
-    node->next = _rt_alloc_list;
-    _rt_alloc_list = node;
+    _rt_alloc_table_insert(ptr);
 
     _RT_TRACE_MEM("op=new_alloc bytes=%d ptr=%p action=ok", (int)bytes, ptr);
     return ptr;
@@ -2419,19 +2504,10 @@ static void _rt_drop_impl(void *ptr, const char *_loc_file, int _loc_line) {
         return; /* covers drop of null optional pointers (T*?) */
     }
 
-    _rt_alloc_node** cur = &_rt_alloc_list;
-    while (*cur != NULL && (*cur)->ptr != ptr) {
-        cur = &((*cur)->next);
-    }
-
-    if (*cur == NULL) {
+    if (!_rt_alloc_table_remove(ptr)) {
         _RT_TRACE_MEM("op=drop ptr=%p action=panic-not-found loc=\"%s\":%d", ptr, _loc_file, _loc_line);
         _rt_panic("drop: pointer not allocated by 'new'");
     }
-
-    _rt_alloc_node *dead = *cur;
-    *cur = dead->next;
-    free(dead);
 
     _RT_TRACE_MEM("op=drop ptr=%p action=free loc=\"%s\":%d", ptr, _loc_file, _loc_line);
     _rt_free_impl(ptr, _loc_file, _loc_line);
@@ -2444,19 +2520,10 @@ static void _rt_drop(void *ptr) {
         return; /* covers drop of null optional pointers (T*?) */
     }
 
-    _rt_alloc_node** cur = &_rt_alloc_list;
-    while (*cur != NULL && (*cur)->ptr != ptr) {
-        cur = &((*cur)->next);
-    }
-
-    if (*cur == NULL) {
+    if (!_rt_alloc_table_remove(ptr)) {
         _RT_TRACE_MEM("op=drop ptr=%p action=panic-not-found", ptr);
         _rt_panic("drop: pointer not allocated by 'new'");
     }
-
-    _rt_alloc_node *dead = *cur;
-    *cur = dead->next;
-    free(dead);
 
     _RT_TRACE_MEM("op=drop ptr=%p action=free", ptr);
     free(ptr);

@@ -38,6 +38,14 @@ struct RtFileInfo {
 extern func rt_string_get(s: string, index: int) -> byte;
 
 /**
+ * Return a pointer to the raw byte data of a string.
+ *
+ * @param s The string.
+ * @return Pointer to the first byte.
+ */
+extern func rt_string_bytes_ptr(s: string) -> byte*;
+
+/**
  * Return the length of the string.
  *
  * @param str The string.
