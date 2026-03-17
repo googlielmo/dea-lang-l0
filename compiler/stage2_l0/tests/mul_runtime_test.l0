@@ -1,0 +1,201 @@
+/*
+ * SPDX-License-Identifier: MIT OR Apache-2.0
+ * Copyright (c) 2026 gwz
+ */
+
+module mul_runtime_test;
+
+import std.assert;
+import std.fs;
+import std.io;
+import std.string;
+import std.text;
+import std.vector;
+
+import l0c_lib;
+
+/**
+ * Return the temporary module path used for one overflow child case.
+ *
+ * @param module_name Temporary module name.
+ * @return Repo-local temp source path.
+ */
+func mrt_temp_module_path(module_name: string) -> string {
+    return concat3_s("compiler/stage2_l0/tests/tmp_", module_name, ".l0");
+}
+
+/**
+ * Delete a temporary file when it exists.
+ *
+ * @param path File path to remove.
+ */
+func mrt_delete_if_exists(path: string) {
+    if (exists(path)) {
+        delete_file(path);
+    }
+}
+
+/**
+ * Build one temporary child module source for an overflow case.
+ *
+ * @param module_name Temporary module name.
+ * @param expr Multiplication expression under test.
+ * @return Module source text.
+ */
+func mrt_child_source(module_name: string, expr: string) -> string {
+    with (let sb = sb_create() => sb_free(sb)) {
+        sb_append(sb, "module ");
+        sb_append(sb, module_name);
+        sb_append(sb, ";\n\n");
+        sb_append(sb, "func main() -> int {\n");
+        sb_append(sb, "    let value: int = ");
+        sb_append(sb, expr);
+        sb_append(sb, ";\n");
+        sb_append(sb, "    return value;\n");
+        sb_append(sb, "}\n");
+        return sb_to_string(sb);
+    }
+}
+
+/**
+ * Assert one valid multiplication case.
+ *
+ * @param label Human-readable case label.
+ * @param actual Computed product.
+ * @param expected Expected product.
+ */
+func mrt_expect_eq(label: string, actual: int, expected: int) {
+    assert(actual == expected, concat3_s("multiplication mismatch: ", label, ""));
+    printl_ss("[PASS]", label);
+}
+
+/**
+ * Compile and run one child module that must fail with multiplication overflow.
+ *
+ * @param module_name Temporary module name.
+ * @param expr Overflowing multiplication expression.
+ * @param label Human-readable case label.
+ */
+func mrt_expect_overflow(module_name: string, expr: string, label: string) {
+    with (let path = mrt_temp_module_path(module_name)) {
+        mrt_delete_if_exists(path);
+
+        let temp_module_name = concat_s("tmp_", module_name);
+        let source = mrt_child_source(temp_module_name, expr);
+        let wrote = write_file(path, source);
+        assert(wrote != null, concat3_s("failed to write overflow fixture: ", label, ""));
+
+        with (let argv = vs_create(8) => vs_free(argv)) {
+            vs_push(argv, "--run");
+            vs_push(argv, "-P");
+            vs_push(argv, "compiler/stage2_l0/tests");
+            vs_push(argv, path);
+
+            let rc = run_with_argv(argv);
+            assert(rc != 0, concat3_s("expected runtime overflow failure: ", label, ""));
+        }
+
+        printl_ss("[PASS]", label);
+    }
+    cleanup {
+        mrt_delete_if_exists(path);
+    }
+}
+
+/**
+ * Tests multiplication cases involving zero.
+ */
+func test_zero_cases() {
+    printl_s("== Zero cases ==");
+    mrt_expect_eq("0 * 0", 0 * 0, 0);
+    mrt_expect_eq("0 * 1", 0 * 1, 0);
+    mrt_expect_eq("1 * 0", 1 * 0, 0);
+    mrt_expect_eq("0 * -1", 0 * -1, 0);
+    mrt_expect_eq("-1 * 0", -1 * 0, 0);
+    mrt_expect_eq("0 * INT32_MAX", 0 * 2147483647, 0);
+    mrt_expect_eq("INT32_MIN * 0", -2147483648 * 0, 0);
+}
+
+/**
+ * Tests multiplication of positive numbers.
+ */
+func test_positive_positive() {
+    printl_s("== Positive * positive ==");
+    mrt_expect_eq("1 * 1", 1 * 1, 1);
+    mrt_expect_eq("2 * 3", 2 * 3, 6);
+    mrt_expect_eq("1000 * 1000", 1000 * 1000, 1000000);
+    mrt_expect_eq("46340 * 46340", 46340 * 46340, 2147395600);
+}
+
+/**
+ * Tests multiplication of negative numbers.
+ */
+func test_negative_negative() {
+    printl_s("== Negative * negative ==");
+    mrt_expect_eq("-1 * -1", -1 * -1, 1);
+    mrt_expect_eq("-2 * -3", -2 * -3, 6);
+    mrt_expect_eq("-1000 * -1000", -1000 * -1000, 1000000);
+    mrt_expect_eq("-46340 * -46340", -46340 * -46340, 2147395600);
+}
+
+/**
+ * Tests multiplication with mixed signs.
+ */
+func test_mixed_signs() {
+    printl_s("== Mixed signs ==");
+    mrt_expect_eq("1 * -1", 1 * -1, -1);
+    mrt_expect_eq("-1 * 1", -1 * 1, -1);
+    mrt_expect_eq("2 * -3", 2 * -3, -6);
+    mrt_expect_eq("-3 * 2", -3 * 2, -6);
+    mrt_expect_eq("10 * -10", 10 * -10, -100);
+    mrt_expect_eq("-10 * 10", -10 * 10, -100);
+    mrt_expect_eq("46340 * -46340", 46340 * -46340, -2147395600);
+    mrt_expect_eq("-46340 * 46340", -46340 * 46340, -2147395600);
+}
+
+/**
+ * Tests edge cases around INT32 limits.
+ */
+func test_edge_cases() {
+    printl_s("== Edge cases ==");
+    mrt_expect_eq("INT32_MAX * 1", 2147483647 * 1, 2147483647);
+    mrt_expect_eq("1 * INT32_MAX", 1 * 2147483647, 2147483647);
+    mrt_expect_eq("INT32_MAX * -1", 2147483647 * -1, -2147483647);
+    mrt_expect_eq("-1 * INT32_MAX", -1 * 2147483647, -2147483647);
+    mrt_expect_eq("INT32_MIN * 1", -2147483648 * 1, -2147483648);
+    mrt_expect_eq("1 * INT32_MIN", 1 * -2147483648, -2147483648);
+}
+
+/**
+ * Tests positive overflow cases in child processes.
+ */
+func test_overflow_positive() {
+    printl_s("== Positive overflow cases ==");
+    mrt_expect_overflow("mul_overflow_positive", "46341 * 46341", "46341 * 46341 should overflow");
+    mrt_expect_overflow("mul_overflow_max_times_two", "2147483647 * 2", "INT32_MAX * 2 should overflow");
+    mrt_expect_overflow("mul_overflow_large", "100000 * 100000", "100000 * 100000 should overflow");
+}
+
+/**
+ * Tests negative and mixed-sign overflow cases in child processes.
+ */
+func test_overflow_negative() {
+    printl_s("== Negative overflow cases ==");
+    mrt_expect_overflow("mul_overflow_negative", "-46341 * -46341", "-46341 * -46341 should overflow");
+    mrt_expect_overflow("mul_underflow_mixed", "46341 * -46341", "46341 * -46341 should overflow");
+    mrt_expect_overflow("mul_int32_min_times_minus_one", "-2147483648 * -1", "INT32_MIN * -1 should overflow");
+}
+
+/**
+ * Main entry point for the module.
+ */
+func main() {
+    test_zero_cases();
+    test_positive_positive();
+    test_negative_negative();
+    test_mixed_signs();
+    test_edge_cases();
+    test_overflow_positive();
+    test_overflow_negative();
+    printl_s("mul_runtime_test: all tests passed");
+}

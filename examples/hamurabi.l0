@@ -1,64 +1,66 @@
-/*
- * SPDX-License-Identifier: MIT OR Apache-2.0
- * Copyright (c) 2025-2026 gwz
- */
+   /* SPDX-License-Identifier: CC0-1.0
+      Copyright (c) 2025-2026 gwz
+      Dedicated to the public domain via CC0 1.0. */
 
-// ===========================================================================
-// HAMURABI - Ancient Sumeria Resource Management
-// ===========================================================================
-//
-// A faithful port to L0 of the classic BASIC game that taught a generation
-// to program.
-//
-// HISTORY:
-//   1968 - "The Sumer Game" by Doug Dyment, written in FOCAL for the PDP-8
-//          at Digital Equipment Corporation as a demonstration of the new
-//          FOCAL language created by Richard Merrill
-//
-// c.1971 - David H. Ahl ported the game to BASIC, adding the 10-year
-//          performance assessment and keeping Dyment's "Hamurabi" spelling
-//
-//   1973 - Published in "101 BASIC Computer Games" by DEC
-//
-//   1978 - Republished in "BASIC Computer Games" by Creative Computing,
-//          which became the first computer book to sell one million copies
-//
-//   2022 - David H. Ahl generously placed all his classic computing
-//          publications into the public domain
-//
-//   2025 - This L0 implementation
-//
-// DEDICATION:
-//   This port is dedicated to David H. Ahl (1939-) and Doug Dyment, pioneers
-//   who understood that the real power of computing comes from sharing code
-//   and knowledge freely. Ahl's books didn't just teach syntax - they taught
-//   a generation that computers could be personal, creative, and fun.
-//
-//   Thank you, Dave, for:
-//   - Creating Creative Computing magazine from your home in Morristown, NJ
-//   - Publishing the games that filled our early computers with life
-//   - Releasing your life's work into the public domain so new generations
-//     can learn, build, and be inspired
-//
-//   And thank you, Doug, for creating a game so elegant in its simplicity
-//   and so rich in its lessons that it has been ported to hundreds of
-//   platforms across six decades.
-//
-// THIS IMPLEMENTATION:
-//   This L0 port attempts to faithfully recreate the 1978 BASIC version,
-//   preserving the original messages, game mechanics, and even the bugs
-//   that became features. It serves as both a tribute to the original and
-//   a demonstration of the L0 language - itself a project in the spirit of
-//   those early computing pioneers who believed in building tools that were
-//   understandable, explicit, and free of hidden complexity.
-//
-// LICENSE:
-//   Following David Ahl's example, this L0 implementation is released into
-//   the public domain. Use it, learn from it, improve it, teach with it.
-//
-// "Try your hand at governing ancient Sumeria for a ten-year term of office."
-//
-// ===========================================================================
+   /*
+
+   ===========================================================================
+   HAMURABI - Ancient Sumeria Resource Management
+   ===========================================================================
+
+   A faithful port to Dea of the classic BASIC game that taught a generation
+   to program.
+
+   HISTORY:
+     1968 - "The Sumer Game" by Doug Dyment, written in FOCAL for the PDP-8
+            at Digital Equipment Corporation as a demonstration of the new
+            FOCAL language created by Richard Merrill
+
+   c.1971 - David H. Ahl ported the game to BASIC, adding the 10-year
+            performance assessment and keeping Dyment's "Hamurabi" spelling
+
+     1973 - Published in "101 BASIC Computer Games" by DEC
+
+     1978 - Republished in "BASIC Computer Games" by Creative Computing,
+            which became the first computer book to sell one million copies
+
+     2022 - David H. Ahl generously placed all his classic computing
+            publications into the public domain
+
+     2025 - This Dea/L0 implementation
+
+   DEDICATION:
+     This port is dedicated to David H. Ahl (1939-) and Doug Dyment, pioneers
+     who understood that the real power of computing comes from sharing code
+     and knowledge freely. Ahl's books didn't just teach syntax - they taught
+     a generation that computers could be personal, creative, and fun.
+
+     Thank you, Dave, for creating Creative Computing magazine from your
+     home in Morristown, NJ, for publishing the games that filled our early
+     computers with life, and for releasing your life's work into the public
+     domain so new generations can learn, build, and be inspired.
+
+     And thank you, Doug, for creating a game so elegant in its simplicity
+     and so rich in its lessons that it has been ported to hundreds of
+     platforms across six decades.
+
+   THIS IMPLEMENTATION:
+     This Dea/L0 port attempts to faithfully recreate the 1978 BASIC version,
+     preserving the original messages, game mechanics, and even the bugs
+     that became features. It serves as both a tribute to the original and
+     a demonstration of the Dea language: itself a project in the spirit of
+     those early computing pioneers who believed in building tools that were
+     understandable, explicit, and free of hidden complexity.
+
+   LICENSE:
+     Following David Ahl's example, this implementation is released into the
+     public domain. Use it, learn from it, improve it, teach with it.
+
+   "Try your hand at governing ancient Sumeria for a ten-year term of office."
+
+   ===========================================================================
+
+                                                                            */
 
 module hamurabi;
 

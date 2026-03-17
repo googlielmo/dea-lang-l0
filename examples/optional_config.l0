@@ -1,0 +1,130 @@
+/*
+ * SPDX-License-Identifier: MIT OR Apache-2.0
+ * Copyright (c) 2025-2026 gwz
+ */
+
+module optional_config;
+
+import std.io;
+import std.optional;
+import std.string;
+import std.system;
+import std.text;
+import std.unit;
+
+/**
+ * Print command usage for the optional-config example.
+ *
+ * This example reads a retry count from either:
+ * 1. the first command-line argument, or
+ * 2. the `APP_RETRIES` environment variable,
+ * and falls back to `3` when neither is provided.
+ */
+func print_usage() {
+    printl_s("usage: optional_config [RETRIES]");
+    printl_s("       or set APP_RETRIES to a value from 0 to 10");
+}
+
+/**
+ * Validate one retry count.
+ *
+ * Optional `Unit` is useful for success/failure checks that carry no payload:
+ * `present()` means the value is valid, and `null` means validation failed.
+ *
+ * @param retries Retry count to validate.
+ * @return `present()` when the value is in range, otherwise `null`.
+ */
+func validate_retry_count(retries: int) -> Unit? {
+    if (retries < 0 || retries > 10) {
+        return null;
+    }
+    return present();
+}
+
+/**
+ * Parse one retry-count string.
+ *
+ * The `?` operator short-circuits on either parse failure or failed validation.
+ *
+ * @param text Raw retry-count text.
+ * @return Parsed retry count, or `null` when invalid.
+ */
+func parse_retry_count(text: string) -> int? {
+    let retries: int = string_to_int(text)?;
+    validate_retry_count(retries)?;
+    return retries as int?;
+}
+
+/**
+ * Return the optional retry count from the first command-line argument.
+ *
+ * @return Parsed retry count when an argument is present and valid, otherwise `null`.
+ */
+func cli_retry_count() -> int? {
+    if (argc() != 2) {
+        return null;
+    }
+    return parse_retry_count(argv(1));
+}
+
+/**
+ * Return the optional retry count from the `APP_RETRIES` environment variable.
+ *
+ * @return Parsed retry count when the variable is present and valid, otherwise `null`.
+ */
+func env_retry_count() -> int? {
+    let value = env_get("APP_RETRIES");
+    if (value == null) {
+        return null;
+    }
+    return parse_retry_count(value as string);
+}
+
+/**
+ * Main entry point for the module.
+ *
+ * Examples:
+ *   optional_config
+ *   optional_config 5
+ *   APP_RETRIES=2 optional_config
+ */
+func main() -> int {
+    if (argc() > 2) {
+        print_usage();
+        return 1;
+    }
+
+    let chosen: int? = null;
+    let source: string = "default";
+
+    if (argc() == 2) {
+        chosen = cli_retry_count();
+        if (chosen == null) {
+            printl_ss("Invalid retry count:", argv(1));
+            print_usage();
+            return 1;
+        }
+        source = "command line";
+    } else {
+        let env_value = env_get("APP_RETRIES");
+        if (env_value != null) {
+            chosen = env_retry_count();
+            if (chosen == null) {
+                printl_ss("Invalid APP_RETRIES value:", env_value as string);
+                print_usage();
+                return 1;
+            }
+            source = "APP_RETRIES";
+        }
+    }
+
+    let retries = unwrap_or_i(chosen, 3);
+
+    printl_ss("Using retry count from", source);
+    printl_si("Retries:", retries);
+    printl_s("Attempt schedule:");
+    for (let attempt = 1; attempt <= retries; attempt = attempt + 1) {
+        printl_si(" attempt", attempt);
+    }
+    return 0;
+}

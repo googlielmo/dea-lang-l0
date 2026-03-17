@@ -212,6 +212,9 @@ The `examples/` directory covers most language features and is worth reading as 
 [Hamurabi](examples/hamurabi.l0) is a faithful L0 port of the 1968 resource-management game - ancient Sumeria, grain
 storage, and all.
 
+[optional_config](examples/optional_config.l0) is a smaller example showing optional values in a practical setting:
+parse a retry count from the command line or `APP_RETRIES`, validate it, and fall back to a default.
+
 ### A more advanced example
 
 <details>
