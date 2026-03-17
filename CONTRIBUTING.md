@@ -12,10 +12,12 @@ Prerequisites:
 
 - Python 3.14+
 - A C99 compiler (GCC or Clang) for codegen tests and running compiled programs
-- `make` for the recommended developer workflow
-- [`uv`](https://github.com/astral-sh/uv) is recommended, but not required
+- `make` (the primary developer workflow entrypoint; `make venv` validates the Python version, creates the `.venv`, and
+  installs all dev + docs dependencies from `pyproject.toml`)
+- [`uv`](https://github.com/astral-sh/uv) is recommended, but not required (the `make venv` target uses it automatically
+  when available, and falls back to plain `pip`)
 
-For normal development, prefer the repo-local switchable `l0c` alias:
+For normal development, use `make venv` then the repo-local switchable `l0c` alias:
 
 ```bash
 make venv

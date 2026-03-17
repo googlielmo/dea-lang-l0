@@ -12,8 +12,14 @@ PYTHON ?= $(shell if [ -x ./.venv/bin/python ]; then printf '%s' ./.venv/bin/pyt
 DEA_BUILD_DIR ?= build/dea
 DOCKER_IMAGE ?= l0-test
 
+# Extract dev + docs dependencies from pyproject.toml (requires Python 3.14+ for tomllib).
+PIP_DEPS_CMD = import tomllib,pathlib;\
+	g=tomllib.loads(pathlib.Path('pyproject.toml').read_text()).get('dependency-groups',{});\
+	print(' '.join(d for d in g.get('dev',[])+g.get('docs',[]) if isinstance(d,str)))
+
 .PHONY: \
 	help \
+	_check-python \
 	venv \
 	install-dev-stage1 \
 	install-dev-stage2 \
@@ -82,7 +88,12 @@ help:
 		'  DOCKER_L0_CC=<compiler>' \
 		'                     Optional C compiler passed into the Docker run as `L0_CC` (`gcc` or `clang`).'
 
-venv:
+_check-python:
+	@$(PYTHON) -c "import sys; sys.exit(0 if sys.version_info >= (3, 14) else 1)" 2>/dev/null \
+		|| { printf 'error: Python 3.14+ is required (found: %s)\n' \
+			"$$($(PYTHON) -c 'import sys; print(".".join(map(str,sys.version_info[:3])))' 2>/dev/null || echo 'none')" >&2; exit 1; }
+
+venv: _check-python
 	@if command -v uv >/dev/null 2>&1; then \
 		if [ -x "$(VENV_PYTHON)" ]; then \
 			printf '%s\n' 'make venv: syncing existing .venv with uv'; \
@@ -90,10 +101,10 @@ venv:
 		uv sync --group dev --group docs; \
 	elif [ -x "$(VENV_PYTHON)" ]; then \
 		printf '%s\n' 'make venv: refreshing existing .venv with pip'; \
-		"$(VENV_PYTHON)" -m pip install -e . "pytest>=9.0.2" "pytest-xdist>=3.5" "jinja2>=3.1.6" "PyYAML>=6.0.2" "pygments>=2.19.2"; \
+		"$(VENV_PYTHON)" -m pip install $$("$(VENV_PYTHON)" -c "$(PIP_DEPS_CMD)"); \
 	else \
 		$(PYTHON) -m venv .venv; \
-		"$(VENV_PYTHON)" -m pip install -e . "pytest>=9.0.2" "pytest-xdist>=3.5" "jinja2>=3.1.6" "PyYAML>=6.0.2" "pygments>=2.19.2"; \
+		"$(VENV_PYTHON)" -m pip install $$("$(VENV_PYTHON)" -c "$(PIP_DEPS_CMD)"); \
 	fi
 
 install-dev-stage1:

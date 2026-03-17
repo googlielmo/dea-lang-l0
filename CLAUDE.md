@@ -42,12 +42,13 @@ Also see: `CONTRIBUTING.md`, `SECURITY.md`.
 
 ## Environment & Setup
 
-- **Virtual Environment:** Always check for a local `.venv` and/or `uv` availability. Prefer `make venv` for the
-  repo-managed developer setup; it reuses `.venv` if present, otherwise uses `uv` when available and falls back to a
-  plain `python3 -m venv` workflow.
+- **Virtual Environment:** Always use `make venv` as the primary developer setup entrypoint. It validates Python 3.14+,
+  reuses `.venv` if present, uses `uv` when available, and falls back to a plain `python3 -m venv` workflow with
+  dependencies extracted from `pyproject.toml`.
 - **Manual Environment Setup:** If you are not using `make venv`, prefer `uv sync --group dev --group docs` (uses
-  `pyproject.toml` and `uv.lock`) or fall back to
-  `python3 -m venv .venv && source .venv/bin/activate && pip install -e . "pytest>=9.0.2" "pytest-xdist>=3.5" "jinja2>=3.1.6" "PyYAML>=6.0.2" "pygments>=2.19.2"`.
+  `pyproject.toml` and `uv.lock`) or fall back to `python3 -m venv .venv && source .venv/bin/activate` and install the
+  dev + docs dependency groups from `pyproject.toml` manually. The project is not an installable Python package
+  (`[tool.uv] package = false`); there is no `pip install -e .` step.
 - **Windows Host Setup:** For Windows validation, use an MSYS2 `MINGW64` shell with MinGW-w64 GCC and GNU Make on
   `PATH`. Source-tree Stage 1 usage is available through `./scripts/l0c.cmd`, while repo-local Make targets use the
   normal `./scripts/l0c` and `./scripts/build-stage2-l0c.sh` entrypoints from within MSYS2 bash. Keep the fallback under
