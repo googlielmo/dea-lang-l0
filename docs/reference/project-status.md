@@ -94,7 +94,8 @@ Current backend behavior includes:
 
 CLI entry point: `compiler/stage1_py/l0c.py` (source-tree wrappers: `./scripts/l0c` on POSIX, `scripts/l0c.cmd` on
 Windows). Recommended developer-facing `l0c`: the repo-local alias under `build/dea/bin`, selected with
-`make use-dev-stage1` or `make use-dev-stage2` and activated with `source build/dea/bin/l0-env.sh`.
+`make use-dev-stage1` or `make use-dev-stage2` and activated with `source build/dea/bin/l0-env.sh` on POSIX/MSYS2 bash
+or `call build\\dea\\bin\\l0-env.cmd` in `cmd.exe`.
 
 Commands and aliases:
 
@@ -247,7 +248,8 @@ Stage 2 backend/codegen status:
 - Stage 2 can now be bootstrapped into a repo-local artifact via `./scripts/build-stage2-l0c.sh`, producing
   `build/dea/bin/l0c-stage2` and `l0c-stage2.native` by default.
 - Phase 2 now adds a repo-local `build/dea/bin` workflow via `make install-dev-stages`, explicit `make use-dev-stage1` /
-  `make use-dev-stage2` alias switching, and `source build/dea/bin/l0-env.sh`.
+  `make use-dev-stage2` alias switching, plus `l0-env.sh` for POSIX/MSYS2 bash and `l0-env.cmd` for native `cmd.exe`
+  activation.
 - Phase 3 now adds a repo-independent install prefix via `make PREFIX=/tmp/l0-install install`; the installed binary is
   the self-hosted Stage 2 compiler (`Compiler 2` from the bootstrap chain), not the initial Stage 1-built bootstrap
   artifact. `make install` requires an explicit `PREFIX=...`. Compiler 2 / compiler 3 inside the strict triple-bootstrap
@@ -289,4 +291,5 @@ Current Stage 2 limitations:
 
 Near-term project direction, consistent with current docs/code:
 
-1. Windows developer activation workflow: streamline `make use-dev-*` and `make install` on Windows/MSYS2 hosts.
+1. PowerShell-native activation helper on Windows (`l0-env.ps1`) as an optional follow-up to the current `cmd.exe`
+   activation workflow.

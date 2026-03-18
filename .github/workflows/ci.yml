@@ -7,10 +7,20 @@ on:
   push:
     branches:
       - main
-      - dea-dev
   pull_request:
   workflow_dispatch:
     inputs:
+      platform:
+        description: Platform matrix selection
+        required: true
+        default: all
+        type: choice
+        options:
+          - all
+          - linux
+          - macos-intel
+          - macos-arm64
+          - windows
       c_compiler:
         description: C compiler to use for the Linux validation run
         required: true
@@ -26,27 +36,46 @@ on:
         type: string
 
 jobs:
+  select-matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.select.outputs.matrix }}
+    steps:
+      - name: Select matrix
+        id: select
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_PLATFORM: ${{ inputs.platform }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+
+          default_matrix = [
+              {"runner": "ubuntu-latest", "os": "linux", "arch": "x86_64", "c_compiler": "gcc", "platform": "linux"},
+              {"runner": "macos-15-intel", "os": "darwin", "arch": "x86_64", "c_compiler": "clang", "platform": "macos-intel"},
+              {"runner": "macos-latest", "os": "darwin", "arch": "arm64", "c_compiler": "clang", "platform": "macos-arm64"},
+              {"runner": "windows-latest", "os": "windows", "arch": "x86_64", "c_compiler": "gcc", "platform": "windows"},
+          ]
+
+          event_name = os.environ["EVENT_NAME"]
+          requested_platform = os.environ.get("INPUT_PLATFORM", "all").strip() or "all"
+          selected = default_matrix
+          if event_name == "workflow_dispatch" and requested_platform != "all":
+              selected = [entry for entry in default_matrix if entry["platform"] == requested_platform]
+              if not selected:
+                  raise SystemExit(f"unknown workflow_dispatch platform selection: {requested_platform}")
+
+          github_output = os.environ["GITHUB_OUTPUT"]
+          with open(github_output, "a", encoding="utf-8") as handle:
+              handle.write(f"matrix={json.dumps({'include': selected}, separators=(',', ':'))}\n")
+          PY
+
   test-all:
+    needs: select-matrix
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - runner: ubuntu-latest
-            os: linux
-            arch: x86_64
-            c_compiler: gcc
-          - runner: macos-15-intel
-            os: darwin
-            arch: x86_64
-            c_compiler: clang
-          - runner: macos-latest
-            os: darwin
-            arch: arm64
-            c_compiler: clang
-          - runner: windows-latest
-            os: windows
-            arch: x86_64
-            c_compiler: gcc
+      matrix: ${{ fromJson(needs.select-matrix.outputs.matrix) }}
     runs-on: ${{ matrix.runner }}
     steps:
       - name: Check out repository

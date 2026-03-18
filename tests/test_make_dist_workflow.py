@@ -267,6 +267,8 @@ def main() -> int:
         assert_exists(dist_dir / "bin" / "l0c-stage2.native")
         assert_exists(dist_dir / "bin" / "l0c")
         assert_exists(dist_dir / "bin" / "l0-env.sh")
+        if is_windows_host():
+            assert_exists(dist_dir / "bin" / "l0-env.cmd")
         assert_exists(dist_dir / "VERSION")
         assert_exists(dist_dir / "shared" / "l0" / "stdlib" / "std" / "io.l0")
         assert_exists(dist_dir / "shared" / "runtime" / "l0_runtime.h")
@@ -280,6 +282,8 @@ def main() -> int:
         assert_exists(unpacked_dist / "bin" / "l0c-stage2")
         assert_exists(unpacked_dist / "bin" / "l0c-stage2.native")
         assert_exists(unpacked_dist / "bin" / "l0c")
+        if is_windows_host():
+            assert_exists(unpacked_dist / "bin" / "l0-env.cmd")
         assert_exists(unpacked_dist / "VERSION")
         assert_exists(unpacked_dist / "shared" / "l0" / "stdlib" / "std" / "io.l0")
         assert_contains(unpacked_dist / "bin" / "l0-env.sh", 'export L0_HOME="${PREFIX_DIR}"')

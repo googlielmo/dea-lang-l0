@@ -50,12 +50,13 @@ Also see: `CONTRIBUTING.md`, `SECURITY.md`.
   dev + docs dependency groups from `pyproject.toml` manually. The project is not an installable Python package
   (`[tool.uv] package = false`); there is no `pip install -e .` step.
 - **Windows Host Setup:** For Windows validation, use an MSYS2 `MINGW64` shell with MinGW-w64 GCC and GNU Make on
-  `PATH`. Source-tree Stage 1 usage is available through `./scripts/l0c.cmd`, while repo-local Make targets use the
-  normal `./scripts/l0c` and `./scripts/build-stage2-l0c.sh` entrypoints from within MSYS2 bash. Keep the fallback under
-  `scripts/`: the root-level `l0c` name is reserved for the selected dev or installed compiler command.
-- **Environment Variables:** Source `build/dea/bin/l0-env.sh` only for the repo-local Dea build workflow. For an
-  installed Stage 2 prefix, source `<PREFIX>/bin/l0-env.sh`. For source-tree usage, invoke `./scripts/l0c` directly; it
-  derives `L0_HOME` on its own.
+  `PATH`. Source-tree Stage 1 usage is available through `./scripts/l0c.cmd`, while repo-local and install-prefix
+  workflows now generate `l0-env.cmd` plus the selected `l0c.cmd` alias for native `cmd.exe` usage. Keep the fallback
+  under `scripts/`: the root-level `l0c` name is reserved for the selected dev or installed compiler command.
+- **Environment Variables:** Source `build/dea/bin/l0-env.sh` only for the repo-local Dea build workflow in POSIX/MSYS2
+  bash, or `call build\dea\bin\l0-env.cmd` in `cmd.exe`. For an installed Stage 2 prefix, source
+  `<PREFIX>/bin/l0-env.sh` in POSIX/MSYS2 bash or `call <PREFIX>\bin\l0-env.cmd` in `cmd.exe`. For source-tree usage,
+  invoke `./scripts/l0c` or `scripts\l0c.cmd` directly; those wrappers derive `L0_HOME` on their own.
 - **Pre-commit hooks:** Install with `pre-commit install` after `make venv`. Two hooks run on every commit: `mdformat`
   (auto-reformats `.md` files; config in `pyproject.toml`) and `copyright-headers` (validates source file copyright
   notices). If mdformat reformats a file, stage the changes and re-commit.
@@ -70,6 +71,9 @@ source build/dea/bin/l0-env.sh
 make PREFIX=/tmp/l0-install install
 source /tmp/l0-install/bin/l0-env.sh
 ```
+
+On Windows `cmd.exe`, use `call build\dea\bin\l0-env.cmd` for the repo-local workflow and `call <PREFIX>\bin\l0-env.cmd`
+for an installed prefix.
 
 `make install` requires an explicit `PREFIX=...`; it does not default to a repo-local install root. Both `install` and
 `dist` default to `L0_CFLAGS=-O2` when the variable is unset; `install-dev-stage*` targets do not, for fast iteration.

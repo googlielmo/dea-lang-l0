@@ -271,7 +271,10 @@ def main() -> int:
             return 0
         if args.command == "set-alias":
             path = set_alias(layout, args.stage)
-            print(f"gen-dea-build-tools: linked {path} -> {path.readlink()}")
+            if path.is_symlink():
+                print(f"gen-dea-build-tools: linked {path} -> {path.readlink()}")
+            else:
+                print(f"gen-dea-build-tools: selected {args.stage} alias at {path}")
             return 0
         if args.command == "clean-dea-build":
             remove_dea_build_tree(layout)

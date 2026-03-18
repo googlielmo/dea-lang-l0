@@ -31,6 +31,10 @@ def fail(message: str) -> None:
     raise SystemExit(f"test_make_dea_build_workflow: FAIL: {message}")
 
 
+def is_windows_host() -> bool:
+    return os.name == "nt"
+
+
 def run_checked(command: list[str], *, extra_env: dict[str, str] | None = None) -> str:
     env = os.environ.copy()
     if extra_env:
@@ -93,8 +97,27 @@ def assert_symlink_target(path: Path, expected: str) -> None:
         fail(f"expected {path} -> {expected}, got {target}")
 
 
+def assert_same_text(path: Path, expected_path: Path) -> None:
+    if path.read_text(encoding="utf-8") != expected_path.read_text(encoding="utf-8"):
+        fail(f"expected {path} to match {expected_path}")
+
+
+def launcher_path(base: Path) -> str:
+    if is_windows_host():
+        cmd_path = base.with_suffix(".cmd")
+        if cmd_path.is_file():
+            return str(cmd_path)
+    return str(base)
+
+
+def stage2_bootstrap_build_command() -> list[str]:
+    if is_windows_host():
+        return [sys.executable, "./scripts/build_stage2_l0c.py"]
+    return ["./scripts/build-stage2-l0c.sh"]
+
+
 def make_command(dea_build_rel: str, *targets: str, dry_run: bool = False) -> list[str]:
-    command = ["make"]
+    command = ["make", "--no-print-directory"]
     if dry_run:
         command.append("-n")
     command.append(f"DEA_BUILD_DIR={dea_build_rel}")
@@ -103,7 +126,7 @@ def make_command(dea_build_rel: str, *targets: str, dry_run: bool = False) -> li
 
 
 def prefix_command(prefix: Path, *targets: str, dry_run: bool = False) -> list[str]:
-    command = ["make"]
+    command = ["make", "--no-print-directory"]
     if dry_run:
         command.append("-n")
     command.append(f"PREFIX={prefix}")
@@ -162,6 +185,41 @@ def assert_provenance_helper_contract() -> None:
         assert_output_not_contains(rendered, unexpected)
 
 
+def clean_runtime_env(*, extra_env: dict[str, str] | None = None) -> dict[str, str]:
+    env = os.environ.copy()
+    for name in ("L0_HOME", "L0_SYSTEM", "L0_RUNTIME_INCLUDE", "L0_RUNTIME_LIB"):
+        env.pop(name, None)
+    if extra_env:
+        env.update(extra_env)
+    return env
+
+
+def cmd_quote(text: str) -> str:
+    return '"' + text.replace('"', '""') + '"'
+
+
+def run_cmd_activated(env_script: Path, command: str, *, extra_env: dict[str, str] | None = None) -> str:
+    driver_fd, driver_text = tempfile.mkstemp(
+        prefix="make_dea_build_cmd.",
+        suffix=".cmd",
+        dir=BUILD_TESTS_ROOT,
+        text=True,
+    )
+    driver_path = Path(driver_text)
+    try:
+        with os.fdopen(driver_fd, "w", encoding="utf-8", newline="\r\n") as handle:
+            handle.write("@echo off\n")
+            handle.write(f"call {cmd_quote(str(env_script))}\n")
+            handle.write("if errorlevel 1 exit /b %ERRORLEVEL%\n")
+            handle.write(f"{command}\n")
+        return run_checked(
+            ["cmd.exe", "/d", "/c", str(driver_path)],
+            extra_env=clean_runtime_env(extra_env=extra_env),
+        )
+    finally:
+        driver_path.unlink(missing_ok=True)
+
+
 def source_env_and_check(dea_build_dir: Path) -> None:
     env_script = dea_build_dir / "bin" / "l0-env.sh"
     command = [
@@ -172,24 +230,54 @@ def source_env_and_check(dea_build_dir: Path) -> None:
     run_checked(command)
 
 
+def tempdir_prefix(base: str) -> str:
+    return f"{base} " if is_windows_host() else f"{base}_"
+
+
+def make_hello_project(project_dir: Path) -> None:
+    project_dir.mkdir(parents=True, exist_ok=True)
+    (project_dir / "hello.l0").write_text(
+        """module hello;
+
+import std.io;
+
+func main() -> int {
+    printl_s("Hello, World!");
+    return 0;
+}
+""",
+        encoding="utf-8",
+    )
+
+
 def main() -> int:
     BUILD_TESTS_ROOT.mkdir(parents=True, exist_ok=True)
     assert_provenance_helper_contract()
-    dea_build_dir = Path(tempfile.mkdtemp(prefix="make_dea_build.", dir=BUILD_TESTS_ROOT))
-    prefix_dir = Path(tempfile.mkdtemp(prefix="make_prefix.")).resolve(strict=False)
+    dea_build_dir = Path(tempfile.mkdtemp(prefix=tempdir_prefix("make_dea_build"), dir=BUILD_TESTS_ROOT))
+    prefix_dir = Path(tempfile.mkdtemp(prefix=tempdir_prefix("make_prefix"))).resolve(strict=False)
+    project_dir = Path(tempfile.mkdtemp(prefix=tempdir_prefix("make_project"), dir=BUILD_TESTS_ROOT))
     dea_build_rel = os.path.relpath(dea_build_dir, REPO_ROOT)
     alias_path = dea_build_dir / "bin" / "l0c"
+    alias_cmd_path = dea_build_dir / "bin" / "l0c.cmd"
     stage1_path = dea_build_dir / "bin" / "l0c-stage1"
+    stage1_cmd_path = dea_build_dir / "bin" / "l0c-stage1.cmd"
     stage2_path = dea_build_dir / "bin" / "l0c-stage2"
+    stage2_cmd_path = dea_build_dir / "bin" / "l0c-stage2.cmd"
     native_path = dea_build_dir / "bin" / "l0c-stage2.native"
     env_path = dea_build_dir / "bin" / "l0-env.sh"
+    env_cmd_path = dea_build_dir / "bin" / "l0-env.cmd"
     prefix_alias_path = prefix_dir / "bin" / "l0c"
+    prefix_alias_cmd_path = prefix_dir / "bin" / "l0c.cmd"
     prefix_stage2_path = prefix_dir / "bin" / "l0c-stage2"
+    prefix_stage2_cmd_path = prefix_dir / "bin" / "l0c-stage2.cmd"
     prefix_native_path = prefix_dir / "bin" / "l0c-stage2.native"
     prefix_env_path = prefix_dir / "bin" / "l0-env.sh"
+    prefix_env_cmd_path = prefix_dir / "bin" / "l0-env.cmd"
     expected_source_hint = f"source {dea_build_rel}/bin/l0-env.sh"
+    expected_windows_hint = "l0-env.cmd"
 
     try:
+        make_hello_project(project_dir)
         help_output = run_checked(["make", "help"])
         for target in (
             "install-dev-stages",
@@ -217,65 +305,133 @@ def main() -> int:
         run_checked(make_command(dea_build_rel, "install-dev-stage1"))
         assert_exists(stage1_path)
         assert_exists(env_path)
+        if is_windows_host():
+            assert_exists(stage1_cmd_path)
+            assert_exists(env_cmd_path)
         assert_missing(alias_path)
         stable_env_text = env_path.read_text(encoding="utf-8")
+        stable_env_cmd_text = env_cmd_path.read_text(encoding="utf-8") if is_windows_host() else None
 
-        run_expected_fail(
-            ["bash", str(env_path)],
-            expected_source_hint,
-        )
+        if not is_windows_host():
+            run_expected_fail(
+                ["bash", str(env_path)],
+                expected_source_hint,
+            )
 
         run_checked(make_command(dea_build_rel, "install-dev-stage2"))
         assert_exists(stage2_path)
         assert_exists(native_path)
         assert_exists(env_path)
+        if is_windows_host():
+            assert_exists(stage2_cmd_path)
+            assert_exists(env_cmd_path)
         assert_missing(alias_path)
-        repo_wrapper_version = run_checked([str(stage2_path), "--version"])
+        repo_wrapper_version = run_checked([launcher_path(stage2_path), "--version"])
         repo_native_version = run_checked([str(native_path), "--version"])
         assert_version_report(repo_wrapper_version)
         if repo_native_version != repo_wrapper_version:
             fail("expected repo-local wrapper/native --version output to match")
         if env_path.read_text(encoding="utf-8") != stable_env_text:
             fail("expected l0-env.sh to remain stable after install-dev-stage2")
+        if is_windows_host() and env_cmd_path.read_text(encoding="utf-8") != stable_env_cmd_text:
+            fail("expected l0-env.cmd to remain stable after install-dev-stage2")
 
         run_checked(make_command(dea_build_rel, "install-dev-stages"))
         assert_exists(stage1_path)
         assert_exists(stage2_path)
         assert_exists(native_path)
         assert_exists(env_path)
+        if is_windows_host():
+            assert_exists(stage1_cmd_path)
+            assert_exists(stage2_cmd_path)
+            assert_exists(env_cmd_path)
         assert_missing(alias_path)
         if env_path.read_text(encoding="utf-8") != stable_env_text:
             fail("expected l0-env.sh to remain stable after install-dev-stages")
+        if is_windows_host() and env_cmd_path.read_text(encoding="utf-8") != stable_env_cmd_text:
+            fail("expected l0-env.cmd to remain stable after install-dev-stages")
 
         use_stage1_output = run_checked(make_command(dea_build_rel, "use-dev-stage1"))
-        assert_symlink_target(alias_path, "l0c-stage1")
-        assert_output_contains(use_stage1_output, expected_source_hint)
+        if is_windows_host():
+            assert_exists(alias_path)
+            assert_exists(alias_cmd_path)
+            assert_same_text(alias_path, stage1_path)
+            assert_same_text(alias_cmd_path, stage1_cmd_path)
+            assert_output_contains(use_stage1_output, expected_windows_hint)
+        else:
+            assert_symlink_target(alias_path, "l0c-stage1")
+            assert_output_contains(use_stage1_output, expected_source_hint)
 
         run_checked(make_command(dea_build_rel, "install-dev-stages"))
-        assert_symlink_target(alias_path, "l0c-stage1")
-
-        source_env_and_check(dea_build_dir)
+        if is_windows_host():
+            assert_same_text(alias_path, stage1_path)
+            assert_same_text(alias_cmd_path, stage1_cmd_path)
+            stage1_env_output = run_cmd_activated(
+                env_cmd_path,
+                "echo L0_HOME=%L0_HOME% && l0c --check -P examples hello",
+            )
+            assert_output_contains(stage1_env_output, f"L0_HOME={REPO_ROOT / 'compiler'}")
+        else:
+            assert_symlink_target(alias_path, "l0c-stage1")
+            source_env_and_check(dea_build_dir)
 
         use_stage2_output = run_checked(make_command(dea_build_rel, "use-dev-stage2"))
-        assert_symlink_target(alias_path, "l0c-stage2")
-        assert_output_contains(use_stage2_output, expected_source_hint)
+        if is_windows_host():
+            assert_exists(alias_path)
+            assert_exists(alias_cmd_path)
+            assert_same_text(alias_path, stage2_path)
+            assert_same_text(alias_cmd_path, stage2_cmd_path)
+            assert_output_contains(use_stage2_output, expected_windows_hint)
+        else:
+            assert_symlink_target(alias_path, "l0c-stage2")
+            assert_output_contains(use_stage2_output, expected_source_hint)
         run_checked(make_command(dea_build_rel, "use-dev-stage2"))
-        assert_symlink_target(alias_path, "l0c-stage2")
-        source_env_and_check(dea_build_dir)
+        if is_windows_host():
+            assert_same_text(alias_path, stage2_path)
+            assert_same_text(alias_cmd_path, stage2_cmd_path)
+            stage2_env_output = run_cmd_activated(
+                env_cmd_path,
+                "call "
+                + cmd_quote(str(env_cmd_path))
+                + " && echo PATH=%PATH% && echo L0_HOME=%L0_HOME% && l0c --check -P examples hello",
+            )
+            assert_output_contains(stage2_env_output, f"L0_HOME={REPO_ROOT / 'compiler'}")
+            if stage2_env_output.lower().count(str(env_cmd_path.parent).lower()) != 1:
+                fail("expected l0-env.cmd to prepend the repo-local bin directory to PATH only once")
+        else:
+            assert_symlink_target(alias_path, "l0c-stage2")
+            source_env_and_check(dea_build_dir)
 
         install_prefix_output = run_checked(prefix_command(prefix_dir, "install"))
         assert_exists(prefix_stage2_path)
         assert_exists(prefix_native_path)
         assert_exists(prefix_env_path)
+        if is_windows_host():
+            assert_exists(prefix_stage2_cmd_path)
+            assert_exists(prefix_env_cmd_path)
         assert_exists(prefix_dir / "shared" / "l0" / "stdlib" / "std" / "io.l0")
         assert_exists(prefix_dir / "shared" / "runtime" / "l0_runtime.h")
-        assert_symlink_target(prefix_alias_path, "l0c-stage2")
+        if is_windows_host():
+            assert_exists(prefix_alias_path)
+            assert_exists(prefix_alias_cmd_path)
+            assert_same_text(prefix_alias_path, prefix_stage2_path)
+            assert_same_text(prefix_alias_cmd_path, prefix_stage2_cmd_path)
+            assert_output_contains(install_prefix_output, expected_windows_hint)
+        else:
+            assert_symlink_target(prefix_alias_path, "l0c-stage2")
         assert_output_contains(install_prefix_output, "installed self-hosted Stage 2 compiler")
-        prefix_wrapper_version = run_checked([str(prefix_stage2_path), "--version"])
+        prefix_wrapper_version = run_checked([launcher_path(prefix_stage2_path), "--version"])
         prefix_native_version = run_checked([str(prefix_native_path), "--version"])
         assert_version_report(prefix_wrapper_version)
         if prefix_native_version != prefix_wrapper_version:
             fail("expected installed wrapper/native --version output to match")
+        if is_windows_host():
+            prefix_env_output = run_cmd_activated(
+                prefix_env_cmd_path,
+                f"echo L0_HOME=%L0_HOME% && l0c --run -P {cmd_quote(str(project_dir))} hello",
+            )
+            assert_output_contains(prefix_env_output, f"L0_HOME={prefix_dir}")
+            assert_output_contains(prefix_env_output, "Hello, World!")
 
         run_expected_fail(
             ["make", "DEA_BUILD_DIR=/tmp/l0-dev", "install-dev-stage1"],
@@ -298,7 +454,7 @@ def main() -> int:
             "DEA_BUILD_DIR must resolve to a subdirectory inside the repository",
         )
         run_expected_fail(
-            ["./scripts/build-stage2-l0c.sh"],
+            stage2_bootstrap_build_command(),
             "DEA_BUILD_DIR must resolve to a subdirectory inside the repository",
             extra_env={"DEA_BUILD_DIR": "."},
         )
@@ -320,6 +476,8 @@ def main() -> int:
             assert_output_contains(output, expected)
             if target in {"test-stage2", "test-stage2-trace", "triple-test"}:
                 assert_output_contains(output, "./scripts/build-stage2-l0c.sh")
+            if target == "test-all":
+                assert_output_contains(output, "./tests/test_make_dea_build_workflow.py")
 
         run_checked(make_command(dea_build_rel, "clean-dea-build"))
         if dea_build_dir.exists():
@@ -327,6 +485,7 @@ def main() -> int:
     finally:
         shutil.rmtree(dea_build_dir, ignore_errors=True)
         shutil.rmtree(prefix_dir, ignore_errors=True)
+        shutil.rmtree(project_dir, ignore_errors=True)
 
     print("test_make_dea_build_workflow: PASS")
     return 0

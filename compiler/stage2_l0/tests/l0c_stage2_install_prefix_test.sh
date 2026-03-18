@@ -141,6 +141,9 @@ assert_contains "$INSTALL_LOG" "stage 3/3: installing self-hosted Stage 2 compil
 assert_file "$PREFIX_DIR/bin/l0c-stage2"
 assert_file "$PREFIX_DIR/bin/l0c-stage2.native"
 assert_file "$PREFIX_DIR/bin/l0-env.sh"
+if is_windows_host; then
+    assert_file "$PREFIX_DIR/bin/l0-env.cmd"
+fi
 assert_file "$PREFIX_DIR/shared/l0/stdlib/std/fs.l0"
 assert_file "$PREFIX_DIR/shared/l0/stdlib/std/io.l0"
 assert_file "$PREFIX_DIR/shared/l0/stdlib/std/path.l0"

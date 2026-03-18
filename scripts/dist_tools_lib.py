@@ -504,14 +504,16 @@ def write_relative_symlink(path: Path, target_name: str) -> None:
     if path.exists() or path.is_symlink():
         path.unlink()
     if is_windows_host():
-        # Symlinks require elevated privileges on Windows; copy instead.
+        # Symlinks require elevated privileges on Windows; copy the selected wrapper pair instead.
+        cmd_link_path = path.parent / f"{path.name}.cmd"
+        if cmd_link_path.exists() or cmd_link_path.is_symlink():
+            cmd_link_path.unlink()
         target_path = path.parent / target_name
-        # Try .cmd wrapper first for Windows batch dispatch.
         cmd_target = path.parent / f"{target_name}.cmd"
-        if cmd_target.exists():
-            shutil.copy2(cmd_target, path.parent / f"{path.name}.cmd")
         if target_path.exists():
             shutil.copy2(target_path, path)
+        if cmd_target.exists():
+            shutil.copy2(cmd_target, cmd_link_path)
     else:
         path.symlink_to(target_name)
 
@@ -564,6 +566,30 @@ if [ -z "${{python_bin}}" ]; then
 fi
 
 exec "${{python_bin}}" "${{repo_root}}/compiler/stage1_py/l0c.py" "$@"
+"""
+
+
+def render_stage1_cmd_wrapper(layout: DeaBuildLayout) -> str:
+    """Return the repo-local Windows batch Stage 1 launcher."""
+
+    bat_rel = layout.repo_relative_from_bin.replace("/", "\\")
+    return f"""@echo off
+setlocal
+
+set "SCRIPT_DIR=%~dp0"
+set "SCRIPT_DIR=%SCRIPT_DIR:~0,-1%"
+for %%I in ("%SCRIPT_DIR%\\{bat_rel}") do set "REPO_ROOT=%%~fI"
+set "PYTHON_BIN=%PYTHON%"
+
+if not defined PYTHON_BIN if exist "%REPO_ROOT%\\.venv\\Scripts\\python.exe" set "PYTHON_BIN=%REPO_ROOT%\\.venv\\Scripts\\python.exe"
+if not defined PYTHON_BIN if exist "%REPO_ROOT%\\.venv\\bin\\python" set "PYTHON_BIN=%REPO_ROOT%\\.venv\\bin\\python"
+if not defined PYTHON_BIN set "PYTHON_BIN=python"
+
+set "L0_HOME=%REPO_ROOT%\\compiler"
+
+"%PYTHON_BIN%" "%REPO_ROOT%\\compiler\\stage1_py\\l0c.py" %*
+set "EXITCODE=%ERRORLEVEL%"
+endlocal & exit /b %EXITCODE%
 """
 
 
@@ -663,6 +689,27 @@ hash -r 2>/dev/null || true
 """
 
 
+def render_env_cmd_script(layout: DeaBuildLayout) -> str:
+    """Return the repo-local Windows activation script."""
+
+    bat_rel = layout.repo_relative_from_bin.replace("/", "\\")
+    return f"""@echo off
+set "SCRIPT_DIR=%~dp0"
+set "SCRIPT_DIR=%SCRIPT_DIR:~0,-1%"
+for %%I in ("%SCRIPT_DIR%\\{bat_rel}") do set "REPO_ROOT=%%~fI"
+set "L0_HOME=%REPO_ROOT%\\compiler"
+set "PATH_PADDED=;%PATH%;"
+if /I "%PATH_PADDED%"=="%PATH_PADDED:;%SCRIPT_DIR%;=%" (
+    if defined PATH (
+        set "PATH=%SCRIPT_DIR%;%PATH%"
+    ) else (
+        set "PATH=%SCRIPT_DIR%"
+    )
+)
+set "PATH_PADDED="
+"""
+
+
 def render_prefix_stage2_wrapper() -> str:
     """Return the prefix-relative Stage 2 launcher."""
 
@@ -735,12 +782,36 @@ hash -r 2>/dev/null || true
 """
 
 
+def render_prefix_env_cmd_script() -> str:
+    """Return the prefix-relative Windows activation script."""
+
+    return """@echo off
+set "SCRIPT_DIR=%~dp0"
+set "SCRIPT_DIR=%SCRIPT_DIR:~0,-1%"
+for %%I in ("%SCRIPT_DIR%\\..") do set "PREFIX_ROOT=%%~fI"
+set "L0_HOME=%PREFIX_ROOT%"
+set "PATH_PADDED=;%PATH%;"
+if /I "%PATH_PADDED%"=="%PATH_PADDED:;%SCRIPT_DIR%;=%" (
+    if defined PATH (
+        set "PATH=%SCRIPT_DIR%;%PATH%"
+    ) else (
+        set "PATH=%SCRIPT_DIR%"
+    )
+)
+set "PATH_PADDED="
+"""
+
+
 def write_stage1_wrapper(layout: DeaBuildLayout) -> Path:
     """Write the Stage 1 wrapper."""
 
     ensure_dea_build_bin_dir(layout)
     path = layout.bin_dir / "l0c-stage1"
     write_executable(path, render_stage1_wrapper(layout))
+    if is_windows_host():
+        (layout.bin_dir / "l0c-stage1.cmd").write_text(
+            render_stage1_cmd_wrapper(layout), encoding="utf-8"
+        )
     return path
 
 
@@ -763,6 +834,10 @@ def write_env_script(layout: DeaBuildLayout) -> Path:
     ensure_dea_build_bin_dir(layout)
     path = layout.bin_dir / "l0-env.sh"
     write_executable(path, render_env_script(layout))
+    if is_windows_host():
+        (layout.bin_dir / "l0-env.cmd").write_text(
+            render_env_cmd_script(layout), encoding="utf-8"
+        )
     return path
 
 
@@ -785,6 +860,10 @@ def write_prefix_env_script(layout: PrefixLayout) -> Path:
     ensure_prefix_bin_dir(layout)
     path = layout.bin_dir / "l0-env.sh"
     write_executable(path, render_prefix_env_script())
+    if is_windows_host():
+        (layout.bin_dir / "l0-env.cmd").write_text(
+            render_prefix_env_cmd_script(), encoding="utf-8"
+        )
     return path
 
 
@@ -920,7 +999,7 @@ def list_installed_files(layout: PrefixLayout) -> list[Path]:
         if p.exists() or p.is_symlink():
             files.append(p)
     if is_windows_host():
-        for name in ("l0c-stage2.cmd", "l0c.cmd"):
+        for name in ("l0c-stage2.cmd", "l0c.cmd", "l0-env.cmd"):
             p = layout.bin_dir / name
             if p.exists():
                 files.append(p)

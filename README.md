@@ -143,6 +143,8 @@ l0c --help
 l0c --version
 ```
 
+On Windows `cmd.exe`, the equivalent activation step is `call build\\dea\\bin\\l0-env.cmd`.
+
 The `./scripts/l0c` entrypoint remains available, but it is the source-tree Stage 1 wrapper and is mainly useful for
 bootstrap mechanics, internal tooling, and Stage 1-focused testing.
 
@@ -153,6 +155,8 @@ make PREFIX=/tmp/l0-install install
 source /tmp/l0-install/bin/l0-env.sh
 l0c --version
 ```
+
+On Windows `cmd.exe`, the equivalent activation step is `call <PREFIX>\\bin\\l0-env.cmd`.
 
 `make install` requires an explicit `PREFIX=...`; there is no implicit default install root.
 
@@ -371,8 +375,9 @@ References:
 ## CLI
 
 The recommended developer-facing CLI is `l0c` after selecting a stage with `make use-dev-stage1` or
-`make use-dev-stage2` and sourcing `build/dea/bin/l0-env.sh`. The source-tree `./scripts/l0c` wrapper is Stage 1 only
-and remains useful mainly for bootstrap mechanics and Stage 1-focused testing.
+`make use-dev-stage2` and activating the selected environment (`source build/dea/bin/l0-env.sh` on POSIX/MSYS2 bash,
+`call build\\dea\\bin\\l0-env.cmd` in `cmd.exe`). The source-tree `./scripts/l0c` wrapper is Stage 1 only and remains
+useful mainly for bootstrap mechanics and Stage 1-focused testing.
 
 ```shell
 l0c [mode] [options] <target>

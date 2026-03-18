@@ -33,21 +33,23 @@ l0c --version
 ### From `cmd.exe`
 
 ```cmd
-set "PATH=C:\l0-install\bin;%PATH%"
+call C:\l0-install\bin\l0-env.cmd
 l0c --version
 ```
 
 ### From PowerShell
 
 ```powershell
-$env:PATH = "C:\l0-install\bin;$env:PATH"
-l0c --version
+cmd /d /c "call C:\l0-install\bin\l0-env.cmd && l0c --version"
+# or invoke the selected launcher directly:
+& "C:\l0-install\bin\l0c.cmd" --version
 ```
 
 Notes:
 
 - The installed Windows entry point is `l0c.cmd`; native Windows shells resolve bare `l0c` to that launcher.
-- `l0-env.sh` is generated on Windows, but it is for MSYS2/bash only.
+- `l0-env.cmd` is generated for native `cmd.exe` activation.
+- `l0-env.sh` remains the MSYS2/bash activation helper.
 
 ## If you are developing Dea/L0 itself
 
@@ -71,10 +73,10 @@ l0c --version
 
 Native Windows shell summary:
 
-- Repo-local Stage 2 works through `build\dea\bin\l0c-stage2.cmd` and, after `make use-dev-stage2`, through
-  `build\dea\bin\l0c.cmd`.
-- Repo-local Stage 1 does not currently get a matching `build\...\bin\l0c.cmd`; in `cmd.exe` or PowerShell, use
-  `scripts\l0c.cmd`.
+- Repo-local Stage 1 and Stage 2 both work through `build\dea\bin\l0c.cmd` after `make use-dev-stage1` or
+  `make use-dev-stage2`.
+- Installed Stage 2 works through `<PREFIX>\bin\l0-env.cmd` followed by `l0c`, or through the direct launcher
+  `<PREFIX>\bin\l0c.cmd`.
 
 ## Technical addendum
 
@@ -83,14 +85,16 @@ layout in detail.
 
 ### Supported workflow
 
-| Scenario                                                    | Recommended entry point on Windows                                                  |
-| ----------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| Source-tree Stage 1 from MSYS2 bash                         | `./scripts/l0c`                                                                     |
-| Source-tree Stage 1 from `cmd.exe` / PowerShell             | `scripts\\l0c.cmd`                                                                  |
-| Repo-local Stage 2 dev launcher from MSYS2 bash             | `build/dea/bin/l0c-stage2` or selected `l0c` after `make use-dev-stage2`            |
-| Repo-local Stage 2 dev launcher from `cmd.exe` / PowerShell | `build\\dea\\bin\\l0c-stage2.cmd` or selected `l0c.cmd` after `make use-dev-stage2` |
-| Installed Stage 2 from MSYS2 bash                           | `source <PREFIX>/bin/l0-env.sh` then `l0c`                                          |
-| Installed Stage 2 from `cmd.exe` / PowerShell               | add `<PREFIX>\\bin` to `PATH`, then run `l0c`                                       |
+| Scenario                                        | Recommended entry point on Windows                                    |
+| ----------------------------------------------- | --------------------------------------------------------------------- |
+| Source-tree Stage 1 from MSYS2 bash             | `./scripts/l0c`                                                       |
+| Source-tree Stage 1 from `cmd.exe` / PowerShell | `scripts\\l0c.cmd`                                                    |
+| Repo-local Stage 1 or Stage 2 from MSYS2 bash   | `source build/dea/bin/l0-env.sh` then `l0c`                           |
+| Repo-local Stage 1 or Stage 2 from `cmd.exe`    | `call build\\dea\\bin\\l0-env.cmd` then `l0c`                         |
+| Repo-local Stage 1 or Stage 2 from PowerShell   | `build\\dea\\bin\\l0c.cmd` directly, or a one-shot `cmd /d /c` bridge |
+| Installed Stage 2 from MSYS2 bash               | `source <PREFIX>/bin/l0-env.sh` then `l0c`                            |
+| Installed Stage 2 from `cmd.exe`                | `call <PREFIX>\\bin\\l0-env.cmd` then `l0c`                           |
+| Installed Stage 2 from PowerShell               | `<PREFIX>\\bin\\l0c.cmd` directly, or a one-shot `cmd /d /c` bridge   |
 
 ## What the Windows targets generate
 
@@ -100,15 +104,16 @@ This writes a repo-local Stage 1 launcher layout under `DEA_BUILD_DIR/bin/`:
 
 - `l0c-stage1`
 - `l0-env.sh`
+- `l0c-stage1.cmd`
+- `l0-env.cmd`
 
 Important current behavior:
 
 - `l0c-stage1` is a POSIX shell wrapper.
-- There is no generated `l0c-stage1.cmd`.
+- `l0c-stage1.cmd` is the Windows batch wrapper.
 - There is no selected `l0c` alias yet.
 
-This target is directly usable from MSYS2 bash. For native Windows shells, use the source-tree fallback
-`scripts\\l0c.cmd` instead of the repo-local Stage 1 wrapper.
+This target is directly usable from MSYS2 bash or through `build\\...\\bin\\l0c-stage1.cmd` in native Windows shells.
 
 ### `make install-dev-stage2`
 
@@ -118,6 +123,7 @@ This writes a repo-local Stage 2 launcher layout under `DEA_BUILD_DIR/bin/`:
 - `l0c-stage2`
 - `l0c-stage2.cmd`
 - `l0-env.sh`
+- `l0-env.cmd`
 
 Important current behavior:
 
@@ -139,12 +145,13 @@ This selects Stage 1 as the repo-local `l0c` alias under `DEA_BUILD_DIR/bin/`.
 Current Windows behavior:
 
 - `l0c` is created for the POSIX/MSYS2 side.
-- There is no corresponding generated `l0c.cmd`, because there is no repo-local Stage 1 `.cmd` wrapper to copy.
+- `l0c.cmd`
 
 Practical result:
 
 - In MSYS2 bash, `source build/dea/bin/l0-env.sh` then `l0c ...` works.
-- In `cmd.exe` or PowerShell, the reliable Stage 1 entry point is still `scripts\\l0c.cmd`.
+- In `cmd.exe`, `call build\\dea\\bin\\l0-env.cmd` then `l0c ...` works.
+- In PowerShell, `build\\dea\\bin\\l0c.cmd` works directly.
 
 ### `make use-dev-stage2`
 
@@ -174,6 +181,7 @@ On Windows the installed `PREFIX/bin/` layout includes:
 - `l0c`
 - `l0c.cmd`
 - `l0-env.sh`
+- `l0-env.cmd`
 
 There is no Stage 1 install-prefix workflow. `make install` installs Stage 2 only.
 
@@ -219,13 +227,12 @@ Important caveat:
 
 ## `cmd.exe` usage
 
-`l0-env.sh` is not for `cmd.exe`. In native Windows shells, the supported pattern is:
+`l0-env.sh` is not for `cmd.exe`. The supported native activation pattern is:
 
-1. ensure the relevant `bin` directory is on `PATH`, or call the `.cmd` wrapper explicitly
-2. run `l0c` or `l0c-stage2`
+1. `call` the generated `l0-env.cmd`
+2. run `l0c`
 
-The generated Stage 2 `.cmd` wrappers derive `L0_HOME` themselves, so no extra activation script is required in native
-Windows shells.
+Direct `.cmd` launcher invocation also works when you do not want a shell-local activation step.
 
 ### Repo-local Stage 2 in `cmd.exe`
 
@@ -233,7 +240,7 @@ After you have already run `make install-dev-stage2` and `make use-dev-stage2` f
 Make available:
 
 ```cmd
-set "PATH=%CD%\build\dea\bin;%PATH%"
+call build\dea\bin\l0-env.cmd
 l0c --version
 ```
 
@@ -248,7 +255,7 @@ build\dea\bin\l0c-stage2.cmd --version
 After the prefix has already been created with `make install`:
 
 ```cmd
-set "PATH=C:\l0-install\bin;%PATH%"
+call C:\l0-install\bin\l0-env.cmd
 l0c --version
 ```
 
@@ -260,20 +267,24 @@ C:\l0-install\bin\l0c.cmd --version
 
 ### Stage 1 in `cmd.exe`
 
-For Stage 1, use the source-tree batch launcher:
+After you have already run `make use-dev-stage1`:
 
 ```cmd
-scripts\l0c.cmd --version
-scripts\l0c.cmd --check -P examples hello
+call build\dea\bin\l0-env.cmd
+l0c --version
+l0c --check -P examples hello
 ```
 
-Do not rely on `build\...\bin\l0c` after `make use-dev-stage1` in native Windows shells; that repo-local alias is
-currently MSYS2/bash-oriented.
+Direct stage-specific invocation also works:
+
+```cmd
+build\dea\bin\l0c-stage1.cmd --version
+```
 
 ## PowerShell usage
 
-PowerShell follows the same launcher model as `cmd.exe`: use the generated `.cmd` files or put the relevant `bin`
-directory on `PATH`.
+There is no generated `l0-env.ps1` today. In PowerShell, either invoke the generated `.cmd` launcher directly or use a
+one-shot `cmd.exe /d /c` bridge when you want `l0-env.cmd` semantics.
 
 ### Repo-local Stage 2 in PowerShell
 
@@ -281,14 +292,13 @@ After you have already run `make install-dev-stage2` and `make use-dev-stage2` f
 Make available:
 
 ```powershell
-$env:PATH = "$PWD\build\dea\bin;$env:PATH"
-l0c --version
+cmd /d /c "call $PWD\build\dea\bin\l0-env.cmd && l0c --version"
 ```
 
 Direct invocation:
 
 ```powershell
-& "$PWD\build\dea\bin\l0c-stage2.cmd" --version
+& "$PWD\build\dea\bin\l0c.cmd" --version
 ```
 
 ### Installed Stage 2 in PowerShell
@@ -296,8 +306,7 @@ Direct invocation:
 After the prefix has already been created with `make install`:
 
 ```powershell
-$env:PATH = "C:\l0-install\bin;$env:PATH"
-l0c --version
+cmd /d /c "call C:\l0-install\bin\l0-env.cmd && l0c --version"
 ```
 
 Direct invocation:
@@ -308,10 +317,10 @@ Direct invocation:
 
 ### Stage 1 in PowerShell
 
-Use the source-tree Stage 1 batch wrapper:
+After `make use-dev-stage1`, use the selected repo-local batch wrapper:
 
 ```powershell
-& "$PWD\scripts\l0c.cmd" --version
+& "$PWD\build\dea\bin\l0c.cmd" --version
 ```
 
 ## Why both `l0c-stage2.cmd` and `l0c.cmd` exist
@@ -349,6 +358,7 @@ That is why there is no `l0c.exe` wrapper in the generated layout:
 
 ## Current limitations
 
-- There is no generated `l0-env.cmd` or `l0-env.ps1`. Native Windows shells must set `PATH` manually.
-- Repo-local Stage 1 selection does not currently produce a native-shell `l0c.cmd` alias under `build/.../bin`.
-- `l0-env.sh` is the MSYS2/bash activation story; native shells use `.cmd` launchers plus manual `PATH` setup.
+- There is no generated `l0-env.ps1`; PowerShell relies on direct `.cmd` launchers or a `cmd.exe` bridge.
+- `l0-env.sh` remains the MSYS2/bash activation story.
+- The source-tree fallback `scripts\\l0c.cmd` still exists for direct Stage 1 use outside the repo-local selected-alias
+  workflow.
