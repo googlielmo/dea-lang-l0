@@ -245,7 +245,7 @@ func bd_temp_root() -> string {
  */
 func bd_temp_stem(tag: string) -> string {
     let root = bd_temp_root();
-    let pid = rt_get_pid();
+    let pid = get_pid();
     let sec = 0;
     let nsec = 0;
     let now_opt = wall_now();

@@ -622,6 +622,8 @@ def main() -> int:
         assert_same_bytes("retained C (stage2 vs stage3)", second_c, third_c, artifact_dir, include_diff=True)
         if uses_tcc(compiler_text):
             notice("skipping native binary comparison for tcc (no stable binary guarantee)")
+        elif sys.platform == "win32":
+            notice("skipping native binary comparison on Windows (PE binaries are not reliably deterministic)")
         else:
             native_left = normalized_native_artifact(second_native, artifact_dir)
             native_right = normalized_native_artifact(third_native, artifact_dir)

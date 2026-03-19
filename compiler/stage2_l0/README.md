@@ -163,11 +163,16 @@ The test performs, in order:
 3. second self-built Stage 2 compiler → third self-built Stage 2 compiler
 4. byte-for-byte comparison of second-build vs third-build retained C
 5. byte-for-byte comparison of second-build vs third-build native compiler binaries, unless the host compiler is `tcc`
+   or the host platform is Windows
 6. smoke run through the third self-built compiler
 
 On Linux, the native identity step compares stripped binaries. Raw ELF outputs can differ across identical builds when
 the retained C source path changes, even after disabling the linker build ID. Stripping preserves the meaningful native
 code / link-result comparison while ignoring filename-sensitive metadata.
+
+On Windows, the triple-bootstrap test keeps the retained-C identity gate but skips the native binary byte comparison.
+MinGW-w64 PE outputs are not reliably reproducible byte-for-byte on CI even when the retained C is identical and linker
+timestamps are disabled.
 
 If you want to run the same flow manually step by step, keep one compiler and one flag set for both builds:
 
@@ -190,7 +195,8 @@ cmp build/tests/triple-manual/l0c-stage2-second.stripped build/tests/triple-manu
 L0_HOME="$PWD/compiler" ./build/tests/triple-manual/l0c-stage2-third.native --run -P examples hello
 ```
 
-When the host compiler is `tcc`, keep the retained-C comparison but skip the native-binary `cmp` step above.
+When the host compiler is `tcc`, keep the retained-C comparison but skip the native-binary `cmp` step above. Do the same
+on Windows hosts.
 
 Expected smoke output:
 
