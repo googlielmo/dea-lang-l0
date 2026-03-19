@@ -42,7 +42,10 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
-#if !defined(_WIN32)
+#if defined(_WIN32)
+#include <process.h>
+#else
+#include <unistd.h>
 #include <sys/wait.h>
 #endif
 
@@ -1271,6 +1274,42 @@ static l0_opt_string rt_get_env_var(l0_string name) {
  */
 static l0_int rt_get_argc(void) {
     return (l0_int)_rt_argc;
+}
+
+/**
+ * Convert a native process identifier into `l0_int`.
+ *
+ * @param value Native process identifier.
+ * @param out Output location.
+ * @return 1 when `value` fits in `l0_int`, otherwise 0.
+ */
+static l0_bool _rt_pid_to_l0_int(intmax_t value, l0_int *out) {
+    if (value < 0 || value > INT32_MAX) {
+        return 0;
+    }
+    *out = (l0_int)value;
+    return 1;
+}
+
+/**
+ * Get the current process identifier.
+ *
+ * @return Process identifier.
+ *
+ * L0 signature: `extern func rt_get_pid() -> int;`
+ */
+static l0_int rt_get_pid(void) {
+    l0_int out = 0;
+#if defined(_WIN32)
+    if (!_rt_pid_to_l0_int((intmax_t)_getpid(), &out)) {
+        _rt_panic("rt_get_pid: process identifier does not fit in l0_int");
+    }
+#else
+    if (!_rt_pid_to_l0_int((intmax_t)getpid(), &out)) {
+        _rt_panic("rt_get_pid: process identifier does not fit in l0_int");
+    }
+#endif
+    return out;
 }
 
 /**

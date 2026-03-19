@@ -268,6 +268,13 @@ extern func rt_get_env_var(name: string) -> string?;
 extern func rt_get_argc() -> int;
 
 /**
+ * Get the current process identifier.
+ *
+ * @return The process identifier.
+ */
+extern func rt_get_pid() -> int;
+
+/**
  * Get the command-line argument at the given index.
  *
  * @param i The index.

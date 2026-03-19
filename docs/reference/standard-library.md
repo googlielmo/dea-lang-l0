@@ -41,7 +41,7 @@ For canonical ownership behavior around `new`/`drop`, ARC strings, and container
 **Imports:** `sys.rt`
 
 | Function | Signature                           | Description                             |
-|----------|-------------------------------------|-----------------------------------------|
+| -------- | ----------------------------------- | --------------------------------------- |
 | `assert` | `(cond: bool, msg: string) -> void` | Aborts with `msg` when `cond` is false. |
 
 ### `std.array`
@@ -49,7 +49,7 @@ For canonical ownership behavior around `new`/`drop`, ARC strings, and container
 **Imports:** `sys.rt`, `sys.unsafe`, `std.assert`, `std.string`
 
 | Type/Function | Signature                                                             | Description                                        |
-|---------------|-----------------------------------------------------------------------|----------------------------------------------------|
+| ------------- | --------------------------------------------------------------------- | -------------------------------------------------- |
 | `ArrayBase`   | `struct ArrayBase { capacity: int; element_size: int; data: void*; }` | Untyped fixed-size backing storage.                |
 | `ByteArray`   | `struct ByteArray { storage: ArrayBase*; }`                           | Byte-specialized fixed-size array wrapper.         |
 | `arr_create`  | `(element_size: int, length: int) -> ArrayBase*`                      | Allocates and zero-initializes storage.            |
@@ -70,7 +70,7 @@ For canonical ownership behavior around `new`/`drop`, ARC strings, and container
 **Imports:** `sys.rt`, `std.unit`
 
 | Type/Function | Signature                                                                                              | Description                                             |
-|---------------|--------------------------------------------------------------------------------------------------------|---------------------------------------------------------|
+| ------------- | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------- |
 | `FileInfo`    | `struct { exists: bool; is_file: bool; is_dir: bool; size: int?; mtime_sec: int?; mtime_nsec: int?; }` | Public file-metadata wrapper type.                      |
 | `exists`      | `(path: string) -> bool`                                                                               | Returns whether any filesystem object exists at `path`. |
 | `stat`        | `(path: string) -> FileInfo`                                                                           | Returns path metadata with nullable size/timestamps.    |
@@ -87,7 +87,7 @@ For canonical ownership behavior around `new`/`drop`, ARC strings, and container
 **Imports:** `sys.rt`, `sys.unsafe`, `std.assert`, `std.string`, `std.array`
 
 | Type/Function                | Signature                                                   | Description                                     |
-|------------------------------|-------------------------------------------------------------|-------------------------------------------------|
+| ---------------------------- | ----------------------------------------------------------- | ----------------------------------------------- |
 | `VectorBase`                 | `struct VectorBase { arr: ArrayBase*; length: int; }`       | Untyped growable vector.                        |
 | `vec_create`                 | `(element_size: int, initial_capacity: int) -> VectorBase*` | Creates vector storage.                         |
 | `vec_grow`                   | `(self: VectorBase*) -> void`                               | Ensures capacity and increments length.         |
@@ -108,7 +108,7 @@ For canonical ownership behavior around `new`/`drop`, ARC strings, and container
 **Imports:** `sys.rt`, `sys.unsafe`, `std.assert`, `std.string`, `sys.hash`, `std.array`, `std.vector`
 
 | Type/Function                     | Signature                                | Description                                  |
-|-----------------------------------|------------------------------------------|----------------------------------------------|
+| --------------------------------- | ---------------------------------------- | -------------------------------------------- |
 | `StringPtrMap`                    | `struct`                                 | Open-addressed `string -> void*` map.        |
 | `spm_create/create_with_capacity` | constructors                             | Create map with default or minimum capacity. |
 | `spm_put/get/has/remove`          | map ops                                  | Insert/update/lookup/presence/remove.        |
@@ -127,7 +127,7 @@ For canonical ownership behavior around `new`/`drop`, ARC strings, and container
 **Imports:** `sys.rt`, `sys.unsafe`, `std.assert`, `std.string`, `sys.hash`, `std.array`, `std.vector`
 
 | Type/Function                    | Signature                                 | Description                                  |
-|----------------------------------|-------------------------------------------|----------------------------------------------|
+| -------------------------------- | ----------------------------------------- | -------------------------------------------- |
 | `StringSet`                      | `struct`                                  | Open-addressed set of strings.               |
 | `ss_create/create_with_capacity` | constructors                              | Create set with default or minimum capacity. |
 | `ss_add`                         | `(self: StringSet*, key: string) -> bool` | Adds key; returns false if already present.  |
@@ -141,7 +141,7 @@ For canonical ownership behavior around `new`/`drop`, ARC strings, and container
 **Imports:** `sys.rt`, `sys.unsafe`, `std.assert`, `std.string`, `sys.hash`, `std.vector`
 
 | Type/Function           | Signature                                                 | Description                                 |
-|-------------------------|-----------------------------------------------------------|---------------------------------------------|
+| ----------------------- | --------------------------------------------------------- | ------------------------------------------- |
 | `LinearMapBase`         | `struct`                                                  | Generic byte-comparison linear map storage. |
 | `lm_create/free/len`    | base lifecycle                                            | Create, free, and query length.             |
 | `lm_set/get/remove`     | base ops                                                  | Set/get/remove key-value by raw key bytes.  |
@@ -158,7 +158,7 @@ For canonical ownership behavior around `new`/`drop`, ARC strings, and container
 `std.io` classifies I/O success/failure from direct runtime return values (optional/boolean/sentinel results).
 
 | Function            | Signature                                            | Description                                                                         |
-|---------------------|------------------------------------------------------|-------------------------------------------------------------------------------------|
+| ------------------- | ---------------------------------------------------- | ----------------------------------------------------------------------------------- |
 | `read_line`         | `() -> string?`                                      | Reads line from stdin; `null` on EOF/error.                                         |
 | `read_char`         | `() -> int?`                                         | Reads one byte as int; `null` on EOF/error.                                         |
 | `read_char_or_eof`  | `() -> int`                                          | Reads one byte; returns `-1` on EOF/error.                                          |
@@ -216,7 +216,7 @@ For canonical ownership behavior around `new`/`drop`, ARC strings, and container
 **Imports:** `std.assert`
 
 | Function | Signature                 | Description                                                             |
-|----------|---------------------------|-------------------------------------------------------------------------|
+| -------- | ------------------------- | ----------------------------------------------------------------------- |
 | `emod`   | `(a: int, b: int) -> int` | Euclidean modulo. Requires `b > 0`; always returns non-negative result. |
 
 ### `std.optional`
@@ -224,7 +224,7 @@ For canonical ownership behavior around `new`/`drop`, ARC strings, and container
 **Imports:** `std.assert`
 
 | Function      | Signature                                   | Description                           |
-|---------------|---------------------------------------------|---------------------------------------|
+| ------------- | ------------------------------------------- | ------------------------------------- |
 | `unwrap_or_s` | `(opt: string?, default: string) -> string` | Returns value or default.             |
 | `unwrap_or_i` | `(opt: int?, default: int) -> int`          | Returns value or default.             |
 | `unwrap_or_b` | `(opt: bool?, default: bool) -> bool`       | Returns value or default.             |
@@ -237,7 +237,7 @@ For canonical ownership behavior around `new`/`drop`, ARC strings, and container
 **Imports:** `std.string`, `std.text`
 
 | Function        | Signature                               | Description                                                    |
-|-----------------|-----------------------------------------|----------------------------------------------------------------|
+| --------------- | --------------------------------------- | -------------------------------------------------------------- |
 | `is_sep`        | `(c: byte) -> bool`                     | Returns whether byte is `/` or `\\`.                           |
 | `is_absolute`   | `(path: string) -> bool`                | Supports POSIX absolute paths and Windows drive roots.         |
 | `has_parent`    | `(path: string) -> bool`                | Returns whether the path contains a separator.                 |
@@ -252,7 +252,7 @@ For canonical ownership behavior around `new`/`drop`, ARC strings, and container
 **Imports:** `sys.rt`
 
 | Function         | Signature                         | Description                                           |
-|------------------|-----------------------------------|-------------------------------------------------------|
+| ---------------- | --------------------------------- | ----------------------------------------------------- |
 | `rand_seed`      | `(seed: int) -> void`             | Seeds RNG. `0` selects time-based seed.               |
 | `rand_int`       | `(max: int) -> int`               | Returns random int in `[0, max)`.                     |
 | `rand_int_range` | `(min: int, max: int) -> int`     | Returns random int in `[min, max)`.                   |
@@ -264,7 +264,7 @@ For canonical ownership behavior around `new`/`drop`, ARC strings, and container
 **Imports:** `sys.rt`, `std.assert`
 
 | Function        | Signature                                             | Description                                                              |
-|-----------------|-------------------------------------------------------|--------------------------------------------------------------------------|
+| --------------- | ----------------------------------------------------- | ------------------------------------------------------------------------ |
 | `len_s`         | `(s: string) -> int`                                  | Returns string byte length.                                              |
 | `is_empty_s`    | `(s: string) -> bool`                                 | Returns whether string length is zero.                                   |
 | `char_at_s`     | `(s: string, index: int) -> byte`                     | Returns byte at index.                                                   |
@@ -296,10 +296,11 @@ For canonical ownership behavior around `new`/`drop`, ARC strings, and container
 **Imports:** `sys.rt`
 
 | Function  | Signature                       | Description                                                         |
-|-----------|---------------------------------|---------------------------------------------------------------------|
+| --------- | ------------------------------- | ------------------------------------------------------------------- |
 | `exit`    | `(code: int) -> void`           | Exits program with status code.                                     |
 | `env_get` | `(var_name: string) -> string?` | Returns environment variable or `null`.                             |
 | `argc`    | `() -> int`                     | Returns command-line argument count.                                |
+| `get_pid` | `() -> int`                     | Returns the current process identifier.                             |
 | `argv`    | `(index: int) -> string`        | Returns command-line argument string at index.                      |
 | `abort`   | `(message: string) -> void`     | Aborts program with message.                                        |
 | `errno`   | `() -> int`                     | Returns runtime error number.                                       |
@@ -310,7 +311,7 @@ For canonical ownership behavior around `new`/`drop`, ARC strings, and container
 **Imports:** `std.string`, `std.math`, `std.assert`, `std.vector`
 
 | Type/Function                                       | Signature                                                                                           | Description                                                                                               |
-|-----------------------------------------------------|-----------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------|
+| --------------------------------------------------- | --------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
 | `StringBuffer`                                      | `struct`                                                                                            | String-part buffer with cached total size.                                                                |
 | `sb_*`                                              | `create/append/append_int/append_byte/to_string/size/free`                                          | String buffer API.                                                                                        |
 | `CharBuffer`                                        | `struct`                                                                                            | Byte-backed buffer for incremental string assembly.                                                       |
@@ -335,7 +336,7 @@ For canonical ownership behavior around `new`/`drop`, ARC strings, and container
 **Imports:** `sys.rt`, `std.math`
 
 | Type/Function            | Signature                                                 | Description                                                    |
-|--------------------------|-----------------------------------------------------------|----------------------------------------------------------------|
+| ------------------------ | --------------------------------------------------------- | -------------------------------------------------------------- |
 | `WallTime`               | `struct { sec: int; nsec: int; }`                         | Unix wall-clock snapshot with nanosecond fraction.             |
 | `MonotonicTime`          | `struct { sec: int; nsec: int; }`                         | Monotonic-clock snapshot with nanosecond fraction.             |
 | `Duration`               | `struct { sec: int; nsec: int; }`                         | Non-negative normalized duration (`0 <= nsec < 1e9`).          |
@@ -352,21 +353,21 @@ For canonical ownership behavior around `new`/`drop`, ARC strings, and container
 ### `std.unit`
 
 | Type/Function | Signature        | Description                     |
-|---------------|------------------|---------------------------------|
+| ------------- | ---------------- | ------------------------------- |
 | `Unit`        | `struct Unit {}` | Unit type.                      |
 | `unit`        | `() -> Unit`     | Returns unit value.             |
 | `present`     | `() -> Unit?`    | Returns non-null optional unit. |
 
 ### `sys.hash`
 
-Low-level runtime FFI for hashing raw values and pointers. Uses the siphash-1-3 algorithm.
-Used by `std.hashmap` and `std.hashset` for hash calculations.
+Low-level runtime FFI for hashing raw values and pointers. Uses the siphash-1-3 algorithm. Used by `std.hashmap` and
+`std.hashset` for hash calculations.
 
 ### `sys.rt`
 
-Low-level runtime FFI for strings, I/O, process/system, time, and errors.
-Also defines `RtTimeParts` (`struct { sec: int; nsec: int; }`) and
-`RtFileInfo` (`struct { exists: bool; is_file: bool; is_dir: bool; size: int?; mtime_sec: int?; mtime_nsec: int?; }`).
+Low-level runtime FFI for strings, I/O, process/system, time, and errors. Also defines `RtTimeParts`
+(`struct { sec: int; nsec: int; }`) and `RtFileInfo`
+(`struct { exists: bool; is_file: bool; is_dir: bool; size: int?; mtime_sec: int?; mtime_nsec: int?; }`).
 
 ### `sys.unsafe`
 
@@ -379,7 +380,7 @@ All `extern func` symbols exposed to L0 from stdlib modules are listed here.
 ### Declared in `sys.rt` (41)
 
 | Function                      | Signature                                     |
-|-------------------------------|-----------------------------------------------|
+| ----------------------------- | --------------------------------------------- |
 | `rt_string_get`               | `(s: string, index: int) -> byte`             |
 | `rt_strlen`                   | `(str: string) -> int`                        |
 | `rt_string_equals`            | `(a: string, b: string) -> bool`              |
@@ -426,7 +427,7 @@ All `extern func` symbols exposed to L0 from stdlib modules are listed here.
 These are unsafe raw-memory primitives.
 
 | Function           | Signature                                                     |
-|--------------------|---------------------------------------------------------------|
+| ------------------ | ------------------------------------------------------------- |
 | `rt_alloc`         | `(bytes: int) -> void*?`                                      |
 | `rt_realloc`       | `(ptr: void*, new_bytes: int) -> void*?`                      |
 | `rt_free`          | `(ptr: void*?) -> void`                                       |
@@ -444,7 +445,7 @@ These are unsafe raw-memory primitives.
 These are runtime-backed hash externs declared directly in `sys.hash`.
 
 | Function             | Signature                         |
-|----------------------|-----------------------------------|
+| -------------------- | --------------------------------- |
 | `rt_hash_bool`       | `(value: bool) -> int`            |
 | `rt_hash_byte`       | `(value: byte) -> int`            |
 | `rt_hash_int`        | `(value: int) -> int`             |

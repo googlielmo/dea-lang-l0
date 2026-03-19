@@ -42,6 +42,15 @@ func argc() -> int {
 }
 
 /**
+ * Retrieves the current process identifier.
+ *
+ * @return The current process identifier.
+ */
+func get_pid() -> int {
+    return rt_get_pid();
+}
+
+/**
  * Retrieves the command-line argument at the specified index.
  *
  * @param index The argument index.

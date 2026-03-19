@@ -241,10 +241,11 @@ func bd_temp_root() -> string {
  * Build one temporary-file stem under the configured temp root.
  *
  * @param tag Small tag describing the temp-artifact family.
- * @return Unique stem path without extension.
+ * @return Unique per-process stem path without extension.
  */
 func bd_temp_stem(tag: string) -> string {
     let root = bd_temp_root();
+    let pid = rt_get_pid();
     let sec = 0;
     let nsec = 0;
     let now_opt = wall_now();
@@ -258,6 +259,8 @@ func bd_temp_stem(tag: string) -> string {
         with (let sb = sb_create() => sb_free(sb)) {
             sb_append(sb, "l0c-stage2-");
             sb_append(sb, tag);
+            sb_append(sb, "-");
+            sb_append_int(sb, pid);
             sb_append(sb, "-");
             sb_append_int(sb, sec);
             sb_append(sb, "-");
