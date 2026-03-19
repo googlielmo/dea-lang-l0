@@ -20,7 +20,8 @@ import tempfile
 from test_runner_common import (
     REPO_ROOT,
     SCRIPT_DIR,
-    discover_l0_tests,
+    TRACE_EXCLUDED_L0_TESTS,
+    discover_trace_l0_tests,
     first_lines,
     require_repo_stage2_test_env,
     resolve_job_count,
@@ -189,7 +190,7 @@ def main() -> int:
         print(f"run_trace_tests.py: {exc}", file=sys.stderr, flush=True)
         return 2
 
-    cases = discover_l0_tests()
+    cases = discover_trace_l0_tests()
     if not cases:
         print("No tests found in compiler/stage2_l0/tests", flush=True)
         return 0
@@ -203,6 +204,9 @@ def main() -> int:
         print("Running stage2_l0 trace checks...", flush=True)
         print(f"artifacts={artifact_dir}", flush=True)
         print(f"Parallel jobs: {jobs}", flush=True)
+        if TRACE_EXCLUDED_L0_TESTS:
+            skipped = " ".join(sorted(TRACE_EXCLUDED_L0_TESTS))
+            print(f"Skipping trace-incompatible tests: {skipped}", flush=True)
         print("======================================", flush=True)
 
         ready: dict[int, TraceResult] = {}

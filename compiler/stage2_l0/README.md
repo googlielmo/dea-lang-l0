@@ -204,7 +204,7 @@ Expected smoke output:
 Hello, World!
 ```
 
-Run Stage 2 L0 trace checks (runtime + leak triage on every test):
+Run Stage 2 L0 trace checks (runtime + leak triage on every trace-eligible top-level `.l0` test):
 
 ```bash
 ./compiler/stage2_l0/run_trace_tests.py
@@ -220,6 +220,7 @@ Options:
 
 Output:
 
+- Optional skip notice for trace-incompatible tests that remain covered by the normal Stage 2 suite.
 - Per-test `TRACE_OK`/`TRACE_FAIL`/`RUN_FAIL`.
 - Leak summary fields from analyzer (`leaked_object_ptrs`, `leaked_string_ptrs`).
 - Exit code: `0` if all trace checks pass, `1` if any test fails or has trace errors.

@@ -21,6 +21,12 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parent.parent
 TESTS_DIR = SCRIPT_DIR / "tests"
 DEA_BUILD_DIR_ENV = "DEA_BUILD_DIR"
+TRACE_EXCLUDED_L0_TESTS = {
+    # `mul_runtime_test` recursively invokes Stage 2 and runs expected-crash child
+    # programs. Keep it in the normal Stage 2 suite, but exclude it from the trace
+    # health gate to avoid CI flakes unrelated to ARC/memory ownership validation.
+    "mul_runtime_test",
+}
 
 
 def repo_venv_bin_dir() -> Path:
@@ -225,6 +231,16 @@ def discover_l0_tests() -> list[TestCase]:
     return [
         TestCase(index=index, name=path.stem, path=path, kind="l0")
         for index, path in enumerate(sorted(TESTS_DIR.glob("*.l0")))
+    ]
+
+
+def discover_trace_l0_tests() -> list[TestCase]:
+    """Return trace-eligible `.l0` Stage 2 tests in deterministic order."""
+
+    filtered = [case for case in discover_l0_tests() if case.name not in TRACE_EXCLUDED_L0_TESTS]
+    return [
+        TestCase(index=index, name=case.name, path=case.path, kind=case.kind)
+        for index, case in enumerate(filtered)
     ]
 
 
