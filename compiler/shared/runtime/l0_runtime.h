@@ -77,6 +77,7 @@
         fprintf(stderr, "[l0][arc] "); \
         fprintf(stderr, __VA_ARGS__); \
         fprintf(stderr, "\n"); \
+        fflush(stderr); \
     } while (0)
 /**
  * Trace reference counting operations with location info.
@@ -87,6 +88,7 @@
         fprintf(stderr, __VA_ARGS__); \
         fprintf(stderr, " loc=\"%s\":%d", loc_file, loc_line); \
         fprintf(stderr, "\n"); \
+        fflush(stderr); \
     } while (0)
 #else
 #define _RT_TRACE_ARC(...) ((void)0)
@@ -102,6 +104,7 @@
         fprintf(stderr, "[l0][mem] "); \
         fprintf(stderr, __VA_ARGS__); \
         fprintf(stderr, "\n"); \
+        fflush(stderr); \
     } while (0)
 /**
  * Trace memory allocation operations with location info.
@@ -112,6 +115,7 @@
         fprintf(stderr, __VA_ARGS__); \
         fprintf(stderr, " loc=\"%s\":%d", loc_file, loc_line); \
         fprintf(stderr, "\n"); \
+        fflush(stderr); \
     } while (0)
 #else
 #define _RT_TRACE_MEM(...) ((void)0)

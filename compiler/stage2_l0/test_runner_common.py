@@ -21,12 +21,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parent.parent
 TESTS_DIR = SCRIPT_DIR / "tests"
 DEA_BUILD_DIR_ENV = "DEA_BUILD_DIR"
-TRACE_EXCLUDED_L0_TESTS = {
-    # `mul_runtime_test` recursively invokes Stage 2 and runs expected-crash child
-    # programs. Keep it in the normal Stage 2 suite, but exclude it from the trace
-    # health gate to avoid CI flakes unrelated to ARC/memory ownership validation.
-    "mul_runtime_test",
-}
+TRACE_EXCLUDED_L0_TESTS: set[str] = set()
 
 
 def repo_venv_bin_dir() -> Path:
