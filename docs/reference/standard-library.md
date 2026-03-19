@@ -377,83 +377,85 @@ Low-level raw memory FFI. Misuse can cause undefined behavior.
 
 All `extern func` symbols exposed to L0 from stdlib modules are listed here.
 
-### Declared in `sys.rt` (41)
+### Declared in `sys.rt` (42)
 
-| Function                      | Signature                                     |
-| ----------------------------- | --------------------------------------------- |
-| `rt_string_get`               | `(s: string, index: int) -> byte`             |
-| `rt_strlen`                   | `(str: string) -> int`                        |
-| `rt_string_equals`            | `(a: string, b: string) -> bool`              |
-| `rt_string_compare`           | `(a: string, b: string) -> int`               |
-| `rt_string_concat`            | `(a: string, b: string) -> string`            |
-| `rt_string_slice`             | `(s: string, start: int, end: int) -> string` |
-| `rt_string_from_byte_array`   | `(bytes: byte*, len: int) -> string`          |
-| `rt_string_from_byte`         | `(b: byte) -> string`                         |
-| `rt_string_retain`            | `(s: string) -> void`                         |
-| `rt_string_release`           | `(s: string) -> void`                         |
-| `rt_read_file_all`            | `(path: string) -> string?`                   |
-| `rt_write_file_all`           | `(path: string, data: string) -> bool`        |
-| `rt_flush_stdout`             | `() -> void`                                  |
-| `rt_flush_stderr`             | `() -> void`                                  |
-| `rt_print`                    | `(s: string) -> void`                         |
-| `rt_print_stderr`             | `(s: string) -> void`                         |
-| `rt_println`                  | `() -> void`                                  |
-| `rt_println_stderr`           | `() -> void`                                  |
-| `rt_print_int`                | `(x: int) -> void`                            |
-| `rt_print_int_stderr`         | `(x: int) -> void`                            |
-| `rt_print_bool`               | `(x: bool) -> void`                           |
-| `rt_print_bool_stderr`        | `(x: bool) -> void`                           |
-| `rt_read_line`                | `() -> string?`                               |
-| `rt_read_char`                | `() -> int`                                   |
-| `rt_abort`                    | `(message: string) -> void`                   |
-| `rt_exit`                     | `(code: int) -> void`                         |
-| `rt_srand`                    | `(seed: int) -> void`                         |
-| `rt_rand`                     | `(max: int) -> int`                           |
-| `rt_errno`                    | `() -> int`                                   |
-| `rt_get_env_var`              | `(name: string) -> string?`                   |
-| `rt_get_argc`                 | `() -> int`                                   |
-| `rt_get_argv`                 | `(i: int) -> string`                          |
-| `rt_time_unix`                | `(out: RtTimeParts*) -> bool`                 |
-| `rt_time_monotonic`           | `(out: RtTimeParts*) -> bool`                 |
-| `rt_time_monotonic_supported` | `() -> bool`                                  |
-| `rt_time_local_offset_sec`    | `(unix_sec: int) -> int?`                     |
-| `rt_time_local_is_dst`        | `(unix_sec: int) -> bool?`                    |
-| `rt_system`                   | `(cmd: string) -> int`                        |
-| `rt_file_info`                | `(path: string) -> RtFileInfo`                |
-| `rt_delete_file`              | `(path: string) -> bool`                      |
+| Function                      | Signature                                     | Description                            |
+| ----------------------------- | --------------------------------------------- | -------------------------------------- |
+| `rt_string_get`               | `(s: string, index: int) -> byte`             | Returns one byte from a string.        |
+| `rt_string_bytes_ptr`         | `(s: string) -> byte*`                        | Returns a raw pointer to string bytes. |
+| `rt_strlen`                   | `(str: string) -> int`                        | Returns string byte length.            |
+| `rt_string_equals`            | `(a: string, b: string) -> bool`              | Compares strings for equality.         |
+| `rt_string_compare`           | `(a: string, b: string) -> int`               | Compares strings lexicographically.    |
+| `rt_string_concat`            | `(a: string, b: string) -> string`            | Concatenates two strings.              |
+| `rt_string_slice`             | `(s: string, start: int, end: int) -> string` | Returns a string slice by byte range.  |
+| `rt_string_from_byte_array`   | `(bytes: byte*, len: int) -> string`          | Creates a string from raw bytes.       |
+| `rt_string_from_byte`         | `(b: byte) -> string`                         | Creates a one-byte string.             |
+| `rt_string_retain`            | `(s: string) -> void`                         | Increments heap-string refcount.       |
+| `rt_string_release`           | `(s: string) -> void`                         | Decrements heap-string refcount.       |
+| `rt_read_file_all`            | `(path: string) -> string?`                   | Reads a whole file into a string.      |
+| `rt_write_file_all`           | `(path: string, data: string) -> bool`        | Writes a whole string to a file.       |
+| `rt_flush_stdout`             | `() -> void`                                  | Flushes standard output.               |
+| `rt_flush_stderr`             | `() -> void`                                  | Flushes standard error.                |
+| `rt_print`                    | `(s: string) -> void`                         | Prints a string to stdout.             |
+| `rt_print_stderr`             | `(s: string) -> void`                         | Prints a string to stderr.             |
+| `rt_println`                  | `() -> void`                                  | Prints a newline to stdout.            |
+| `rt_println_stderr`           | `() -> void`                                  | Prints a newline to stderr.            |
+| `rt_print_int`                | `(x: int) -> void`                            | Prints an int to stdout.               |
+| `rt_print_int_stderr`         | `(x: int) -> void`                            | Prints an int to stderr.               |
+| `rt_print_bool`               | `(x: bool) -> void`                           | Prints a bool to stdout.               |
+| `rt_print_bool_stderr`        | `(x: bool) -> void`                           | Prints a bool to stderr.               |
+| `rt_read_line`                | `() -> string?`                               | Reads one line from stdin.             |
+| `rt_read_char`                | `() -> int`                                   | Reads one byte from stdin.             |
+| `rt_abort`                    | `(message: string) -> void`                   | Aborts execution with a message.       |
+| `rt_exit`                     | `(code: int) -> void`                         | Exits the current process.             |
+| `rt_srand`                    | `(seed: int) -> void`                         | Seeds the runtime RNG.                 |
+| `rt_rand`                     | `(max: int) -> int`                           | Returns a random int below `max`.      |
+| `rt_errno`                    | `() -> int`                                   | Returns the current errno value.       |
+| `rt_get_env_var`              | `(name: string) -> string?`                   | Reads an environment variable.         |
+| `rt_get_argc`                 | `() -> int`                                   | Returns process argument count.        |
+| `rt_get_pid`                  | `() -> int`                                   | Returns the current process id.        |
+| `rt_get_argv`                 | `(i: int) -> string`                          | Returns one process argument.          |
+| `rt_time_unix`                | `(out: RtTimeParts*) -> bool`                 | Captures wall-clock time.              |
+| `rt_time_monotonic`           | `(out: RtTimeParts*) -> bool`                 | Captures monotonic time.               |
+| `rt_time_monotonic_supported` | `() -> bool`                                  | Reports monotonic-clock availability.  |
+| `rt_time_local_offset_sec`    | `(unix_sec: int) -> int?`                     | Looks up local UTC offset.             |
+| `rt_time_local_is_dst`        | `(unix_sec: int) -> bool?`                    | Looks up local DST state.              |
+| `rt_system`                   | `(cmd: string) -> int`                        | Runs a shell command.                  |
+| `rt_file_info`                | `(path: string) -> RtFileInfo`                | Returns stat-like file metadata.       |
+| `rt_delete_file`              | `(path: string) -> bool`                      | Deletes a file by path.                |
 
 ### Declared in `sys.unsafe` (11)
 
 These are unsafe raw-memory primitives.
 
-| Function           | Signature                                                     |
-| ------------------ | ------------------------------------------------------------- |
-| `rt_alloc`         | `(bytes: int) -> void*?`                                      |
-| `rt_realloc`       | `(ptr: void*, new_bytes: int) -> void*?`                      |
-| `rt_free`          | `(ptr: void*?) -> void`                                       |
-| `rt_calloc`        | `(count: int, elem_size: int) -> void*?`                      |
-| `rt_memcpy`        | `(dest: void*, src: void*, bytes: int) -> void*`              |
-| `rt_memset`        | `(dest: void*, value: int, bytes: int) -> void*`              |
-| `rt_memcmp`        | `(a: void*, b: void*, bytes: int) -> int`                     |
-| `rt_array_element` | `(array_data: void*, element_size: int, index: int) -> void*` |
-| `rt_stdin_read`    | `(buf: byte*, capacity: int) -> int`                          |
-| `rt_stdout_write`  | `(buf: byte*, len: int) -> int`                               |
-| `rt_stderr_write`  | `(buf: byte*, len: int) -> int`                               |
+| Function           | Signature                                                     | Description                  |
+| ------------------ | ------------------------------------------------------------- | ---------------------------- |
+| `rt_alloc`         | `(bytes: int) -> void*?`                                      | Allocates raw heap memory.   |
+| `rt_realloc`       | `(ptr: void*, new_bytes: int) -> void*?`                      | Resizes raw heap memory.     |
+| `rt_free`          | `(ptr: void*?) -> void`                                       | Frees raw heap memory.       |
+| `rt_calloc`        | `(count: int, elem_size: int) -> void*?`                      | Allocates zeroed raw memory. |
+| `rt_memcpy`        | `(dest: void*, src: void*, bytes: int) -> void*`              | Copies raw bytes.            |
+| `rt_memset`        | `(dest: void*, value: int, bytes: int) -> void*`              | Fills raw bytes.             |
+| `rt_memcmp`        | `(a: void*, b: void*, bytes: int) -> int`                     | Compares raw bytes.          |
+| `rt_array_element` | `(array_data: void*, element_size: int, index: int) -> void*` | Computes an element pointer. |
+| `rt_stdin_read`    | `(buf: byte*, capacity: int) -> int`                          | Reads raw bytes from stdin.  |
+| `rt_stdout_write`  | `(buf: byte*, len: int) -> int`                               | Writes raw bytes to stdout.  |
+| `rt_stderr_write`  | `(buf: byte*, len: int) -> int`                               | Writes raw bytes to stderr.  |
 
 ### Declared in `sys.hash` (11)
 
 These are runtime-backed hash externs declared directly in `sys.hash`.
 
-| Function             | Signature                         |
-| -------------------- | --------------------------------- |
-| `rt_hash_bool`       | `(value: bool) -> int`            |
-| `rt_hash_byte`       | `(value: byte) -> int`            |
-| `rt_hash_int`        | `(value: int) -> int`             |
-| `rt_hash_string`     | `(value: string) -> int`          |
-| `rt_hash_data`       | `(data: void*, size: int) -> int` |
-| `rt_hash_opt_bool`   | `(opt: bool?) -> int`             |
-| `rt_hash_opt_byte`   | `(opt: byte?) -> int`             |
-| `rt_hash_opt_int`    | `(opt: int?) -> int`              |
-| `rt_hash_opt_string` | `(opt: string?) -> int`           |
-| `rt_hash_ptr`        | `(ptr: void*) -> int`             |
-| `rt_hash_opt_ptr`    | `(opt: void*?) -> int`            |
+| Function             | Signature                         | Description                     |
+| -------------------- | --------------------------------- | ------------------------------- |
+| `rt_hash_bool`       | `(value: bool) -> int`            | Hashes a bool value.            |
+| `rt_hash_byte`       | `(value: byte) -> int`            | Hashes a byte value.            |
+| `rt_hash_int`        | `(value: int) -> int`             | Hashes an int value.            |
+| `rt_hash_string`     | `(value: string) -> int`          | Hashes a string value.          |
+| `rt_hash_data`       | `(data: void*, size: int) -> int` | Hashes raw byte data.           |
+| `rt_hash_opt_bool`   | `(opt: bool?) -> int`             | Hashes an optional bool.        |
+| `rt_hash_opt_byte`   | `(opt: byte?) -> int`             | Hashes an optional byte.        |
+| `rt_hash_opt_int`    | `(opt: int?) -> int`              | Hashes an optional int.         |
+| `rt_hash_opt_string` | `(opt: string?) -> int`           | Hashes an optional string.      |
+| `rt_hash_ptr`        | `(ptr: void*) -> int`             | Hashes a raw pointer value.     |
+| `rt_hash_opt_ptr`    | `(opt: void*?) -> int`            | Hashes an optional raw pointer. |
