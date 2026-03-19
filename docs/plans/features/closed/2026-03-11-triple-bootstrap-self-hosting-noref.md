@@ -10,40 +10,39 @@
 - Stage: 2
 - Subsystem: Bootstrap/self-hosting validation / Stage 2 semantic stabilization
 - Modules:
-    - `compiler/stage2_l0/src/expr_types.l0`
-    - `compiler/stage2_l0/src/l0c.l0`
-    - `compiler/stage2_l0/run_tests.py`
-    - `compiler/stage2_l0/tests/l0c_stage2_bootstrap_test.sh`
-    - `compiler/stage2_l0/tests/l0c_triple_bootstrap_test.py`
-    - `docs/plans/features/closed/2026-03-09-stage2-bootstrap-compiler-artifact-noref.md`
+  - `compiler/stage2_l0/src/expr_types.l0`
+  - `compiler/stage2_l0/src/l0c.l0`
+  - `compiler/stage2_l0/run_tests.py`
+  - `compiler/stage2_l0/tests/l0c_stage2_bootstrap_test.sh`
+  - `compiler/stage2_l0/tests/l0c_triple_bootstrap_test.py`
+  - `docs/plans/features/closed/2026-03-09-stage2-bootstrap-compiler-artifact-noref.md`
 - Test modules:
-    - `compiler/stage2_l0/tests/l0c_triple_bootstrap_test.py`
-    - `compiler/stage2_l0/tests/l0c_stage2_bootstrap_test.sh`
+  - `compiler/stage2_l0/tests/l0c_triple_bootstrap_test.py`
+  - `compiler/stage2_l0/tests/l0c_stage2_bootstrap_test.sh`
 - Repro:
-    -
-    `DIST_DIR=build/tests/triple-probe ./scripts/build-stage2-l0c.sh && ./build/tests/triple-probe/bin/l0c-stage2 --check -P compiler/stage2_l0/src l0c`
+  `DIST_DIR=build/tests/triple-probe ./scripts/build-stage2-l0c.sh && ./build/tests/triple-probe/bin/l0c-stage2 --check -P compiler/stage2_l0/src l0c`
 
 ## Summary
 
-Phases 1 and 2 of the bootstrap plan produced a runnable Stage 2 compiler artifact and a repo-local Make workflow.
-This follow-on milestone is now implemented: the built Stage 2 compiler can self-host on the current checkout and the
-strict triple-bootstrap / triple-compilation regression is part of the Stage 2 test surface.
+Phases 1 and 2 of the bootstrap plan produced a runnable Stage 2 compiler artifact and a repo-local Make workflow. This
+follow-on milestone is now implemented: the built Stage 2 compiler can self-host on the current checkout and the strict
+triple-bootstrap / triple-compilation regression is part of the Stage 2 test surface.
 
 The original blocker was that a built `l0c-stage2` artifact could not yet self-host cleanly on the Stage 2 compiler
 sources. A direct `--check` or `--build` of `compiler/stage2_l0/src/l0c.l0` through a built Stage 2 artifact exposed a
 cluster of semantic-analysis, literal-decoding, and retained-C parity bugs. Those prerequisites were fixed first, then
-the strict stage2/stage3 fixed-point regression was added on top.
+the strict fixed-point regression was added on top.
 
 This plan therefore covers both:
 
-1. the prerequisite Stage 2 self-hosting fixes needed to make a built `l0c-stage2` compile the Stage 2 compiler
-   sources correctly, and
-2. the final strict triple-bootstrap regression that compares the second and third self-built Stage 2 compiler
-   artifacts at both the retained-C and native-binary levels.
+1. the prerequisite Stage 2 self-hosting fixes needed to make a built `l0c-stage2` compile the Stage 2 compiler sources
+   correctly, and
+2. the final strict triple-bootstrap regression that compares the second and third self-built Stage 2 compiler artifacts
+   at both the retained-C and native-binary levels.
 
 This plan depends on the Phase 1 and Phase 2 deliverables from
-`docs/plans/features/closed/2026-03-09-stage2-bootstrap-compiler-artifact-noref.md`. It does not change that plan’s Phase 3
-install-prefix scope.
+`docs/plans/features/closed/2026-03-09-stage2-bootstrap-compiler-artifact-noref.md`. It does not change that plan’s
+Phase 3 install-prefix scope.
 
 ## Goals
 
@@ -99,10 +98,10 @@ The third self-built compiler must also pass a direct smoke check after the iden
 1. Build Stage 2 from Stage 1 with `KEEP_C=1` into a unique repo-local directory under `build/tests/...`.
 2. Before the full self-build, run a direct built-artifact probe that `--check`s the Stage 2 compiler source tree, so
    self-hosting readiness fails fast with a clear error.
-3. Build the second self-built compiler artifact by invoking the built `l0c-stage2` directly with `--build --keep-c
-   -P compiler/stage2_l0/src -o <triple_dir>/l0c-stage2-second.native l0c`.
-4. Build the third self-built compiler artifact by invoking the second self-built compiler directly with `--build
-   --keep-c -P compiler/stage2_l0/src -o <triple_dir>/l0c-stage2-third.native l0c`.
+3. Build the second self-built compiler artifact by invoking the built `l0c-stage2` directly with
+   `--build --keep-c -P compiler/stage2_l0/src -o <triple_dir>/l0c-stage2-second.native l0c`.
+4. Build the third self-built compiler artifact by invoking the second self-built compiler directly with
+   `--build --keep-c -P compiler/stage2_l0/src -o <triple_dir>/l0c-stage2-third.native l0c`.
 5. Compare `l0c-stage2-second.c` against `l0c-stage2-third.c`, and compare `l0c-stage2-second.native` against
    `l0c-stage2-third.native` when the host compiler can produce stable binaries.
 6. On mismatch, report which artifacts differ and include compact hashes/sizes; include a short unified diff only for
@@ -114,8 +113,8 @@ The third self-built compiler must also pass a direct smoke check after the iden
 
 1. Resolve one host C compiler once and use it for all self-builds.
 2. Preserve existing user-provided `L0_CFLAGS`, but append deterministic linker flags by platform:
-    1. Darwin: `-Wl,-no_uuid`
-    2. ELF gcc/clang toolchains: `-Wl,--build-id=none`
+   1. Darwin: `-Wl,-no_uuid`
+   2. ELF gcc/clang toolchains: `-Wl,--build-id=none`
 3. If the host compiler is `tcc`, keep the retained-C comparison but skip the native-binary stability probe and the
    native-binary identity check.
 4. If some other host toolchain still does not produce stable binaries after that deterministic-flags probe, fail the
@@ -133,8 +132,10 @@ The third self-built compiler must also pass a direct smoke check after the iden
 1. Add targeted Stage 2 regressions for the semantic/type-checking defect classes that currently block built-artifact
    self-hosting.
 2. Verify that a built `l0c-stage2` can `--check -P compiler/stage2_l0/src l0c`.
-3. Verify that a built `l0c-stage2` can `--build --keep-c -P compiler/stage2_l0/src -o <tmp>/l0c-stage2-second.native l0c`.
-4. Verify that the second self-built compiler can `--build --keep-c -P compiler/stage2_l0/src -o <tmp>/l0c-stage2-third.native l0c`.
+3. Verify that a built `l0c-stage2` can
+   `--build --keep-c -P compiler/stage2_l0/src -o <tmp>/l0c-stage2-second.native l0c`.
+4. Verify that the second self-built compiler can
+   `--build --keep-c -P compiler/stage2_l0/src -o <tmp>/l0c-stage2-third.native l0c`.
 5. Run `compiler/stage2_l0/tests/l0c_triple_bootstrap_test.py` and require:
    1. the second-build retained C artifact matches the third-build retained C artifact exactly
    2. the second-build native compiler binary matches the third-build native compiler binary exactly on stable host

@@ -118,7 +118,7 @@ make use-dev-stage2 # build, install, and select the Stage 2 launcher under buil
 source build/dea/bin/l0-env.sh # activate the repo-local Dea build workflow in your shell
 make PREFIX=/tmp/l0-install install # install the self-hosted Stage 2 compiler under one prefix
 make test-all # run the full Stage 1 + Stage 2 validation suite
-make triple-test # run the strict stage2/stage3 triple-bootstrap regression
+make triple-test # run the strict triple-bootstrap regression
 ```
 
 Stage 2 currently implements analysis/dump modes plus `--gen`, `--build`, and `--run`.

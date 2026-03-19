@@ -619,7 +619,7 @@ def main() -> int:
         )
 
         notice("comparing second and third self-built retained C artifacts")
-        assert_same_bytes("retained C (stage2 vs stage3)", second_c, third_c, artifact_dir, include_diff=True)
+        assert_same_bytes("retained C (compiler 2 vs compiler 3)", second_c, third_c, artifact_dir, include_diff=True)
         if uses_tcc(compiler_text):
             notice("skipping native binary comparison for tcc (no stable binary guarantee)")
         elif sys.platform == "win32":
@@ -629,7 +629,7 @@ def main() -> int:
             native_right = normalized_native_artifact(third_native, artifact_dir)
             notice("comparing stripped second and third self-built native compiler binaries")
             assert_same_bytes(
-                "native binary (stage2 vs stage3)",
+                "native binary (compiler 2 vs compiler 3)",
                 native_left,
                 native_right,
                 artifact_dir,

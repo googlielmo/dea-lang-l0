@@ -103,8 +103,8 @@ This fix set closed that gap. After the changes below, the Stage 2 compiler can:
 The triple-bootstrap comparison was strict enough to expose two layers of defects:
 
 1. **true semantic bugs** that prevented self-hosted Stage 2 from compiling the Stage 2 sources correctly, and
-2. **oracle-parity bugs** where Stage 2 produced correct-enough C semantically, but not the same retained C that Stage
-   1 produces.
+2. **oracle-parity bugs** where Stage 2 produced correct-enough C semantically, but not the same retained C that Stage 1
+   produces.
 
 The semantic bugs clustered around Stage 2 still not fully matching Stage 1 in three places:
 
@@ -208,7 +208,7 @@ Implemented:
 1. Deterministic host compiler selection.
 2. Deterministic linker-flag probing and native output stability checks.
 3. Stage 1 build -> Stage 2 self-check -> Stage 2 self-build -> retained-C compare -> native-binary compare flow.
-4. Final stage2/stage3 fixed-point comparison by adding one more self-build before the identity check.
+4. Final fixed-point comparison by adding one more self-build before the identity check.
 5. Artifact retention and compact mismatch reporting for debugging.
 
 ## Verification
