@@ -15,6 +15,7 @@ LINKS_NAVBAR1 = [
 ]
 
 LINKS_NAVBAR2 = [
+    ('<a href="pdf/refman.pdf">PDF</a>', []),
     ('<a href="https://github.com/googlielmo/dea-lang-l0">GitHub</a>', []),
 ]
 

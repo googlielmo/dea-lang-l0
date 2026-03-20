@@ -72,7 +72,7 @@ jobs:
         run: uv sync --group docs
 
       - name: Build HTML, Markdown, LaTeX, and PDF
-        run: ./scripts/gen-docs.sh --pdf
+        run: ./scripts/gen-docs.sh --pdf --strict
 
       - name: Stage Pages site
         run: |
@@ -112,7 +112,7 @@ jobs:
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v6
+        uses: actions/deploy-pages@v4
 
   upload-release-pdf:
     needs: build-docs

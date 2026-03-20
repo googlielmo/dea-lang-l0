@@ -109,6 +109,12 @@ def test_mcss_template_uses_show_undocumented_setting() -> None:
     assert "SHOW_UNDOCUMENTED = True" in template
     assert "M_SHOW_UNDOCUMENTED" not in template
     assert "annotated.html" not in template
+    assert '<a href="pdf/refman.pdf">PDF</a>' in template
+
+
+def test_mainpage_html_template_links_to_pdf_reference() -> None:
+    template = (repo_root() / "scripts/docs/templates/mainpage_html.md.j2").read_text(encoding="utf-8")
+    assert "[Reference Manual (pdf)](pdf/refman.pdf)" in template
 
 
 def test_patch_mcss_renderer_excludes_directory_pages_from_search_results(tmp_path: Path) -> None:
