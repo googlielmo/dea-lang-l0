@@ -4,7 +4,7 @@
 
 from pathlib import Path
 
-from compiler.docgen.l0_docgen_blog import export_markdown_tree, parse_markdown_index, rewrite_markdown_links
+from compiler.docgen.l0_docgen_blog import export_markdown_tree, parse_args, parse_markdown_index, rewrite_markdown_links
 
 
 def test_parse_markdown_index_groups_entries() -> None:
@@ -66,6 +66,11 @@ def test_rewrite_markdown_links_rewrites_internal_targets_and_preserves_anchors(
     assert "[raw](../stage2_l0/src/tokens.md)" in rewritten
 
 
+def test_parse_args_defaults_blog_tab_order_to_five(tmp_path: Path) -> None:
+    args = parse_args(["--input", str(tmp_path / "in"), "--output", str(tmp_path / "out")])
+    assert args.tab_order == 5
+
+
 def test_export_markdown_tree_generates_chirpy_pages_and_tab(tmp_path: Path) -> None:
     input_dir = tmp_path / "markdown"
     output_dir = tmp_path / "blog-export"
@@ -119,7 +124,7 @@ Token docs.
         docs_prefix="api/reference",
         tab_title="API",
         tab_icon="fas fa-book",
-        tab_order=4,
+        tab_order=5,
         html_site_url="https://example.com/api/",
         pdf_url="https://example.com/api/pdf/refman.pdf",
     )

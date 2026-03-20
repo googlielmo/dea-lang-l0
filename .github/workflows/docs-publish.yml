@@ -204,7 +204,7 @@ jobs:
           docs_prefix="${BLOG_DOCS_PREFIX:-api/reference}"
           tab_title="${BLOG_TAB_TITLE:-API}"
           tab_icon="${BLOG_TAB_ICON:-fas fa-book}"
-          tab_order="${BLOG_TAB_ORDER:-4}"
+          tab_order="${BLOG_TAB_ORDER:-5}"
           if [ -n "$PAGE_URL" ]; then
             html_site_url="$PAGE_URL"
           elif [ -n "$DOCS_SITE_URL_OVERRIDE" ]; then

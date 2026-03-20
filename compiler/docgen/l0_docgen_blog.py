@@ -34,7 +34,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--docs-prefix", default="api/reference", help="Destination prefix inside the blog repo.")
     parser.add_argument("--tab-title", default="API", help="Title for the generated Chirpy tab page.")
     parser.add_argument("--tab-icon", default="fas fa-book", help="Icon class for the generated Chirpy tab page.")
-    parser.add_argument("--tab-order", type=int, default=4, help="Order for the generated Chirpy tab page.")
+    parser.add_argument("--tab-order", type=int, default=5, help="Order for the generated Chirpy tab page.")
     parser.add_argument("--html-site-url", default="", help="Standalone HTML site URL.")
     parser.add_argument("--pdf-url", default="", help="Published PDF URL.")
     return parser.parse_args(argv)
