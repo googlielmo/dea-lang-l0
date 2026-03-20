@@ -371,6 +371,7 @@ References:
 - [Ownership and memory management](docs/reference/ownership.md)
 - [Stage 1 contract](docs/specs/compiler/stage1-contract.md)
 - [Shared CLI contract](docs/specs/compiler/cli-contract.md)
+- [Contributing guide](CONTRIBUTING.md) for developer workflow, setup, and validation commands
 
 ## CLI
 
@@ -412,7 +413,8 @@ Trace output contract: [docs/specs/runtime/trace.md](docs/specs/runtime/trace.md
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md).
+See [CONTRIBUTING.md](CONTRIBUTING.md). It is the source of truth for developer workflow, setup, and validation
+commands.
 
 ## License
 

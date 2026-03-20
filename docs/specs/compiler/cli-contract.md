@@ -27,8 +27,7 @@ Primary mode flags:
 - `--sym` (alias flag: `--symbols`)
 - `--type` (alias flag: `--types`)
 
-Mode selection uses flags only. Legacy command words such as `run`, `build`, `gen`, `check`, `tok`, `ast`, `sym`, and
-`type` are not accepted as positional mode words. A bare word is treated as a target name, not a mode.
+Mode selection uses flags only.
 
 `--tok`, `--ast`, `--sym`, and `--type` are developer-facing diagnostic modes; their output format is not guaranteed
 stable.

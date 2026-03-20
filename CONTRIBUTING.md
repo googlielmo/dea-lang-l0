@@ -93,7 +93,7 @@ For Stage 1 (`compiler/stage1_py`) changes, you can also run specific tests with
 For Stage 2 (`compiler/stage2_l0`) changes, run one of the following Make targets depending on your needs:
 
 ```bash
-make test-stage2  # runs the full Stage 2 test suite, including the triple-bootstrap test
+make test-stage2  # runs the standard Stage 2 test suite
 make test-stage2 TESTS="driver_test l0c_build_run_test" # runs a specific subset of Stage 2 tests
 make test-stage2-trace  # runs the Stage 2 L0-based tests with trace collection and leak triage
 make triple-test  # runs only the triple-bootstrap test

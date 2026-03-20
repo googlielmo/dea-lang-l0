@@ -280,8 +280,8 @@ cat /tmp/smoke/dea-l0/VERSION
 
 ## Related Documents
 
-- [Windows dev install workflow](2026-03-13-windows-dev-install-and-prefix-workflow.md)
-- [Bootstrap plan](closed/2026-03-09-stage2-bootstrap-compiler-artifact-noref.md)
-- [Stage 2 contract](../../specs/compiler/stage2-contract.md)
-- [CLI contract](../../specs/compiler/cli-contract.md)
-- [Project status](../../reference/project-status.md)
+- [Windows dev install workflow](../2026-03-13-windows-dev-install-and-prefix-workflow.md)
+- [Bootstrap plan](2026-03-09-stage2-bootstrap-compiler-artifact-noref.md)
+- [Stage 2 contract](../../../specs/compiler/stage2-contract.md)
+- [CLI contract](../../../specs/compiler/cli-contract.md)
+- [Project status](../../../reference/project-status.md)

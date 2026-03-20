@@ -1,8 +1,9 @@
 # L0 Trace Specification
 
-Version: 2026-02-19
+Version: 2026-03-20
 
-This document specifies Stage 1 trace instrumentation for generated C code and runtime behavior.
+This document specifies the shared trace instrumentation contract for generated C code and runtime behavior in both
+Stage 1 and Stage 2.
 
 ## 1. Purpose
 
@@ -11,7 +12,7 @@ Trace instrumentation exists to verify ownership and memory code paths at runtim
 
 Tracing is opt-in and intended for debugging, validation, and regression analysis.
 
-## 2. User Interface (Stage 1 CLI)
+## 2. User Interface (Shared CLI)
 
 `l0c` exposes trace flags on codegen-producing modes (`--gen`, `--build`, `--run`):
 
@@ -23,14 +24,15 @@ Flags are independent and composable.
 Examples:
 
 ```bash
-./scripts/l0c --gen --trace-arc app.main
-./scripts/l0c --build --trace-memory app.main
-./scripts/l0c --run --trace-arc --trace-memory app.main
+l0c --gen --trace-arc app.main
+l0c --build --trace-memory app.main
+l0c --run --trace-arc --trace-memory app.main
 ```
 
 ## 3. Generated C Contract
 
-When enabled, generated C emits preprocessor defines immediately before including `l0_runtime.h`:
+When enabled, generated C emitted by either stage writes preprocessor defines immediately before including
+`l0_runtime.h`:
 
 - `#define L0_TRACE_ARC 1`
 - `#define L0_TRACE_MEMORY 1`
@@ -43,8 +45,8 @@ Manual C defines passed via `-C` (for example `-C "-DL0_TRACE_ARC"`) remain comp
 
 - Trace output stream: `stderr`.
 - Prefixes:
-    - ARC: `[l0][arc]`
-    - Memory: `[l0][mem]`
+  - ARC: `[l0][arc]`
+  - Memory: `[l0][mem]`
 - Trace format is line-oriented text, one event per line.
 
 No stdout behavior is changed by tracing.

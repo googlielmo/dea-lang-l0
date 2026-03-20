@@ -10,18 +10,18 @@
 - Stage: Shared
 - Subsystem: Build workflow / driver / CI
 - Modules:
-    - `pyproject.toml`
-    - `compiler/stage1_py/l0c.py`
-    - `compiler/stage1_py/tests/conftest.py`
-    - `compiler/stage2_l0/src/build_driver.l0`
-    - `compiler/stage2_l0/test_runner_common.py`
-    - `scripts/build-stage2-l0c.sh`
-    - `.github/workflows/ci.yml`
-    - `docs/reference/project-status.md`
-    - `CLAUDE.md`
+  - `pyproject.toml`
+  - `compiler/stage1_py/l0c.py`
+  - `compiler/stage1_py/tests/conftest.py`
+  - `compiler/stage2_l0/src/build_driver.l0`
+  - `compiler/stage2_l0/test_runner_common.py`
+  - `scripts/build-stage2-l0c.sh`
+  - `.github/workflows/ci.yml`
+  - `docs/reference/project-status.md`
+  - `CLAUDE.md`
 - Test modules:
-    - `compiler/stage1_py/tests/` (all — via Windows CI runner)
-    - `compiler/stage2_l0/tests/` (all — via Windows CI runner)
+  - `compiler/stage1_py/tests/` (all — via Windows CI runner)
+  - `compiler/stage2_l0/tests/` (all — via Windows CI runner)
 
 ## Summary
 
@@ -49,8 +49,7 @@ behavior, Stage 2 shell-test bash detection, and GitHub Actions Windows CI along
 ## Prerequisites
 
 - The bootstrap/Makefile plan (`closed/2026-03-09-stage2-bootstrap-compiler-artifact-noref.md`) should be at least
-  through
-  Phase 2 (Makefile exists) before Phase 6 CI validation of Makefile targets.
+  through Phase 2 (Makefile exists) before Phase 6 CI validation of Makefile targets.
 
 ## Current Cross-Platform Foundation
 
@@ -68,7 +67,7 @@ The following already work or have Windows code paths:
 ## Blockers
 
 | Blocker                          | Location                    | Fix                                                               |
-|----------------------------------|-----------------------------|-------------------------------------------------------------------|
+| -------------------------------- | --------------------------- | ----------------------------------------------------------------- |
 | `l0c` is a bash script           | `./scripts/l0c`             | Python `console_scripts` entry point + `scripts/l0c.cmd` fallback |
 | `l0-env.sh` is bash/zsh only     | `./l0-env.sh`               | Out of scope — env setup via Makefile or manual                   |
 | `build-stage2-l0c.sh` is bash    | `scripts/`                  | Runs via MSYS2 bash from MinGW-w64; no rewrite needed             |
@@ -107,12 +106,11 @@ Replace the bash `l0c` wrapper with a cross-platform Python entry point.
    if not defined L0_HOME set "L0_HOME=%REPO_ROOT%\compiler"
    python "%L0_HOME%\stage1_py\l0c.py" %*
    ```
-   Keep it under `scripts/`, not the repo root: the root-level `l0c` name previously caused confusion with the
-   selected repo-local or installed `l0c` command, so the source-tree fallback should stay alongside `scripts/l0c`.
+   Keep it under `scripts/`, not the repo root: the root-level `l0c` name previously caused confusion with the selected
+   repo-local or installed `l0c` command, so the source-tree fallback should stay alongside `scripts/l0c`.
 
 **Validation:** `./scripts/l0c -P examples --check hello` works on POSIX, and
-`scripts\l0c.cmd -P examples --check hello`
-works on Windows.
+`scripts\l0c.cmd -P examples --check hello` works on Windows.
 
 ### Phase 2: Platform-Aware Executable Naming
 
@@ -229,6 +227,6 @@ follow-up lands.
 
 ## Related Documents
 
-- [Bootstrap plan](closed/2026-03-09-stage2-bootstrap-compiler-artifact-noref.md) — Makefile and install layout
-- [Architecture](../../reference/architecture.md) — compiler pipeline and file layout
-- [Project status](../../reference/project-status.md) — platform support and roadmap
+- [Bootstrap plan](2026-03-09-stage2-bootstrap-compiler-artifact-noref.md) — Makefile and install layout
+- [Architecture](../../../reference/architecture.md) — compiler pipeline and file layout
+- [Project status](../../../reference/project-status.md) — platform support and roadmap
