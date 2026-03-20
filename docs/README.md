@@ -27,6 +27,14 @@ repository.
 - Use `plans/` for execution plans and operational work tracking.
 - Move a document to `attic/` only when it is superseded or obsolete.
 
+Plan category guidance:
+
+- `plans/features/`: user-facing language, compiler, or standard-library features.
+- `plans/tools/`: repository tooling and operational workflows, including CI, build/install packaging, release
+  automation, docs pipelines, Docker workflows, launchers, and validation tooling.
+- `plans/refactors/`: internal restructures that preserve the current external behavior.
+- `plans/bug-fixes/`: defect fixes in any subsystem.
+
 ## Naming Conventions
 
 - Use lowercase kebab-case file names.
@@ -57,7 +65,7 @@ Version: YYYY-MM-DD
 
 ### Plans (`plans/`)
 
-Plans for bug fixes, features, or refactors follow a more detailed metadata block.
+Plans for bug fixes, features, refactors, or tooling follow a more detailed metadata block.
 
 **Layout:** Each category (`features/`, `bug-fixes/`, `refactors/`, `tools/`) has a `closed/` subdirectory. Active plans
 (`Draft`, `In Progress`) remain at the category root. Plans with status `Closed` or `Implemented` are moved into

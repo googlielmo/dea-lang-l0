@@ -48,8 +48,8 @@ behavior, Stage 2 shell-test bash detection, and GitHub Actions Windows CI along
 
 ## Prerequisites
 
-- The bootstrap/Makefile plan (`closed/2026-03-09-stage2-bootstrap-compiler-artifact-noref.md`) should be at least
-  through Phase 2 (Makefile exists) before Phase 6 CI validation of Makefile targets.
+- The bootstrap/Makefile plan (`2026-03-09-stage2-bootstrap-compiler-artifact-noref.md`) should be at least through
+  Phase 2 (Makefile exists) before Phase 6 CI validation of Makefile targets.
 
 ## Current Cross-Platform Foundation
 

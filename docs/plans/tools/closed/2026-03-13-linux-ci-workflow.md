@@ -10,17 +10,17 @@
 - Stage: Shared
 - Subsystem: Build workflow / CI
 - Modules:
-    - `.github/workflows/ci.yml`
-    - `docs/plans/features/closed/2026-03-11-windows-build-support.md`
+  - `.github/workflows/ci.yml`
+  - `docs/plans/tools/closed/2026-03-11-windows-build-support.md`
 - Test modules:
-    - `Makefile`
-    - `compiler/stage1_py/tests/`
-    - `compiler/stage2_l0/tests/`
+  - `Makefile`
+  - `compiler/stage1_py/tests/`
+  - `compiler/stage2_l0/tests/`
 
 ## Summary
 
-The repository had documentation publishing workflows, but no general-purpose CI workflow for compiler validation.
-This feature adds a Linux-only GitHub Actions workflow that runs the existing top-level validation entrypoint
+The repository had documentation publishing workflows, but no general-purpose CI workflow for compiler validation. This
+feature adds a Linux-only GitHub Actions workflow that runs the existing top-level validation entrypoint
 `make test-all`.
 
 The initial rollout is intentionally narrow:
@@ -77,9 +77,9 @@ Add one Linux job:
 
 ### Windows follow-up alignment
 
-Update the active Windows build support plan so it no longer assumes the first CI rollout is cross-platform.
-The Windows plan should treat the Linux workflow as the baseline and describe Windows runner support as a future
-extension of `.github/workflows/ci.yml`.
+Update the active Windows build support plan so it no longer assumes the first CI rollout is cross-platform. The Windows
+plan should treat the Linux workflow as the baseline and describe Windows runner support as a future extension of
+`.github/workflows/ci.yml`.
 
 ## Verification Criteria
 

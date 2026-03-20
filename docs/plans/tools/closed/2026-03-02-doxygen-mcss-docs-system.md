@@ -10,40 +10,40 @@
 - Stage: Shared
 - Subsystem: Documentation
 - Modules:
-    - `scripts/gen-docs.sh`
-    - `scripts/docs/templates/doxyfile.in`
-    - `scripts/docs/templates/mcss_conf.py.in`
-    - `scripts/docs/templates/mainpage_html.md.j2`
-    - `scripts/docs/templates/mainpage_latex.md.j2`
-    - `scripts/docs/templates/markdown_file.md.j2`
-    - `scripts/docs/templates/markdown_index.md.j2`
-    - `scripts/docs/templates/html_api_page.j2`
-    - `scripts/docs/templates/html_api_group.j2`
-    - `scripts/docs/templates/html_redirect.j2`
-    - `compiler/docgen/l0_docgen.py`
-    - `compiler/docgen/l0_docgen_python_filter.py`
-    - `compiler/docgen/l0_docgen_markdown.py`
-    - `compiler/docgen/l0_docgen_l0_filter.py`
-    - `compiler/docgen/l0_docgen_l0_helpers.py`
-    - `compiler/docgen/l0_docgen_latex.py`
-    - `tools/m.css/`
-    - `tools/m.css.L0-PATCHES.md`
-    - `tools/m.css/documentation/templates/doxygen/base-class-reference.html`
-    - `tools/m.css/documentation/templates/doxygen/entry-var.html`
-    - `tools/m.css/documentation/templates/doxygen/details-var.html`
-    - `tools/m.css/documentation/templates/doxygen/entry-enum.html`
+  - `scripts/gen-docs.sh`
+  - `scripts/docs/templates/doxyfile.in`
+  - `scripts/docs/templates/mcss_conf.py.in`
+  - `scripts/docs/templates/mainpage_html.md.j2`
+  - `scripts/docs/templates/mainpage_latex.md.j2`
+  - `scripts/docs/templates/markdown_file.md.j2`
+  - `scripts/docs/templates/markdown_index.md.j2`
+  - `scripts/docs/templates/html_api_page.j2`
+  - `scripts/docs/templates/html_api_group.j2`
+  - `scripts/docs/templates/html_redirect.j2`
+  - `compiler/docgen/l0_docgen.py`
+  - `compiler/docgen/l0_docgen_python_filter.py`
+  - `compiler/docgen/l0_docgen_markdown.py`
+  - `compiler/docgen/l0_docgen_l0_filter.py`
+  - `compiler/docgen/l0_docgen_l0_helpers.py`
+  - `compiler/docgen/l0_docgen_latex.py`
+  - `tools/m.css/`
+  - `tools/m.css.L0-PATCHES.md`
+  - `tools/m.css/documentation/templates/doxygen/base-class-reference.html`
+  - `tools/m.css/documentation/templates/doxygen/entry-var.html`
+  - `tools/m.css/documentation/templates/doxygen/details-var.html`
+  - `tools/m.css/documentation/templates/doxygen/entry-enum.html`
 - Test modules:
-    - `compiler/stage1_py/tests/cli/test_docgen_cli.py`
-    - `compiler/stage1_py/tests/cli/test_docgen_source_scope.py`
-    - `compiler/stage1_py/tests/cli/test_docgen_python_filter.py`
-    - `compiler/stage1_py/tests/cli/test_docgen_markdown_renderer.py`
-    - `compiler/stage1_py/tests/cli/test_docgen_l0_filter.py`
-    - `compiler/stage1_py/tests/cli/test_docgen_latex.py`
+  - `compiler/stage1_py/tests/cli/test_docgen_cli.py`
+  - `compiler/stage1_py/tests/cli/test_docgen_source_scope.py`
+  - `compiler/stage1_py/tests/cli/test_docgen_python_filter.py`
+  - `compiler/stage1_py/tests/cli/test_docgen_markdown_renderer.py`
+  - `compiler/stage1_py/tests/cli/test_docgen_l0_filter.py`
+  - `compiler/stage1_py/tests/cli/test_docgen_latex.py`
 
 ## Summary
 
-Implement a reproducible API documentation pipeline that generates HTML, Markdown, Doxygen XML, and normalized LaTeX
-for the Dea/L0 codebase.
+Implement a reproducible API documentation pipeline that generates HTML, Markdown, Doxygen XML, and normalized LaTeX for
+the Dea/L0 codebase.
 
 This document records the decisions and features implemented across the original docs-system work from:
 
@@ -82,8 +82,8 @@ generation. It covers:
 - `m.css` is vendored under `tools/m.css/` as a tracked snapshot.
 - The docs pipeline never clones `m.css` at build time.
 - Local renderer adjustments are documented in `tools/m.css.L0-PATCHES.md`.
-- The local `m.css` patch set allows Python, C, Markdown, and Objective-C compounds in addition to C++ and hardens
-  title extraction for nested/empty heading text.
+- The local `m.css` patch set allows Python, C, Markdown, and Objective-C compounds in addition to C++ and hardens title
+  extraction for nested/empty heading text.
 - The local `m.css` template patches also align raw HTML rendering with L0 syntax conventions:
   - struct/class member sections use `Fields` / `Field documentation` for L0 compounds
   - L0 non-static members render as `name: type`
@@ -94,8 +94,7 @@ generation. It covers:
 ### Generated Doxygen configuration
 
 - Doxygen configuration is generated from templates instead of using a tracked root `Doxyfile`.
-- The pipeline uses generated config files with absolute paths so it works from normal checkouts and phantom
-  worktrees.
+- The pipeline uses generated config files with absolute paths so it works from normal checkouts and phantom worktrees.
 - The previous root-level `Doxyfile` and `conf.py` were replaced by generated config and template-based main pages.
 - HTML-oriented and LaTeX-oriented main pages are split:
   - `mainpage_html.md.j2`
@@ -124,8 +123,7 @@ generation. It covers:
   - struct fields: `name: Type;` to `Type name;`
   - enum members: `VALUE;` to `VALUE,`
   - `struct` / `enum` closing braces normalized to `};`
-- This eliminates Doxygen-invented synthetic members such as `__pad0__` and stops parser bleed into later
-  declarations.
+- This eliminates Doxygen-invented synthetic members such as `__pad0__` and stops parser bleed into later declarations.
 - The fix applies to XML, HTML, Markdown, and LaTeX because it changes the parsed Doxygen model itself.
 
 ### Markdown output design
@@ -141,8 +139,8 @@ generation. It covers:
   - rendered symbol sections
 - Internal links are generated as stable relative Markdown paths plus anchors.
 - The Markdown index page uses original source filenames as the visible link text while keeping `.md` targets.
-- `L0 signature:` prose attached after Doxygen `@return` blocks is preserved in Markdown output (instead of being dropped
-  by section filtering).
+- `L0 signature:` prose attached after Doxygen `@return` blocks is preserved in Markdown output (instead of being
+  dropped by section filtering).
 - L0 signature cross-links are normalized to link the full callable form:
   - `extern [func name(args) -> Ret](...)`
   - this also repairs Doxygen forms where argument lists were emitted outside the link label.
@@ -167,8 +165,8 @@ generation. It covers:
   cross-surface drift.
 - Search result URLs are normalized against the docs-root `search-v2.js` location so nested curated pages under
   `/api/...` resolve raw symbol targets correctly instead of producing relative-path 404s.
-- Directory compounds are excluded from search indexing so pruned raw `dir_*.html` pages are not surfaced as dead
-  search targets.
+- Directory compounds are excluded from search indexing so pruned raw `dir_*.html` pages are not surfaced as dead search
+  targets.
 - The main HTML navbar was rewritten away from empty default `Pages` / `Files` / `Namespaces` views and toward the
   curated browsing structure.
 

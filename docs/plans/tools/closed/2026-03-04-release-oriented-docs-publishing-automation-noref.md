@@ -4,24 +4,25 @@
 
 - Date: 2026-03-04
 - Status: Implemented
-- Title: Release-oriented automation for publishing generated HTML, Chirpy-integrated Markdown, and PDF API documentation
+- Title: Release-oriented automation for publishing generated HTML, Chirpy-integrated Markdown, and PDF API
+  documentation
 - Kind: Feature
 - Severity: Medium (Tooling/Docs)
 - Stage: Shared
 - Subsystem: Documentation / CI
 - Modules:
-    - `.github/workflows/docs-validate.yml`
-    - `.github/workflows/docs-publish.yml`
-    - `compiler/docgen/l0_docgen_blog.py`
-    - `scripts/gen-docs.sh`
-    - `README.md`
-    - `CLAUDE.md`
-    - `docs/README.md`
+  - `.github/workflows/docs-validate.yml`
+  - `.github/workflows/docs-publish.yml`
+  - `compiler/docgen/l0_docgen_blog.py`
+  - `scripts/gen-docs.sh`
+  - `README.md`
+  - `CLAUDE.md`
+  - `docs/README.md`
 - Test modules:
-    - `compiler/stage1_py/tests/cli/test_docgen_cli.py`
-    - `compiler/stage1_py/tests/cli/test_docgen_markdown_renderer.py`
-    - `compiler/stage1_py/tests/cli/test_docgen_latex.py`
-    - `compiler/stage1_py/tests/cli/test_docgen_blog.py`
+  - `compiler/stage1_py/tests/cli/test_docgen_cli.py`
+  - `compiler/stage1_py/tests/cli/test_docgen_markdown_renderer.py`
+  - `compiler/stage1_py/tests/cli/test_docgen_latex.py`
+  - `compiler/stage1_py/tests/cli/test_docgen_blog.py`
 
 ## Summary
 
@@ -74,7 +75,7 @@ publication plus manual trigger.
   lists stay readable.
 
 Detailed rendering and syntax-normalization rules remain documented in
-`docs/plans/features/closed/2026-03-02-doxygen-mcss-docs-system.md`.
+`docs/plans/tools/closed/2026-03-02-doxygen-mcss-docs-system.md`.
 
 ### Ownership model
 

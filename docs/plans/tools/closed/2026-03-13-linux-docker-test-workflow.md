@@ -10,14 +10,14 @@
 - Stage: Shared
 - Subsystem: Build workflow / Docker
 - Modules:
-    - `Dockerfile`
-    - `.dockerignore`
-    - `Makefile`
-    - `README.md`
-    - `CLAUDE.md`
+  - `Dockerfile`
+  - `.dockerignore`
+  - `Makefile`
+  - `README.md`
+  - `CLAUDE.md`
 - Test modules:
-    - `compiler/stage1_py/tests/`
-    - `compiler/stage2_l0/tests/`
+  - `compiler/stage1_py/tests/`
+  - `compiler/stage2_l0/tests/`
 
 ## Summary
 

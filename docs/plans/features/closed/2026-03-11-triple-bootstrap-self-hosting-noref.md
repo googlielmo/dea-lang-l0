@@ -15,7 +15,7 @@
   - `compiler/stage2_l0/run_tests.py`
   - `compiler/stage2_l0/tests/l0c_stage2_bootstrap_test.sh`
   - `compiler/stage2_l0/tests/l0c_triple_bootstrap_test.py`
-  - `docs/plans/features/closed/2026-03-09-stage2-bootstrap-compiler-artifact-noref.md`
+  - `docs/plans/tools/closed/2026-03-09-stage2-bootstrap-compiler-artifact-noref.md`
 - Test modules:
   - `compiler/stage2_l0/tests/l0c_triple_bootstrap_test.py`
   - `compiler/stage2_l0/tests/l0c_stage2_bootstrap_test.sh`
@@ -41,8 +41,8 @@ This plan therefore covers both:
    at both the retained-C and native-binary levels.
 
 This plan depends on the Phase 1 and Phase 2 deliverables from
-`docs/plans/features/closed/2026-03-09-stage2-bootstrap-compiler-artifact-noref.md`. It does not change that plan’s
-Phase 3 install-prefix scope.
+`docs/plans/tools/closed/2026-03-09-stage2-bootstrap-compiler-artifact-noref.md`. It does not change that plan’s Phase 3
+install-prefix scope.
 
 ## Goals
 

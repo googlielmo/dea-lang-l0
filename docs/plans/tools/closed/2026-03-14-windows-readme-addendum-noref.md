@@ -10,10 +10,10 @@
 - Stage: Shared
 - Subsystem: Documentation / developer workflow
 - Modules:
-    - `README.md`
-    - `README-WINDOWS.md`
+  - `README.md`
+  - `README-WINDOWS.md`
 - Test modules:
-    - none
+  - none
 - Repro: Windows shell usage of `make install-dev-*`, `make use-dev-*`, and `make install`
 
 ## Summary
@@ -29,7 +29,8 @@ across the main README, Stage 2 README, CLAUDE instructions, and implementation 
 - document `l0-env.sh` generation and its Bash/MSYS2-only activation role
 - document native-shell usage for `cmd.exe` and PowerShell via generated `.cmd` launchers
 - explain that `l0c-stage2.cmd` and `l0c.cmd` are stage-specific vs selected-alias entry points, not redundant files
-- call out the current repo-local Stage 1 native-shell limitation explicitly instead of implying parity that does not exist
+- call out the current repo-local Stage 1 native-shell limitation explicitly instead of implying parity that does not
+  exist
 
 ## Verification
 

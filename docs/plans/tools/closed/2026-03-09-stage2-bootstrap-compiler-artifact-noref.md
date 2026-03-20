@@ -10,24 +10,24 @@
 - Stage: 2
 - Subsystem: Bootstrap/build workflow / top-level Make UX / install layout
 - Modules:
-    - `scripts/build-stage2-l0c.sh`
-    - `scripts/build_stage2_l0c.py`
-    - `scripts/dist_tools_lib.py`
-    - `scripts/gen_dist_tools.py`
-    - `Makefile`
-    - `README.md`
-    - `compiler/stage2_l0/README.md`
-    - `docs/reference/project-status.md`
-    - `docs/reference/architecture.md`
-    - `CLAUDE.md`
+  - `scripts/build-stage2-l0c.sh`
+  - `scripts/build_stage2_l0c.py`
+  - `scripts/dist_tools_lib.py`
+  - `scripts/gen_dist_tools.py`
+  - `Makefile`
+  - `README.md`
+  - `compiler/stage2_l0/README.md`
+  - `docs/reference/project-status.md`
+  - `docs/reference/architecture.md`
+  - `CLAUDE.md`
 - Test modules:
-    - `compiler/stage2_l0/tests/source_paths_test.l0`
-    - `compiler/stage2_l0/tests/l0c_codegen_test.sh`
-    - `compiler/stage2_l0/tests/l0c_stage2_default_dist_test.sh`
-    - `compiler/stage2_l0/tests/l0c_stage2_bootstrap_test.sh`
-    - `compiler/stage2_l0/tests/l0c_stage2_install_prefix_test.sh`
-    - `compiler/stage2_l0/tests/l0c_triple_bootstrap_test.py`
-    - `tests/test_make_dist_workflow.py`
+  - `compiler/stage2_l0/tests/source_paths_test.l0`
+  - `compiler/stage2_l0/tests/l0c_codegen_test.sh`
+  - `compiler/stage2_l0/tests/l0c_stage2_default_dist_test.sh`
+  - `compiler/stage2_l0/tests/l0c_stage2_bootstrap_test.sh`
+  - `compiler/stage2_l0/tests/l0c_stage2_install_prefix_test.sh`
+  - `compiler/stage2_l0/tests/l0c_triple_bootstrap_test.py`
+  - `tests/test_make_dist_workflow.py`
 
 ## Summary
 
@@ -35,8 +35,8 @@ This feature defines a staged path from today’s repo-only Stage 2 execution mo
 artifact and, later, to a real installable toolchain.
 
 Triple-bootstrap self-hosting validation and the strict triple-compilation test are tracked separately in
-`docs/plans/features/closed/2026-03-11-triple-bootstrap-self-hosting-noref.md`. That follow-on work depends on
-this plan’s Phase 1 and Phase 2 deliverables, but it does not replace this plan’s Phase 3 install-prefix scope.
+`docs/plans/features/closed/2026-03-11-triple-bootstrap-self-hosting-noref.md`. That follow-on work depends on this
+plan’s Phase 1 and Phase 2 deliverables, but it does not replace this plan’s Phase 3 install-prefix scope.
 
 The plan had three phases, and all three are now implemented:
 
@@ -105,9 +105,9 @@ Phase 1 also adds one forward-compatibility hook for later phases:
 
 1. the builder supports a repo-local output-root override via `DIST_DIR=<path>`
 
-Phase 1 `DIST_DIR` must resolve to a strict subdirectory inside the repository so the generated launcher can compute
-the repo root relative to itself. That override exists so Phase 2 and Phase 3 can reuse the same build logic instead
-of reimplementing it.
+Phase 1 `DIST_DIR` must resolve to a strict subdirectory inside the repository so the generated launcher can compute the
+repo root relative to itself. That override exists so Phase 2 and Phase 3 can reuse the same build logic instead of
+reimplementing it.
 
 Phase 1 also enables a more efficient Stage 2 codegen golden-test path:
 
@@ -142,15 +142,15 @@ Phase 2 is intentionally repo-centric:
 
 Public Make targets:
 
-1. `help`
-2. `venv`
-3. `install-dev-stage1`
-4. `install-dev-stage2`
-5. `install-dev-stages`
-6. `use-dev-stage1`
-7. `use-dev-stage2`
-8. `test-stage1`
-9. `test-stage2`
+01. `help`
+02. `venv`
+03. `install-dev-stage1`
+04. `install-dev-stage2`
+05. `install-dev-stages`
+06. `use-dev-stage1`
+07. `use-dev-stage2`
+08. `test-stage1`
+09. `test-stage2`
 10. `test-stage2-trace`
 11. `triple-test`
 12. `test-all`
@@ -161,15 +161,15 @@ Public Make targets:
 
 Target behavior:
 
-1. `venv` creates or reuses `./.venv`, preferring `uv` when available and falling back to `python -m venv`.
-2. `install-dev-stage1` writes `<DIST_DIR>/bin/l0c-stage1`.
-3. `install-dev-stage2` builds and installs the Phase 1 artifact into `<DIST_DIR>/bin`.
-4. `install-dev-stages` installs both stage-specific commands and does not rewrite `<DIST_DIR>/bin/l0c`.
-5. `use-dev-stage1` and `use-dev-stage2` are the only targets that switch `<DIST_DIR>/bin/l0c`.
-6. `use-dev-stage1` and `use-dev-stage2` print the exact `source <DIST_DIR>/bin/l0-env.sh` command to run next.
-7. `test-stage1` ensures the local virtual environment exists, then runs `python -m pytest -n auto` from `./.venv`.
-8. `test-stage2` runs `./compiler/stage2_l0/run_tests.py`.
-9. `test-stage2-trace` runs `./compiler/stage2_l0/run_trace_tests.py`.
+01. `venv` creates or reuses `./.venv`, preferring `uv` when available and falling back to `python -m venv`.
+02. `install-dev-stage1` writes `<DIST_DIR>/bin/l0c-stage1`.
+03. `install-dev-stage2` builds and installs the Phase 1 artifact into `<DIST_DIR>/bin`.
+04. `install-dev-stages` installs both stage-specific commands and does not rewrite `<DIST_DIR>/bin/l0c`.
+05. `use-dev-stage1` and `use-dev-stage2` are the only targets that switch `<DIST_DIR>/bin/l0c`.
+06. `use-dev-stage1` and `use-dev-stage2` print the exact `source <DIST_DIR>/bin/l0-env.sh` command to run next.
+07. `test-stage1` ensures the local virtual environment exists, then runs `python -m pytest -n auto` from `./.venv`.
+08. `test-stage2` runs `./compiler/stage2_l0/run_tests.py`.
+09. `test-stage2-trace` runs `./compiler/stage2_l0/run_trace_tests.py`.
 10. `test-all` runs the three test targets above.
 11. `triple-test` runs `./compiler/stage2_l0/tests/l0c_triple_bootstrap_test.py` only as a convenience entrypoint for
     the separately tracked strict bootstrap fixed-point regression.
@@ -228,18 +228,18 @@ Phase 3 does not require `l0c-stage1` to be installed into the final prefix.
 
 ## Key Implementation Changes
 
-1. Keep `scripts/build-stage2-l0c.sh` as the single low-level builder for Stage 2, and make it reusable by later
-   phases through the repo-local `DIST_DIR` override.
-2. Keep Stage 2 default-root behavior aligned with Stage 1: explicit `-S/--sys-root` wins, `L0_SYSTEM` is
-   authoritative, and `L0_HOME/shared/l0/stdlib` is the fallback.
+1. Keep `scripts/build-stage2-l0c.sh` as the single low-level builder for Stage 2, and make it reusable by later phases
+   through the repo-local `DIST_DIR` override.
+2. Keep Stage 2 default-root behavior aligned with Stage 1: explicit `-S/--sys-root` wins, `L0_SYSTEM` is authoritative,
+   and `L0_HOME/shared/l0/stdlib` is the fallback.
 3. Make `compiler/stage2_l0/tests/l0c_codegen_test.sh` consume a freshly built Phase 1 artifact once per script run
    instead of rebuilding Stage 2 through Stage 1 for every golden fixture.
 4. Keep codegen-test bootstrap artifacts isolated under `build/tests/...` so the regression harness does not interfere
    with a developer-managed `build/stage2` checkout artifact.
 5. Add the top-level `Makefile` only in Phase 2; it is the developer UX layer, not a second compiler driver.
 6. Structure wrapper and env-script generation so there are two modes:
-    1. repo-relative mode for Phase 2
-    2. prefix-relative mode for Phase 3
+   1. repo-relative mode for Phase 2
+   2. prefix-relative mode for Phase 3
 7. Keep Phase 3 Stage-2-first: copied shared assets and installed Stage 2 are mandatory; Stage 1 packaging is deferred
    and not required by this plan.
 8. Keep `install` shell-state-independent: its temporary self-hosted rebuild must not consume caller-provided
@@ -254,28 +254,28 @@ Phase 3 does not require `l0c-stage1` to be installed into the final prefix.
 3. `./build/stage2/bin/l0c-stage2 --check -P examples hello` succeeds.
 4. `./build/stage2/bin/l0c-stage2 --gen -P examples hello` succeeds if `--gen` is implemented at execution time.
 5. `source_paths` unit tests cover:
-    1. no env values,
-    2. `L0_SYSTEM` precedence,
-    3. `L0_HOME` fallback,
-    4. explicit sys-root suppression of defaults.
+   1. no env values,
+   2. `L0_SYSTEM` precedence,
+   3. `L0_HOME` fallback,
+   4. explicit sys-root suppression of defaults.
 6. `compiler/stage2_l0/tests/l0c_stage2_bootstrap_test.sh` bootstraps Stage 2 under a dedicated repo-local
    `build/tests/...` root and validates the built wrapper end to end.
-7. `compiler/stage2_l0/tests/l0c_stage2_default_dist_test.sh` keeps coverage of the builder default
-   `build/stage2/bin` destination without leaving `build/stage2` behind after cleanup.
-8. `compiler/stage2_l0/tests/l0c_codegen_test.sh` bootstraps Stage 2 once into a dedicated repo-local
-   `build/tests/...` root and reuses that built wrapper across all golden fixtures in the same run.
+7. `compiler/stage2_l0/tests/l0c_stage2_default_dist_test.sh` keeps coverage of the builder default `build/stage2/bin`
+   destination without leaving `build/stage2` behind after cleanup.
+8. `compiler/stage2_l0/tests/l0c_codegen_test.sh` bootstraps Stage 2 once into a dedicated repo-local `build/tests/...`
+   root and reuses that built wrapper across all golden fixtures in the same run.
 
 ### Phase 2
 
-1. `make venv`
-2. `make install-dev-stage1`
-3. `make install-dev-stage2`
-4. `make install-dev-stages`
-5. `make use-dev-stage1`
-6. `make use-dev-stage2`
-7. `make DIST_DIR=build/dev-dist install-dev-stages`
-8. `make DIST_DIR=build/dev-dist use-dev-stage2`
-9. after sourcing `<DIST_DIR>/bin/l0-env.sh`, `l0c --check -P examples hello` succeeds with Stage 1 selected
+01. `make venv`
+02. `make install-dev-stage1`
+03. `make install-dev-stage2`
+04. `make install-dev-stages`
+05. `make use-dev-stage1`
+06. `make use-dev-stage2`
+07. `make DIST_DIR=build/dev-dist install-dev-stages`
+08. `make DIST_DIR=build/dev-dist use-dev-stage2`
+09. after sourcing `<DIST_DIR>/bin/l0-env.sh`, `l0c --check -P examples hello` succeeds with Stage 1 selected
 10. after sourcing `<DIST_DIR>/bin/l0-env.sh`, `l0c --check -P examples hello` succeeds with Stage 2 selected
 11. `make test-stage1`
 12. `make test-stage2`

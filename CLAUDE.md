@@ -32,8 +32,8 @@ implementation status, read the relevant doc file(s).**
 Documentation policy:
 
 - `docs/README.md` for docs placement, naming, metadata standards, and attic rules.
-- **Metadata:** Reference/Specs must have `Version: YYYY-MM-DD`. Plans (Bug Fix/Feature/Refactor) must use the standard
-  metadata block (Date, Status, Kind, etc.).
+- **Metadata:** Reference/Specs must have `Version: YYYY-MM-DD`. Plans (Bug Fix/Feature/Refactor/Tool) must use the
+  standard metadata block (Date, Status, Kind, etc.).
 - `docs/attic/README.md` for archived/obsolete document policy details.
 - **Maintenance:** If you change stdlib or ARC behavior, you MUST update the corresponding `.md` in `docs/` in the same
   PR.
@@ -252,6 +252,6 @@ rg -n 'XXX-NNNN' compiler/stage1_py compiler/stage2_l0 docs
 6. **Diagnostic Codes:** Equivalent Stage 2 conditions reuse Stage 1 codes exactly, including `ICE-xxxx`; new codes are
    globally unique and verified by search.
 7. **Plans Documented:** For non-trivial changes or bug fixes a plan must be documented in `docs/plans/` with a clear
-   execution path and expected outcomes. Active plans live at the category root (e.g., `docs/plans/features/`); closed
-   plans are `git mv`-ed into `<category>/closed/` with cross-references updated. See `docs/README.md` for naming,
-   placement, and closing workflow rules.
+   execution path and expected outcomes. Active plans live at the category root (for example `docs/plans/features/` or
+   `docs/plans/tools/`); closed plans are `git mv`-ed into `<category>/closed/` with cross-references updated. See
+   `docs/README.md` for naming, placement, and closing workflow rules.
