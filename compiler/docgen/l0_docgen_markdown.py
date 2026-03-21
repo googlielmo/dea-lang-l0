@@ -13,7 +13,7 @@ from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader
 
-from .l0_docgen_l0_helpers import extract_l0_enum_variants, module_name_for_source_path
+from .l0_docgen_l0_helpers import extract_l0_enum_variants, extract_l0_member_declaration, module_name_for_source_path
 
 
 def _heading_slug(value: str) -> str:
@@ -439,10 +439,35 @@ def _member_bitfield(memberdef: ET.Element) -> str:
     return f": {bitfield}"
 
 
+def _structured_l0_function_signature(memberdef: ET.Element) -> str | None:
+    name = memberdef.findtext("name", default="").strip()
+    return_type = _sanitize_anonymous_type_text(_normalize_l0_type_text(_inner_text(memberdef.find("type"))))
+    if not name or not return_type or return_type == "func":
+        return None
+
+    rendered_params: list[str] = []
+    for param in memberdef.findall("param"):
+        param_type = _sanitize_anonymous_type_text(_normalize_l0_type_text(_inner_text(param.find("type"))))
+        param_name = param.findtext("declname", default="").strip()
+        if param_name and param_type:
+            rendered_params.append(f"{param_name}: {param_type}")
+        elif param_name:
+            rendered_params.append(param_name)
+        elif param_type:
+            rendered_params.append(param_type)
+
+    prefix = "extern func" if memberdef.attrib.get("extern") == "yes" else "func"
+    return _normalize_l0_signature_text(f"{prefix} {name}({', '.join(rendered_params)}) -> {return_type}")
+
+
 def _member_signature(memberdef: ET.Element, owner: ET.Element | None = None) -> str:
     location = memberdef.find("location")
     source_path = location.attrib.get("file", "") if location is not None else ""
     is_l0 = Path(source_path).suffix == ".l0"
+    if is_l0:
+        source_declaration = extract_l0_member_declaration(memberdef)
+        if source_declaration is not None:
+            return source_declaration
     if memberdef.attrib.get("kind") == "variable":
         definition = memberdef.findtext("definition", default="").strip()
         initializer = memberdef.findtext("initializer", default="").strip()
@@ -501,6 +526,10 @@ def _member_signature(memberdef: ET.Element, owner: ET.Element | None = None) ->
         if "::" in qualified and is_l0:
             if name and type_text:
                 return f"{name}: {type_text}"
+    if is_l0 and memberdef.attrib.get("kind") == "function":
+        structured_signature = _structured_l0_function_signature(memberdef)
+        if structured_signature is not None:
+            return structured_signature
     definition = memberdef.findtext("definition", default="").strip()
     args = memberdef.findtext("argsstring", default="").strip()
     if definition and args:

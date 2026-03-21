@@ -182,3 +182,10 @@ preview_root="build/preview"
 sync_preview_dir "${output_dir%/}/html" "${preview_root}/html"
 sync_preview_dir "${output_dir%/}/markdown" "${preview_root}/markdown"
 sync_preview_dir "${output_dir%/}/pdf" "${preview_root}/pdf"
+
+undocumented_functions_report="${output_dir%/}/undocumented-functions.txt"
+if [[ -f "$undocumented_functions_report" ]]; then
+    if grep -E -v '^(#|$|No undocumented functions found\.)' "$undocumented_functions_report" >/dev/null; then
+        echo "Undocumented functions report: $undocumented_functions_report"
+    fi
+fi

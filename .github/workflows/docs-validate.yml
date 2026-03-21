@@ -66,6 +66,9 @@ jobs:
       - name: Build docs strictly
         run: ./scripts/gen-docs.sh --strict
 
+      - name: Show undocumented functions report
+        run: cat build/docs/undocumented-functions.txt
+
       - name: Export Chirpy Markdown
         run: |
           python -m compiler.docgen.l0_docgen_blog \

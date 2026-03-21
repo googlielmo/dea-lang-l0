@@ -5,6 +5,8 @@
 from __future__ import annotations
 
 import argparse
+from datetime import datetime, timezone
+import os
 import re
 import shutil
 import subprocess
@@ -40,6 +42,50 @@ def repo_root() -> Path:
     return Path(__file__).resolve().parents[2]
 
 
+def _git_revision_suffix_for_latex(root: Path | None = None) -> str:
+    root = root or repo_root()
+    try:
+        short_hash = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            cwd=root,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+    except (OSError, subprocess.CalledProcessError):
+        return ""
+    if not short_hash:
+        return ""
+
+    dirty_suffix = ""
+    try:
+        status_output = subprocess.run(
+            ["git", "status", "--porcelain"],
+            cwd=root,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout
+    except (OSError, subprocess.CalledProcessError):
+        status_output = ""
+    if status_output.strip():
+        dirty_suffix = "+"
+    return f" ({short_hash}{dirty_suffix})"
+
+
+def _project_number_for_latex() -> str:
+    source_date_epoch = os.environ.get("SOURCE_DATE_EPOCH", "").strip()
+    if source_date_epoch:
+        try:
+            timestamp = int(source_date_epoch)
+        except ValueError:
+            pass
+        else:
+            build_date = datetime.fromtimestamp(timestamp, tz=timezone.utc).date()
+            return f"Generated {build_date.isoformat()}{_git_revision_suffix_for_latex()}"
+    return f"Generated {datetime.now(timezone.utc).date().isoformat()}{_git_revision_suffix_for_latex()}"
+
+
 def build_source_manifest(root: Path) -> SourceManifest:
     """Return the exact list of sources included in generated API docs."""
     files: list[Path] = []
@@ -66,7 +112,13 @@ def build_source_manifest(root: Path) -> SourceManifest:
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     """Parse command-line arguments."""
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(
+        description=__doc__,
+        epilog=(
+            "For wrapper-only options such as --pdf, --pdf-fast, and --verbose, "
+            "use ./scripts/gen-docs.sh --help."
+        ),
+    )
     parser.add_argument("--html-only", action="store_true", help="Generate only HTML output.")
     parser.add_argument("--markdown-only", action="store_true", help="Generate only Markdown output.")
     parser.add_argument("--latex-only", action="store_true", help="Generate only LaTeX output.")
@@ -189,6 +241,78 @@ def _warnings_count(warnings_log: Path) -> int:
     return count
 
 
+def _member_line(memberdef: ET.Element) -> int | None:
+    location = memberdef.find("location")
+    if location is None:
+        return None
+    line_text = location.attrib.get("declline") or location.attrib.get("line")
+    if not line_text:
+        return None
+    try:
+        line = int(line_text)
+    except ValueError:
+        return None
+    return line if line > 0 else None
+
+
+def _member_has_documentation(memberdef: ET.Element) -> bool:
+    for tag in ("briefdescription", "detaileddescription", "inbodydescription"):
+        section = memberdef.find(tag)
+        if section is not None and "".join(section.itertext()).strip():
+            return True
+    return False
+
+
+def _collect_undocumented_functions(xml_dir: Path) -> list[tuple[str, int | None, str]]:
+    entries: set[tuple[str, int | None, str]] = set()
+    for xml_path in sorted(xml_dir.glob("*.xml")):
+        if xml_path.name == "index.xml":
+            continue
+        root = ET.parse(xml_path).getroot()
+        for memberdef in root.findall(".//memberdef[@kind='function']"):
+            location = memberdef.find("location")
+            if location is None:
+                continue
+            source_path = location.attrib.get("file", "").strip()
+            name = memberdef.findtext("name", default="").strip()
+            if not source_path or not name or _member_has_documentation(memberdef):
+                continue
+            entries.add((source_path, _member_line(memberdef), name))
+    return sorted(entries, key=lambda item: (item[0], item[1] if item[1] is not None else 0, item[2]))
+
+
+def _undocumented_function_source_type(source_path: str) -> str:
+    suffix = Path(source_path).suffix
+    if suffix == ".l0":
+        return "Dea"
+    if suffix == ".py":
+        return "Python"
+    return "Other"
+
+
+def _write_undocumented_functions_report(report_path: Path, entries: list[tuple[str, int | None, str]]) -> None:
+    lines = ["# Undocumented Functions", ""]
+    if not entries:
+        lines.append("No undocumented functions found.")
+    else:
+        grouped_entries: dict[str, list[tuple[str, int | None, str]]] = {"Dea": [], "Python": [], "Other": []}
+        for entry in entries:
+            grouped_entries[_undocumented_function_source_type(entry[0])].append(entry)
+        for section_name in ("Dea", "Python", "Other"):
+            section_entries = grouped_entries[section_name]
+            if not section_entries:
+                continue
+            lines.append(f"## {section_name}")
+            lines.append("")
+            for source_path, line, name in section_entries:
+                location = f"{source_path}:{line}" if line is not None else source_path
+                lines.append(f"{location} {name}")
+            lines.append("")
+        if lines[-1] == "":
+            lines.pop()
+    report_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
 def _find_synthetic_pad_members(xml_dir: Path) -> list[tuple[str, str]]:
     """Return synthetic __padN__ members discovered in generated Doxygen XML."""
     pad_member_re = re.compile(r"^__pad[0-9]+__$")
@@ -229,6 +353,7 @@ def main(argv: list[str] | None = None) -> int:
     templates_dir = root / "scripts/docs/templates"
     xml_warnings_log = doxygen_root / "warnings-xml.log"
     latex_warnings_log = doxygen_root / "warnings-latex.log"
+    undocumented_functions_report = output_root / "undocumented-functions.txt"
     xml_doxygen_path = generated_root / "Doxyfile.xml"
     latex_doxygen_path = generated_root / "Doxyfile.latex"
     mcss_conf_path = generated_root / "mcss_conf.py"
@@ -267,6 +392,7 @@ def main(argv: list[str] | None = None) -> int:
         shared_runtime_dir=(shadow_root / "compiler/shared/runtime").as_posix(),
         strip_from_path=shadow_root.as_posix(),
         warn_logfile=xml_warnings_log.as_posix(),
+        project_number="",
         generate_xml="YES",
         generate_latex="NO",
     )
@@ -293,6 +419,7 @@ def main(argv: list[str] | None = None) -> int:
             shared_runtime_dir=(shadow_root / "compiler/shared/runtime").as_posix(),
             strip_from_path=shadow_root.as_posix(),
             warn_logfile=latex_warnings_log.as_posix(),
+            project_number=_project_number_for_latex(),
             generate_xml="NO",
             generate_latex="YES",
         )
@@ -316,6 +443,9 @@ def main(argv: list[str] | None = None) -> int:
         render_compat_redirect_pages(xml_dir, markdown_render_root, html_dir, templates_dir)
     if latex_enabled:
         normalize_latex_site(xml_dir, doxygen_root / "latex")
+
+    undocumented_functions = _collect_undocumented_functions(xml_dir)
+    _write_undocumented_functions_report(undocumented_functions_report, undocumented_functions)
 
     warning_count = _warnings_count(xml_warnings_log) + _warnings_count(latex_warnings_log)
     if args.strict:

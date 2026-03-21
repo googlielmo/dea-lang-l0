@@ -1,4 +1,5 @@
 PROJECT_NAME           = "Dea/L0 API"
+PROJECT_NUMBER         = "{{ project_number }}"
 OUTPUT_DIRECTORY       = "{{ output_directory }}"
 INPUT                  = \
     "{{ mainpage }}" \

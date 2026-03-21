@@ -213,6 +213,404 @@ The documentation for this struct was generated from the following file:
     assert r"Diagnostic::\+phase" not in page
 
 
+def test_normalize_latex_site_recovers_l0_function_declarations_from_source(tmp_path: Path, monkeypatch) -> None:
+    xml_dir = tmp_path / "xml"
+    xml_dir.mkdir()
+    latex_dir = tmp_path / "latex"
+    latex_dir.mkdir()
+    source_path = tmp_path / "compiler/stage2_l0/src/parser.l0"
+    source_path.parent.mkdir(parents=True, exist_ok=True)
+    source_path.write_text(
+        """module parser;
+func parse_diag_count(self: ParseResult*) -> int {
+    return 0;
+}
+""",
+        encoding="utf-8",
+    )
+
+    (xml_dir / "parser_8l0.xml").write_text(
+        """<?xml version='1.0' encoding='UTF-8' standalone='no'?>
+<doxygen>
+    <compounddef id="parser_8l0" kind="file" language="C++">
+      <compoundname>parser.l0</compoundname>
+      <sectiondef kind="func">
+      <memberdef kind="function" id="parser_8l0_1a1" prot="public">
+        <name>parse_diag_count</name>
+        <location file="compiler/stage2_l0/src/parser.l0" line="2" declline="2" />
+      </memberdef>
+    </sectiondef>
+    <location file="compiler/stage2_l0/src/parser.l0" line="1" />
+  </compounddef>
+</doxygen>
+""",
+        encoding="utf-8",
+    )
+
+    (latex_dir / "parser_8l0.tex").write_text(
+        """\\doxysection{compiler/stage2_l0/src/parser.l0 File Reference}
+\\hypertarget{parser_8l0}{}\\label{parser_8l0}\\index{compiler/stage2_l0/src/parser.l0@{compiler/stage2_l0/src/parser.l0}}
+\\doxysubsubsection*{Functions}
+\\begin{DoxyCompactItemize}
+\\item
+int \\doxymbox{\\hyperlink{parser_8l0_a1}{parse\\+_diag\\+_count}} (\\begin{DoxyParamCaption}\\item[{\\doxymbox{\\hyperlink{struct_parse_result}{Parse\\+Result}}\\texorpdfstring{$\\ast$}{*}}]{self}{}\\end{DoxyParamCaption})
+\\end{DoxyCompactItemize}
+\\doxysubsection{Function Documentation}
+\\Hypertarget{parser_8l0_a1}\\index{parser.l0@{parser.l0}!parse\\_diag\\_count@{parse\\_diag\\_count}}
+\\index{parse\\_diag\\_count@{parse\\_diag\\_count}!parser.l0@{parser.l0}}
+\\doxysubsubsection{\\texorpdfstring{parse\\_diag\\_count()}{parse\\_diag\\_count()}}
+{\\footnotesize\\ttfamily \\label{parser_8l0_a1}
+int parse\\+_diag\\+_count (\\begin{DoxyParamCaption}\\item[{\\doxymbox{\\hyperlink{struct_parse_result}{Parse\\+Result}}\\texorpdfstring{$\\ast$}{*}}]{self}{}\\end{DoxyParamCaption})}
+""",
+        encoding="utf-8",
+    )
+
+    monkeypatch.chdir(tmp_path)
+    normalize_latex_site(xml_dir, latex_dir)
+
+    page = (latex_dir / "parser_8l0.tex").read_text(encoding="utf-8")
+    assert (
+        r"func \doxymbox{\hyperlink{parser_8l0_a1}{parse\+_diag\+_count}}"
+        r"(self: ParseResult\texorpdfstring{$\ast$}{*}) \texorpdfstring{$\rightarrow$}{->} int"
+    ) in page
+    assert r"func parse\_diag\_count(self: ParseResult\texorpdfstring{$\ast$}{*}) \texorpdfstring{$\rightarrow$}{->} int" in page
+
+
+def test_normalize_latex_site_recovers_documented_l0_function_declarations_from_source(
+    tmp_path: Path, monkeypatch
+) -> None:
+    xml_dir = tmp_path / "xml"
+    xml_dir.mkdir()
+    latex_dir = tmp_path / "latex"
+    latex_dir.mkdir()
+    source_path = tmp_path / "compiler/stage2_l0/src/symbols.l0"
+    source_path.parent.mkdir(parents=True, exist_ok=True)
+    source_path.write_text(
+        """module symbols;
+/**
+ * Free a symbol and any owned resolved type.
+ *
+ * @param self Symbol to free.
+ */
+func symbol_free(self: Symbol*) {
+    drop self;
+}
+""",
+        encoding="utf-8",
+    )
+
+    (xml_dir / "symbols_8l0.xml").write_text(
+        """<?xml version='1.0' encoding='UTF-8' standalone='no'?>
+<doxygen>
+    <compounddef id="symbols_8l0" kind="file" language="C++">
+      <compoundname>symbols.l0</compoundname>
+      <sectiondef kind="func">
+      <memberdef kind="function" id="symbols_8l0_1a1" prot="public">
+        <name>symbol_free</name>
+        <location file="compiler/stage2_l0/src/symbols.l0" line="6" declline="6" />
+      </memberdef>
+    </sectiondef>
+    <location file="compiler/stage2_l0/src/symbols.l0" line="1" />
+  </compounddef>
+</doxygen>
+""",
+        encoding="utf-8",
+    )
+
+    (latex_dir / "symbols_8l0.tex").write_text(
+        """\\doxysection{compiler/stage2_l0/src/symbols.l0 File Reference}
+\\hypertarget{symbols_8l0}{}\\label{symbols_8l0}\\index{compiler/stage2_l0/src/symbols.l0@{compiler/stage2_l0/src/symbols.l0}}
+\\doxysubsubsection*{Functions}
+\\begin{DoxyCompactItemize}
+\\item
+void \\doxymbox{\\hyperlink{symbols_8l0_a1}{symbol\\+_free}} (\\begin{DoxyParamCaption}\\item[{\\doxymbox{\\hyperlink{struct_symbol}{Symbol}}\\texorpdfstring{$\\ast$}{*}}]{self}{}\\end{DoxyParamCaption})
+\\begin{DoxyCompactList}\\small\\item\\em Free a symbol and any owned resolved type. \\end{DoxyCompactList}
+\\end{DoxyCompactItemize}
+\\doxysubsection{Function Documentation}
+\\Hypertarget{symbols_8l0_a1}\\index{symbols.l0@{symbols.l0}!symbol\\_free@{symbol\\_free}}
+\\index{symbol\\_free@{symbol\\_free}!symbols.l0@{symbols.l0}}
+\\doxysubsubsection{\\texorpdfstring{symbol\\_free()}{symbol\\_free()}}
+{\\footnotesize \\ttfamily \\label{symbols_8l0_a1}
+void symbol\\+_free (\\begin{DoxyParamCaption}\\item[{\\doxymbox{\\hyperlink{struct_symbol}{Symbol}}\\texorpdfstring{$\\ast$}{*}}]{self}{}\\end{DoxyParamCaption})}
+
+Free a symbol and any owned resolved type.
+""",
+        encoding="utf-8",
+    )
+
+    monkeypatch.chdir(tmp_path)
+    normalize_latex_site(xml_dir, latex_dir)
+
+    page = (latex_dir / "symbols_8l0.tex").read_text(encoding="utf-8")
+    assert r"func \doxymbox{\hyperlink{symbols_8l0_a1}{symbol\+_free}}(self: Symbol\texorpdfstring{$\ast$}{*})" in page
+    assert r"func symbol\_free(self: Symbol\texorpdfstring{$\ast$}{*})" in page
+    assert r"void symbol\+\_free (\begin{DoxyParamCaption}" not in page
+
+
+def test_normalize_latex_site_recovers_l0_function_details_when_xml_and_latex_ids_differ(
+    tmp_path: Path, monkeypatch
+) -> None:
+    xml_dir = tmp_path / "xml"
+    xml_dir.mkdir()
+    latex_dir = tmp_path / "latex"
+    latex_dir.mkdir()
+    source_path = tmp_path / "compiler/stage2_l0/src/symbols.l0"
+    source_path.parent.mkdir(parents=True, exist_ok=True)
+    source_path.write_text(
+        """module symbols;
+func symbol_create(name: string, kind: SymbolKind, module_name: string, owner_name: string, decl_ptr: void*, span: Span) -> Symbol* {
+    return null;
+}
+""",
+        encoding="utf-8",
+    )
+
+    (xml_dir / "symbols_8l0.xml").write_text(
+        """<?xml version='1.0' encoding='UTF-8' standalone='no'?>
+<doxygen>
+    <compounddef id="symbols_8l0" kind="file" language="C++">
+      <compoundname>symbols.l0</compoundname>
+      <sectiondef kind="func">
+      <memberdef kind="function" id="symbols_8l0_1axmlid" prot="public">
+        <name>symbol_create</name>
+        <location file="compiler/stage2_l0/src/symbols.l0" line="2" declline="2" />
+      </memberdef>
+    </sectiondef>
+    <location file="compiler/stage2_l0/src/symbols.l0" line="1" />
+  </compounddef>
+</doxygen>
+""",
+        encoding="utf-8",
+    )
+
+    (latex_dir / "symbols_8l0.tex").write_text(
+        """\\doxysection{compiler/stage2_l0/src/symbols.l0 File Reference}
+\\hypertarget{symbols_8l0}{}\\label{symbols_8l0}\\index{compiler/stage2_l0/src/symbols.l0@{compiler/stage2_l0/src/symbols.l0}}
+\\doxysubsection{Function Documentation}
+\\Hypertarget{symbols_8l0_adifferentlatexid}\\index{symbols.l0@{symbols.l0}!symbol\\_create@{symbol\\_create}}
+\\index{symbol\\_create@{symbol\\_create}!symbols.l0@{symbols.l0}}
+\\doxysubsubsection{\\texorpdfstring{symbol\\_create()}{symbol\\_create()}}
+{\\footnotesize\\ttfamily \\label{symbols_8l0_adifferentlatexid}
+\\doxymbox{\\hyperlink{struct_symbol}{Symbol}}\\texorpdfstring{$\\ast$}{*} symbol\\_create (\\begin{DoxyParamCaption}\\item[{string}]{name}{, }\\item[{SymbolKind}]{kind}{, }\\item[{string}]{module\\_name}{, }\\item[{string}]{owner\\_name}{, }\\item[{void \\texorpdfstring{$\\ast$}{*}}]{decl\\_ptr}{, }\\item[{\\doxymbox{\\hyperlink{struct_span}{Span}}}]{span}{}\\end{DoxyParamCaption})}
+""",
+        encoding="utf-8",
+    )
+
+    monkeypatch.chdir(tmp_path)
+    normalize_latex_site(xml_dir, latex_dir)
+
+    page = (latex_dir / "symbols_8l0.tex").read_text(encoding="utf-8")
+    assert (
+        r"func symbol\_create(name: string, kind: SymbolKind, module\_name: string, owner\_name: string, "
+        r"decl\_ptr: void\texorpdfstring{$\ast$}{*}, span: Span) \texorpdfstring{$\rightarrow$}{->} "
+        r"Symbol\texorpdfstring{$\ast$}{*}"
+    ) in page
+    assert r"Symbol}\texorpdfstring{$\ast$}{*} symbol\_create (\begin{DoxyParamCaption}" not in page
+
+
+def test_normalize_latex_site_replaces_detail_when_label_outside_block(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """Doxygen <= 1.9.x places \\label before the {\\footnotesize} block."""
+    xml_dir = tmp_path / "xml"
+    xml_dir.mkdir()
+    latex_dir = tmp_path / "latex"
+    latex_dir.mkdir()
+    source_path = tmp_path / "compiler/stage2_l0/src/symbols.l0"
+    source_path.parent.mkdir(parents=True, exist_ok=True)
+    source_path.write_text(
+        """module symbols;
+func symbol_free(self: Symbol*) {
+    drop self;
+}
+""",
+        encoding="utf-8",
+    )
+
+    (xml_dir / "symbols_8l0.xml").write_text(
+        """<?xml version='1.0' encoding='UTF-8' standalone='no'?>
+<doxygen>
+    <compounddef id="symbols_8l0" kind="file" language="C++">
+      <compoundname>symbols.l0</compoundname>
+      <sectiondef kind="func">
+      <memberdef kind="function" id="symbols_8l0_1a1" prot="public">
+        <name>symbol_free</name>
+        <location file="compiler/stage2_l0/src/symbols.l0" line="2" declline="2" />
+      </memberdef>
+    </sectiondef>
+    <location file="compiler/stage2_l0/src/symbols.l0" line="1" />
+  </compounddef>
+</doxygen>
+""",
+        encoding="utf-8",
+    )
+
+    # Doxygen 1.9.x: \label is on a separate line BEFORE {\footnotesize}
+    (latex_dir / "symbols_8l0.tex").write_text(
+        """\\doxysection{compiler/stage2_l0/src/symbols.l0 File Reference}
+\\hypertarget{symbols_8l0}{}\\label{symbols_8l0}\\index{compiler/stage2_l0/src/symbols.l0@{compiler/stage2_l0/src/symbols.l0}}
+\\doxysubsubsection*{Functions}
+\\begin{DoxyCompactItemize}
+\\item
+void \\doxymbox{\\hyperlink{symbols_8l0_a1}{symbol\\+_free}} (\\begin{DoxyParamCaption}\\item[{\\doxymbox{\\hyperlink{struct_symbol}{Symbol}}\\texorpdfstring{$\\ast$}{*}}]{self}{}\\end{DoxyParamCaption})
+\\begin{DoxyCompactList}\\small\\item\\em Free a symbol and any owned resolved type. \\end{DoxyCompactList}
+\\end{DoxyCompactItemize}
+\\doxysubsection{Function Documentation}
+\\Hypertarget{symbols_8l0_a1}\\index{symbols.l0@{symbols.l0}!symbol\\_free@{symbol\\_free}}
+\\index{symbol\\_free@{symbol\\_free}!symbols.l0@{symbols.l0}}
+\\doxysubsubsection{\\texorpdfstring{symbol\\_free()}{symbol\\_free()}}
+\\label{symbols_8l0_a1}
+{\\footnotesize\\ttfamily void symbol\\+_free (\\begin{DoxyParamCaption}\\item[{\\doxymbox{\\hyperlink{struct_symbol}{Symbol}}\\texorpdfstring{$\\ast$}{*}}]{self}{}\\end{DoxyParamCaption})}
+
+Free a symbol and any owned resolved type.
+""",
+        encoding="utf-8",
+    )
+
+    monkeypatch.chdir(tmp_path)
+    normalize_latex_site(xml_dir, latex_dir)
+
+    page = (latex_dir / "symbols_8l0.tex").read_text(encoding="utf-8")
+    # Summary should be replaced
+    assert r"func \doxymbox{\hyperlink{symbols_8l0_a1}{symbol\+_free}}(self: Symbol\texorpdfstring{$\ast$}{*})" in page
+    # Detail should be replaced — no C-style signature remaining
+    assert r"func symbol\_free(self: Symbol\texorpdfstring{$\ast$}{*})" in page
+    assert r"void symbol\+_free (\begin{DoxyParamCaption}" not in page
+
+
+def test_normalize_latex_site_recovers_l0_top_level_let_from_source(tmp_path: Path, monkeypatch) -> None:
+    xml_dir = tmp_path / "xml"
+    xml_dir.mkdir()
+    latex_dir = tmp_path / "latex"
+    latex_dir.mkdir()
+    source_path = tmp_path / "compiler/shared/l0/stdlib/std/hashset.l0"
+    source_path.parent.mkdir(parents=True, exist_ok=True)
+    source_path.write_text(
+        """module std.hashset;
+let HS_EMPTY: byte = 0;
+""",
+        encoding="utf-8",
+    )
+
+    (xml_dir / "hashset_8l0.xml").write_text(
+        """<?xml version='1.0' encoding='UTF-8' standalone='no'?>
+<doxygen>
+    <compounddef id="hashset_8l0" kind="file" language="C++">
+      <compoundname>hashset.l0</compoundname>
+      <sectiondef kind="var">
+      <memberdef kind="variable" id="hashset_8l0_1a1" prot="public">
+        <name>HS_EMPTY</name>
+        <location file="compiler/shared/l0/stdlib/std/hashset.l0" line="2" />
+      </memberdef>
+    </sectiondef>
+    <location file="compiler/shared/l0/stdlib/std/hashset.l0" line="1" />
+  </compounddef>
+</doxygen>
+""",
+        encoding="utf-8",
+    )
+
+    (latex_dir / "hashset_8l0.tex").write_text(
+        """\\doxysection{compiler/shared/l0/stdlib/std/hashset.l0 File Reference}
+\\hypertarget{hashset_8l0}{}\\label{hashset_8l0}\\index{compiler/shared/l0/stdlib/std/hashset.l0@{compiler/shared/l0/stdlib/std/hashset.l0}}
+\\doxysubsubsection*{Variables}
+\\begin{DoxyCompactItemize}
+\\item
+let \\doxymbox{\\hyperlink{hashset_8l0_a1}{HS\\+_\\+EMPTY}}
+\\end{DoxyCompactItemize}
+\\doxysubsection{Variable Documentation}
+\\Hypertarget{hashset_8l0_a1}\\index{hashset.l0@{hashset.l0}!HS\\_EMPTY@{HS\\_EMPTY}}
+\\index{HS\\_EMPTY@{HS\\_EMPTY}!hashset.l0@{hashset.l0}}
+\\doxysubsubsection{\\texorpdfstring{HS\\_EMPTY}{HS\\_EMPTY}}
+{\\footnotesize \\ttfamily \\label{hashset_8l0_a1}
+let HS\\+_\\+EMPTY}
+""",
+        encoding="utf-8",
+    )
+
+    monkeypatch.chdir(tmp_path)
+    normalize_latex_site(xml_dir, latex_dir)
+
+    page = (latex_dir / "hashset_8l0.tex").read_text(encoding="utf-8")
+    assert r"let \doxymbox{\hyperlink{hashset_8l0_a1}{HS\+_\+EMPTY}}: byte = 0" in page
+    assert r"let HS\_EMPTY: byte = 0" in page
+
+
+def test_normalize_latex_site_recovers_nullable_l0_struct_fields_from_source(tmp_path: Path, monkeypatch) -> None:
+    xml_dir = tmp_path / "xml"
+    xml_dir.mkdir()
+    latex_dir = tmp_path / "latex"
+    latex_dir.mkdir()
+    source_path = tmp_path / "compiler/stage2_l0/src/ast.l0"
+    source_path.parent.mkdir(parents=True, exist_ok=True)
+    source_path.write_text(
+        """module ast;
+struct TypeRef {
+    module_path: VectorString*?;
+}
+""",
+        encoding="utf-8",
+    )
+
+    (xml_dir / "ast_8l0.xml").write_text(
+        """<?xml version='1.0' encoding='UTF-8' standalone='no'?>
+<doxygen>
+  <compounddef id="ast_8l0" kind="file" language="C++">
+    <compoundname>ast.l0</compoundname>
+    <location file="compiler/stage2_l0/src/ast.l0" line="1" />
+  </compounddef>
+</doxygen>
+""",
+        encoding="utf-8",
+    )
+    (xml_dir / "struct_type_ref.xml").write_text(
+        """<?xml version='1.0' encoding='UTF-8' standalone='no'?>
+<doxygen>
+    <compounddef id="struct_type_ref" kind="struct" language="C++">
+      <compoundname>TypeRef</compoundname>
+      <sectiondef kind="public-attrib">
+      <memberdef kind="variable" id="struct_type_ref_1a1" prot="public">
+        <name>module_path</name>
+        <location file="compiler/stage2_l0/src/ast.l0" line="3" />
+      </memberdef>
+    </sectiondef>
+    <location file="compiler/stage2_l0/src/ast.l0" line="2" />
+  </compounddef>
+</doxygen>
+""",
+        encoding="utf-8",
+    )
+
+    (latex_dir / "struct_type_ref.tex").write_text(
+        """\\doxysection{TypeRef Struct Reference}
+\\hypertarget{struct_type_ref}{}\\label{struct_type_ref}\\index{TypeRef@{TypeRef}}
+\\doxysubsubsection*{Public Attributes}
+\\begin{DoxyCompactItemize}
+\\item
+\\doxymbox{\\hyperlink{vector_8l0_a1}{Vector\\+String}} \\texorpdfstring{$\\ast$}{*} \\doxymbox{\\hyperlink{struct_type_ref_a1}{module\\+_path}}
+\\end{DoxyCompactItemize}
+\\doxysubsection{Detailed Description}
+Body.
+\\label{doc-variable-members}
+\\Hypertarget{struct_type_ref_doc-variable-members}
+\\doxysubsection{Member Data Documentation}
+{\\footnotesize\\ttfamily \\label{struct_type_ref_a1}
+\\doxymbox{\\hyperlink{vector_8l0_a1}{Vector\\+String}} TypeRef::\\+module\\+_path}
+""",
+        encoding="utf-8",
+    )
+
+    monkeypatch.chdir(tmp_path)
+    normalize_latex_site(xml_dir, latex_dir)
+
+    page = (latex_dir / "struct_type_ref.tex").read_text(encoding="utf-8")
+    assert (
+        r"\doxymbox{\hyperlink{struct_type_ref_a1}{module\+_path}}: "
+        r"VectorString\texorpdfstring{$\ast$}{*}?"
+    ) in page
+    assert r"module\_path: VectorString\texorpdfstring{$\ast$}{*}?" in page
+
+
 def test_normalize_latex_site_expands_l0_signature_link_text(tmp_path: Path, monkeypatch) -> None:
     xml_dir = tmp_path / "xml"
     xml_dir.mkdir()
@@ -387,6 +785,14 @@ enum TokenType {
     (latex_dir / "tokens_8l0.tex").write_text(
         """\\doxysection{compiler/stage2_l0/src/tokens.l0 File Reference}
 \\hypertarget{tokens_8l0}{}\\label{tokens_8l0}\\index{compiler/stage2_l0/src/tokens.l0@{compiler/stage2_l0/src/tokens.l0}}
+\\doxysubsubsection*{Enumerations}
+\\begin{DoxyCompactItemize}
+\\item
+enum \\doxymbox{\\hyperlink{tokens_8l0_a}{Token\\+Type}} \\{ \\newline
+\\doxymbox{\\hyperlink{tokens_8l0_a1}{TT\\+_EOF}}
+, \\doxymbox{\\hyperlink{tokens_8l0_a2}{TT\\+_UNDERSCORE}} =(text: string)
+\\}
+\\begin{DoxyCompactList}\\small\\item\\em Defines the TokenType enumeration. \\end{DoxyCompactList}\\end{DoxyCompactItemize}
 \\doxysubsubsection{\\texorpdfstring{TokenType}{TokenType}}
 Description.
 \\begin{DoxyEnumFields}[2]{Enumerator}
@@ -400,6 +806,9 @@ Description.
     normalize_latex_site(xml_dir, latex_dir)
 
     page = (latex_dir / "tokens_8l0.tex").read_text(encoding="utf-8")
+    assert r"enum \doxymbox{\hyperlink{tokens_8l0_a}{Token\+Type}}" in page
+    assert r"=(text: string)" not in page
+    assert r"\{ \newline" not in page
     assert r"\textbf{Variants:}\\" in page
     assert r"\texttt{TT\_IDENT(text: string)}" in page
     assert r"\texttt{TT\_INT(text: string, value: int)}" in page
@@ -490,6 +899,44 @@ func demo (x: int) -\\/$>$ bool
     page = (latex_dir / "demo_8l0.tex").read_text(encoding="utf-8")
     assert r"Examples: Foo \texorpdfstring{$\rightarrow$}{->} Bar" in page
     assert r"func demo (x: int) \texorpdfstring{$\rightarrow$}{->} bool" in page
+
+
+def test_normalize_latex_site_uses_double_arrow_symbol_for_fat_arrow_syntax(tmp_path: Path, monkeypatch) -> None:
+    xml_dir = tmp_path / "xml"
+    xml_dir.mkdir()
+    latex_dir = tmp_path / "latex"
+    latex_dir.mkdir()
+    source_path = tmp_path / "compiler/stage2_l0/src/demo.l0"
+    source_path.parent.mkdir(parents=True, exist_ok=True)
+    source_path.write_text("module demo;\n", encoding="utf-8")
+
+    (xml_dir / "demo_8l0.xml").write_text(
+        """<?xml version='1.0' encoding='UTF-8' standalone='no'?>
+<doxygen>
+  <compounddef id="demo_8l0" kind="file" language="C++">
+    <compoundname>demo.l0</compoundname>
+    <location file="compiler/stage2_l0/src/demo.l0" line="1" />
+  </compounddef>
+</doxygen>
+""",
+        encoding="utf-8",
+    )
+
+    (latex_dir / "demo_8l0.tex").write_text(
+        """\\doxysection{compiler/stage2_l0/src/demo.l0 File Reference}
+\\hypertarget{demo_8l0}{}\\label{demo_8l0}\\index{compiler/stage2_l0/src/demo.l0@{compiler/stage2_l0/src/demo.l0}}
+Pattern: Some(value) => { return value; }
+Cleanup: with (let x = create() => free(x)) {}
+""",
+        encoding="utf-8",
+    )
+
+    monkeypatch.chdir(tmp_path)
+    normalize_latex_site(xml_dir, latex_dir)
+
+    page = (latex_dir / "demo_8l0.tex").read_text(encoding="utf-8")
+    assert r"Some(value) \texorpdfstring{$\Rightarrow$}{=>} { return value; }" in page
+    assert r"create() \texorpdfstring{$\Rightarrow$}{=>} free(x)" in page
 
 
 def test_normalize_latex_site_normalizes_prose_arrows_on_non_l0_pages(tmp_path: Path) -> None:

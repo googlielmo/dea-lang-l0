@@ -813,9 +813,22 @@ def test_render_markdown_site_preserves_l0_signature_prefix_and_expands_link_lab
     <compoundname>rt.l0</compoundname>
     <sectiondef kind="func">
       <memberdef kind="function" id="rt_8l0_1a_slice" prot="public" extern="yes">
-        <definition>func rt_string_slice</definition>
-        <argsstring>(s: string, start: int, end: int) -&gt; string</argsstring>
+        <type>string</type>
+        <definition>string rt_string_slice</definition>
+        <argsstring>(string s, int start, int end)</argsstring>
         <name>rt_string_slice</name>
+        <param>
+          <type>string</type>
+          <declname>s</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>start</declname>
+        </param>
+        <param>
+          <type>int</type>
+          <declname>end</declname>
+        </param>
         <location file="compiler/shared/l0/stdlib/sys/rt.l0" line="10" />
       </memberdef>
     </sectiondef>
@@ -832,9 +845,14 @@ def test_render_markdown_site_preserves_l0_signature_prefix_and_expands_link_lab
     <compoundname>unsafe.l0</compoundname>
     <sectiondef kind="func">
       <memberdef kind="function" id="unsafe_8l0_1a_free" prot="public" extern="yes">
-        <definition>func rt_free</definition>
-        <argsstring>(ptr: void*?) -&gt; void</argsstring>
+        <type>void</type>
+        <definition>void rt_free</definition>
+        <argsstring>(void *ptr)</argsstring>
         <name>rt_free</name>
+        <param>
+          <type>void *</type>
+          <declname>ptr</declname>
+        </param>
         <location file="compiler/shared/l0/stdlib/sys/unsafe.l0" line="10" />
       </memberdef>
     </sectiondef>
@@ -856,7 +874,171 @@ def test_render_markdown_site_preserves_l0_signature_prefix_and_expands_link_lab
     rt_page = (output_dir / "compiler/shared/l0/stdlib/sys/rt.md").read_text(encoding="utf-8")
     unsafe_page = (output_dir / "compiler/shared/l0/stdlib/sys/unsafe.md").read_text(encoding="utf-8")
     assert "extern func rt_string_slice(s: string, start: int, end: int) -> string" in rt_page
-    assert "extern func rt_free(ptr: void*?) -> void" in unsafe_page
+    assert "extern func rt_free(ptr: void*) -> void" in unsafe_page
+
+
+def test_render_markdown_site_recovers_nullable_l0_function_signatures_from_source(
+    tmp_path: Path, monkeypatch
+) -> None:
+    xml_dir = tmp_path / "xml"
+    xml_dir.mkdir()
+    output_dir = tmp_path / "markdown"
+    templates_dir = Path(__file__).resolve().parents[4] / "scripts/docs/templates"
+
+    source_path = tmp_path / "compiler/shared/l0/stdlib/sys/unsafe.l0"
+    source_path.parent.mkdir(parents=True, exist_ok=True)
+    source_path.write_text(
+        """module sys.unsafe;
+
+extern func rt_alloc(bytes: int) -> void*?;
+extern func rt_free(ptr: void*?) -> void;
+""",
+        encoding="utf-8",
+    )
+
+    (xml_dir / "unsafe_8l0.xml").write_text(
+        """<?xml version='1.0' encoding='UTF-8' standalone='no'?>
+<doxygen>
+  <compounddef id="unsafe_8l0" kind="file" language="C++">
+    <compoundname>unsafe.l0</compoundname>
+    <sectiondef kind="func">
+      <memberdef kind="function" id="unsafe_8l0_1a_alloc" prot="public" extern="yes">
+        <type>void *</type>
+        <definition>void * rt_alloc</definition>
+        <argsstring>(int bytes)</argsstring>
+        <name>rt_alloc</name>
+        <param>
+          <type>int</type>
+          <declname>bytes</declname>
+        </param>
+        <location file="compiler/shared/l0/stdlib/sys/unsafe.l0" line="3" declline="3" />
+      </memberdef>
+      <memberdef kind="function" id="unsafe_8l0_1a_free" prot="public" extern="yes">
+        <type>void</type>
+        <definition>void rt_free</definition>
+        <argsstring>(void *ptr)</argsstring>
+        <name>rt_free</name>
+        <param>
+          <type>void *</type>
+          <declname>ptr</declname>
+        </param>
+        <location file="compiler/shared/l0/stdlib/sys/unsafe.l0" line="4" declline="4" />
+      </memberdef>
+    </sectiondef>
+    <location file="compiler/shared/l0/stdlib/sys/unsafe.l0" line="1" />
+  </compounddef>
+</doxygen>
+""",
+        encoding="utf-8",
+    )
+
+    monkeypatch.chdir(tmp_path)
+    render_markdown_site(xml_dir, output_dir, templates_dir)
+
+    page = (output_dir / "compiler/shared/l0/stdlib/sys/unsafe.md").read_text(encoding="utf-8")
+    assert "extern func rt_alloc(bytes: int) -> void*?" in page
+    assert "extern func rt_free(ptr: void*?) -> void" in page
+
+
+def test_render_markdown_site_recovers_l0_top_level_let_from_source(tmp_path: Path, monkeypatch) -> None:
+    xml_dir = tmp_path / "xml"
+    xml_dir.mkdir()
+    output_dir = tmp_path / "markdown"
+    templates_dir = Path(__file__).resolve().parents[4] / "scripts/docs/templates"
+
+    source_path = tmp_path / "compiler/shared/l0/stdlib/std/hashset.l0"
+    source_path.parent.mkdir(parents=True, exist_ok=True)
+    source_path.write_text(
+        """module std.hashset;
+
+let HS_EMPTY: byte = 0;
+""",
+        encoding="utf-8",
+    )
+
+    (xml_dir / "hashset_8l0.xml").write_text(
+        """<?xml version='1.0' encoding='UTF-8' standalone='no'?>
+<doxygen>
+  <compounddef id="hashset_8l0" kind="file" language="C++">
+    <compoundname>hashset.l0</compoundname>
+    <sectiondef kind="var">
+      <memberdef kind="variable" id="hashset_8l0_1a_empty" prot="public">
+        <type>let</type>
+        <definition>let HS_EMPTY</definition>
+        <name>HS_EMPTY</name>
+        <location file="compiler/shared/l0/stdlib/std/hashset.l0" line="3" />
+      </memberdef>
+    </sectiondef>
+    <location file="compiler/shared/l0/stdlib/std/hashset.l0" line="1" />
+  </compounddef>
+</doxygen>
+""",
+        encoding="utf-8",
+    )
+
+    monkeypatch.chdir(tmp_path)
+    render_markdown_site(xml_dir, output_dir, templates_dir)
+
+    page = (output_dir / "compiler/shared/l0/stdlib/std/hashset.md").read_text(encoding="utf-8")
+    assert "let HS_EMPTY: byte = 0" in page
+
+
+def test_render_markdown_site_recovers_nullable_l0_struct_fields_from_source(tmp_path: Path, monkeypatch) -> None:
+    xml_dir = tmp_path / "xml"
+    xml_dir.mkdir()
+    output_dir = tmp_path / "markdown"
+    templates_dir = Path(__file__).resolve().parents[4] / "scripts/docs/templates"
+
+    source_path = tmp_path / "compiler/stage2_l0/src/ast.l0"
+    source_path.parent.mkdir(parents=True, exist_ok=True)
+    source_path.write_text(
+        """module ast;
+
+struct TypeRef {
+    module_path: VectorString*?;   // string entries
+}
+""",
+        encoding="utf-8",
+    )
+
+    (xml_dir / "ast_8l0.xml").write_text(
+        """<?xml version='1.0' encoding='UTF-8' standalone='no'?>
+<doxygen>
+  <compounddef id="ast_8l0" kind="file" language="C++">
+    <compoundname>ast.l0</compoundname>
+    <innerstruct refid="struct_type_ref">TypeRef</innerstruct>
+    <location file="compiler/stage2_l0/src/ast.l0" line="1" />
+  </compounddef>
+</doxygen>
+""",
+        encoding="utf-8",
+    )
+    (xml_dir / "struct_type_ref.xml").write_text(
+        """<?xml version='1.0' encoding='UTF-8' standalone='no'?>
+<doxygen>
+  <compounddef id="struct_type_ref" kind="struct" language="C++" prot="public">
+    <compoundname>TypeRef</compoundname>
+    <sectiondef kind="public-attrib">
+      <memberdef kind="variable" id="struct_type_ref_1a_module_path" prot="public">
+        <type>VectorString *</type>
+        <definition>VectorString * TypeRef::module_path</definition>
+        <name>module_path</name>
+        <qualifiedname>TypeRef::module_path</qualifiedname>
+        <location file="compiler/stage2_l0/src/ast.l0" line="4" />
+      </memberdef>
+    </sectiondef>
+    <location file="compiler/stage2_l0/src/ast.l0" line="3" bodystart="3" bodyend="5" />
+  </compounddef>
+</doxygen>
+""",
+        encoding="utf-8",
+    )
+
+    monkeypatch.chdir(tmp_path)
+    render_markdown_site(xml_dir, output_dir, templates_dir)
+
+    page = (output_dir / "compiler/stage2_l0/src/ast.md").read_text(encoding="utf-8")
+    assert "module_path: VectorString*?" in page
 
 
 def test_render_markdown_site_uses_display_language_mapping_for_l0(tmp_path: Path) -> None:
@@ -1217,10 +1399,18 @@ def test_render_markdown_site_normalizes_l0_function_signature_spacing(tmp_path:
     <compoundname>driver.l0</compoundname>
     <sectiondef kind="func">
       <memberdef kind="function" id="driver_8l0_1a" prot="public">
-        <type>func</type>
-        <definition>func dr_vs_has</definition>
-        <argsstring>(items:VectorString *, module_name:string) -&gt; bool</argsstring>
+        <type>bool</type>
+        <definition>bool dr_vs_has</definition>
+        <argsstring>(VectorString *items, string module_name)</argsstring>
         <name>dr_vs_has</name>
+        <param>
+          <type>VectorString *</type>
+          <declname>items</declname>
+        </param>
+        <param>
+          <type>string</type>
+          <declname>module_name</declname>
+        </param>
         <briefdescription><para>Check whether a module name is present.</para></briefdescription>
         <location file="compiler/stage2_l0/src/driver.l0" line="1" />
       </memberdef>
