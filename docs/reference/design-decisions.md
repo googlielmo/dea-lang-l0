@@ -1,6 +1,6 @@
 # L0 Language and Runtime Design Decisions
 
-Version: 2026-03-01
+Version: 2026-03-21
 
 This document records rationale and policy decisions.
 
@@ -126,9 +126,8 @@ Policy:
 - `byte` is 8-bit semantics,
 - runtime helpers enforce defined behavior for overflow/division/mod edge cases.
 
-Implementation details of generated helpers and typedef mapping are canonical
-in [reference/c-backend-design.md](c-backend-design.md) and
-`compiler/shared/runtime/l0_runtime.h`.
+Implementation details of generated helpers and typedef mapping are canonical in
+[reference/c-backend-design.md](c-backend-design.md) and `compiler/shared/runtime/l0_runtime.h`.
 
 ## 8. Toolchain and Portability Policy
 
@@ -145,14 +144,14 @@ Operational backend rules belong in [reference/c-backend-design.md](c-backend-de
 Planned direction:
 
 1. Keep Stage 1 minimal and stable.
-2. Expand language features in Stage 2 when semantics are decision-complete.
+2. Expand language features in Dea/L1 when semantics are decision-complete.
 3. Continue keeping unsafe/platform-specific details behind explicit runtime boundaries.
 
----
+______________________________________________________________________
 
-# Addendum: Planned Stage 2 Language Extensions
+# Addendum: Planned Dea/L1 Language Extensions
 
-These are design intentions, not guaranteed implementation commitments.
+These are design intentions for Dea/L1, not guaranteed implementation commitments.
 
 ## A. Bitwise operators for `int`
 

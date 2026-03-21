@@ -3,7 +3,7 @@
 ## Windows developer activation and install-prefix workflow
 
 - Date: 2026-03-13
-- Status: Implemented
+- Status: Closed
 - Title: Add a usable Windows workflow for `install-dev-*`, `use-dev-*`, and `install`
 - Kind: Feature
 - Severity: Medium

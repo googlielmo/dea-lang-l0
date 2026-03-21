@@ -1,6 +1,6 @@
 # L0 Project Status
 
-Version: 2026-03-20
+Version: 2026-03-21
 
 This document summarizes what is implemented in this repository today and what remains open.
 
@@ -79,5 +79,6 @@ These remain true in the current implementation:
 
 Near-term project direction, consistent with current docs/code:
 
-1. Prepare the `v0.9` release across the existing install, dist, and release-packaging workflows.
-2. Publish the generated reference documentation on GitHub Pages as part of that release-oriented workflow.
+1. The `v0.9.0` release is the current milestone, covering the existing install, dist, and release-packaging workflows.
+2. Publish the generated reference documentation on GitHub Pages as part of the release workflow.
+3. Bitwise operators, top-level `const`, and further language extensions are deferred to Dea/L1.
