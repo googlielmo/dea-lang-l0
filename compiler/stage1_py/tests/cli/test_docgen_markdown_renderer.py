@@ -874,7 +874,7 @@ def test_render_markdown_site_preserves_l0_signature_prefix_and_expands_link_lab
     rt_page = (output_dir / "compiler/shared/l0/stdlib/sys/rt.md").read_text(encoding="utf-8")
     unsafe_page = (output_dir / "compiler/shared/l0/stdlib/sys/unsafe.md").read_text(encoding="utf-8")
     assert "extern func rt_string_slice(s: string, start: int, end: int) -> string" in rt_page
-    assert "extern func rt_free(ptr: void*) -> void" in unsafe_page
+    assert "extern func rt_free(ptr: void*?) -> void" in unsafe_page
 
 
 def test_render_markdown_site_recovers_nullable_l0_function_signatures_from_source(
