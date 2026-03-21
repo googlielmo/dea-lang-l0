@@ -7,7 +7,41 @@ on:
   push:
     branches:
       - main
+    paths:
+      - .github/workflows/ci.yml
+      - Makefile
+      - pyproject.toml
+      - uv.lock
+      - VERSION
+      - compiler/stage1_py/**
+      - compiler/stage2_l0/**
+      - compiler/shared/**
+      - examples/**
+      - scripts/build-stage2-l0c.sh
+      - scripts/build_stage2_l0c.py
+      - scripts/dist_tools_lib.py
+      - scripts/gen_dist_tools.py
+      - scripts/l0c
+      - scripts/l0c.cmd
+      - tests/**
   pull_request:
+    paths:
+      - .github/workflows/ci.yml
+      - Makefile
+      - pyproject.toml
+      - uv.lock
+      - VERSION
+      - compiler/stage1_py/**
+      - compiler/stage2_l0/**
+      - compiler/shared/**
+      - examples/**
+      - scripts/build-stage2-l0c.sh
+      - scripts/build_stage2_l0c.py
+      - scripts/dist_tools_lib.py
+      - scripts/gen_dist_tools.py
+      - scripts/l0c
+      - scripts/l0c.cmd
+      - tests/**
   workflow_dispatch:
     inputs:
       platform:
