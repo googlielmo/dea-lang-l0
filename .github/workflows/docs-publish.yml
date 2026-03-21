@@ -17,7 +17,7 @@ on:
       publish_blog:
         description: "Sync generated API pages into the Chirpy blog repo"
         required: true
-        default: true
+        default: false
         type: boolean
       upload_pdf_to_release:
         description: "Upload refman.pdf to an existing release"

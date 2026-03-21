@@ -14,6 +14,7 @@ from pathlib import Path
 SECTION_HEADINGS = {"## Stage 1": "stage1", "## Stage 2": "stage2", "## Shared": "shared"}
 LINK_RE = re.compile(r"(?<!!)\[([^\]]+)\]\(([^)]+)\)")
 SOURCE_LINE_RE = re.compile(r"^Source:\s*`([^`]+)`\s*$", re.MULTILINE)
+ANCHOR_TAG_RE = re.compile(r"<a\s+(?:id|name)=['\"]([^'\"]+)['\"]\s*>\s*</a>")
 
 
 @dataclass(frozen=True)
@@ -103,6 +104,12 @@ def rewrite_markdown_links(markdown_text: str, current_rel_path: Path, docs_pref
     return "\n".join(rewritten_lines).rstrip() + "\n"
 
 
+def rewrite_anchor_targets(markdown_text: str) -> str:
+    """Rewrite anchor-only HTML tags to fragment-safe non-link elements."""
+
+    return ANCHOR_TAG_RE.sub(lambda match: f'<span id="{match.group(1)}"></span>', markdown_text)
+
+
 def parse_markdown_index(index_text: str) -> dict[str, list[tuple[str, str]]]:
     """Return grouped entries from the generated markdown index."""
     groups: dict[str, list[tuple[str, str]]] = {"stage1": [], "stage2": [], "shared": []}
@@ -155,6 +162,7 @@ def export_markdown_tree(
 
         body = _strip_leading_h1(raw_text)
         body = rewrite_markdown_links(body, rel_path, docs_prefix)
+        body = rewrite_anchor_targets(body)
 
         front_matter = "\n".join(
             [

@@ -4,7 +4,13 @@
 
 from pathlib import Path
 
-from compiler.docgen.l0_docgen_blog import export_markdown_tree, parse_args, parse_markdown_index, rewrite_markdown_links
+from compiler.docgen.l0_docgen_blog import (
+    export_markdown_tree,
+    parse_args,
+    parse_markdown_index,
+    rewrite_anchor_targets,
+    rewrite_markdown_links,
+)
 
 
 def test_parse_markdown_index_groups_entries() -> None:
@@ -71,6 +77,15 @@ def test_parse_args_defaults_blog_tab_order_to_five(tmp_path: Path) -> None:
     assert args.tab_order == 5
 
 
+def test_rewrite_anchor_targets_replaces_anchor_only_tags() -> None:
+    text = '<a id="function-demo"></a>\n<a name="struct-demo"></a>\n'
+    rewritten = rewrite_anchor_targets(text)
+    assert '<span id="function-demo"></span>' in rewritten
+    assert '<span id="struct-demo"></span>' in rewritten
+    assert "<a id=" not in rewritten
+    assert "<a name=" not in rewritten
+
+
 def test_export_markdown_tree_generates_chirpy_pages_and_tab(tmp_path: Path) -> None:
     input_dir = tmp_path / "markdown"
     output_dir = tmp_path / "blog-export"
@@ -97,6 +112,8 @@ def test_export_markdown_tree_generates_chirpy_pages_and_tab(tmp_path: Path) -> 
 
 Source: `compiler/stage1_py/demo.py`
 Language: `Python`
+
+<a id="function-demo"></a>
 
 Demo summary.
 
@@ -135,6 +152,8 @@ Token docs.
     assert 'title: "demo.py"' in page
     assert "permalink: /api/reference/compiler/stage1_py/demo/" in page
     assert not page.splitlines()[6].startswith("# ")
+    assert '<span id="function-demo"></span>' in page
+    assert '<a id="function-demo"></a>' not in page
     assert "[tokens]({{ '/api/reference/compiler/stage2_l0/src/tokens/' | relative_url }}#enum-tokentype)" in page
 
     assert 'title: "API"' in tab
