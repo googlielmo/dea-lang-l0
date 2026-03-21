@@ -3,7 +3,7 @@
 ## Chirpy blog export link-target parity
 
 - Date: 2026-03-21
-- Status: In Progress
+- Status: Closed
 - Title: Fix Chirpy blog export fragment-target mismatches and operational defaults for the API sync workflow
 - Kind: Bug Fix
 - Severity: High (published API section blocked by blog CI failure)
