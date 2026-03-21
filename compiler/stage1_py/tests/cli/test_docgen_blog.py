@@ -6,6 +6,7 @@ from pathlib import Path
 
 from compiler.docgen.l0_docgen_blog import (
     export_markdown_tree,
+    file_anchor_for_source_path,
     parse_args,
     parse_markdown_index,
     rewrite_anchor_targets,
@@ -75,6 +76,11 @@ def test_rewrite_markdown_links_rewrites_internal_targets_and_preserves_anchors(
 def test_parse_args_defaults_blog_tab_order_to_five(tmp_path: Path) -> None:
     args = parse_args(["--input", str(tmp_path / "in"), "--output", str(tmp_path / "out")])
     assert args.tab_order == 5
+
+
+def test_file_anchor_for_source_path_matches_markdown_renderer_shape() -> None:
+    assert file_anchor_for_source_path("compiler/shared/l0/stdlib/std/io.l0") == "file-iol0"
+    assert file_anchor_for_source_path("compiler/stage1_py/l0_paths.py") == "file-l0_pathspy"
 
 
 def test_rewrite_anchor_targets_replaces_anchor_only_tags() -> None:
@@ -152,6 +158,7 @@ Token docs.
     assert 'title: "demo.py"' in page
     assert "permalink: /api/reference/compiler/stage1_py/demo/" in page
     assert not page.splitlines()[6].startswith("# ")
+    assert '<span id="file-demopy"></span>' in page
     assert '<span id="function-demo"></span>' in page
     assert '<a id="function-demo"></a>' not in page
     assert "[tokens]({{ '/api/reference/compiler/stage2_l0/src/tokens/' | relative_url }}#enum-tokentype)" in page

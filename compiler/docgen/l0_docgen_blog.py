@@ -45,6 +45,21 @@ def _normalize_docs_prefix(prefix: str) -> str:
     return prefix.strip("/").replace("\\", "/")
 
 
+def _heading_slug(value: str) -> str:
+    """Return the same fragment slug shape used by the markdown renderer."""
+
+    normalized = value.lower().replace("`", "").replace(":", "")
+    normalized = re.sub(r"[^a-z0-9_\-\s]+", "", normalized)
+    normalized = re.sub(r"[\s\-]+", "-", normalized).strip("-")
+    return normalized or "section"
+
+
+def file_anchor_for_source_path(source_path: str) -> str:
+    """Return the file-compound anchor expected by generated cross-page links."""
+
+    return _heading_slug(f"File `{Path(source_path).name}`")
+
+
 def _source_path_from_markdown(markdown_text: str, fallback_rel_path: Path) -> str:
     match = SOURCE_LINE_RE.search(markdown_text)
     if match:
@@ -177,7 +192,8 @@ def export_markdown_tree(
         )
         destination = destination_root / rel_path
         destination.parent.mkdir(parents=True, exist_ok=True)
-        destination.write_text(front_matter + body, encoding="utf-8")
+        file_anchor = f'<span id="{file_anchor_for_source_path(source_path)}"></span>\n\n'
+        destination.write_text(front_matter + file_anchor + body, encoding="utf-8")
 
     def render_group(title: str, key: str) -> list[str]:
         lines = [f"## {title}", ""]
