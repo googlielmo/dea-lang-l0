@@ -870,6 +870,53 @@ def test_codegen_try_stmt_with_arc_payload_compiles(codegen_single, compile_and_
     assert ok, stderr
 
 
+def test_codegen_nested_try_call_chain_short_circuits(codegen_single, compile_and_run, tmp_path):
+    c_code, _ = codegen_single(
+        "main",
+        """
+        module main;
+
+        import std.io;
+
+        func l1() -> int? {
+            printl_s("l1");
+            return null;
+        }
+
+        func l2(value: int) -> int? {
+            printl_s("l2");
+            return value;
+        }
+
+        func l3(value: int) -> int? {
+            printl_s("l3");
+            return value;
+        }
+
+        func helper() -> int? {
+            l3(l2(l1()?)?)?;
+            printl_s("done");
+            return 0;
+        }
+
+        func main() -> int {
+            let result = helper();
+            if (result == null) {
+                return 0;
+            }
+            return 1;
+        }
+        """,
+    )
+
+    if c_code is None:
+        return
+
+    ok, stdout, stderr = compile_and_run(c_code, tmp_path)
+    assert ok, stderr
+    assert stdout == "l1\n"
+
+
 def test_codegen_nested_arc_call_temps_released(codegen_single, compile_and_run, tmp_path):
     c_code, _ = codegen_single(
         "main",

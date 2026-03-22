@@ -716,6 +716,29 @@ def test_codegen_with_cleanup_block_return_compiles_and_runs(codegen_single, com
     assert success, f"Program should exit 0: stderr={stderr}"
 
 
+def test_codegen_with_expr_header_cleanup_return_overrides_body_return(codegen_single, compile_and_run, tmp_path):
+    """A cleanup-block return overrides a body return even for a bare expression header item."""
+    c_code, diags = codegen_single("main", """
+        module main;
+        import std.io;
+        func helper() -> int {
+            with (null) {
+                return 0;
+            } cleanup {
+                return 1;
+            }
+        }
+        func main() -> int {
+            printl_i(helper());
+            return 0;
+        }
+    """)
+    assert c_code is not None, [d.message for d in diags]
+    success, stdout, stderr = compile_and_run(c_code, tmp_path)
+    assert success, f"Program should exit 0: stderr={stderr}"
+    assert stdout == "1\n"
+
+
 def test_codegen_with_inline_cleanup_return_compiles_and_runs(codegen_single, compile_and_run, tmp_path):
     """Return inside inline cleanup should compile and run with expected result."""
     c_code, diags = codegen_single("main", """

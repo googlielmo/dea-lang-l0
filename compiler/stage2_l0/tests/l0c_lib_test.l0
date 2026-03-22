@@ -299,6 +299,51 @@ func test_run_keep_c_output_file() {
 }
 
 /**
+ * Tests cleanup-block return precedence in `--run` mode.
+ */
+func test_run_cleanup_return_precedence() {
+    with (let argv = vs_create(8) => vs_free(argv)) {
+        vs_push(argv, "--run");
+        vs_push(argv, "-P");
+        vs_push(argv, fixture_root());
+        vs_push(argv, "cleanup_return_main");
+
+        let rc = run_with_argv(argv);
+        assert(rc == 11, "cleanup block should override the body return value");
+    }
+}
+
+/**
+ * Tests chained postfix-try short-circuiting in `--run` mode.
+ */
+func test_run_try_chain_short_circuits() {
+    with (let argv = vs_create(8) => vs_free(argv)) {
+        vs_push(argv, "--run");
+        vs_push(argv, "-P");
+        vs_push(argv, fixture_root());
+        vs_push(argv, "try_chain_main");
+
+        let rc = run_with_argv(argv);
+        assert(rc == 12, "nested try chain should short-circuit before later calls run");
+    }
+}
+
+/**
+ * Tests qualified enum variant execution when imports are shadowed locally.
+ */
+func test_run_shadowed_qualified_variant() {
+    with (let argv = vs_create(8) => vs_free(argv)) {
+        vs_push(argv, "--run");
+        vs_push(argv, "-P");
+        vs_push(argv, semantics_fixture_root());
+        vs_push(argv, "shadow_warn_main");
+
+        let rc = run_with_argv(argv);
+        assert(rc == 13, "qualified imported enum variants should still run under RES-0021 warnings");
+    }
+}
+
+/**
  * Tests test_merge_c_option_words_cli_last.
  */
 func test_merge_c_option_words_cli_last() {
@@ -370,6 +415,9 @@ func main() {
     test_default_build_mode_succeeds();
     test_run_exit_code_passthrough();
     test_run_keep_c_output_file();
+    test_run_cleanup_return_precedence();
+    test_run_try_chain_short_circuits();
+    test_run_shadowed_qualified_variant();
     test_merge_c_option_words_cli_last();
     test_merge_c_option_words_ignores_empty_inputs();
     test_type_ok();

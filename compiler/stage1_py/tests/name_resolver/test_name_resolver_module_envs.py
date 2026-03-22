@@ -4,6 +4,7 @@
 import textwrap
 from pathlib import Path
 
+from l0_backend import Backend
 from l0_driver import L0Driver
 from l0_name_resolver import NameResolver
 from l0_paths import SourceSearchPaths
@@ -366,3 +367,83 @@ def test_local_and_imported_extern_with_different_signature_is_error(tmp_path):
     assert any("RES-0021" in msg for msg in msgs)
     kinds = {d.kind for d in resolver.diagnostics}
     assert kinds == {"warning"}
+
+
+def test_qualified_enum_variant_runtime_survives_import_shadow_warning(tmp_path, compile_and_run):
+    """
+    Imported variants shadowed by a local enum should still resolve when referenced via qualification.
+    """
+    proj_root = tmp_path / "project"
+    proj_root.mkdir()
+
+    _write(
+        proj_root,
+        "uno.l0",
+        """
+        module uno;
+
+        enum Color {
+            Red;
+        }
+        """,
+    )
+
+    _write(
+        proj_root,
+        "due.l0",
+        """
+        module due;
+
+        enum Shape {
+            Red;
+        }
+        """,
+    )
+
+    _write(
+        proj_root,
+        "tre.l0",
+        """
+        module tre;
+
+        import uno;
+        import due;
+
+        enum MyColor {
+            Zero;
+            Red;
+        }
+
+        func f(c: uno::Color) -> int {
+            match (c) {
+                uno::Red => {
+                    return ord(Red);
+                }
+            }
+        }
+
+        func main() -> int {
+            let c: uno::Color = uno::Red;
+            if (f(c) == 1) {
+                return 0;
+            }
+            return 1;
+        }
+        """,
+    )
+
+    paths = SourceSearchPaths()
+    paths.add_project_root(proj_root)
+
+    driver = L0Driver(search_paths=paths)
+    result = driver.analyze("tre")
+
+    assert not result.has_errors(), [d.message for d in result.diagnostics]
+    warnings = [d for d in result.diagnostics if d.kind == "warning"]
+    assert len(warnings) == 2
+    assert any("RES-0021" in d.message and "uno::Red" in d.message for d in warnings)
+    assert any("RES-0021" in d.message and "due::Red" in d.message for d in warnings)
+
+    c_code = Backend(result).generate()
+    success, _stdout, stderr = compile_and_run(c_code, tmp_path)
+    assert success, stderr

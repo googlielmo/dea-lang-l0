@@ -2618,6 +2618,11 @@ func be_emit_stmt(self: Backend*, stmt_id: StmtId) {
             }
         }
         ST_EXPR => {
+            if (ord(expr_arena_get(be_current_expr_arena(self), stmt.expr_a).kind) == ord(EX_NULL)) {
+                cem_emit_comment(self.emitter, "null literal");
+                self.next_stmt_unreachable = false;
+                return;
+            }
             let c_expr = be_emit_expr(self, stmt.expr_a);
             with (let expr_ty = be_expr_type(self, stmt.expr_a) => type_free_opt(expr_ty)) {
                 if (expr_ty != null && be_should_materialize_arc_temp(self, stmt.expr_a, expr_ty as Type*)) {

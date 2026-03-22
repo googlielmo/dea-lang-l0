@@ -119,10 +119,42 @@ func test_tr_resolve_type_ref() {
 }
 
 /**
+ * Tests module-qualified enum variant lookup when a local variant shadows imported names.
+ */
+func test_tr_module_qualified_variant_lookup_survives_shadow_warning() {
+    let sp = make_paths();
+    with (let cfg = log_config_create(LL_SILENT, false) => drop cfg) {
+        let result = analysis_analyze_entry(sp, "shadow_warn_main", cfg);
+        let nr = result.names as NameResolution*;
+        let env = nr_env_find(nr, "shadow_warn_main") as ModuleEnv*;
+
+        assert(!analysis_has_errors(result), "expected shadow_warn_main analysis to succeed");
+        assert(env != null, "shadow_warn_main env should be available");
+
+        let local = tr_symbol_lookup(nr, env, "Red", null, null);
+        assert(local != null, "local Red should resolve without qualification");
+        assert(eq_s((local as Symbol*).module_name, "shadow_warn_main"), "unqualified Red should resolve locally");
+
+        with (let module_path = vs_create(1) => vs_free(module_path)) {
+            vs_push(module_path, "shadow_warn_uno");
+            let qualified = tr_symbol_lookup(nr, env, "Red", module_path, null);
+            assert(qualified != null, "shadow_warn_uno::Red should resolve");
+            assert(ord((qualified as Symbol*).kind) == ord(SYM_ENUM_VARIANT), "qualified Red should be a variant");
+            assert(eq_s((qualified as Symbol*).module_name, "shadow_warn_uno"),
+                "qualified Red should resolve from shadow_warn_uno");
+        }
+
+        analysis_result_free(result);
+    }
+    sp_free(sp);
+}
+
+/**
  * Main entry point for the module.
  */
 func main() {
     test_tr_symbol_lookup();
     test_tr_resolve_type_ref();
+    test_tr_module_qualified_variant_lookup_survives_shadow_warning();
     printl_s("type_resolve_test: all tests passed");
 }

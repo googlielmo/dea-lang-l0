@@ -376,6 +376,21 @@ def test_equality_requires_same_type(op, analyze_single):
     assert has_error_code(result.diagnostics, "TYP-0172")
 
 
+@pytest.mark.parametrize("op", ["==", "!="])
+def test_string_equality_rejected_in_this_stage(op, analyze_single):
+    src = f"""
+    module main;
+
+    func f(a: string, b: string) -> bool {{
+        return a {op} b;
+    }}
+    """
+
+    result = analyze_single("main", src)
+    assert result.has_errors()
+    assert has_error_code(result.diagnostics, "TYP-0173")
+
+
 @pytest.mark.parametrize("op", ["&&", "||"])
 def test_logical_requires_bool(op, analyze_single):
     src = f"""

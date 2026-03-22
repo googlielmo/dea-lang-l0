@@ -54,6 +54,24 @@ func has_diag_code(diags: DiagCollector*, code: string) -> bool {
 }
 
 /**
+ * Counts diagnostics with one specific code.
+ *
+ * @param diags The diagnostic collector to inspect.
+ * @param code The diagnostic code to count.
+ * @return Number of diagnostics using `code`.
+ */
+func count_diag_code(diags: DiagCollector*, code: string) -> int {
+    let count = 0;
+    for (let i = 0; i < diag_count(diags); i = i + 1) {
+        let d = diag_get(diags, i);
+        if (eq_s(d.code, code)) {
+            count = count + 1;
+        }
+    }
+    return count;
+}
+
+/**
  * Tests test_name_resolution_ok.
  */
 func test_name_resolution_ok() {
@@ -135,11 +153,54 @@ func test_duplicate_top_level_reports_error() {
 }
 
 /**
+ * Tests test_import_shadow_warning_keeps_qualified_variant_lookup_available.
+ */
+func test_import_shadow_warning_keeps_qualified_variant_lookup_available() {
+    let sp = make_paths();
+    with (let cfg = log_config_create(LL_SILENT, false) => drop cfg,
+          let diags = diag_create() => diag_free(diags)) {
+        let state = driver_analyze_entry(sp, "shadow_warn_main", cfg);
+        let names = nr_resolve(state, diags);
+
+        assert(!driver_has_errors(state), "expected no driver errors");
+        assert(count_diag_code(diags, "RES-0021") == 2, "expected two RES-0021 shadow warnings");
+
+        let saw_uno = false;
+        let saw_due = false;
+        for (let i = 0; i < diag_count(diags); i = i + 1) {
+            let d = diag_get(diags, i);
+            if (!eq_s(d.code, "RES-0021")) {
+                continue;
+            }
+            if (contains_s(d.message, "shadow_warn_uno::Red")) {
+                saw_uno = true;
+            }
+            if (contains_s(d.message, "shadow_warn_due::Red")) {
+                saw_due = true;
+            }
+        }
+        assert(saw_uno, "expected shadow warning for shadow_warn_uno::Red");
+        assert(saw_due, "expected shadow warning for shadow_warn_due::Red");
+
+        let env = nr_env_find(names, "shadow_warn_main");
+        assert(env != null, "expected shadow_warn_main env");
+        assert(nr_module_env_imports_module(env as ModuleEnv*, "shadow_warn_uno"), "expected shadow_warn_uno import");
+        assert(nr_module_env_imports_module(env as ModuleEnv*, "shadow_warn_due"), "expected shadow_warn_due import");
+        assert(nr_module_env_local(env as ModuleEnv*, "Red") != null, "expected local Red symbol to win unqualified lookup");
+
+        nr_free(names);
+        driver_state_free(state);
+    }
+    sp_free(sp);
+}
+
+/**
  * Main entry point for the module.
  */
 func main() {
     test_name_resolution_ok();
     test_ambiguous_import_reports_warning();
     test_duplicate_top_level_reports_error();
+    test_import_shadow_warning_keeps_qualified_variant_lookup_available();
     printl_s("name_resolver_test: all tests passed");
 }

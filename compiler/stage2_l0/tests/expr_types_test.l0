@@ -53,6 +53,24 @@ func has_diag_code(result: AnalysisResult*, code: string) -> bool {
 }
 
 /**
+ * Counts diagnostics with one specific code.
+ *
+ * @param result The analysis result to inspect.
+ * @param code The diagnostic code to count.
+ * @return Number of diagnostics using `code`.
+ */
+func count_diag_code(result: AnalysisResult*, code: string) -> int {
+    let count = 0;
+    for (let i = 0; i < analysis_diag_count(result); i = i + 1) {
+        let d = analysis_diag_get(result, i);
+        if (eq_s(d.code, code)) {
+            count = count + 1;
+        }
+    }
+    return count;
+}
+
+/**
  * Tests test_typing_ok.
  */
 func test_typing_ok() {
@@ -120,6 +138,20 @@ func test_typing_try_err() {
 }
 
 /**
+ * Tests unsupported equality diagnostics for strings.
+ */
+func test_typing_equality_unsupported() {
+    let sp = make_paths();
+    with (let cfg = log_config_create(LL_SILENT, false) => drop cfg) {
+        let result = analysis_analyze_entry(sp, "typing_equality_unsupported", cfg);
+        assert(analysis_has_errors(result), "expected typing errors for typing_equality_unsupported");
+        assert(count_diag_code(result, "TYP-0173") == 2, "expected both string equality operators to report TYP-0173");
+        analysis_result_free(result);
+    }
+    sp_free(sp);
+}
+
+/**
  * Tests successful typing for `new` parity cases.
  */
 func test_typing_new_ok() {
@@ -157,6 +189,7 @@ func main() {
     test_typing_err();
     test_typing_try_ok();
     test_typing_try_err();
+    test_typing_equality_unsupported();
     test_typing_new_ok();
     test_typing_new_err();
     printl_s("expr_types_test: all tests passed");

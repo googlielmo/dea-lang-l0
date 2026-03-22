@@ -740,15 +740,24 @@ func etc_infer_binary(self: ExpressionTypeChecker*, expr_id: ExprId, expr: ExprN
         type_free(r_ty);
         return type_builtin_int();
     } else if (eq_s(op, "==") || eq_s(op, "!=")) {
+        let is_null_check = false;
         if (!etc_types_equal(l_ty, r_ty)) {
-            let ok = false;
-            if (ord(l_ty.kind) == ord(TY_NULL) && (ord(r_ty.kind) == ord(TY_POINTER) || ord(r_ty.kind) == ord(TY_NULLABLE))) ok = true;
-            if (ord(r_ty.kind) == ord(TY_NULL) && (ord(l_ty.kind) == ord(TY_POINTER) || ord(l_ty.kind) == ord(TY_NULLABLE))) ok = true;
-            
-            if (!ok) {
+            if (ord(l_ty.kind) == ord(TY_NULL) && (ord(r_ty.kind) == ord(TY_POINTER) || ord(r_ty.kind) == ord(TY_NULLABLE))) {
+                is_null_check = true;
+            }
+            if (ord(r_ty.kind) == ord(TY_NULL) && (ord(l_ty.kind) == ord(TY_POINTER) || ord(l_ty.kind) == ord(TY_NULLABLE))) {
+                is_null_check = true;
+            }
+
+            if (!is_null_check) {
                 etc_diag_error(self, "TYP-0310", concat_s(concat4_s("binary '", op, "' type mismatch: ", type_format(l_ty)),
                     concat_s(" and ", type_format(r_ty))), (self.current_unit as DriverUnit*).path, expr.span);
             }
+        }
+        if (!is_null_check && etc_types_equal(l_ty, r_ty) && !etc_is_int(l_ty) && !etc_is_bool(l_ty)) {
+            etc_diag_error(self, "TYP-0173",
+                concat4_s("equality not supported for type '", type_format(l_ty), "' in this stage", ""),
+                (self.current_unit as DriverUnit*).path, expr.span);
         }
         type_free(l_ty);
         type_free(r_ty);
