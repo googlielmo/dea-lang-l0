@@ -107,6 +107,17 @@ func type_param_vec_free(items: VectorBase*?) {
     vec_free(vec);
 }
 
+/**
+ * Create a type descriptor from raw components.
+ *
+ * @param kind Type kind tag.
+ * @param module_name Defining module name for nominal types.
+ * @param name Type name for builtin and nominal kinds.
+ * @param inner Owned inner type for pointer and nullable kinds.
+ * @param params Owned parameter vector for function kinds.
+ * @param result Owned result type for function kinds.
+ * @return New type descriptor.
+ */
 func type_new(kind: TypeKind, module_name: string, name: string, inner: Type*?, params: VectorBase*?,
               result: Type*?) -> Type* {
     return new Type(kind, module_name, name, inner, params, result);

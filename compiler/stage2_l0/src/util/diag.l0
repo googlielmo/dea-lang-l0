@@ -128,6 +128,19 @@ func diag_create() -> DiagCollector* {
     return self;
 }
 
+/**
+ * Record an error diagnostic.
+ *
+ * @param dc Collector receiving the diagnostic.
+ * @param phase Compiler phase name.
+ * @param code Diagnostic code.
+ * @param message Diagnostic message.
+ * @param filename Source filename, or empty when unavailable.
+ * @param line Starting line number.
+ * @param column Starting column number.
+ * @param line_end Ending line number.
+ * @param column_end Ending column number.
+ */
 func diag_error(dc: DiagCollector*, phase: string, code: string,
                 message: string, filename: string,
                 line: int, column: int, line_end: int, column_end: int) {
@@ -146,6 +159,19 @@ func diag_error(dc: DiagCollector*, phase: string, code: string,
     dc.error_count = dc.error_count + 1;
 }
 
+/**
+ * Record a warning diagnostic.
+ *
+ * @param dc Collector receiving the diagnostic.
+ * @param phase Compiler phase name.
+ * @param code Diagnostic code.
+ * @param message Diagnostic message.
+ * @param filename Source filename, or empty when unavailable.
+ * @param line Starting line number.
+ * @param column Starting column number.
+ * @param line_end Ending line number.
+ * @param column_end Ending column number.
+ */
 func diag_warn(dc: DiagCollector*, phase: string, code: string,
                message: string, filename: string,
                line: int, column: int, line_end: int, column_end: int) {
@@ -163,6 +189,19 @@ func diag_warn(dc: DiagCollector*, phase: string, code: string,
     dgv_push(dc.items, diag);
 }
 
+/**
+ * Record an informational note diagnostic.
+ *
+ * @param dc Collector receiving the diagnostic.
+ * @param phase Compiler phase name.
+ * @param code Diagnostic code.
+ * @param message Diagnostic message.
+ * @param filename Source filename, or empty when unavailable.
+ * @param line Starting line number.
+ * @param column Starting column number.
+ * @param line_end Ending line number.
+ * @param column_end Ending column number.
+ */
 func diag_note(dc: DiagCollector*, phase: string, code: string,
                message: string, filename: string,
                line: int, column: int, line_end: int, column_end: int) {

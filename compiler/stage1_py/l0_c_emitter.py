@@ -900,6 +900,16 @@ class CEmitter:
         self._emit_cleanup_by_type(c_expr, ty)
 
     def _emit_cleanup_by_type(self, c_expr: str, ty: Type) -> None:
+        """Emit recursive cleanup code for any ARC-managed data inside a type.
+
+        Args:
+            c_expr: C expression evaluating to the by-value object to clean up.
+            ty: The L0 type describing ``c_expr``.
+
+        See Also:
+            `emit_value_cleanup`: Public entry point for by-value cleanup emission.
+            `_emit_enum_value_cleanup`: Handles enum-specific cleanup lowering.
+        """
         if self.analysis.is_arc_type(ty):
             self.out.emit(f"rt_string_release({c_expr});")
             return
@@ -945,6 +955,20 @@ class CEmitter:
         *,
         missing_info_is_ice: bool,
     ) -> None:
+        """Emit a cleanup switch over the active variant of an enum value.
+
+        Args:
+            enum_type: Enum type whose payload cleanup is being emitted.
+            c_tag_expr: C expression yielding the enum tag to switch on.
+            field_expr_for_variant_field: Callback that maps variant and field
+                names to the corresponding C lvalue expression.
+            missing_info_is_ice: Whether missing enum metadata should raise an
+                internal compiler error.
+
+        See Also:
+            `_emit_enum_value_cleanup`: Uses this helper for by-value enum cleanup.
+            `_iter_variant_cleanup_fields`: Supplies the field names paired with types.
+        """
         enum_info = self._get_enum_info(enum_type, strict=missing_info_is_ice)
         if enum_info is None:
             return
@@ -985,6 +1009,21 @@ class CEmitter:
         variant_name: str,
         variant_field_types: List[Type],
     ) -> List[Tuple[str, Type]]:
+        """Pair variant field names with their resolved field types.
+
+        Args:
+            enum_type: Enum type owning the variant.
+            variant_name: Variant whose fields are being cleaned up.
+            variant_field_types: Resolved payload field types for the variant.
+
+        Returns:
+            A list of ``(field_name, field_type)`` pairs, or an empty list when
+            the AST declaration cannot be matched to the resolved payload types.
+
+        See Also:
+            `find_variant_decl`: Retrieves the source declaration used for field names.
+            `_emit_enum_cleanup_switch`: Consumes these pairs to emit cleanup code.
+        """
         variant_decl = self.find_variant_decl(
             enum_type.module,
             enum_type.name,
@@ -1000,18 +1039,53 @@ class CEmitter:
         ]
 
     def _enum_has_arc_data(self, enum_info: EnumInfo) -> bool:
+        """Report whether any enum payload field requires ARC-aware cleanup.
+
+        Args:
+            enum_info: Resolved enum metadata to inspect.
+
+        Returns:
+            ``True`` if any variant payload contains ARC-managed data.
+
+        See Also:
+            `_emit_enum_cleanup_switch`: Skips switch emission when this is false.
+        """
         return any(
             any(self.analysis.has_arc_data(ft) for ft in variant_info.field_types)
             for variant_info in enum_info.variants.values()
         )
 
     def _get_struct_info(self, struct_type: StructType, *, strict: bool) -> Optional[StructInfo]:
+        """Look up resolved metadata for a struct type.
+
+        Args:
+            struct_type: Struct type whose metadata is needed.
+            strict: Whether a missing entry should raise an internal compiler error.
+
+        Returns:
+            The matching ``StructInfo`` when available, otherwise ``None``.
+
+        See Also:
+            `emit_struct_cleanup`: Requires strict struct metadata during emission.
+        """
         info = self.analysis.struct_infos.get((struct_type.module, struct_type.name))
         if info is None and strict:
             self.ice(f"[ICE-1270] missing StructInfo for {struct_type.module}.{struct_type.name}", None)
         return info
 
     def _get_enum_info(self, enum_type: EnumType, *, strict: bool) -> Optional[EnumInfo]:
+        """Look up resolved metadata for an enum type.
+
+        Args:
+            enum_type: Enum type whose metadata is needed.
+            strict: Whether a missing entry should raise an internal compiler error.
+
+        Returns:
+            The matching ``EnumInfo`` when available, otherwise ``None``.
+
+        See Also:
+            `_emit_enum_cleanup_switch`: Uses enum metadata to enumerate payload fields.
+        """
         info = self.analysis.enum_infos.get((enum_type.module, enum_type.name))
         if info is None and strict:
             self.ice(f"[ICE-1080] missing EnumInfo for {enum_type.module}.{enum_type.name}", None)

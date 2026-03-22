@@ -14,6 +14,18 @@ KV_RE = re.compile(r"(\w+)=([^\s]+)")
 
 
 def _parse_events(text: str) -> tuple[list[dict[str, str]], list[str]]:
+    """Parse raw trace output into structured event dictionaries.
+
+    Args:
+        text: Trace log text, typically captured from Stage 2 stderr.
+
+    Returns:
+        A pair containing the parsed events and non-fatal parse warnings.
+
+    See Also:
+        `_validate_events`: Consumes the parsed events for semantic checks.
+        `main`: Reads the input file and drives the full validation flow.
+    """
     events: list[dict[str, str]] = []
     warnings: list[str] = []
 
@@ -38,6 +50,19 @@ def _parse_events(text: str) -> tuple[list[dict[str, str]], list[str]]:
 
 
 def _validate_events(events: list[dict[str, str]]) -> tuple[list[str], list[str], dict[str, int], dict]:
+    """Validate trace event sequences for definite runtime misuse patterns.
+
+    Args:
+        events: Parsed trace events from `_parse_events`.
+
+    Returns:
+        A tuple of ``(errors, warnings, op_counts, triage)`` summarizing the
+        validation result and leak triage metadata.
+
+    See Also:
+        `_parse_events`: Produces the event stream consumed here.
+        `_print_report`: Renders the returned validation summary.
+    """
     errors: list[str] = []
     warnings: list[str] = []
     op_counts: Counter[str] = Counter()
@@ -198,6 +223,21 @@ def _print_report(
     max_details: int,
     show_triage: bool,
 ) -> None:
+    """Print a validation summary and optional leak triage details.
+
+    Args:
+        events: Parsed trace events used for aggregate counts.
+        parse_warnings: Non-fatal warnings produced during parsing.
+        errors: Validation errors to report.
+        warnings: Validation warnings to report.
+        op_counts: Per-family operation counts.
+        triage: Leak triage metadata from `_validate_events`.
+        max_details: Maximum number of detail lines to print per section.
+        show_triage: Whether to print the triage section.
+
+    See Also:
+        `_validate_events`: Produces the summary and triage data rendered here.
+    """
     mem_count = sum(1 for e in events if e["family"] == "mem")
     arc_count = sum(1 for e in events if e["family"] == "arc")
     total_warnings = parse_warnings + warnings
@@ -269,6 +309,14 @@ def _print_report(
 
 
 def _build_arg_parser() -> argparse.ArgumentParser:
+    """Build the command-line parser for the trace log checker.
+
+    Returns:
+        Configured argument parser for the `check_trace_log.py` CLI.
+
+    See Also:
+        `main`: Uses this parser to handle CLI arguments.
+    """
     parser = argparse.ArgumentParser(
         prog=Path(sys.argv[0]).name,
         description="Analyze Stage 2 trace stderr logs for definite runtime issues.",
@@ -289,6 +337,21 @@ def _build_arg_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str]) -> int:
+    """Run the trace log checker command-line entry point.
+
+    Args:
+        argv: Process argument vector, including program name at index 0.
+
+    Returns:
+        Exit status ``0`` on success, ``1`` when validation finds errors, or
+        ``2`` for invalid usage or file-read failures.
+
+    See Also:
+        `_build_arg_parser`: Defines the accepted CLI arguments.
+        `_parse_events`: Parses the raw trace file contents.
+        `_validate_events`: Checks the parsed events for runtime issues.
+        `_print_report`: Prints the final human-readable report.
+    """
     parser = _build_arg_parser()
     args = parser.parse_args(argv[1:])
 

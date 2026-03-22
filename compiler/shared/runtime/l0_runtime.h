@@ -144,7 +144,7 @@ typedef double   l0_double;
 /**
  * @struct _l0_h_string
  * Heap-allocated L0 string header.
- * 
+ *
  * L0 string: length-tracked, reference counted, immutable character sequence.
  * Strings are always length-tracked to prevent out-of-bounds access.
  * An l0_string with len=0 represents an empty string.
@@ -269,7 +269,7 @@ static char** _rt_argv = NULL;
 
 /**
  * Initialize command-line arguments.
- * 
+ *
  * @param argc Number of arguments.
  * @param argv Argument vector.
  */
@@ -284,7 +284,7 @@ void _rt_init_args(int argc, char** argv) {
 
 /**
  * Abort the program with a message.
- * 
+ *
  * @param message The panic message.
  */
 static void _rt_panic(const char* message) {
@@ -299,7 +299,7 @@ static void _rt_panic(const char* message) {
 
 /**
  * Abort the program with a formatted message.
- * 
+ *
  * @param fmt Format string.
  */
 static void _rt_panic_fmt(const char* fmt, ...) {
@@ -320,7 +320,7 @@ static void _rt_panic_fmt(const char* fmt, ...) {
 
 /**
  * Safe integer division.
- * 
+ *
  * @param a Dividend.
  * @param b Divisor.
  * @return Quotient.
@@ -337,7 +337,7 @@ static l0_int _rt_idiv(l0_int a, l0_int b) {
 
 /**
  * Safe integer modulo.
- * 
+ *
  * @param a Dividend.
  * @param b Divisor.
  * @return Remainder.
@@ -354,7 +354,7 @@ static l0_int _rt_imod(l0_int a, l0_int b) {
 
 /**
  * Safe integer addition with overflow check.
- * 
+ *
  * @param a First operand.
  * @param b Second operand.
  * @return Sum.
@@ -368,7 +368,7 @@ static l0_int _rt_iadd(l0_int a, l0_int b) {
 
 /**
  * Safe integer subtraction with overflow check.
- * 
+ *
  * @param a First operand.
  * @param b Second operand.
  * @return Difference.
@@ -382,7 +382,7 @@ static l0_int _rt_isub(l0_int a, l0_int b) {
 
 /**
  * Safe integer multiplication with overflow check.
- * 
+ *
  * @param a First operand.
  * @param b Second operand.
  * @return Product.
@@ -435,7 +435,7 @@ static l0_int _rt_imul(l0_int a, l0_int b) {
 
 /**
  * Narrow l0_int to l0_byte with range check.
- * 
+ *
  * @param value Integer value.
  * @return Byte value.
  */
@@ -452,7 +452,7 @@ l0_byte _rt_narrow_l0_byte(l0_int value) {
 
 /**
  * Unwrap a pointer, panicking if NULL.
- * 
+ *
  * @param opt Pointer to unwrap.
  * @param type_name Name of the type for error reporting.
  * @return Unwrapped pointer.
@@ -466,7 +466,7 @@ static inline void *_unwrap_ptr(void *opt, const char *type_name) {
 
 /**
  * Unwrap an optional type structure, panicking if it has no value.
- * 
+ *
  * @param opt_ptr Pointer to the optional structure.
  * @param type_name Name of the type for error reporting.
  * @return Pointer to the optional structure.
@@ -489,7 +489,7 @@ static inline void *_unwrap_opt(void *opt_ptr, const char *type_name) {
  *
  * Note: Does NOT allocate or copy - just wraps the existing C string.
  * Use only for string literals or static const data.
- * 
+ *
  * @param c_str Constant C string.
  * @return L0 string.
  */
@@ -517,7 +517,7 @@ static l0_string _rt_l0_string_from_const_literal(const char *c_str) {
  *
  * The returned string is of kind L0_STRING_K_HEAP and
  * its data is null-terminated in advance.
- * 
+ *
  * @param mem Allocated memory block.
  * @param s_len Length of the string.
  * @return Initialized L0 string.
@@ -542,7 +542,7 @@ static l0_string _rt_init_heap_string(void *mem, l0_int s_len) {
  *
  * The returned string is of kind L0_STRING_K_HEAP and
  * its data is null-terminated in advance.
- * 
+ *
  * @param len Length of the string.
  * @return Allocated L0 string.
  */
@@ -2649,24 +2649,60 @@ static l0_int _rt_hash_tag8(const _rt_siphash_tag8_t tag8,
 
 /* Hash functions for basic types */
 
+/**
+ * Hash a boolean value with the runtime bool tag.
+ *
+ * @param value Boolean value to hash.
+ * @param flags Type-shaping flags mixed into the hash domain.
+ * @return 32-bit hash.
+ */
 static l0_int _rt_hash_bool(l0_bool value, const uint8_t flags) {
     return _rt_hash_tag8(_l0_sh_tag_bool, flags, &value, sizeof(l0_bool), _rt_sh_key);
 }
 
+/**
+ * Hash a byte value with the runtime byte tag.
+ *
+ * @param value Byte value to hash.
+ * @param flags Type-shaping flags mixed into the hash domain.
+ * @return 32-bit hash.
+ */
 static l0_int _rt_hash_byte(l0_byte value, const uint8_t flags) {
     return _rt_hash_tag8(_l0_sh_tag_byte, flags, &value, sizeof(l0_byte), _rt_sh_key);
 }
 
+/**
+ * Hash an integer value with the runtime int tag.
+ *
+ * @param value Integer value to hash.
+ * @param flags Type-shaping flags mixed into the hash domain.
+ * @return 32-bit hash.
+ */
 static l0_int _rt_hash_int(l0_int value, const uint8_t flags) {
     return _rt_hash_tag8(_l0_sh_tag_int, flags, &value, sizeof(l0_int), _rt_sh_key);
 }
 
+/**
+ * Hash a string's byte contents with the runtime string tag.
+ *
+ * @param str String value to hash.
+ * @param flags Type-shaping flags mixed into the hash domain.
+ * @return 32-bit hash.
+ */
 static l0_int _rt_hash_string(l0_string str, const uint8_t flags) {
     const char *str_data = _rt_string_bytes(str);
     l0_int str_len = rt_strlen(str);
     return _rt_hash_tag8(_l0_sh_tag_string, flags, str_data, (size_t)str_len, _rt_sh_key);
 }
 
+/**
+ * Hash an arbitrary byte sequence with the runtime data tag.
+ *
+ * @param data Pointer to the byte sequence.
+ * @param size Size of `data` in bytes.
+ * @param flags Type-shaping flags mixed into the hash domain.
+ * @return 32-bit hash.
+ */
 static l0_int _rt_hash_data(void *data, l0_int size, const uint8_t flags) {
     return _rt_hash_tag8(_l0_sh_tag_data, flags, data, (size_t)size, _rt_sh_key);
 }

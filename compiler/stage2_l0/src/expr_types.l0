@@ -183,6 +183,15 @@ func etc_lookup_local(self: ExpressionTypeChecker*, name: string) -> Type*? {
     return null;
 }
 
+/**
+ * Resolve a visible symbol from the current expression-checking environment.
+ *
+ * @param self Expression checker state.
+ * @param name Unqualified symbol name.
+ * @param module_path Optional parsed module path for cross-module lookups.
+ * @param name_qualifier Optional enum-variant qualifier.
+ * @return Resolved symbol, or `null` if lookup fails.
+ */
 func etc_lookup_symbol(self: ExpressionTypeChecker*, name: string, module_path: VectorString*?,
                         name_qualifier: VectorString*?) -> Symbol*? {
     return tr_symbol_lookup(self.result.names as NameResolution*, self.current_env as ModuleEnv*, name, module_path,

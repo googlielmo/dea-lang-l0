@@ -60,6 +60,16 @@ func tr_diag_error(diags: DiagCollector*, code: string, message: string, filenam
         span.end_column);
 }
 
+/**
+ * Resolve a symbol visible from a module environment.
+ *
+ * @param nr Name-resolution data containing module environments.
+ * @param env Current module environment.
+ * @param name Unqualified symbol name.
+ * @param module_path Optional parsed module path for cross-module lookup.
+ * @param name_qualifier Optional enum-variant qualifier.
+ * @return Resolved symbol, or `null` if lookup fails.
+ */
 func tr_symbol_lookup(nr: NameResolution*, env: ModuleEnv*, name: string, module_path: VectorString*?,
                        name_qualifier: VectorString*?) -> Symbol*? {
     if (module_path == null) {
@@ -119,6 +129,17 @@ func tr_symbol_lookup(nr: NameResolution*, env: ModuleEnv*, name: string, module
     return s2;
 }
 
+/**
+ * Resolve a type alias symbol to its final target type.
+ *
+ * @param tables Signature tables available during type resolution.
+ * @param nr Name-resolution data containing module environments.
+ * @param env Current module environment for diagnostics.
+ * @param sym Alias symbol to resolve.
+ * @param diags Diagnostic collector for resolution failures.
+ * @param seen Alias keys currently being expanded for cycle detection.
+ * @return Resolved aliased type, or `null` on failure.
+ */
 func tr_resolve_alias(tables: SignatureTables*, nr: NameResolution*, env: ModuleEnv*, sym: Symbol*, diags: DiagCollector*,
                        seen: StringSet*) -> Type*? {
     if (sym.resolved_type != null) {
@@ -175,6 +196,17 @@ func tr_apply_suffix(base: Type*, tref: TypeRef*, diags: DiagCollector*, filenam
     return type_new_nullable(current);
 }
 
+/**
+ * Resolve a parsed type reference into a semantic type descriptor.
+ *
+ * @param tables Signature tables available during type resolution.
+ * @param nr Name-resolution data containing module environments.
+ * @param env Current module environment for lookup and diagnostics.
+ * @param tref Parsed type reference to resolve.
+ * @param diags Diagnostic collector for resolution failures.
+ * @param seen Alias keys currently being expanded for cycle detection.
+ * @return Resolved type, or `null` if resolution fails.
+ */
 func tr_resolve_type_ref(tables: SignatureTables*, nr: NameResolution*, env: ModuleEnv*, tref: TypeRef*,
                           diags: DiagCollector*, seen: StringSet*) -> Type*? {
     if (tref.name_qualifier != null) {

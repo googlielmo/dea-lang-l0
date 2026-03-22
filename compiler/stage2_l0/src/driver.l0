@@ -285,6 +285,16 @@ func dr_visit_closure(state: DriverState*, search_paths: SourceSearchPaths*, mod
     }
 }
 
+/**
+ * Load one module and its import closure into the driver state.
+ *
+ * @param state Driver state that caches loaded modules and diagnostics.
+ * @param search_paths Source search paths used to resolve module names.
+ * @param loading_chain Import chain encoded with `|name|` sentinels for cycle detection.
+ * @param module_name Module name to load.
+ * @param cfg Logging configuration.
+ * @return `true` if the module was loaded successfully or was already cached.
+ */
 func dr_load_module(state: DriverState*, search_paths: SourceSearchPaths*, loading_chain: string,
                     module_name: string, cfg: LogConfig*) -> bool {
     if (dr_vs_has(state.loaded, module_name)) {

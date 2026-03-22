@@ -33,6 +33,15 @@ class SourceEncodingError(Exception):
     """
 
     def __init__(self, path: str | Path, message: str):
+        """Initialize a UTF-8 decoding failure.
+
+        Args:
+            path: Path to the source file that failed to decode.
+            message: Human-readable explanation of the decoding failure.
+
+        See Also:
+            `load_source_utf8`: Raises this exception for invalid source encodings.
+        """
         self.path = str(path)
         self.message = message
         super().__init__(f"{self.path}: {self.message}")

@@ -189,6 +189,13 @@ func dp_print_diag(diag: Diagnostic*) {
     dp_print_snippet(diag);
 }
 
+/**
+ * Print all diagnostics using caller-provided source-text caches.
+ *
+ * @param dc Diagnostic collector to print.
+ * @param source_names Cached filenames aligned with `source_texts`.
+ * @param source_texts Cached source texts aligned with `source_names`.
+ */
 func dp_print_collector_with_sources(dc: DiagCollector*,
     source_names: VectorString*, source_texts: VectorString*)
 {

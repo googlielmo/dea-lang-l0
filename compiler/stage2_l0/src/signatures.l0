@@ -191,6 +191,15 @@ func sig_make_tables() -> SignatureTables* {
     return new SignatureTables(spm_create(), spm_create(), spm_create(), spm_create());
 }
 
+/**
+ * Resolve one struct declaration into stored signature metadata.
+ *
+ * @param tables Signature tables receiving resolved struct info.
+ * @param nr Name-resolution data for symbol lookups.
+ * @param env Module environment owning the declaration.
+ * @param decl Struct declaration to resolve.
+ * @param diags Diagnostic collector for resolution failures.
+ */
 func sig_resolve_struct(tables: SignatureTables*, nr: NameResolution*, env: ModuleEnv*, decl: StructDecl*,
                         diags: DiagCollector*) {
     with (let fields: VectorBase*? = ptr_vec_create(vec_size(decl.fields)) => sig_struct_field_vec_temp_free(fields),
@@ -231,6 +240,15 @@ func sig_resolve_struct(tables: SignatureTables*, nr: NameResolution*, env: Modu
     }
 }
 
+/**
+ * Resolve one enum declaration into stored signature metadata.
+ *
+ * @param tables Signature tables receiving resolved enum info.
+ * @param nr Name-resolution data for symbol lookups.
+ * @param env Module environment owning the declaration.
+ * @param decl Enum declaration to resolve.
+ * @param diags Diagnostic collector for resolution failures.
+ */
 func sig_resolve_enum(tables: SignatureTables*, nr: NameResolution*, env: ModuleEnv*, decl: EnumDecl*,
                       diags: DiagCollector*) {
     with (let variants: VectorBase*? = ptr_vec_create(vec_size(decl.variants)) => sig_enum_variant_vec_temp_free(variants),
@@ -276,6 +294,15 @@ func sig_resolve_enum(tables: SignatureTables*, nr: NameResolution*, env: Module
     }
 }
 
+/**
+ * Resolve one function declaration into a stored function type.
+ *
+ * @param tables Signature tables receiving resolved function types.
+ * @param nr Name-resolution data for symbol lookups.
+ * @param env Module environment owning the declaration.
+ * @param decl Function declaration to resolve.
+ * @param diags Diagnostic collector for resolution failures.
+ */
 func sig_resolve_func(tables: SignatureTables*, nr: NameResolution*, env: ModuleEnv*, decl: FuncDecl*,
                       diags: DiagCollector*) {
     with (let params: VectorBase*? = ptr_vec_create(vec_size(decl.params)) => sig_type_vec_free_opt(params),
@@ -317,6 +344,16 @@ func sig_resolve_func(tables: SignatureTables*, nr: NameResolution*, env: Module
     }
 }
 
+/**
+ * Infer a top-level literal initializer type without full expression checking.
+ *
+ * @param tables Signature tables available during signature resolution.
+ * @param nr Name-resolution data for symbol lookups.
+ * @param env Module environment owning the initializer.
+ * @param driver_state Driver state providing parsed ASTs.
+ * @param expr_id Expression id to inspect.
+ * @return Inferred literal type, or `null` when inference is not supported.
+ */
 func sig_infer_literal_type(tables: SignatureTables*, nr: NameResolution*, env: ModuleEnv*, driver_state: DriverState*,
                             expr_id: ExprId) -> Type*? {
     let unit = driver_find_unit(driver_state, env.module_name);
@@ -370,6 +407,16 @@ func sig_infer_literal_type(tables: SignatureTables*, nr: NameResolution*, env: 
     return null;
 }
 
+/**
+ * Resolve or infer the type of one top-level `let` binding.
+ *
+ * @param tables Signature tables receiving resolved `let` types.
+ * @param nr Name-resolution data for symbol lookups.
+ * @param env Module environment owning the declaration.
+ * @param driver_state Driver state providing parsed ASTs.
+ * @param decl `let` declaration to resolve.
+ * @param diags Diagnostic collector for resolution failures.
+ */
 func sig_resolve_let(tables: SignatureTables*, nr: NameResolution*, env: ModuleEnv*, driver_state: DriverState*,
                      decl: LetDecl*, diags: DiagCollector*) {
     let let_type: Type*? = null;
@@ -427,6 +474,16 @@ func sig_extract_dependencies(ty: Type*, out: StringSet*) {
     }
 }
 
+/**
+ * Visit one value-type node in the cycle-detection graph.
+ *
+ * @param tables Signature tables containing resolved struct and enum metadata.
+ * @param key Fully qualified type key to visit.
+ * @param visiting DFS stack set for cycle detection.
+ * @param visited Set of nodes already proven acyclic.
+ * @param diags Diagnostic collector for emitted cycle errors.
+ * @return `true` if this visit reaches a value-type cycle.
+ */
 func sig_cycle_visit(tables: SignatureTables*, key: string, visiting: StringSet*, visited: StringSet*,
                      diags: DiagCollector*) -> bool {
     if (ss_has(visited, key)) {
