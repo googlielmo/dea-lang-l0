@@ -166,8 +166,11 @@ jobs:
           name: dist-${{ matrix.os }}-${{ matrix.arch }}
           path: ${{ env.DIST_ARCHIVE_PATH }}
 
+  build-docs:
+    uses: ./.github/workflows/docs-build.yml
+
   publish-release:
-    needs: build-dist
+    needs: [build-dist, build-docs]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -184,10 +187,16 @@ jobs:
           merge-multiple: true
           path: build/release-assets
 
+      - name: Download PDF artifact
+        uses: actions/download-artifact@v6
+        with:
+          name: docs-pdf
+          path: build/release-assets
+
       - name: Generate checksums
         run: |
           cd build/release-assets
-          sha256sum *.tar.gz *.zip > SHA256SUMS
+          sha256sum *.tar.gz *.zip refman.pdf > SHA256SUMS
 
       - name: Generate release notes
         env:
