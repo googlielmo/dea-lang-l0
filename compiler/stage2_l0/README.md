@@ -204,6 +204,28 @@ Expected smoke output:
 Hello, World!
 ```
 
+### Whole-compiler Stage 1 vs Stage 2 `--gen` comparison
+
+This is an explicit on-demand comparison, not part of `run_tests.py` or `make test-stage2`.
+
+Run it directly from the repo root after preparing the repo-local Stage 2 env:
+
+```bash
+make venv
+make DEA_BUILD_DIR=build/dev-dea install-dev-stage2
+DEA_BUILD_DIR=build/dev-dea ./.venv/bin/python compiler/stage2_l0/scripts/l0c_stage1_stage2_codegen_compare.py
+```
+
+This script:
+
+1. builds a fresh Stage 2 bootstrap compiler under `build/tests/...` from trusted Stage 1 input
+2. runs `--gen --no-line-directives -P compiler/stage2_l0/src l0c` through Stage 1
+3. runs the same command through the fresh Stage 2 compiler
+4. compares the generated C programs byte-for-byte and fails with a retained diff if they differ
+
+Use `KEEP_ARTIFACTS=1` to keep the generated `build/tests/l0_stage1_stage2_codegen_compare.*` directory on success for
+inspection. On failure, the test keeps artifacts automatically.
+
 Run Stage 2 L0 trace checks (runtime + leak triage on every trace-eligible top-level `.l0` test):
 
 ```bash

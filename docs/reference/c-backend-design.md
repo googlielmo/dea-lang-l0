@@ -1,10 +1,9 @@
 # L0 C Backend Design
 
-Version: 2026-03-09
+Version: 2026-03-23
 
-This is the canonical backend implementation document for the current C backend.
-Stage 1 remains the behavioral oracle; Stage 2 is expected to emit the same C and reuse the same diagnostic/ICE codes
-for equivalent backend conditions.
+This is the canonical backend implementation document for the current C backend. Stage 1 remains the behavioral oracle;
+Stage 2 is expected to emit the same C and reuse the same diagnostic/ICE codes for equivalent backend conditions.
 
 Related docs:
 
@@ -52,8 +51,8 @@ Input is a fully-typed `AnalysisResult`. Output is one C99 translation unit.
 
 The generated C file is organized in this order in both stages:
 
-1. File header and includes (`stdint.h`, `stdbool.h`, `stddef.h`, `l0_siphash.h`, `l0_runtime.h`), with optional
-   trace defines (`L0_TRACE_ARC`, `L0_TRACE_MEMORY`) emitted before `l0_runtime.h` when enabled via CLI
+1. File header and includes (`stdint.h`, `stdbool.h`, `stddef.h`, `l0_siphash.h`, `l0_runtime.h`), with optional trace
+   defines (`L0_TRACE_ARC`, `L0_TRACE_MEMORY`) emitted before `l0_runtime.h` when enabled via CLI
 2. Forward declarations for all structs/enums
 3. Optional wrapper typedefs (early phase: builtins)
 4. Struct/enum definitions in dependency order
@@ -81,8 +80,8 @@ Current backend target is a **single C translation unit**.
 
 - Structs lower to `struct l0_{module}_{Name}`.
 - Enums lower to tagged unions:
-    - `enum l0_{module}_{Enum}_tag`
-    - `struct l0_{module}_{Enum} { tag; union data { ... } }`
+  - `enum l0_{module}_{Enum}_tag`
+  - `struct l0_{module}_{Enum} { tag; union data { ... } }`
 - Zero-field structs/variants emit dummy fields to stay C99-valid.
 
 ### Pointers and nullable
@@ -90,7 +89,7 @@ Current backend target is a **single C translation unit**.
 - `T*` lowers to pointer type in C.
 - `T*?` uses niche representation: also a pointer type, `NULL` represents L0 `null`.
 - Value nullable (`T?`, where `T` is not pointer-shaped) lowers to wrapper typedef:
-    - `typedef struct { l0_bool has_value; T value; } l0_opt_*;`
+  - `typedef struct { l0_bool has_value; T value; } l0_opt_*;`
 
 Wrapper typedefs are emitted in two phases so dependencies are valid.
 
@@ -108,8 +107,8 @@ Wrapper typedefs are emitted in two phases so dependencies are valid.
 Implemented lowering includes:
 
 - Literals, var refs, unary/binary ops, calls, field/index access, casts, constructors
-- String literals are decoded from token escapes to bytes, then emitted as `L0_STRING_CONST("...", len)` values
-  (cast to `l0_string` where required by expression context), with bytes C-escaped from decoded content.
+- String literals are decoded from token escapes to bytes, then emitted as `L0_STRING_CONST("...", len)` values (cast to
+  `l0_string` where required by expression context), with bytes C-escaped from decoded content.
 - `new` heap allocation (`_rt_alloc_obj`) + initialization
 - `try` (`expr?`) lowering to checked unwrap with early return on empty
 - Checked int arithmetic uses runtime helpers (`_rt_iadd`, `_rt_isub`, `_rt_imul`, `_rt_idiv`, `_rt_imod`)
@@ -161,8 +160,8 @@ If entry module defines `main`, backend emits C wrapper:
 - Generated code is sectioned and comment-labeled.
 - `#line` directives are emitted when enabled in compile context (default on, can be disabled with
   `--no-line-directives`) for accurate source mapping in debuggers and error messages.
-- Runtime tracing can be enabled from codegen with `--trace-arc` and `--trace-memory`; generated C emits
-  preprocessor toggles consumed by `l0_runtime.h`.
+- Runtime tracing can be enabled from codegen with `--trace-arc` and `--trace-memory`; generated C emits preprocessor
+  toggles consumed by `l0_runtime.h`.
 - Escape decoding used by `case` literal semantic checks is shared with codegen to avoid divergence.
 
 Tracing details and runtime log contract are specified in [specs/runtime/trace.md](../specs/runtime/trace.md).
@@ -198,3 +197,8 @@ Primary Stage 2 backend/codegen parity checks live under `compiler/stage2_l0/tes
 
 Committed Stage 2 backend goldens are in `compiler/stage2_l0/tests/fixtures/backend_golden/` and are refreshed from
 Stage 1 via `scripts/refresh_stage2_backend_goldens.py`.
+
+An additional on-demand whole-compiler parity script lives at
+`compiler/stage2_l0/scripts/l0c_stage1_stage2_codegen_compare.py`, which diffs exact `--gen` output for
+`compiler/stage2_l0/src/l0c` between Stage 1 and a fresh Stage 2 bootstrap compiler when explicit investigation is
+needed.
