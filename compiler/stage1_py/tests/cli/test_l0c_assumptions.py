@@ -7,7 +7,7 @@ from types import SimpleNamespace
 
 import l0c
 from l0_driver import SourceEncodingError
-from l0c import cmd_ast, cmd_build, cmd_check, cmd_run, cmd_tok
+from l0c import cmd_ast, cmd_build, cmd_check, cmd_codegen, cmd_run, cmd_tok
 
 
 def _write_module(root, module_name: str, source: str):
@@ -92,6 +92,25 @@ def test_build_warns_when_entry_main_return_type_is_not_preferred(tmp_path, monk
 
     assert rc == 0
     assert "[L0C-0013]" in capsys.readouterr().err
+
+
+def test_codegen_stdout_preserves_single_trailing_newline(monkeypatch, capsys):
+    class _FakeBackend:
+        def __init__(self, result):
+            self.result = result
+
+        def generate(self):
+            return "line1\nline2\n"
+
+    monkeypatch.setattr("l0c._run_analysis", lambda args: (object(), object(), 0))
+    monkeypatch.setattr("l0c.Backend", _FakeBackend)
+
+    rc = cmd_codegen(argparse.Namespace(output=None))
+
+    assert rc == 0
+    captured = capsys.readouterr()
+    assert captured.out == "line1\nline2\n"
+    assert captured.err == ""
 
 
 def test_check_rejects_invalid_entry_module_name(tmp_path, capsys):

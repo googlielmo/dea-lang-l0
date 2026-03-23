@@ -743,7 +743,7 @@ def cmd_codegen(args: argparse.Namespace) -> int:
     if args.output:
         Path(args.output).write_text(c_code)
     else:
-        print(c_code)
+        sys.stdout.write(c_code)
 
     return 0
 
