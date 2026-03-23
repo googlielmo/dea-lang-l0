@@ -577,7 +577,7 @@ def test_codegen_match_simple(codegen_single):
         return
 
     # Should have switch on tag
-    assert "switch (_scrutinee.tag)" in c_code
+    assert "switch ((_scrutinee).tag)" in c_code
 
     # Should have case statements
     assert "case l0_main_Option_Some:" in c_code
@@ -644,7 +644,7 @@ def test_codegen_match_binds_pattern_variables(codegen_single):
         return
 
     # Should bind pattern variable
-    assert "l0_int value = _scrutinee.data.Int.value;" in c_code
+    assert "l0_int value = (_scrutinee).data.Int.value;" in c_code
 
 
 # ============================================================================

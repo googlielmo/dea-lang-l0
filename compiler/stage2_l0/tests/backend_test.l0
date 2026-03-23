@@ -415,8 +415,8 @@ func test_backend_generate_match_and_with_cleanup_block() {
         let generated = backend_generate(result, opts, cfg);
         assert(contains_s(generated, "struct l0_demo_main_MaybeInt _scrutinee = l0_demo_main_make();"),
             "match scrutinee temp mismatch");
-        assert(contains_s(generated, "switch (_scrutinee.tag) {"), "match lowering should switch on enum tag");
-        assert(contains_s(generated, "l0_int v = _scrutinee.data.Some.value;"), "pattern binding mismatch");
+        assert(contains_s(generated, "switch ((_scrutinee).tag) {"), "match lowering should switch on enum tag");
+        assert(contains_s(generated, "l0_int v = (_scrutinee).data.Some.value;"), "pattern binding mismatch");
         assert(contains_s(generated, "total = x;\n        }\n        {\n            total = x;"),
             "with cleanup block should run after body in header scope");
 
@@ -556,7 +556,7 @@ func test_backend_generate_new_and_try_lowering() {
         assert(contains_s(generated, "l0_demo_main_Result_Ok"),
             "enum variant new should initialize the variant tag");
         assert(contains_s(generated, "l0_opt_int l0_try_"), "try expression should materialize a temp");
-        assert(contains_s(generated, "if (!l0_try_"), "try expression should check has_value");
+        assert(contains_s(generated, "if (!((l0_try_"), "try expression should check has_value");
 
         analysis_result_free(result);
     }

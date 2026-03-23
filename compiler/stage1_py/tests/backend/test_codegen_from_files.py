@@ -185,7 +185,7 @@ class TestCodeGen:
         assert ".tag" in c_code
 
         # Verify match lowering to switch
-        assert "switch (_scrutinee.tag)" in c_code
+        assert "switch ((_scrutinee).tag)" in c_code
         assert "case l0_option_Option_Some:" in c_code
         assert "case l0_option_Option_None:" in c_code
 
@@ -779,7 +779,7 @@ class TestCodeGenFromFiles:
         c_code = backend.generate()
 
         # Verify switch statement
-        assert "switch (_scrutinee.tag)" in c_code
+        assert "switch ((_scrutinee).tag)" in c_code
 
         # Verify case labels
         assert "case l0_test_match_Result_Ok:" in c_code

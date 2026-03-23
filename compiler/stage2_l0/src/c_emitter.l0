@@ -1277,6 +1277,16 @@ func cem_emit_unary_op(op: string, c_operand: string) -> string {
 }
 
 /**
+ * Emit a negated condition expression for control-flow lowering.
+ *
+ * @param c_cond Lowered condition expression.
+ * @return Negated condition expression.
+ */
+func cem_emit_negated_condition(c_cond: string) -> string {
+    return cem_emit_unary_op("!", cem_emit_paren_expr(c_cond));
+}
+
+/**
  * Emit a binary operation expression.
  *
  * @param op Binary operator token.
@@ -1432,7 +1442,7 @@ func cem_emit_unwrap_opt(c_src_type: string, c_inner: string, type_str: string) 
  * @return Equality-check expression.
  */
 func cem_emit_null_check_eq(c_expr: string) -> string {
-    return concat4_s("(!((", c_expr, ").has_value", "))");
+    return concat4_s("(!(", cem_emit_optional_has_value(c_expr), "", "))");
 }
 
 /**
@@ -1442,7 +1452,7 @@ func cem_emit_null_check_eq(c_expr: string) -> string {
  * @return Inequality-check expression.
  */
 func cem_emit_null_check_ne(c_expr: string) -> string {
-    return concat4_s("((", c_expr, ").has_value", ")");
+    return cem_emit_optional_has_value(c_expr);
 }
 
 /**
@@ -1454,6 +1464,69 @@ func cem_emit_null_check_ne(c_expr: string) -> string {
  */
 func cem_emit_pointer_null_check(c_expr: string, op: string) -> string {
     return concat4_s("(", c_expr, concat3_s(" ", op, " NULL"), ")");
+}
+
+/**
+ * Emit access to an optional wrapper's `has_value` flag.
+ *
+ * @param c_expr Wrapper expression.
+ * @return Member-access expression.
+ */
+func cem_emit_optional_has_value(c_expr: string) -> string {
+    return concat4_s("(", c_expr, ").has_value", "");
+}
+
+/**
+ * Emit access to an optional wrapper's payload value.
+ *
+ * @param c_expr Wrapper expression.
+ * @return Member-access expression.
+ */
+func cem_emit_optional_value(c_expr: string) -> string {
+    return concat4_s("(", c_expr, ").value", "");
+}
+
+/**
+ * Emit access to an enum tag.
+ *
+ * @param c_expr Enum expression.
+ * @return Member-access expression.
+ */
+func cem_emit_enum_tag_access(c_expr: string) -> string {
+    return concat4_s("(", c_expr, ").tag", "");
+}
+
+/**
+ * Emit access to one enum payload field.
+ *
+ * @param c_expr Enum expression.
+ * @param variant Active variant name.
+ * @param field Field name.
+ * @return Member-access expression.
+ */
+func cem_emit_enum_payload_field_access(c_expr: string, variant: string, field: string) -> string {
+    return concat4_s(concat4_s("(", c_expr, ").data.", variant), ".", field, "");
+}
+
+/**
+ * Emit the runtime string-equality helper call.
+ *
+ * @param lhs Left operand.
+ * @param rhs Right operand.
+ * @return Call expression.
+ */
+func cem_emit_string_equals_call(lhs: string, rhs: string) -> string {
+    return concat4_s("rt_string_equals(", lhs, ", ", concat_s(rhs, ")"));
+}
+
+/**
+ * Emit a statement-context discard wrapper for an expression.
+ *
+ * @param c_expr Expression to discard.
+ * @return Wrapped expression.
+ */
+func cem_emit_discard_expr(c_expr: string) -> string {
+    return concat4_s("(void)(", c_expr, ")", "");
 }
 
 /**
@@ -1902,7 +1975,7 @@ func cem_emit_switch_start(self: CEmitter*, c_expr: string) {
  * @param scrutinee_name Scrutinee variable name.
  */
 func cem_emit_match_switch_start(self: CEmitter*, scrutinee_name: string) {
-    cem_emit_switch_start(self, concat3_s(scrutinee_name, ".", "tag"));
+    cem_emit_switch_start(self, cem_emit_enum_tag_access(scrutinee_name));
 }
 
 /**
@@ -2058,7 +2131,7 @@ func cem_emit_zero_init(self: CEmitter*, c_temp_name: string, c_base_type: strin
  * @param ret_none Lowered `none` return value.
  */
 func cem_emit_try_check_niche(self: CEmitter*, c_tmp: string, ret_none: string) {
-    ccb_emit(self.out, concat4_s("if (", c_tmp, " == NULL)", concat_s(" return ", concat_s(ret_none, ";"))));
+    ccb_emit(self.out, concat4_s("if ", cem_emit_pointer_null_check(c_tmp, "=="), "", concat_s(" return ", concat_s(ret_none, ";"))));
 }
 
 /**
@@ -2069,7 +2142,7 @@ func cem_emit_try_check_niche(self: CEmitter*, c_tmp: string, ret_none: string) 
  * @param ret_none Lowered `none` return value.
  */
 func cem_emit_try_check_value(self: CEmitter*, c_tmp: string, ret_none: string) {
-    ccb_emit(self.out, concat4_s("if (!", c_tmp, ".has_value)", concat_s(" return ", concat_s(ret_none, ";"))));
+    ccb_emit(self.out, concat4_s("if ", cem_emit_null_check_eq(c_tmp), "", concat_s(" return ", concat_s(ret_none, ";"))));
 }
 
 /**
@@ -2079,7 +2152,7 @@ func cem_emit_try_check_value(self: CEmitter*, c_tmp: string, ret_none: string) 
  * @return Lowered extraction expression.
  */
 func cem_emit_try_extract_value(c_tmp: string) -> string {
-    return concat4_s("(", c_tmp, ".value", ")");
+    return concat4_s("(", cem_emit_optional_value(c_tmp), "", ")");
 }
 
 /**
@@ -2091,7 +2164,7 @@ func cem_emit_try_extract_value(c_tmp: string) -> string {
  * @return Lowered payload access.
  */
 func cem_emit_pattern_binding_init(scrutinee: string, variant: string, field: string) -> string {
-    return concat4_s(scrutinee, ".data.", variant, concat_s(".", field));
+    return cem_emit_enum_payload_field_access(scrutinee, variant, field);
 }
 
 /**
@@ -2162,9 +2235,9 @@ func cem_emit_value_cleanup(self: CEmitter*, c_expr: string, ty: Type*) {
         if (ord(inner.kind) == ord(TY_POINTER) || !analysis_has_arc_data(cem_analysis(self), inner)) {
             return;
         }
-        ccb_emit(self.out, concat4_s("if ((", c_expr, ").has_value", ") {"));
+        ccb_emit(self.out, concat4_s("if (", cem_emit_optional_has_value(c_expr), ")", " {"));
         ccb_indent(self.out);
-        cem_emit_value_cleanup(self, concat4_s("(", c_expr, ").value", ""), inner);
+        cem_emit_value_cleanup(self, cem_emit_optional_value(c_expr), inner);
         ccb_dedent(self.out);
         ccb_emit(self.out, "}");
         return;
@@ -2178,7 +2251,7 @@ func cem_emit_value_cleanup(self: CEmitter*, c_expr: string, ty: Type*) {
         let fields = (info as StructInfo*).fields;
         for (let i = 0; i < vec_size(fields); i = i + 1) {
             let field = ptr_vec_get(fields, i) as StructFieldInfo*;
-            cem_emit_value_cleanup(self, concat4_s("(", c_expr, ").", field.name), field.field_type);
+            cem_emit_value_cleanup(self, cem_emit_field_access(c_expr, field.name, false), field.field_type);
         }
         return;
     }
@@ -2196,7 +2269,7 @@ func cem_emit_value_cleanup(self: CEmitter*, c_expr: string, ty: Type*) {
             return;
         }
 
-        cem_emit_switch_start(self, concat4_s("(", c_expr, ").tag", ""));
+        cem_emit_switch_start(self, cem_emit_enum_tag_access(c_expr));
         for (let i = 0; i < vec_size((decl as EnumDecl*).variants); i = i + 1) {
             let variant = ptr_vec_get((decl as EnumDecl*).variants, i) as EnumVariant*;
             let info2 = cem_find_enum_variant_info(enum_info as EnumInfo*, variant.name);
@@ -2220,9 +2293,7 @@ func cem_emit_value_cleanup(self: CEmitter*, c_expr: string, ty: Type*) {
             for (let j = 0; j < vec_size((info2 as EnumVariantInfo*).field_types); j = j + 1) {
                 let field_decl = ptr_vec_get(variant.fields, j) as FieldDecl*;
                 let field_ty = ptr_vec_get((info2 as EnumVariantInfo*).field_types, j) as Type*;
-                cem_emit_value_cleanup(self,
-                    concat4_s(concat4_s("(", c_expr, ").data.", variant.name), ".", field_decl.name, ""),
-                    field_ty);
+                cem_emit_value_cleanup(self, cem_emit_enum_payload_field_access(c_expr, variant.name, field_decl.name), field_ty);
             }
             cem_emit_exit_switch(self);
             ccb_dedent(self.out);

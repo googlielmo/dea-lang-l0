@@ -248,6 +248,14 @@ func test_emitter_expression_and_statement_helpers() {
         assert(eq_s(cem_emit_function_call("fn", "x, y"), "fn(x, y)"), "function call helper mismatch");
         assert(eq_s(cem_emit_field_access("obj", "x", false), "(obj).x"), "field access helper mismatch");
         assert(eq_s(cem_emit_cast("l0_int", "b"), "((l0_int)(b))"), "cast helper mismatch");
+        assert(eq_s(cem_emit_optional_has_value("opt"), "(opt).has_value"), "optional has-value helper mismatch");
+        assert(eq_s(cem_emit_optional_value("opt"), "(opt).value"), "optional value helper mismatch");
+        assert(eq_s(cem_emit_enum_tag_access("value"), "(value).tag"), "enum tag helper mismatch");
+        assert(eq_s(cem_emit_enum_payload_field_access("value", "Some", "inner"),
+            "(value).data.Some.inner"), "enum payload helper mismatch");
+        assert(eq_s(cem_emit_string_equals_call("lhs", "rhs"), "rt_string_equals(lhs, rhs)"),
+            "string-equals helper mismatch");
+        assert(eq_s(cem_emit_discard_expr("tmp"), "(void)(tmp)"), "discard helper mismatch");
         assert(eq_s(cem_emit_struct_constructor_for_type(point_ty, field_inits),
             "(struct l0_demo_main_Point){ .x = 1, .y = 2 }"), "struct constructor helper mismatch");
         assert(eq_s(cem_emit_variant_constructor_for_type(maybe_point_ty, "Some", payload_inits),
@@ -326,7 +334,7 @@ func test_emitter_cleanup_and_switch_helpers() {
     assert(contains_s(text, "rt_string_retain(name);"), "string retain helper mismatch");
     assert(contains_s(text, "rt_string_release(name);"), "string release helper mismatch");
     assert(contains_s(text, "struct l0_demo_main_Maybe _scrutinee = value;"), "scrutinee decl mismatch");
-    assert(contains_s(text, "switch (_scrutinee.tag) {"), "match switch helper mismatch");
+    assert(contains_s(text, "switch ((_scrutinee).tag) {"), "match switch helper mismatch");
     assert(contains_s(text, "case l0_demo_main_Maybe_Some:"), "case-label helper mismatch");
     assert(contains_s(text, "default:\nbreak;\n}"), "default/exit-switch helper mismatch");
     assert(contains_s(text, "rt_string_release((pt).name);"), "struct cleanup helper mismatch");

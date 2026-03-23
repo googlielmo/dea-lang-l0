@@ -689,9 +689,9 @@ func be_emit_retain_for_copied_value(self: Backend*, c_expr: string, ty: Type*) 
         if (cem_is_niche_nullable(ty) || !analysis_has_arc_data(self.result, ty.inner as Type*)) {
             return;
         }
-        cem_emit_if_header(self.emitter, concat4_s("(", c_expr, ").has_value", ""));
+        cem_emit_if_header(self.emitter, cem_emit_optional_has_value(c_expr));
         cem_emit_block_start(self.emitter);
-        be_emit_retain_for_copied_value(self, concat4_s("(", c_expr, ").value", ""), ty.inner as Type*);
+        be_emit_retain_for_copied_value(self, cem_emit_optional_value(c_expr), ty.inner as Type*);
         cem_emit_block_end(self.emitter);
         return;
     }
@@ -703,8 +703,7 @@ func be_emit_retain_for_copied_value(self: Backend*, c_expr: string, ty: Type*) 
         }
         for (let i = 0; i < vec_size((info as StructInfo*).fields); i = i + 1) {
             let field = ptr_vec_get((info as StructInfo*).fields, i) as StructFieldInfo*;
-            be_emit_retain_for_copied_value(self, concat4_s(concat4_s("(", c_expr, ").", field.name), "", "", ""),
-                field.field_type);
+            be_emit_retain_for_copied_value(self, cem_emit_field_access(c_expr, field.name, false), field.field_type);
         }
         return;
     }
@@ -716,7 +715,7 @@ func be_emit_retain_for_copied_value(self: Backend*, c_expr: string, ty: Type*) 
             return;
         }
 
-        cem_emit_switch_start(self.emitter, concat4_s("(", c_expr, ").tag", ""));
+        cem_emit_switch_start(self.emitter, cem_emit_enum_tag_access(c_expr));
         for (let i = 0; i < vec_size((decl as EnumDecl*).variants); i = i + 1) {
             let variant = ptr_vec_get((decl as EnumDecl*).variants, i) as EnumVariant*;
             let info2 = cem_find_enum_variant_info(enum_info as EnumInfo*, variant.name);
@@ -728,9 +727,7 @@ func be_emit_retain_for_copied_value(self: Backend*, c_expr: string, ty: Type*) 
             for (let j = 0; j < vec_size((info2 as EnumVariantInfo*).field_types); j = j + 1) {
                 let field_decl = ptr_vec_get(variant.fields, j) as FieldDecl*;
                 let field_ty = ptr_vec_get((info2 as EnumVariantInfo*).field_types, j) as Type*;
-                be_emit_retain_for_copied_value(self,
-                    concat4_s(concat4_s("(", c_expr, ").data.", variant.name), ".", field_decl.name, ""),
-                    field_ty);
+                be_emit_retain_for_copied_value(self, cem_emit_enum_payload_field_access(c_expr, variant.name, field_decl.name), field_ty);
             }
             cem_emit_exit_switch(self.emitter);
             cem_emit_block_end(self.emitter);
@@ -1903,7 +1900,7 @@ func be_emit_expr(self: Backend*, expr_id: ExprId) -> string {
 
                 if (cem_is_niche_nullable(src_ty as Type*)) {
                     if (be_scope_chain_has_cleanup(self)) {
-                        cem_emit_if_header(self.emitter, concat4_s(tmp, " == NULL", "", ""));
+                        cem_emit_if_header(self.emitter, cem_emit_pointer_null_check(tmp, "=="));
                         cem_emit_block_start(self.emitter);
                         be_emit_cleanup_for_return(self, null);
                         cem_emit_return_stmt(self.emitter, ret_none);
@@ -1915,7 +1912,7 @@ func be_emit_expr(self: Backend*, expr_id: ExprId) -> string {
                 }
 
                 if (be_scope_chain_has_cleanup(self)) {
-                    cem_emit_if_header(self.emitter, concat4_s("!", tmp, ".has_value", ""));
+                    cem_emit_if_header(self.emitter, cem_emit_null_check_eq(tmp));
                     cem_emit_block_start(self.emitter);
                     be_emit_cleanup_for_return(self, null);
                     cem_emit_return_stmt(self.emitter, ret_none);
@@ -2262,7 +2259,7 @@ func be_emit_case_stmt(self: Backend*, stmt: StmtNode*) {
         if (type_is_builtin(scrutinee_ty as Type*, "string")) {
             for (let i = 0; i < vec_size(arms); i = i + 1) {
                 let arm = ptr_vec_get(arms, i) as CaseArm*;
-                let cond = concat4_s("rt_string_equals(_scrutinee, ", be_emit_case_literal(self, arm.literal), ")", "");
+                let cond = cem_emit_string_equals_call("_scrutinee", be_emit_case_literal(self, arm.literal));
                 if (i == 0) {
                     cem_emit_if_header(self.emitter, cond);
                 } else {
@@ -2630,7 +2627,7 @@ func be_emit_stmt(self: Backend*, stmt_id: StmtId) {
                 } else if (expr_ty != null &&
                            ord(expr_arena_get(be_current_expr_arena(self), stmt.expr_a).kind) == ord(EX_TRY) &&
                            !analysis_has_arc_data(self.result, expr_ty as Type*)) {
-                    cem_emit_expr_stmt(self.emitter, concat4_s("(void)(", c_expr, ")", ""));
+                    cem_emit_expr_stmt(self.emitter, cem_emit_discard_expr(c_expr));
                 } else {
                     cem_emit_expr_stmt(self.emitter, c_expr);
                 }
@@ -2657,7 +2654,7 @@ func be_emit_stmt(self: Backend*, stmt_id: StmtId) {
             cem_emit_while_header(self.emitter, cem_emit_bool_literal(true));
             cem_emit_block_start(self.emitter);
             let c_cond = be_emit_condition_value(self, stmt.expr_a);
-            cem_emit_if_header(self.emitter, concat4_s("!(", c_cond, ")", ""));
+            cem_emit_if_header(self.emitter, cem_emit_negated_condition(c_cond));
             cem_emit_block_start(self.emitter);
             cem_emit_goto(self.emitter, break_label);
             cem_emit_block_end(self.emitter);
@@ -2689,7 +2686,7 @@ func be_emit_stmt(self: Backend*, stmt_id: StmtId) {
             cem_emit_block_start(self.emitter);
             if (stmt.expr_a >= 0) {
                 let c_cond2 = be_emit_condition_value(self, stmt.expr_a);
-                cem_emit_if_header(self.emitter, concat4_s("!(", c_cond2, ")", ""));
+                cem_emit_if_header(self.emitter, cem_emit_negated_condition(c_cond2));
                 cem_emit_block_start(self.emitter);
                 cem_emit_goto(self.emitter, break_label2);
                 cem_emit_block_end(self.emitter);

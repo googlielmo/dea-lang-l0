@@ -52,7 +52,7 @@ l0_int l0_main_main(void)
             __cond_false_4:;
             __cond_end_5:;
             }
-            if (!(l0_cond_1))
+            if ((!(l0_cond_1)))
             {
                 goto __lbrk_1;
             }
@@ -99,7 +99,7 @@ __lbrk_1:;
         __cond_false_12:;
         __cond_end_13:;
         }
-        if (!(l0_cond_3))
+        if ((!(l0_cond_3)))
         {
             goto __lbrk_9;
         }

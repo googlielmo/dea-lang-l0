@@ -1425,7 +1425,7 @@ class Backend:
         self.emitter.emit_block_start()
 
         c_cond = self._emit_condition_value(stmt.cond)
-        self.emitter.emit_if_header(f"!({c_cond})")
+        self.emitter.emit_if_header(self.emitter.emit_negated_condition(c_cond))
         self.emitter.emit_block_start()
         self.emitter.emit_goto(break_label)
         self.emitter.emit_block_end()
@@ -1472,7 +1472,7 @@ class Backend:
         self.emitter.emit_block_start()
         if stmt.cond:
             c_cond = self._emit_condition_value(stmt.cond)
-            self.emitter.emit_if_header(f"!({c_cond})")
+            self.emitter.emit_if_header(self.emitter.emit_negated_condition(c_cond))
             self.emitter.emit_block_start()
             self.emitter.emit_goto(break_label)
             self.emitter.emit_block_end()
@@ -1826,9 +1826,9 @@ class Backend:
             if not self.analysis.has_arc_data(ty.inner):
                 return
 
-            self.emitter.emit_if_header(f"({c_expr}).has_value")
+            self.emitter.emit_if_header(self.emitter.emit_optional_has_value(c_expr))
             self.emitter.emit_block_start()
-            self._emit_retain_for_copied_value(f"({c_expr}).value", ty.inner)
+            self._emit_retain_for_copied_value(self.emitter.emit_optional_value(c_expr), ty.inner)
             self.emitter.emit_block_end()
             return
 
@@ -1837,7 +1837,7 @@ class Backend:
             if info is None:
                 return
             for field in info.fields:
-                self._emit_retain_for_copied_value(f"({c_expr}).{field.name}", field.type)
+                self._emit_retain_for_copied_value(self.emitter.emit_field_access(c_expr, field.name, False), field.type)
             return
 
         if isinstance(ty, EnumType):
@@ -1845,7 +1845,7 @@ class Backend:
             if enum_info is None:
                 return
 
-            self.emitter.emit_switch_start(f"({c_expr}).tag")
+            self.emitter.emit_switch_start(self.emitter.emit_enum_tag_access(c_expr))
             for variant_name, variant_info in enum_info.variants.items():
                 c_tag = self.emitter.emit_enum_tag(ty, variant_name)
                 self.emitter.emit_case_label(c_tag)
@@ -1856,7 +1856,7 @@ class Backend:
                     self.ice(f"[ICE-1304] missing variant decl for {ty.module}.{ty.name}.{variant_name}")
 
                 for field, field_ty in zip(variant_decl.fields, variant_info.field_types):
-                    field_expr = f"({c_expr}).data.{variant_name}.{field.name}"
+                    field_expr = self.emitter.emit_enum_payload_field_access(c_expr, variant_name, field.name)
                     self._emit_retain_for_copied_value(field_expr, field_ty)
 
                 self.emitter.emit_exit_switch()
@@ -2011,7 +2011,7 @@ class Backend:
             else:
                 for index, arm in enumerate(stmt.arms):
                     c_literal = self._emit_case_literal(arm.literal)
-                    condition = f"rt_string_equals(_scrutinee, {c_literal})"
+                    condition = self.emitter.emit_string_equals_call("_scrutinee", c_literal)
                     if index == 0:
                         self.emitter.emit_if_header(condition)
                     else:
@@ -2938,7 +2938,7 @@ class Backend:
 
             if self.emitter.is_niche_nullable(src_ty):
                 if needs_cleanup:
-                    self.emitter.emit_if_header(f"{tmp} == NULL")
+                    self.emitter.emit_if_header(self.emitter.emit_pointer_null_check(tmp, "=="))
                     self.emitter.emit_block_start()
                     self._emit_cleanup_for_return()
                     self.emitter.emit_return_stmt(ret_none)
@@ -2948,7 +2948,7 @@ class Backend:
                 return tmp  # unwraps to the pointer itself
 
             if needs_cleanup:
-                self.emitter.emit_if_header(f"!{tmp}.has_value")
+                self.emitter.emit_if_header(self.emitter.emit_null_check_eq(tmp))
                 self.emitter.emit_block_start()
                 self._emit_cleanup_for_return()
                 self.emitter.emit_return_stmt(ret_none)
@@ -2961,7 +2961,7 @@ class Backend:
                 # so ExprStmt can materialize/release them correctly.
                 if self.analysis.has_arc_data(src_ty.inner):
                     return extracted
-                return f"(void)({extracted})"
+                return self.emitter.emit_discard_expr(extracted)
             return extracted
 
         self.ice(f"[ICE-9149] unknown expression type: {type(expr).__name__}", node=expr)

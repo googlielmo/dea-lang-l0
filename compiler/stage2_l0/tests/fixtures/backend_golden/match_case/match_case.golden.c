@@ -89,10 +89,10 @@ l0_int l0_main_main(void)
     }
     {
         struct l0_main_MaybeInt _scrutinee = l0_main_make(1);
-        switch (_scrutinee.tag) {
+        switch ((_scrutinee).tag) {
         case l0_main_MaybeInt_Some:
         {
-            l0_int v = _scrutinee.data.Some.value;
+            l0_int v = (_scrutinee).data.Some.value;
             total = (_rt_iadd(total, v));
             break;
         }

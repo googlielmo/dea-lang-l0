@@ -3,7 +3,7 @@
 ## Move backend-owned C fragments behind emitter helpers in both stages
 
 - Date: 2026-03-22
-- Status: Draft
+- Status: Closed (implemented)
 - Title: Move backend-owned C fragments behind emitter helpers in Stage 1 and Stage 2
 - Kind: Refactor
 - Severity: Medium (internal backend/emitter boundary cleanup with parity-sensitive risk)
@@ -135,6 +135,17 @@ The emitter should own:
    - expected backend metadata/text
    - should still move into emitter
 3. Either finish the remaining obvious cases or explicitly document why they remain backend-owned.
+
+## Closure Notes
+
+1. Phase 1 landed emitter-owned helpers for optional checks and extraction, pointer-null checks, discard wrappers, and
+   string-equality spellings in both stages.
+2. Phase 2 landed emitter-owned enum-tag, enum-payload, and struct-field access across retain, cleanup, pattern binding,
+   and `match` lowering paths.
+3. Phase 3 landed emitter-owned negated-condition wrappers in backend loop lowering.
+4. A residual inventory over `compiler/stage1_py/l0_backend.py` and `compiler/stage2_l0/src/backend.l0` no longer showed
+   remaining obvious backend-owned C spelling from the planned fragment families; the remaining string assembly is
+   backend metadata, diagnostics, or explanatory comments rather than direct C fragment ownership.
 
 ## Helper Design Rules
 

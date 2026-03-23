@@ -919,9 +919,9 @@ class CEmitter:
                 return
             if not self.analysis.has_arc_data(ty.inner):
                 return
-            self.out.emit(f"if (({c_expr}).has_value) {{")
+            self.out.emit(f"if ({self.emit_optional_has_value(c_expr)}) {{")
             self.out.indent()
-            self._emit_cleanup_by_type(f"({c_expr}).value", ty.inner)
+            self._emit_cleanup_by_type(self.emit_optional_value(c_expr), ty.inner)
             self.out.dedent()
             self.out.emit("}")
             return
@@ -932,7 +932,7 @@ class CEmitter:
                 return
 
             for field_ in info.fields:
-                self._emit_cleanup_by_type(f"({c_expr}).{field_.name}", field_.type)
+                self._emit_cleanup_by_type(self.emit_field_access(c_expr, field_.name, False), field_.type)
             return
 
         if isinstance(ty, EnumType):
@@ -942,8 +942,8 @@ class CEmitter:
         """Emit C cleanup code for an enum by-value variable."""
         self._emit_enum_cleanup_switch(
             enum_type,
-            f"({c_expr}).tag",
-            lambda variant_name, field_name: f"({c_expr}).data.{variant_name}.{field_name}",
+            self.emit_enum_tag_access(c_expr),
+            lambda variant_name, field_name: self.emit_enum_payload_field_access(c_expr, variant_name, field_name),
             missing_info_is_ice=False,
         )
 
@@ -1240,6 +1240,10 @@ class CEmitter:
         """
         return f"({op}{c_operand})"
 
+    def emit_negated_condition(self, c_cond: str) -> str:
+        """Emit a negated condition expression for control-flow lowering."""
+        return self.emit_unary_op("!", self.emit_paren_expr(c_cond))
+
     def emit_binary_op(self, op: str, c_left: str, c_right: str) -> str:
         """Emit C code for a simple binary operation.
 
@@ -1338,11 +1342,11 @@ class CEmitter:
 
     def emit_null_check_eq(self, c_expr: str) -> str:
         """Emit C code for null equality check (opt == null)."""
-        return f"(!(({c_expr}).has_value))"
+        return f"(!({self.emit_optional_has_value(c_expr)}))"
 
     def emit_null_check_ne(self, c_expr: str) -> str:
         """Emit C code for null inequality check (opt != null)."""
-        return f"(({c_expr}).has_value)"
+        return self.emit_optional_has_value(c_expr)
 
     def emit_pointer_null_check(self, c_expr: str, op: str) -> str:
         """Emit C code for pointer null comparison.
@@ -1355,6 +1359,30 @@ class CEmitter:
             C comparison expression string.
         """
         return f"({c_expr} {op} NULL)"
+
+    def emit_optional_has_value(self, c_expr: str) -> str:
+        """Emit C code for reading an optional wrapper's has-value flag."""
+        return f"({c_expr}).has_value"
+
+    def emit_optional_value(self, c_expr: str) -> str:
+        """Emit C code for reading an optional wrapper's payload value."""
+        return f"({c_expr}).value"
+
+    def emit_enum_tag_access(self, c_expr: str) -> str:
+        """Emit C code for reading an enum tag."""
+        return f"({c_expr}).tag"
+
+    def emit_enum_payload_field_access(self, c_expr: str, variant: str, field: str) -> str:
+        """Emit C code for reading a field from an enum payload."""
+        return f"({c_expr}).data.{variant}.{field}"
+
+    def emit_string_equals_call(self, lhs: str, rhs: str) -> str:
+        """Emit the runtime string-equality helper call."""
+        return f"rt_string_equals({lhs}, {rhs})"
+
+    def emit_discard_expr(self, c_expr: str) -> str:
+        """Emit a statement-context discard wrapper for an expression."""
+        return f"(void)({c_expr})"
 
     # ============================================================================
     # Lvalue Emission (C syntax for lvalues)
@@ -1487,7 +1515,7 @@ class CEmitter:
         Returns:
             C field access expression string.
         """
-        return f"{scrutinee}.data.{variant}.{field}"
+        return self.emit_enum_payload_field_access(scrutinee, variant, field)
 
     # ============================================================================
     # Statement Emission (C syntax for statements)
@@ -1660,7 +1688,7 @@ class CEmitter:
         Args:
             scrutinee_name: Identifier of the scrutinee variable.
         """
-        self.emit_switch_start(f"{scrutinee_name}.tag")
+        self.emit_switch_start(self.emit_enum_tag_access(scrutinee_name))
 
     def emit_switch_end(self) -> None:
         """Emit a C switch statement closing brace."""
@@ -1771,7 +1799,7 @@ class CEmitter:
             c_tmp: C identifier of the temporary holding the optional.
             ret_none: C expression for the 'none' return value.
         """
-        self.out.emit(f"if ({c_tmp} == NULL) return {ret_none};")
+        self.out.emit(f"if {self.emit_pointer_null_check(c_tmp, '==')} return {ret_none};")
 
     def emit_try_check_value(self, c_tmp: str, ret_none: str) -> None:
         """Emit a has_value check for a value-optional.
@@ -1780,7 +1808,7 @@ class CEmitter:
             c_tmp: C identifier of the temporary holding the optional.
             ret_none: C expression for the 'none' return value.
         """
-        self.out.emit(f"if (!{c_tmp}.has_value) return {ret_none};")
+        self.out.emit(f"if {self.emit_null_check_eq(c_tmp)} return {ret_none};")
 
     def emit_try_extract_value(self, c_tmp: str) -> str:
         """Emit C code to extract the inner value from an optional.
@@ -1791,4 +1819,4 @@ class CEmitter:
         Returns:
             C expression string for the extracted value.
         """
-        return f"({c_tmp}.value)"
+        return f"({self.emit_optional_value(c_tmp)})"

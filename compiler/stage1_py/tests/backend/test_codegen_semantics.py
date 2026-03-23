@@ -58,7 +58,7 @@ def test_codegen_enum_tagging_and_match_switch(codegen_single):
     assert "enum l0_main_Option_tag" in c_code
     assert "l0_main_Option_None" in c_code
     assert "l0_main_Option_Some" in c_code
-    assert "switch (_scrutinee.tag)" in c_code
+    assert "switch ((_scrutinee).tag)" in c_code
 
 
 def test_codegen_struct_field_access_and_nullability(codegen_single):
