@@ -1,0 +1,182 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+# Copyright (c) 2026 gwz
+#
+# Reference workflow for a Chirpy/Jekyll blog repository that polls Dea
+# releases for new API-docs archives and commits them automatically.
+#
+# Installation:
+#   1. Copy this file to <blog-repo>/.github/workflows/poll-dea-docs.yml
+#   2. Set the repository variable DEA_SOURCE_REPO (e.g. "dea-lang/dea")
+#   3. Optionally set BLOG_DOCS_PREFIX (default: "api/reference")
+#   4. Add secret BLOG_PUSH_PAT (fine-grained token with contents:write on the
+#      blog repo) — required so pushes trigger downstream workflows
+#   5. For run_id downloads: add secret DEA_ARTIFACTS_TOKEN (fine-grained token
+#      with actions:read on the source repo(s))
+#   6. Adjust the cron schedule to taste
+#
+# Trigger modes:
+#   - Scheduled poll   — cron checks for new Dea releases
+#   - repository_dispatch (event_type: blog-docs-update) — fired by Dea
+#   - workflow_dispatch — manual re-sync with optional tag or run ID override
+
+name: Poll and Sync Dea API Docs
+
+on:
+  schedule:
+    - cron: "17 */4 * * *"            # every 4 hours at :17
+  repository_dispatch:
+    types: [blog-docs-update]
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Specific Dea release tag to sync (leave empty for latest)"
+        required: false
+        default: ""
+        type: string
+      run_id:
+        description: "Dea workflow run ID to download blog-export artifact from (bypasses release asset lookup)"
+        required: false
+        default: ""
+        type: string
+      run_repo:
+        description: "Repository that owns the run ID, if different from DEA_SOURCE_REPO (e.g. org/repo)"
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  sync-docs:
+    runs-on: ubuntu-latest
+    env:
+      DEA_SOURCE_REPO: ${{ vars.DEA_SOURCE_REPO }}
+      BLOG_DOCS_PREFIX: ${{ vars.BLOG_DOCS_PREFIX || 'api/reference' }}
+    steps:
+      - name: Check out blog repository
+        uses: actions/checkout@v6
+        with:
+          token: ${{ secrets.BLOG_PUSH_PAT }}
+
+      - name: Validate configuration
+        run: |
+          if [ -z "$DEA_SOURCE_REPO" ]; then
+            echo "::error::Repository variable DEA_SOURCE_REPO is required (e.g. 'dea-lang/dea')."
+            exit 1
+          fi
+
+      # ── Determine target release tag ──────────────────────────────
+      - name: Resolve source
+        id: resolve
+        env:
+          INPUT_TAG: ${{ inputs.release_tag }}
+          INPUT_RUN_ID: ${{ inputs.run_id }}
+          DISPATCH_TAG: ${{ github.event.client_payload.release_tag }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Workflow run ID bypasses tag resolution; download handled separately
+          if [ -n "$INPUT_RUN_ID" ]; then
+            echo "run_id=$INPUT_RUN_ID" >> "$GITHUB_OUTPUT"
+            echo "tag=" >> "$GITHUB_OUTPUT"
+            echo "Using workflow run ID: $INPUT_RUN_ID"
+            exit 0
+          fi
+
+          # Priority: manual input > dispatch payload > latest release
+          if [ -n "$INPUT_TAG" ]; then
+            tag="$INPUT_TAG"
+          elif [ -n "$DISPATCH_TAG" ]; then
+            tag="$DISPATCH_TAG"
+          else
+            tag="$(gh api "repos/$DEA_SOURCE_REPO/releases/latest" --jq '.tag_name' 2>/dev/null || true)"
+            if [ -z "$tag" ]; then
+              echo "::warning::No releases found in $DEA_SOURCE_REPO; nothing to do."
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "url=https://github.com/$DEA_SOURCE_REPO/releases/download/$tag/blog-export.tar.gz" >> "$GITHUB_OUTPUT"
+          echo "Resolved release tag: $tag"
+
+      # ── Check whether this version was already synced ─────────────
+      - name: Check version marker
+        if: steps.resolve.outputs.skip != 'true' && steps.resolve.outputs.tag != ''
+        id: marker
+        env:
+          TAG: ${{ steps.resolve.outputs.tag }}
+        run: |
+          marker_file=".dea-docs-version"
+          if [ -f "$marker_file" ] && [ "$(cat "$marker_file")" = "$TAG" ]; then
+            echo "Already at $TAG — nothing to do."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # ── Download the blog export archive ──────────────────────────
+      - name: Download from workflow run artifact
+        if: steps.resolve.outputs.skip != 'true' && steps.marker.outputs.skip != 'true' && steps.resolve.outputs.run_id != ''
+        env:
+          RUN_ID: ${{ steps.resolve.outputs.run_id }}
+          RUN_REPO: ${{ inputs.run_repo }}
+          GH_TOKEN: ${{ secrets.DEA_ARTIFACTS_TOKEN || github.token }}
+        run: |
+          repo="${RUN_REPO:-$DEA_SOURCE_REPO}"
+          echo "Downloading blog-export artifact from run $RUN_ID in $repo"
+          gh run download "$RUN_ID" -n blog-export -R "$repo"
+
+      - name: Download from release asset
+        if: steps.resolve.outputs.skip != 'true' && steps.marker.outputs.skip != 'true' && steps.resolve.outputs.run_id == ''
+        env:
+          ARCHIVE_URL: ${{ steps.resolve.outputs.url }}
+        run: |
+          echo "Downloading $ARCHIVE_URL"
+          curl -fsSL -o blog-export.tar.gz "$ARCHIVE_URL"
+
+      - name: Unpack archive into blog tree
+        if: steps.resolve.outputs.skip != 'true' && steps.marker.outputs.skip != 'true'
+        env:
+          TAG: ${{ steps.resolve.outputs.tag }}
+        run: |
+          # Clean previous API docs
+          rm -f "_tabs/api.md"
+          rm -rf "$BLOG_DOCS_PREFIX"
+
+          # Unpack; archive root contains _tabs/ and the docs prefix tree
+          mkdir -p _tabs
+          mkdir -p "$(dirname "$BLOG_DOCS_PREFIX")"
+          tar -xzf blog-export.tar.gz
+
+          # Update version marker (tag or URL fingerprint)
+          if [ -n "$TAG" ]; then
+            echo "$TAG" > .dea-docs-version
+          else
+            echo "manual-$(date -u +%Y%m%dT%H%M%SZ)" > .dea-docs-version
+          fi
+
+          rm -f blog-export.tar.gz
+
+      # ── Commit and push ───────────────────────────────────────────
+      - name: Commit and push
+        if: steps.resolve.outputs.skip != 'true' && steps.marker.outputs.skip != 'true'
+        env:
+          TAG: ${{ steps.resolve.outputs.tag }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add _tabs/api.md "$BLOG_DOCS_PREFIX" .dea-docs-version
+          if git diff --cached --quiet; then
+            echo "No changes after sync — nothing to commit."
+            exit 0
+          fi
+
+          if [ -n "$TAG" ]; then
+            message="Sync API docs from Dea $TAG"
+          else
+            message="Sync API docs from Dea (manual archive import)"
+          fi
+          git commit -m "$message"
+          git push origin HEAD

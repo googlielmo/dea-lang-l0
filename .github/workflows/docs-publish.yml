@@ -15,7 +15,7 @@ on:
         default: true
         type: boolean
       publish_blog:
-        description: "Sync generated API pages into the Chirpy blog repo"
+        description: "Build and upload Chirpy blog export archive to release"
         required: true
         default: false
         type: boolean
@@ -89,7 +89,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: gh release upload "$TARGET_RELEASE_TAG" build/docs/pdf/refman.pdf --clobber --repo "$GITHUB_REPOSITORY"
 
-  sync-blog:
+  upload-blog-export:
     needs:
       - build-docs
       - deploy-pages
@@ -100,8 +100,6 @@ jobs:
       (github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && inputs.publish_blog))
     runs-on: ubuntu-latest
     env:
-      BLOG_REPO: ${{ vars.BLOG_REPO }}
-      BLOG_BRANCH: ${{ vars.BLOG_BRANCH }}
       BLOG_DOCS_PREFIX: ${{ vars.BLOG_DOCS_PREFIX }}
       BLOG_TAB_TITLE: ${{ vars.BLOG_TAB_TITLE }}
       BLOG_TAB_ICON: ${{ vars.BLOG_TAB_ICON }}
@@ -111,17 +109,6 @@ jobs:
     steps:
       - name: Check out source repository
         uses: actions/checkout@v6
-
-      - name: Validate blog sync configuration
-        run: |
-          if [ -z "$BLOG_REPO" ]; then
-            echo "Error: repository variable BLOG_REPO is required." >&2
-            exit 1
-          fi
-          if [ -z "${{ secrets.BLOG_PUSH_TOKEN }}" ]; then
-            echo "Error: secret BLOG_PUSH_TOKEN is required." >&2
-            exit 1
-          fi
 
       - name: Set up Python
         uses: actions/setup-python@v6
@@ -133,14 +120,6 @@ jobs:
         with:
           name: docs-markdown
           path: build/docs/markdown
-
-      - name: Check out blog repository
-        uses: actions/checkout@v6
-        with:
-          repository: ${{ vars.BLOG_REPO }}
-          ref: ${{ vars.BLOG_BRANCH || 'main' }}
-          token: ${{ secrets.BLOG_PUSH_TOKEN }}
-          path: blog-repo
 
       - name: Export Chirpy API pages
         run: |
@@ -165,34 +144,55 @@ jobs:
             --tab-order "$tab_order" \
             --html-site-url "$html_site_url" \
             --pdf-url "$pdf_url"
-          echo "RESOLVED_DOCS_PREFIX=$docs_prefix" >> "$GITHUB_ENV"
 
-      - name: Sync exported API pages into blog repo
-        run: |
-          rm -f "blog-repo/_tabs/api.md"
-          rm -rf "blog-repo/$RESOLVED_DOCS_PREFIX"
-          mkdir -p "blog-repo/_tabs"
-          mkdir -p "blog-repo/$(dirname "$RESOLVED_DOCS_PREFIX")"
-          cp build/docs/blog-export/_tabs/api.md blog-repo/_tabs/api.md
-          cp -R "build/docs/blog-export/$RESOLVED_DOCS_PREFIX" "blog-repo/$RESOLVED_DOCS_PREFIX"
+      - name: Create blog export archive
+        run: tar -czf blog-export.tar.gz -C build/docs/blog-export .
 
-      - name: Commit and push blog update
+      - name: Upload blog export artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: blog-export
+          path: blog-export.tar.gz
+
+      - name: Resolve release tag
         env:
           EVENT_NAME: ${{ github.event_name }}
           RELEASE_TAG: ${{ github.event.release.tag_name }}
+          INPUT_RELEASE_TAG: ${{ inputs.release_tag }}
         run: |
-          cd blog-repo
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add _tabs/api.md "$RESOLVED_DOCS_PREFIX"
-          if git diff --cached --quiet; then
-            echo "No blog changes to commit."
+          if [ "$EVENT_NAME" = "release" ]; then
+            echo "TARGET_RELEASE_TAG=$RELEASE_TAG" >> "$GITHUB_ENV"
             exit 0
           fi
-          if [ "$EVENT_NAME" = "release" ]; then
-            message="Sync API docs from L0 $RELEASE_TAG (${GITHUB_SHA})"
-          else
-            message="Sync API docs from L0 manual publish (${GITHUB_SHA})"
+          if [ -n "$INPUT_RELEASE_TAG" ]; then
+            echo "TARGET_RELEASE_TAG=$INPUT_RELEASE_TAG" >> "$GITHUB_ENV"
+            exit 0
           fi
-          git commit -m "$message"
-          git push origin HEAD
+          fallback="$(git describe --tags --abbrev=0 2>/dev/null || true)"
+          if [ -n "$fallback" ]; then
+            echo "TARGET_RELEASE_TAG=$fallback" >> "$GITHUB_ENV"
+          else
+            echo "::warning::No release tag found; skipping archive upload."
+          fi
+
+      - name: Upload blog export to release
+        if: env.TARGET_RELEASE_TAG != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$TARGET_RELEASE_TAG" blog-export.tar.gz --clobber --repo "$GITHUB_REPOSITORY"
+
+      - name: Fire repository_dispatch (optional)
+        if: vars.BLOG_REPO != ''
+        env:
+          GH_TOKEN: ${{ secrets.BLOG_PUSH_TOKEN }}
+          BLOG_REPO: ${{ vars.BLOG_REPO }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::warning::BLOG_REPO is set but BLOG_PUSH_TOKEN is missing; skipping dispatch."
+            exit 0
+          fi
+          gh api "repos/$BLOG_REPO/dispatches" \
+            -f event_type=blog-docs-update \
+            -f "client_payload[release_tag]=$TARGET_RELEASE_TAG" \
+            -f "client_payload[source_repo]=$GITHUB_REPOSITORY" \
+            -f "client_payload[source_sha]=$GITHUB_SHA"
