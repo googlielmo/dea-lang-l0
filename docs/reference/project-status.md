@@ -2,7 +2,8 @@
 
 Version: 2026-03-24
 
-This document summarizes what is implemented in this repository today and what remains open.
+This document summarizes what is implemented in this repository today and what defines the Dea/L0 `1.0.0` stabilization
+target.
 
 ## Scope and Canonical References
 
@@ -62,15 +63,15 @@ filesystem access, time, randomness, assertions, optionals, and the current cont
 
 ## Platform Support
 
-The current validated support matrix is:
+The `1.0.0` support promise is:
 
 - Tier 1 hosts: Linux and macOS for Stage 1 and Stage 2 workflows.
 - Tier 1 Windows toolchain: MSYS2 `MINGW64` with MinGW-w64/GCC for build, test, install, and distribution workflows.
-- Tier 2 / experimental: MSVC-family builds remain outside the validated release matrix.
+- Tier 2 / experimental: MSVC-family builds remain outside the `1.0.0` validated matrix.
 
 ## Known Limitations and Constraints
 
-These remain true in the current implementation:
+These remain true in the `1.0.0` language/compiler contract:
 
 1. Backend output is one C translation unit (no multi-object/header split pipeline yet).
 2. Arrays/slices are not implemented; indexing syntax exists but unsupported targets are rejected.
@@ -78,10 +79,17 @@ These remain true in the current implementation:
 4. No generics, traits, or macros.
 5. Reserved/future keywords and operators are lexed for diagnostics and staged evolution.
 
-## Short Roadmap
+## 1.0 Stabilization Notes
 
-Near-term project direction, consistent with current docs/code:
+The remaining `1.0.0` work is release-definition work, not major compiler-surface expansion:
 
-1. The `v0.9.1` patch release is the current milestone for minor fixes on the self-hosted Stage 2 line.
-2. After `v0.9.1`, begin the `1.0.0.dev0` stabilization cycle on the next development commit.
-3. Bitwise operators, top-level `const`, and further language extensions are deferred to Dea/L1.
+1. Keep the current Stage 1/Stage 2 CLI, semantics, and stdlib surface stable for the `1.0.x` line.
+2. Keep the existing validation gates (`make test-all`, `make triple-test`, workflow/distribution checks, and strict
+   docs generation) as release criteria.
+3. Treat the limitations listed above as explicit L0 scope boundaries, not deferred `1.0.0` blockers.
+
+## Post-1.0 Direction
+
+After Dea/L0 `1.0.0`, further language growth belongs to later levels of the language family:
+
+1. Bitwise operators, top-level `const`, and further language extensions are deferred to Dea/L1.
