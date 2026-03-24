@@ -9,7 +9,10 @@ This directory is organized by document intent first, then subsystem.
 - `implementation/`: implementation-oriented specs and design notes.
 - `proposals/`: planned or in-discussion changes and new features.
 - `plans/`: execution plans, especially bug-fix plans.
-- `attic/`: superseded or obsolete documents.
+- `attic/`: superseded or obsolete documents when archival storage is needed.
+
+Create subdirectories only when they are needed for real documents. Do not keep empty placeholders or `.gitkeep` entries
+in `docs/`; recreate directories on demand.
 
 Generated API documentation is not stored in this tree. The docs pipeline writes generated HTML, Markdown, Doxygen XML,
 and Doxygen LaTeX under `build/docs/`. When `./scripts/gen-docs.sh --pdf` is used, the built PDF is copied to
@@ -123,11 +126,14 @@ Tracker values:
 - `noref` when no tracking system item exists yet.
 - `ref-gh-<number>`, `ref-jira-<key>`, or equivalent when available.
 
-## Attic Policy
+## Archived Documents
 
-- `attic/` mirrors the live tree (`reference`, `specs`, `implementation`, `proposals`, `plans`).
-- Do not use `attic/` as per-change version history; git already provides history.
-- Archive only superseded/obsolete docs.
+Use `docs/attic/` only for superseded or obsolete documents.
+
+- Do not use `docs/attic/` as per-change version history; git already provides history.
+- Archive only retired docs; routine edits stay in the live tree.
+- When `docs/attic/` exists, keep any subdirectories aligned with the live docs tree (`reference/`, `specs/`,
+  `implementation/`, `proposals/`, `plans/`).
 
 Archived file naming pattern:
 

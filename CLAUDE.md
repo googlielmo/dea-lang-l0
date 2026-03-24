@@ -34,7 +34,7 @@ Documentation policy:
 - `docs/README.md` for docs placement, naming, metadata standards, and attic rules.
 - **Metadata:** Reference/Specs must have `Version: YYYY-MM-DD`. Plans (Bug Fix/Feature/Refactor/Tool) must use the
   standard metadata block (Date, Status, Kind, etc.).
-- `docs/attic/README.md` for archived/obsolete document policy details.
+- Archived/obsolete document policy details live in `docs/README.md`.
 - **Maintenance:** If you change stdlib or ARC behavior, you MUST update the corresponding `.md` in `docs/` in the same
   PR.
 
