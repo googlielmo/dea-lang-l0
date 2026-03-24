@@ -1,6 +1,6 @@
 # L0 Project Status
 
-Version: 2026-03-21
+Version: 2026-03-24
 
 This document summarizes what is implemented in this repository today and what remains open.
 
@@ -33,8 +33,8 @@ At a high level, it provides:
 
 ### Stage 2
 
-Stage 2 (`compiler/stage2_l0`) is self-hosted and currently the main delivery vehicle for normal developer and install
-workflows.
+Stage 2 (`compiler/stage2_l0`) is self-hosted and currently the main delivery vehicle for normal developer, install,
+distribution, and release workflows.
 
 At a high level, it provides:
 
@@ -42,7 +42,8 @@ At a high level, it provides:
   `--run`,
 - self-hosted C99 generation, build, and run flows,
 - repo-local, install-prefix, and distribution delivery paths,
-- strict triple-bootstrap validation via `make triple-test`.
+- strict triple-bootstrap validation via `make triple-test`,
+- release packaging plus docs/PDF publishing automation through the repository workflows.
 
 Stage 1 remains the behavioral oracle for equivalent Stage 2 paths.
 
@@ -61,9 +62,11 @@ filesystem access, time, randomness, assertions, optionals, and the current cont
 
 ## Platform Support
 
-- Linux and macOS are supported host platforms for Stage 1 and Stage 2 workflows.
-- Windows is supported for build and test workflows with MinGW-w64/GCC as the validated toolchain.
-- MSVC support remains partial.
+The current validated support matrix is:
+
+- Tier 1 hosts: Linux and macOS for Stage 1 and Stage 2 workflows.
+- Tier 1 Windows toolchain: MSYS2 `MINGW64` with MinGW-w64/GCC for build, test, install, and distribution workflows.
+- Tier 2 / experimental: MSVC-family builds remain outside the validated release matrix.
 
 ## Known Limitations and Constraints
 
@@ -79,6 +82,6 @@ These remain true in the current implementation:
 
 Near-term project direction, consistent with current docs/code:
 
-1. The `v0.9.0` release is the current milestone, covering the existing install, dist, and release-packaging workflows.
-2. Publish the generated reference documentation on GitHub Pages as part of the release workflow.
+1. The `v0.9.1` patch release is the current milestone for minor fixes on the self-hosted Stage 2 line.
+2. After `v0.9.1`, begin the `1.0.0.dev0` stabilization cycle on the next development commit.
 3. Bitwise operators, top-level `const`, and further language extensions are deferred to Dea/L1.

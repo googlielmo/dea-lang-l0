@@ -14,6 +14,8 @@ The recommended Windows path today is:
 - MinGW-w64 GCC
 - GNU Make on `PATH`
 
+This is the current validated Dea/L0 Windows path. MSVC-family builds remain outside the validated release matrix.
+
 To build and install the Stage 2 compiler from the repo:
 
 ```bash

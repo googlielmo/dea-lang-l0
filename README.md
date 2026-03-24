@@ -53,7 +53,9 @@ L0 is currently in its first self-hosted Stage 2 phase.
   - Install available via `make PREFIX=/tmp/l0-install install`; this installs the self-hosted Stage 2 compiler (
     `S1 -> S2`, then `S2 -> S2`) plus copied `shared/l0/stdlib` and `shared/runtime` assets.
 
-  - Triple-bootstrap verified: the compiler reproducibly compiles itself.
+  - Fixed-point self-hosting verified: retained generated C matches across self-builds, and native compiler-binary
+    identity is also checked on the validated reproducibility matrix. See `compiler/stage2_l0/README.md` for the
+    documented `tcc` and Windows exceptions.
 
 - **Built-in Observability:** Language developers need to know what memory is doing. L0 ships with native compiler flags
   to trace ARC events and allocations directly to stderr. Today these are fully usable through the Stage 1 driver and
@@ -104,7 +106,8 @@ The `$CC` environment variable will be checked as a last resort if none of the a
 
 If you need a specific compiler, set `$L0_CC` to its executable name or path. For example:
 
-MSVC is supported by setting `$L0_CC` to point to `CL.EXE`, but it has not been tested (help wanted).
+For the current validated support matrix, Windows validation is through MSYS2 `MINGW64` with MinGW-w64 GCC. MSVC-family
+builds are still experimental and are not part of the validated release matrix.
 
 Specific versions of `gcc` and `clang` whose names include version numbers (e.g. `gcc-14`, `clang-22`) are not probed by
 default but can be used by setting `$L0_CC` accordingly and will be recognized as such.
