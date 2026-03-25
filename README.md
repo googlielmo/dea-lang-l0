@@ -1,21 +1,23 @@
-# Dea/L<sub>0</sub>
+# The Dea Programming Language
 
 > _C-family syntax, UB-free semantics, ARC strings, sum types and pattern matching._
 
-**L0 (Level Zero)** is a small systems language that compiles to C99. It is the foundational subset and first bootstrap
-stage of the **Dea** language family.
+_**Dea is a systems programming language that advances through staged self-hosting levels.**_
 
-Dea employs a staged compiler bootstrapping architecture (Level 0, Level 1, ..., Level N). Dea/L0 is now self-hosted; it
-is the compiler base that will be used to compile L1. L1 will subsequently self-host to build L2, and the process will
-repeat for successive levels.
+**L0 is now self-hosted.** It is the current implementation base, and future levels are intended to be bootstrapped from
+it in sequence.
 
 The design is conservative by choice: a small, precisely specified language whose semantics leave no room for undefined
-behavior. Operations are either well-defined or rejected - at compile time or with a named runtime error.
+behavior. Operations are either well-defined or rejected, at compile time or with a named runtime error.
 
 _Tertium non datur._
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE-MIT)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE-APACHE)
+
+## Dea/L<sub>0</sub>
+
+**L0 (Level Zero)** is a small systems language that compiles to C99.
 
 ## Motivation
 
@@ -405,7 +407,7 @@ l0c --run --trace-arc --trace-memory app  # trace ARC and allocation to stderr
 l0c -c clang -C "-Og -DDEBUG" hello.l0    # use a specific C compiler with custom flags
 ```
 
-Full CLI contract — mode flags, options, targets, identity strings, exit codes, and stage-specific differences:
+Full CLI contract, i.e., mode flags, options, targets, identity strings, exit codes, and stage-specific differences:
 [docs/specs/compiler/cli-contract.md](docs/specs/compiler/cli-contract.md).
 
 Trace output contract: [docs/specs/runtime/trace.md](docs/specs/runtime/trace.md).

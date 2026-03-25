@@ -334,8 +334,8 @@ They are not redundant by role.
 
 When Stage 2 is selected, both may dispatch to the same native binary, but they represent different contracts:
 
-- `l0c-stage2.cmd` stays stable as “the Stage 2 entry point”
-- `l0c.cmd` is “whatever stage is currently selected as `l0c`”
+- `l0c-stage2.cmd` stays stable as "the Stage 2 entry point"
+- `l0c.cmd` is "whatever stage is currently selected as `l0c`"
 
 This matches the Unix layout conceptually:
 

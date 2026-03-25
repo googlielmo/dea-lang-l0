@@ -82,8 +82,8 @@ Stage 1-built artifact. The installed prefix contains:
 The installed wrapper derives `L0_HOME` from `PREFIX` at runtime. The installed `l0-env.sh` sets `L0_HOME="$PREFIX"`
 only; the compiler then derives stdlib and runtime defaults from `L0_HOME` unless you explicitly override them.
 
-The full CLI contract — mode flags, options, identity strings, `--version` provenance, and exit codes — is documented in
-`docs/specs/compiler/cli-contract.md`.
+The full CLI contract, i.e., mode flags, options, identity strings, `--version` provenance, and exit codes, is
+documented in `docs/specs/compiler/cli-contract.md`.
 
 The source-tree `./scripts/l0c` entrypoint is Stage 1 only and is mainly useful for bootstrap mechanics, internal
 tooling, and Stage 1-focused testing.
@@ -158,9 +158,9 @@ L0_CC=clang KEEP_ARTIFACTS=1 python3 compiler/stage2_l0/tests/l0c_triple_bootstr
 
 The test performs, in order:
 
-1. trusted Stage 1 → first Stage 2 build with retained C enabled
-2. first Stage 2 compiler → second self-built Stage 2 compiler
-3. second self-built Stage 2 compiler → third self-built Stage 2 compiler
+1. trusted Stage 1 -> first Stage 2 build with retained C enabled
+2. first Stage 2 compiler -> second self-built Stage 2 compiler
+3. second self-built Stage 2 compiler -> third self-built Stage 2 compiler
 4. byte-for-byte comparison of second-build vs third-build retained C
 5. byte-for-byte comparison of second-build vs third-build native compiler binaries, unless the host compiler is `tcc`
    or the host platform is Windows

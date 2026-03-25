@@ -136,14 +136,14 @@ l0c -vvv -P examples --check hello   # debug-level
 
 ## Project structure
 
-- `compiler/stage1_py/` — Stage 1 compiler (Python). This is the bootstrap implementation.
-- `compiler/stage2_l0/` — Stage 2 compiler (L0). This is the self-hosted implementation.
-- `compiler/shared/runtime/` — Runtime library code written in C.
-- `compiler/shared/l0/stdlib/` — Dea/L0 standard library code.
-- `examples/` — Example L0 programs.
-- `docs/` — Design documents, grammar specification, architecture notes, and other documentation.
-- `scripts/` — Utility scripts for development, testing, and maintenance.
-- `tests/` — End-to-end tests that may involve both compiler stages or external tools.
+- `compiler/stage1_py/`: Stage 1 compiler (Python). This is the bootstrap implementation.
+- `compiler/stage2_l0/`: Stage 2 compiler (L0). This is the self-hosted implementation.
+- `compiler/shared/runtime/`: Runtime library code written in C.
+- `compiler/shared/l0/stdlib/`: Dea/L0 standard library code.
+- `examples/`: Example L0 programs.
+- `docs/`: Design documents, grammar specification, architecture notes, and other documentation.
+- `scripts/`: Utility scripts for development, testing, and maintenance.
+- `tests/`: End-to-end tests that may involve both compiler stages or external tools.
 
 ## Coding conventions
 
@@ -188,7 +188,7 @@ l0c -vvv -P examples --check hello   # debug-level
 
 A PR should include:
 
-- What changed and why (1–3 paragraphs)
+- What changed and why (1-3 paragraphs)
 - Any relevant issue link(s)
 - Tests: added/updated, and how to run them locally
 - Notes on backward-compatibility (breaking vs non-breaking)
@@ -203,7 +203,7 @@ The use of AI or other automated tools to assist in writing code, documentation,
 fully responsible for the correctness, rights to contribute and license, licensing compatibility, and security of their
 contributions, regardless of the tools used.
 
-**All contributions must comply with the project’s licensing, contribution guidelines, and quality standards.**
+**All contributions must comply with the project's licensing, contribution guidelines, and quality standards.**
 
 ## Code of Conduct
 
