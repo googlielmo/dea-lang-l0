@@ -20,7 +20,7 @@ on:
         default: false
         type: boolean
       upload_pdf_to_release:
-        description: "Upload refman.pdf to an existing release"
+        description: "Upload the generated API PDF to an existing release"
         required: true
         default: false
         type: boolean
@@ -42,6 +42,8 @@ concurrency:
 jobs:
   build-docs:
     uses: ./.github/workflows/docs-build.yml
+    with:
+      release_tag: ${{ github.event_name == 'release' && github.event.release.tag_name || inputs.release_tag }}
 
   deploy-pages:
     needs: build-docs
@@ -87,7 +89,11 @@ jobs:
       - name: Upload PDF to GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "$TARGET_RELEASE_TAG" build/docs/pdf/refman.pdf --clobber --repo "$GITHUB_REPOSITORY"
+        run: |
+          stable_pdf="build/docs/pdf/dea_l0_api_reference.pdf"
+          release_pdf="build/docs/pdf/dea_l0_api_reference-$TARGET_RELEASE_TAG.pdf"
+          cp "$stable_pdf" "$release_pdf"
+          gh release upload "$TARGET_RELEASE_TAG" "$release_pdf" --clobber --repo "$GITHUB_REPOSITORY"
 
   upload-blog-export:
     needs:
@@ -134,7 +140,7 @@ jobs:
           else
             html_site_url="https://${GITHUB_REPOSITORY_OWNER}.github.io/${GITHUB_REPOSITORY#*/}"
           fi
-          pdf_url="${html_site_url%/}/pdf/refman.pdf"
+          pdf_url="${html_site_url%/}/pdf/dea_l0_api_reference.pdf"
           python -m compiler.docgen.l0_docgen_blog \
             --input build/docs/markdown \
             --output build/docs/blog-export \

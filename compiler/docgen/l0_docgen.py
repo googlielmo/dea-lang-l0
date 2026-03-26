@@ -29,6 +29,8 @@ from .l0_docgen_markdown import (
 )
 from .l0_docgen_python_filter import transform_python_for_doxygen
 
+_LATEX_FRONT_MATTER_BREAK = "l0docgenlinetwo"
+
 
 @dataclass(frozen=True)
 class SourceManifest:
@@ -73,8 +75,13 @@ def _git_revision_suffix_for_latex(root: Path | None = None) -> str:
     return f" ({short_hash}{dirty_suffix})"
 
 
+def _release_tag_for_latex() -> str:
+    return os.environ.get("L0_DOCS_RELEASE_TAG", "").strip() or os.environ.get("RELEASE_VERSION", "").strip()
+
+
 def _project_number_for_latex() -> str:
     source_date_epoch = os.environ.get("SOURCE_DATE_EPOCH", "").strip()
+    build_date_text: str | None = None
     if source_date_epoch:
         try:
             timestamp = int(source_date_epoch)
@@ -82,8 +89,18 @@ def _project_number_for_latex() -> str:
             pass
         else:
             build_date = datetime.fromtimestamp(timestamp, tz=timezone.utc).date()
-            return f"Generated {build_date.isoformat()}{_git_revision_suffix_for_latex()}"
-    return f"Generated {datetime.now(timezone.utc).date().isoformat()}{_git_revision_suffix_for_latex()}"
+            build_date_text = build_date.isoformat()
+
+    if build_date_text is None:
+        build_date_text = datetime.now(timezone.utc).date().isoformat()
+
+    revision_suffix = _git_revision_suffix_for_latex()
+    if not revision_suffix:
+        return f"Generated {build_date_text}"
+
+    release_tag = _release_tag_for_latex()
+    second_line = f"{release_tag}{revision_suffix}" if release_tag else revision_suffix.lstrip()
+    return f"Generated {build_date_text} {_LATEX_FRONT_MATTER_BREAK} {second_line}"
 
 
 def build_source_manifest(root: Path) -> SourceManifest:

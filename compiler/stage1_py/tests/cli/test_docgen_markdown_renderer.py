@@ -1254,10 +1254,10 @@ Analyzes the entry module.
     assert "annotated.html" not in file_page
     assert 'id="search"' in stage2
     assert "search-v2.js" in stage2
-    assert 'href="./pdf/refman.pdf"' in stage2
+    assert 'href="./pdf/dea_l0_api_reference.pdf"' in stage2
     assert 'id="search"' in file_page
     assert "search-v2.js" in file_page
-    assert 'href="../../../../pdf/refman.pdf"' in file_page
+    assert 'href="../../../../pdf/dea_l0_api_reference.pdf"' in file_page
 
 
 def test_render_curated_html_site_shows_source_path_when_title_differs(tmp_path: Path) -> None:

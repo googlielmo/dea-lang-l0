@@ -92,7 +92,7 @@ tooling, and Stage 1-focused testing:
 ./scripts/l0c -P examples --sym hello     # dump symbols
 ./scripts/l0c -P examples --type hello    # dump resolved top-level types
 ./scripts/gen-docs.sh --strict    # generate docs; fail on warnings and synthetic __padN__ regressions
-./scripts/gen-docs.sh --pdf       # also build/copy build/docs/pdf/refman.pdf
+./scripts/gen-docs.sh --pdf       # also build/copy build/docs/pdf/dea_l0_api_reference.pdf
 ./scripts/gen-docs.sh --pdf-fast  # faster preview PDF build (single pdflatex pass)
 make help                         # show the repo-local developer workflow targets
 make venv                         # create or reuse the local .venv
@@ -125,12 +125,12 @@ Stage 2 currently implements analysis/dump modes plus `--gen`, `--build`, and `-
 
 Generated API documentation is written under `build/docs/` and is not part of the hand-authored `docs/` tree. Native
 Doxygen LaTeX output is generated under `build/docs/doxygen/latex/`; use `./scripts/gen-docs.sh --pdf` to build
-`refman.pdf` and copy it into `build/docs/pdf/` if a local TeX toolchain is installed. For faster local previews,
-`./scripts/gen-docs.sh --pdf-fast --latex-only` performs a single-pass PDF build. After each successful docs run,
-generated artifacts are mirrored to a stable preview tree under `build/preview/` (`html/`, `markdown/`, `pdf/`), which
-is overwritten by the next successful run. Use `-v` / `--verbose` with `scripts/gen-docs.sh` to show m.css warnings and
-LaTeX build output directly. Release/manual publishing is handled by `.github/workflows/docs-publish.yml`; PR validation
-is handled by `.github/workflows/docs-validate.yml`.
+`dea_l0_api_reference.pdf` and copy it into `build/docs/pdf/` if a local TeX toolchain is installed. For faster local
+previews, `./scripts/gen-docs.sh --pdf-fast --latex-only` performs a single-pass PDF build. After each successful docs
+run, generated artifacts are mirrored to a stable preview tree under `build/preview/` (`html/`, `markdown/`, `pdf/`),
+which is overwritten by the next successful run. Use `-v` / `--verbose` with `scripts/gen-docs.sh` to show m.css
+warnings and LaTeX build output directly. Release/manual publishing is handled by `.github/workflows/docs-publish.yml`;
+PR validation is handled by `.github/workflows/docs-validate.yml`.
 
 ### Testing
 

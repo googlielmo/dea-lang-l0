@@ -8,6 +8,8 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
+stable_pdf_name="dea_l0_api_reference.pdf"
+
 show_usage() {
     cat <<'EOF'
 Usage: ./scripts/gen-docs.sh [--pdf|--pdf-fast] [-v|--verbose] [docgen options...]
@@ -15,10 +17,15 @@ Usage: ./scripts/gen-docs.sh [--pdf|--pdf-fast] [-v|--verbose] [docgen options..
 Wrapper around `python -m compiler.docgen.l0_docgen`.
 
 Extra options:
-  --pdf            Build `refman.pdf` from the generated LaTeX and copy it to `build/docs/pdf/`
+  --pdf            Build `dea_l0_api_reference.pdf` from the generated LaTeX and copy it to `build/docs/pdf/`
                    or `<output-dir>/pdf/` when `--output-dir` is provided.
-  --pdf-fast       Build a preview `refman.pdf` with a single `pdflatex` pass (faster, less complete references/index).
+  --pdf-fast       Build a preview `dea_l0_api_reference.pdf` with a single `pdflatex` pass (faster, less complete references/index).
   -v, --verbose    Show docgen warnings and LaTeX build output directly.
+
+Environment:
+  L0_DOCS_RELEASE_TAG
+                   Optional release tag to show on the PDF front matter title page, e.g.
+                   `L0_DOCS_RELEASE_TAG=v0.9.9 ./scripts/gen-docs.sh --pdf-fast`.
 EOF
 }
 
@@ -169,13 +176,13 @@ if (( build_pdf )); then
     pdf_dir="${output_dir%/}/pdf"
     run_logged "$log_dir/latex-build.log" make -C "$latex_dir" LATEX_CMD="pdflatex -interaction=nonstopmode -halt-on-error"
     mkdir -p "$pdf_dir"
-    cp "$latex_dir/refman.pdf" "$pdf_dir/refman.pdf"
+    cp "$latex_dir/refman.pdf" "$pdf_dir/$stable_pdf_name"
 elif (( build_pdf_fast )); then
     latex_dir="${output_dir%/}/doxygen/latex"
     pdf_dir="${output_dir%/}/pdf"
     run_logged "$log_dir/latex-build.log" sh -c "cd \"$latex_dir\" && pdflatex -interaction=nonstopmode -halt-on-error refman"
     mkdir -p "$pdf_dir"
-    cp "$latex_dir/refman.pdf" "$pdf_dir/refman.pdf"
+    cp "$latex_dir/refman.pdf" "$pdf_dir/$stable_pdf_name"
 fi
 
 preview_root="build/preview"

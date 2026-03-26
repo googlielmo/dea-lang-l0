@@ -5,6 +5,11 @@ name: Build Documentation
 
 on:
   workflow_call:
+    inputs:
+      release_tag:
+        required: false
+        type: string
+        default: ""
 
 jobs:
   build-docs:
@@ -39,15 +44,18 @@ jobs:
         run: uv sync --group docs
 
       - name: Build HTML, Markdown, LaTeX, and PDF
+        env:
+          L0_DOCS_RELEASE_TAG: ${{ inputs.release_tag }}
         run: ./scripts/gen-docs.sh --pdf --strict
 
       - name: Stage Pages site
         run: |
+          pdf_name="dea_l0_api_reference.pdf"
           rm -rf build/docs/pages-site
           mkdir -p build/docs/pages-site
           cp -R build/docs/html/. build/docs/pages-site/
           mkdir -p build/docs/pages-site/pdf
-          cp build/docs/pdf/refman.pdf build/docs/pages-site/pdf/refman.pdf
+          cp "build/docs/pdf/$pdf_name" "build/docs/pages-site/pdf/$pdf_name"
           touch build/docs/pages-site/.nojekyll
 
       - name: Upload Pages artifact
@@ -65,4 +73,4 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: docs-pdf
-          path: build/docs/pdf/refman.pdf
+          path: build/docs/pdf/dea_l0_api_reference.pdf

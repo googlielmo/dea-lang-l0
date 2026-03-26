@@ -13,6 +13,7 @@ from .l0_docgen_l0_helpers import extract_l0_enum_variants, extract_l0_member_de
 _POINTER_MACRO = r"\texorpdfstring{$\ast$}{*}"
 _ARROW_MACRO = r"\texorpdfstring{$\rightarrow$}{->}"
 _FAT_ARROW_MACRO = r"\texorpdfstring{$\Rightarrow$}{=>}"
+_FRONT_MATTER_BREAK = "l0docgenlinetwo"
 
 
 def _escape_latex_texttt(text: str) -> str:
@@ -117,6 +118,30 @@ def _normalize_tex_lines(text: str) -> str:
 
 def _normalize_prose_arrows(text: str) -> str:
     return "\n".join(_normalize_prose_arrow_line(line) for line in text.splitlines()) + "\n"
+
+
+def _normalize_titlepage_front_matter(text: str) -> str:
+    pattern = re.compile(r"^(?P<indent>\s*)\[1ex\]\\large (?P<content>.*) \\\\$", re.MULTILINE)
+    separator_re = re.compile(rf"\s+{re.escape(_FRONT_MATTER_BREAK)}\s+")
+
+    def replace(match: re.Match[str]) -> str:
+        content = match.group("content")
+        separator_match = separator_re.search(content)
+        if separator_match is None:
+            return match.group(0)
+        first_line = content[: separator_match.start()].strip()
+        second_line = content[separator_match.end() :].strip()
+        if not first_line or not second_line:
+            return match.group(0)
+        indent = match.group("indent")
+        return "\n".join(
+            (
+                f"{indent}[1ex]\\large {first_line} \\\\",
+                f"{indent}\\large {second_line} \\\\",
+            )
+        )
+
+    return pattern.sub(replace, text, count=1)
 
 
 def _normalize_l0_signature_links(text: str) -> str:
@@ -547,6 +572,13 @@ def normalize_latex_site(xml_dir: Path, latex_dir: Path) -> None:
             continue
         tex_path.write_text(
             _normalize_symbol_tex(tex_path.read_text(encoding="utf-8"), compounddef, preferred_refids_by_name),
+            encoding="utf-8",
+        )
+
+    refman_path = latex_dir / "refman.tex"
+    if refman_path.exists():
+        refman_path.write_text(
+            _normalize_titlepage_front_matter(refman_path.read_text(encoding="utf-8")),
             encoding="utf-8",
         )
 

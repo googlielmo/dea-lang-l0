@@ -168,6 +168,8 @@ jobs:
 
   build-docs:
     uses: ./.github/workflows/docs-build.yml
+    with:
+      release_tag: ${{ github.ref_name }}
 
   publish-release:
     needs: [build-dist, build-docs]
@@ -194,9 +196,13 @@ jobs:
           path: build/release-assets
 
       - name: Generate checksums
+        env:
+          CURRENT_TAG: ${{ github.ref_name }}
         run: |
           cd build/release-assets
-          sha256sum *.tar.gz *.zip refman.pdf > SHA256SUMS
+          pdf_name="dea_l0_api_reference-$CURRENT_TAG.pdf"
+          mv dea_l0_api_reference.pdf "$pdf_name"
+          sha256sum *.tar.gz *.zip "$pdf_name" > SHA256SUMS
 
       - name: Generate release notes
         env:

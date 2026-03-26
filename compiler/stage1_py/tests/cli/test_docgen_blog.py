@@ -149,7 +149,7 @@ Token docs.
         tab_icon="fas fa-book",
         tab_order=5,
         html_site_url="https://example.com/api/",
-        pdf_url="https://example.com/api/pdf/refman.pdf",
+        pdf_url="https://example.com/api/pdf/dea_l0_api_reference.pdf",
     )
 
     page = (output_dir / "api/reference/compiler/stage1_py/demo.md").read_text(encoding="utf-8")
@@ -166,6 +166,6 @@ Token docs.
     assert 'title: "API"' in tab
     assert "permalink: /api/" in tab
     assert "[Standalone HTML reference](https://example.com/api/)" in tab
-    assert "[PDF reference](https://example.com/api/pdf/refman.pdf)" in tab
+    assert "[PDF reference](https://example.com/api/pdf/dea_l0_api_reference.pdf)" in tab
     assert "- [compiler/stage1_py/demo.py]({{ '/api/reference/compiler/stage1_py/demo/' | relative_url }})" in tab
     assert not (output_dir / "api/reference/docs-mainpage-html.md").exists()

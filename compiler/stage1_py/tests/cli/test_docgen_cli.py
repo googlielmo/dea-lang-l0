@@ -72,8 +72,23 @@ def test_parse_args_help_mentions_wrapper_for_pdf_flags(capsys: pytest.CaptureFi
 
 def test_project_number_for_latex_uses_source_date_epoch(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("SOURCE_DATE_EPOCH", "1767225600")
+    monkeypatch.delenv("L0_DOCS_RELEASE_TAG", raising=False)
     monkeypatch.setattr(l0_docgen, "_git_revision_suffix_for_latex", lambda root=None: " (abc1234)")
-    assert _project_number_for_latex() == "Generated 2026-01-01 (abc1234)"
+    assert _project_number_for_latex() == "Generated 2026-01-01 l0docgenlinetwo (abc1234)"
+
+
+def test_project_number_for_latex_includes_release_tag_on_second_line(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("SOURCE_DATE_EPOCH", "1767225600")
+    monkeypatch.setenv("L0_DOCS_RELEASE_TAG", "v0.9.1")
+    monkeypatch.setattr(l0_docgen, "_git_revision_suffix_for_latex", lambda root=None: " (abc1234)")
+    assert _project_number_for_latex() == "Generated 2026-01-01 l0docgenlinetwo v0.9.1 (abc1234)"
+
+
+def test_project_number_for_latex_omits_second_line_without_git_revision(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("SOURCE_DATE_EPOCH", "1767225600")
+    monkeypatch.setenv("L0_DOCS_RELEASE_TAG", "v0.9.1")
+    monkeypatch.setattr(l0_docgen, "_git_revision_suffix_for_latex", lambda root=None: "")
+    assert _project_number_for_latex() == "Generated 2026-01-01"
 
 
 def test_git_revision_suffix_for_latex_marks_dirty_tree(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -246,12 +261,12 @@ def test_mcss_template_uses_show_undocumented_setting() -> None:
     assert "SHOW_UNDOCUMENTED = True" in template
     assert "M_SHOW_UNDOCUMENTED" not in template
     assert "annotated.html" not in template
-    assert '<a href="pdf/refman.pdf">PDF</a>' in template
+    assert '<a href="pdf/dea_l0_api_reference.pdf">PDF</a>' in template
 
 
 def test_mainpage_html_template_links_to_pdf_reference() -> None:
     template = (repo_root() / "scripts/docs/templates/mainpage_html.md.j2").read_text(encoding="utf-8")
-    assert "[Reference Manual (pdf)](pdf/refman.pdf)" in template
+    assert "[Reference Manual (pdf)](pdf/dea_l0_api_reference.pdf)" in template
 
 
 def test_doxyfile_template_supports_project_number() -> None:
