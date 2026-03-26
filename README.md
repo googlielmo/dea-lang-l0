@@ -357,7 +357,7 @@ narrowing conversions. No assignment-as-expression.
 
 ## Grammar
 
-The authoritative grammar is in [docs/reference/grammar/l0.md](docs/reference/grammar/l0.md).
+The authoritative grammar is in [docs/reference/grammar.md](docs/reference/grammar.md).
 
 Types compose as: `T*`, `T**`, `T?`, `T*?`. Expressions follow C precedence, extended with the postfix `?` operator and
 `as` casts.

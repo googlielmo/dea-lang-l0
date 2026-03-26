@@ -33,23 +33,23 @@ These fields are **informational**; their format is not guaranteed stable for ma
 
 ### 2.1 Field formats
 
-**`build:`** — a token identifying the build context.
+**`build:`** atoken identifying the build context.
 
-- Precedence: `DEA_BUILD_ID` environment variable (if set) → GitHub Actions composite id → `<short-hash>-<stamp>` →
+- Precedence: `DEA_BUILD_ID` environment variable (if set) > GitHub Actions composite id > `<short-hash>-<stamp>` >
   `local-<stamp>`, where `<stamp>` is `YYYYMMDDTHHMMSSz` (UTC).
 - GitHub Actions form: `gha-<run_id>.<run_attempt>-<job>-<os>-<arch>`.
 - Character set: alphanumeric, `.`, `_`, `-`.
 
-**`build time:`** — UTC build timestamp, ISO 8601 with second precision and space separator. Example:
+**`build time:`** UTC build timestamp, ISO 8601 with second precision and space separator. Example:
 `2026-03-15 09:42:00+00:00`.
 
-**`commit:`** — full 40-character git SHA-1 of `HEAD` at build time, suffixed with `+dirty` when the working tree had
+**`commit:`** full 40-character git SHA-1 of `HEAD` at build time, suffixed with `+dirty` when the working tree had
 uncommitted changes. `unknown` when git is unavailable.
 
-**`host:`** — space-separated triplet `<kernel_name> <kernel_release> <machine>` from `uname -s`, `uname -r`, `uname -m`
+**`host:`** space-separated triplet `<kernel_name> <kernel_release> <machine>` from `uname -s`, `uname -r`, `uname -m`
 on POSIX; from Python's `platform` module on Windows. Example: `Darwin 24.6.0 arm64`.
 
-**`compiler:`** — first line of `<cc> --version` for the C compiler used to compile the Stage 2 binary. Example:
+**`compiler:`** first line of `<cc> --version` for the C compiler used to compile the Stage 2 binary. Example:
 `Apple clang version 16.0.0 (clang-1600.0.26.3)`.
 
 ### 2.2 Fallback behavior

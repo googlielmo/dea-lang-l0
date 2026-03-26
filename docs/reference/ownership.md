@@ -4,10 +4,10 @@ Version: 2026-03-11
 
 This document describes how ownership works in L0 today, covering:
 
-- **`new` / `drop`** — heap object allocation and deallocation.
-- **ARC-managed `string`** — reference-counted string values.
-- **Container ownership** — how stdlib containers manage the elements they store.
-- **`string?` unwrap** — what happens when you write `opt as string` to extract a value from an optional.
+- **`new` / `drop`**: heap object allocation and deallocation.
+- **ARC-managed `string`**: reference-counted string values.
+- **Container ownership**: how stdlib containers manage the elements they store.
+- **`string?` unwrap**: what happens when you write `opt as string` to extract a value from an optional.
 
 ## Scope and Status
 
@@ -33,11 +33,11 @@ These systems are deliberately separate:
 ## 2. Normative Rules Matrix
 
 | Operation                                                                   | Ownership result                      | What you need to do                                                                                                |
-|-----------------------------------------------------------------------------|---------------------------------------|--------------------------------------------------------------------------------------------------------------------|
+| --------------------------------------------------------------------------- | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
 | `let p = new T(...)`                                                        | Caller owns the heap object           | Call `drop p` exactly once, unless you explicitly transfer ownership elsewhere.                                    |
 | Normal L0 assignment of a `string` (`dst = s`, `*dest = val`, field assign) | Destination takes a managed reference | The compiler emits retain/release automatically. Do **not** add manual retain/release around ordinary assignments. |
 | Removing or clearing string entries from raw storage                        | Container owns stored strings         | Call `rt_string_release` on each owned string **before** zeroing or removing the storage.                          |
-| Byte-copy move (`rt_memcpy`) of string-bearing data                         | Ownership moves with the bytes        | Do **not** release the moved-from slot again — the destination is now the sole owner.                              |
+| Byte-copy move (`rt_memcpy`) of string-bearing data                         | Ownership moves with the bytes        | Do **not** release the moved-from slot again; the destination is now the sole owner.                               |
 | Bulk zero (`rt_memset`, `arr_zap`) on string-bearing storage                | Zeroing bypasses ARC                  | Release owned strings **first**, then zero.                                                                        |
 | `string` returned by value from a container helper                          | Caller receives a managed value       | Follow normal ARC lifetime. Avoid compensating manual releases unless you are crossing a raw-memory boundary.      |
 | `return local_var` (where `local_var` is owned)                             | Ownership moves to caller             | The compiler skips local cleanup for the returned variable (move optimization).                                    |
@@ -47,8 +47,8 @@ These systems are deliberately separate:
 
 How it lowers at runtime:
 
-- `new` → `_rt_alloc_obj(bytes)`.
-- `drop` → `_rt_drop(ptr)`.
+- `new` lowers to `_rt_alloc_obj(bytes)`.
+- `drop` lowers to `_rt_drop(ptr)`.
 - `new Struct` and `new Struct()` allocate one heap object and zero-initialize it.
 - `new Struct(args...)` allocates one heap object and initializes fields positionally; when arguments are present, the
   constructor requires full struct-field arity.
@@ -61,8 +61,8 @@ Before calling `_rt_drop`, the compiler may emit field cleanup automatically:
 
 - If the struct/enum has ARC fields (e.g. `string` members), the current backends insert `rt_string_release` calls for
   those fields before freeing the object.
-- Pointer fields that own **separate** heap objects are **not** cleaned up automatically — you must free or drop
-  children explicitly before dropping the parent.
+- Pointer fields that own **separate** heap objects are **not** cleaned up automatically. You must free or drop children
+  explicitly before dropping the parent.
 
 **Rule of thumb:** if your struct owns child pointers, clean them up yourself before `drop`.
 
@@ -75,11 +75,11 @@ Every `string` value is reference-counted:
 
 In practice:
 
-- Most ordinary L0 code never needs manual retain/release — the compiler balances ARC automatically on assignments and
+- Most ordinary L0 code never needs manual retain/release: the compiler balances ARC automatically on assignments and
   copies.
-- Manual retain/release is reserved for **low-level container internals** and **raw-memory boundaries** (see §7).
+- Manual retain/release is reserved for **low-level container internals** and **raw-memory boundaries** (see section 7).
 
-## 5. Optional Unwrap: `string?` → `string` via `opt as string`
+## 5. Optional Unwrap: `string?` to `string` via `opt as string`
 
 When you have a `string?` (an optional string) and unwrap it with `opt as string`, the result is a plain `string` value.
 The key ownership question is: **does the unwrapped value need an extra retain?**
@@ -92,7 +92,7 @@ The current backend lowering already handles this correctly. When you write:
 let s: string = opt as string
 ```
 
-the unwrapped string is ownership-stabilized — it is **not** tied to the optional's cleanup path, so it will not be
+the unwrapped string is ownership-stabilized: it is **not** tied to the optional's cleanup path, so it will not be
 prematurely released when the optional goes out of scope.
 
 The same applies to:
@@ -101,7 +101,7 @@ The same applies to:
 - Passing an unwrapped `string?` into a container (e.g. `vs_push`).
 
 **When would you need a manual retain?** Only if you are moving the unwrapped value across a **raw, non-assignment
-boundary** — for example, storing it via `rt_memcpy` into a manually managed buffer. In normal L0 code, you should not
+boundary**, for example storing it via `rt_memcpy` into a manually managed buffer. In normal L0 code, you should not
 need to add `rt_string_retain` after `opt as string`.
 
 ## 6. Container Ownership Contracts
@@ -110,7 +110,7 @@ need to add `rt_string_retain` after `opt as string`.
 
 - `vs_push` uses assignment semantics: the compiler retains the incoming value and releases any overwritten slot.
 - `vs_clear` and `vs_free` release all stored strings before clearing or freeing the underlying storage.
-- The generic `vec_*` API is **not** ARC-aware — always use the `vs_*` helpers for string vectors.
+- The generic `vec_*` API is **not** ARC-aware; always use the `vs_*` helpers for string vectors.
 
 **Caller rule:** do not manually release a string after `vs_push`; the container now owns it.
 
@@ -120,7 +120,7 @@ need to add `rt_string_retain` after `opt as string`.
 - Insert/update retains the new key and releases any replaced key.
 - Remove/clear/free release all occupied keys.
 - Rehash moves keys by byte-copy (`rt_memcpy`); old storage is freed without additional per-key release.
-- `spm_keys` / `sim_keys` return a **caller-owned** `VectorString*` — you must call `vs_free` on it.
+- `spm_keys` / `sim_keys` return a **caller-owned** `VectorString*`; you must call `vs_free` on it.
 
 Value ownership:
 
@@ -132,7 +132,7 @@ Value ownership:
 - Set keys are ARC strings owned by the set.
 - Add/remove/clear/free follow the same retain/release discipline as hashmap keys.
 - Rehash uses byte-copy ownership transfer.
-- `ss_to_vector` returns a **caller-owned** `VectorString*` — call `vs_free` when done.
+- `ss_to_vector` returns a **caller-owned** `VectorString*`; call `vs_free` when done.
 
 ### 6.4 `std.linear_map`
 

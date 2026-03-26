@@ -9,15 +9,15 @@
 #   2. Set the repository variable DEA_SOURCE_REPO (e.g. "dea-lang/dea")
 #   3. Optionally set BLOG_DOCS_PREFIX (default: "api/reference")
 #   4. Add secret BLOG_PUSH_PAT (fine-grained token with contents:write on the
-#      blog repo) — required so pushes trigger downstream workflows
+#      blog repo) -required so pushes trigger downstream workflows
 #   5. For run_id downloads: add secret DEA_ARTIFACTS_TOKEN (fine-grained token
 #      with actions:read on the source repo(s))
 #   6. Adjust the cron schedule to taste
 #
 # Trigger modes:
-#   - Scheduled poll   — cron checks for new Dea releases
-#   - repository_dispatch (event_type: blog-docs-update) — fired by Dea
-#   - workflow_dispatch — manual re-sync with optional tag or run ID override
+#   - Scheduled poll   -cron checks for new Dea releases
+#   - repository_dispatch (event_type: blog-docs-update) -fired by Dea
+#   - workflow_dispatch -manual re-sync with optional tag or run ID override
 
 name: Poll and Sync Dea API Docs
 
@@ -66,7 +66,7 @@ jobs:
             exit 1
           fi
 
-      # ── Determine target release tag ──────────────────────────────
+      # -- Determine target release tag ----------------------------------
       - name: Resolve source
         id: resolve
         env:
@@ -100,7 +100,7 @@ jobs:
           echo "url=https://github.com/$DEA_SOURCE_REPO/releases/download/$tag/blog-export.tar.gz" >> "$GITHUB_OUTPUT"
           echo "Resolved release tag: $tag"
 
-      # ── Check whether this version was already synced ─────────────
+      # -- Check whether this version was already synced -----------------
       - name: Check version marker
         if: steps.resolve.outputs.skip != 'true' && steps.resolve.outputs.tag != ''
         id: marker
@@ -109,13 +109,13 @@ jobs:
         run: |
           marker_file=".dea-docs-version"
           if [ -f "$marker_file" ] && [ "$(cat "$marker_file")" = "$TAG" ]; then
-            echo "Already at $TAG — nothing to do."
+            echo "Already at $TAG -nothing to do."
             echo "skip=true" >> "$GITHUB_OUTPUT"
           else
             echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
 
-      # ── Download the blog export archive ──────────────────────────
+      # -- Download the blog export archive ------------------------------
       - name: Download from workflow run artifact
         if: steps.resolve.outputs.skip != 'true' && steps.marker.outputs.skip != 'true' && steps.resolve.outputs.run_id != ''
         env:
@@ -158,7 +158,7 @@ jobs:
 
           rm -f blog-export.tar.gz
 
-      # ── Commit and push ───────────────────────────────────────────
+      # -- Commit and push -----------------------------------------------
       - name: Commit and push
         if: steps.resolve.outputs.skip != 'true' && steps.marker.outputs.skip != 'true'
         env:
@@ -169,7 +169,7 @@ jobs:
 
           git add _tabs/api.md "$BLOG_DOCS_PREFIX" .dea-docs-version
           if git diff --cached --quiet; then
-            echo "No changes after sync — nothing to commit."
+            echo "No changes after sync -nothing to commit."
             exit 0
           fi
 

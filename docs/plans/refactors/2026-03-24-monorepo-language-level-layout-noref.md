@@ -304,11 +304,11 @@ from `l0/README.md`.
 
 ### Phase 9: Verification
 
-1. `cd l0 && make test-all` — full L0 suite passes.
-2. `cd l0 && make dist` — distribution archive builds correctly.
-3. `cd l0 && make docs` — documentation generates with correct m.css path.
-4. Root `make l0-test-all` — dispatcher works.
-5. `git log --follow l0/compiler/stage1_py/l0_parser.py` — history is preserved.
+1. `cd l0 && make test-all`: full L0 suite passes.
+2. `cd l0 && make dist`: distribution archive builds correctly.
+3. `cd l0 && make docs`: documentation generates with correct m.css path.
+4. Root `make l0-test-all`: dispatcher works.
+5. `git log --follow l0/compiler/stage1_py/l0_parser.py`: history is preserved.
 6. L0 CI/docs workflows trigger on both `l0/**` changes and shared-input changes such as `tools/**`,
    `.github/workflows/**`, and relevant root orchestration files.
 7. Release workflow produces correct archive naming and layout.

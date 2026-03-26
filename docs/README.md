@@ -74,6 +74,10 @@ Plans for bug fixes, features, refactors, or tooling follow a more detailed meta
 (`Draft`, `In Progress`) remain at the category root. Plans with status `Closed` or `Implemented` are moved into
 `<category>/closed/`.
 
+**Attachments:** Non-Markdown reference files associated with plans (workflows, configs, scripts, etc.) go in
+`<category>/attachments/`. Attachments stay at the category level even after the referencing plan is closed, unless the
+attachment itself is obsolete.
+
 **Closing workflow:** When closing a plan, `git mv` it into the corresponding `closed/` subdirectory, then grep for its
 filename across `docs/` and update any cross-references to reflect the new path.
 

@@ -36,8 +36,8 @@ The end-to-end flow is:
 
 Entry point: `compiler/stage1_py/l0c.py`
 
-The shared CLI surface — mode flags, global options, mode-scoped options, target rules, identity strings, and exit codes
-— is normatively defined in [cli-contract.md](cli-contract.md).
+The shared CLI surface (mode flags, global options, mode-scoped options, target rules, identity strings, and exit codes)
+is normatively defined in [cli-contract.md](cli-contract.md).
 
 Stage 1-specific notes:
 

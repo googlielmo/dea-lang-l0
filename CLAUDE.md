@@ -7,11 +7,11 @@ Guidance for Claude Code and AI agents working in this repository.
 Dea/L0 is a small, safe, C-family systems language compiling to C99.
 
 - **Core principle:** No undefined behavior in the language itself.
-- **Stage 1:** Compiler pipeline in Python (lexer → parser → AST → semantic passes → C codegen).
+- **Stage 1:** Compiler pipeline in Python (lexer > parser > AST > semantic passes > C codegen).
 - **Stage 2:** Self-hosting compiler (L0-in-L0) with frontend, backend, `--gen`, `--build`, and `--run` implemented.
 - **Subsystems:** Grammar/semantics, backend/codegen, driver/build/module layout, and stdlib.
 
-## Documentation — Read On Demand
+## Documentation: Read On Demand
 
 Detailed information lives in `docs/`. **Before answering questions about grammar, architecture, backend design, or
 implementation status, read the relevant doc file(s).**
@@ -23,7 +23,7 @@ implementation status, read the relevant doc file(s).**
 | `docs/specs/compiler/stage1-contract.md`   | Stage 1 compact contract, interfaces, guarantees, doc routing |
 | `docs/reference/c-backend-design.md`       | C backend architecture, emission strategy                     |
 | `docs/reference/design-decisions.md`       | Runtime, pointer model, integer model, I/O, rationale         |
-| `docs/reference/grammar/l0.md`             | Formal EBNF grammar                                           |
+| `docs/reference/grammar.md`                | Formal EBNF grammar                                           |
 | `docs/reference/project-status.md`         | Implementation status, known limitations, roadmap             |
 | `docs/reference/standard-library.md`       | stdlib module reference (`std.*`, `sys.*`)                    |
 | `docs/reference/ownership.md`              | Ownership rules for `new`/`drop`, ARC strings, and containers |
@@ -224,7 +224,7 @@ rg -n 'XXX-NNNN' compiler/stage1_py compiler/stage2_l0 docs
 ## Git Conventions
 
 - Multiline commits: sentence-case summary with period, then factual body as bullets with "- " prefix, sentence-case,
-  ending with a period. Each bullet is a single line — no line breaks within a bullet regardless of length; no column
+  ending with a period. Each bullet is a single line; no line breaks within a bullet regardless of length; no column
   limit.
 - For multiline commit messages, write the message to a temporary file and use `git commit -F <file>` to avoid shell
   escaping issues (especially with backticks).
@@ -236,6 +236,14 @@ rg -n 'XXX-NNNN' compiler/stage1_py compiler/stage2_l0 docs
 - Before committing, verify this file's accuracy (file references current, new modules listed, deleted ones removed).
 
 ## Quality Standards
+
+### Text and Character Standards
+
+- **ASCII only:** All documentation (`.md`), comments, and commit messages must use only printable ASCII characters.
+- **No em-dashes or en-dashes.** Use colons for definitions (`term: explanation`), semicolons for related clauses,
+  commas, parentheses, or periods instead. When listing alternatives or precedence, use `>`.
+- **No Unicode box-drawing or arrows.** Use ASCII art (`+-+|`, `v`, `>`) for diagrams.
+- **HTML subscripts** (`<sub>0</sub>` in `L<sub>0</sub>`) are the only permitted non-ASCII-range markup in Markdown.
 
 ### Documentation Standards
 

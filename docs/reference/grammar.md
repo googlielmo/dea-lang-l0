@@ -1,9 +1,9 @@
-# L<sub>0</sub> Grammar (Stage 1)
+# Dea/L<sub>0</sub> Grammar
 
-Version: 2026-03-21
+Version: 2026-03-26
 
-The following is the formal grammar for the L<sub>0</sub> programming language in EBNF-style. This describes the
-concrete syntax that the Python lexer/parser should accept.
+The following is the formal grammar for the Dea/L<sub>0</sub> programming language in EBNF-style. This describes the
+concrete syntax that lexers and parsers should accept.
 
 ## 1. Lexical structure
 
@@ -51,7 +51,7 @@ true false sizeof null as new drop void bool string
 byte short int long ubyte ushort uint ulong float double
 ```
 
-Note: not all keywords are used in L<sub>0</sub>; some are reserved for future stages.
+Note: not all keywords are used in L<sub>0</sub>; some are reserved for future extensions.
 
 ### 1.4 Symbols / operators
 
@@ -392,4 +392,4 @@ This grammar is intended to be just expressive enough to:
 
 - Write the compiler and standard library in L<sub>0</sub>.
 - Avoid undefined behavior at the language level.
-- Keep the Python lexer/parser implementation straightforward for Stage 1.
+- Keep the lexer/parser implementation straightforward.

@@ -11,7 +11,7 @@
 - Subsystem: CI / docs publishing
 - Modules:
   - `.github/workflows/docs-publish.yml`
-  - `docs/reference/blog-poll-workflow.yml`
+  - `docs/plans/tools/attachments/blog-poll-workflow.yml`
 
 ## Summary
 
@@ -46,7 +46,7 @@ Removed:
 
 ### Blog repo (`blog-poll-workflow.yml`)
 
-New reference workflow at `docs/reference/blog-poll-workflow.yml`, to be copied into the blog repo:
+New reference workflow at `docs/plans/tools/attachments/blog-poll-workflow.yml`, to be copied into the blog repo:
 
 - **Scheduled poll** (cron every 4 hours): queries Dea's latest release via the GitHub API, compares against a
   `.dea-docs-version` marker file, downloads and unpacks the archive if new.

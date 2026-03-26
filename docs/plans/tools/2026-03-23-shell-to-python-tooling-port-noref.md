@@ -31,7 +31,7 @@ remain for build automation and Stage 2 integration tests, creating a dual-maint
 Windows MSVC support. This plan ports all non-trivial shell scripts to Python, leaving only the thin launcher and
 environment-setup scripts as shell+cmd pairs.
 
-Supersedes the "Rewriting `.sh` test scripts in Python — deferred" non-goal from the
+Supersedes the "Rewriting `.sh` test scripts in Python (deferred)" non-goal from the
 [Windows Build Support plan](closed/2026-03-11-windows-build-support.md).
 
 ## Motivation
@@ -103,9 +103,9 @@ remains the tooling language until Dea can self-serve. This is a medium-term hor
 
 ## Non-Goals
 
-- Porting `scripts/l0c`, `scripts/l0c.cmd`, or `l0-env.sh`/`l0-env.cmd` — these stay as shell pairs.
-- Rewriting the `Makefile` itself — Make remains the top-level orchestrator.
-- Adding MSVC Tier 1 support in this plan — Phase 4 is a placeholder for sequencing; full MSVC support is a separate
+- Porting `scripts/l0c`, `scripts/l0c.cmd`, or `l0-env.sh`/`l0-env.cmd`; these stay as shell pairs.
+- Rewriting the `Makefile` itself; Make remains the top-level orchestrator.
+- Adding MSVC Tier 1 support in this plan; Phase 4 is a placeholder for sequencing; full MSVC support is a separate
   plan.
 - Porting any third-party vendored scripts (e.g., `tools/m.css/`).
 

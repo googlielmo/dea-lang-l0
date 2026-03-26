@@ -13,7 +13,7 @@ Use this file as a status snapshot. For implementation details, use:
 - [specs/compiler/stage1-contract.md](../specs/compiler/stage1-contract.md) for external interfaces and guarantees.
 - [reference/c-backend-design.md](c-backend-design.md) for backend lowering and generated C behavior.
 - [specs/runtime/trace.md](../specs/runtime/trace.md) for tracing flags and runtime trace semantics.
-- [reference/grammar/l0.md](grammar/l0.md) for accepted concrete syntax.
+- [reference/grammar.md](grammar.md) for accepted concrete syntax.
 - [reference/standard-library.md](standard-library.md) for current std/sys module APIs.
 - [specs/compiler/cli-contract.md](../specs/compiler/cli-contract.md) for the shared CLI contract across stages.
 - [specs/compiler/stage2-contract.md](../specs/compiler/stage2-contract.md) for Stage 2 contract and provenance.

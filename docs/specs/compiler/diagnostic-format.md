@@ -18,7 +18,7 @@ Normative specification for compiler diagnostic output in both Stage 1 and Stage
 ### Fields
 
 | Field      | Description                                                          |
-|------------|----------------------------------------------------------------------|
+| ---------- | -------------------------------------------------------------------- |
 | `path`     | Absolute path (preferred) or as-stored path to the source file.      |
 | `line`     | 1-based line number.                                                 |
 | `column`   | 1-based column number.                                               |
@@ -33,14 +33,14 @@ Components are omitted when unavailable. The location prefix is built left-to-ri
 component:
 
 | Available              | Rendered prefix      |
-|------------------------|----------------------|
+| ---------------------- | -------------------- |
 | path, line, column     | `path:line:column: ` |
 | path, line (no column) | `path:line: `        |
 | path only              | `path: `             |
 | nothing                | (no location prefix) |
 
-The `({module})` suffix is appended after column only when a module name is available. When column is absent, the
-module suffix is omitted.
+The `({module})` suffix is appended after column only when a module name is available. When column is absent, the module
+suffix is omitted.
 
 The `[{code}]` bracket is present only when a diagnostic code is set. When absent, severity is followed directly by the
 message.
@@ -86,13 +86,13 @@ No code:
 
 ### Gutter
 
-- `gutter_width = max(5, len(str(line_number)))` — ensures alignment for small line numbers.
+- `gutter_width = max(5, len(str(line_number)))`: ensures alignment for small line numbers.
 - The line number is right-aligned within the gutter width.
 - The caret line uses the same gutter width filled with spaces.
 
 ### Carets
 
-- `caret_width = max(1, end_col - start_col)` — at least one `^`.
+- `caret_width = max(1, end_col - start_col)`: at least one `^`.
 - When the span crosses lines, carets extend to end of the source line.
 - When no column information is available, the source line is shown but the caret line is omitted.
 - When no source text is available, the entire snippet is omitted.
