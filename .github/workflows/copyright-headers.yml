@@ -5,10 +5,18 @@ name: Copyright Headers
 
 on:
   pull_request:
+    paths:
+      - ".github/workflows/check_copyright_headers.py"
+      - ".github/workflows/copyright-headers.yml"
+      - "l*/**"
   push:
     branches:
       - main
       - dea-dev
+    paths:
+      - ".github/workflows/check_copyright_headers.py"
+      - ".github/workflows/copyright-headers.yml"
+      - "l*/**"
 
 jobs:
   check-copyright-headers:

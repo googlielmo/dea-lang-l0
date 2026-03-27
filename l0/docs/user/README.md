@@ -1,0 +1,44 @@
+# Dea/L<sub>0</sub>
+
+This archive contains the standalone Dea/L0 `1.0.0` compiler distribution.
+
+## What is included
+
+- `bin/` for the `l0c` launchers and environment helpers
+- `examples/` for runnable example programs
+- `docs/reference/` for the shipped language and compiler reference
+- `shared/` for the bundled standard library and runtime assets
+
+## Quick start
+
+On POSIX shells:
+
+```bash
+source ./bin/l0-env.sh
+l0c --version
+```
+
+Then try an example:
+
+```bash
+l0c -P examples --run hello
+```
+
+Or use the installed examples as a starting point for your own project:
+
+```bash
+l0c --build -P examples -o hello examples/hello.l0
+```
+
+## Reference docs
+
+The bundled reference set is under `docs/reference/`.
+
+Useful starting points:
+
+- [Language grammar](docs/reference/grammar.md)
+- [Project status](docs/reference/project-status.md)
+- [Standard library](docs/reference/standard-library.md)
+- [Architecture](docs/reference/architecture.md)
+
+For Windows-specific usage of the shipped archive, see [README-WINDOWS.md](README-WINDOWS.md).

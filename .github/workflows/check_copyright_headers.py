@@ -16,7 +16,7 @@ TARGET_SUFFIXES = {".c", ".h", ".l0", ".py", ".sh"}
 MAX_SCAN_LINES = 80
 EXCLUDED_PREFIXES = (
     "tools/",
-    "compiler/stage2_l0/tests/fixtures/backend_golden/",
+    "l0/compiler/stage2_l0/tests/fixtures/backend_golden/",
 )
 
 

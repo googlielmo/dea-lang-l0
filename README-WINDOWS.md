@@ -2,6 +2,9 @@
 
 This document is the Windows-specific addendum to [README.md](README.md).
 
+The L0 project now lives under `l0/` inside the Dea monorepo. Run the commands in this document from the `l0/` directory
+unless noted otherwise.
+
 - If you want to build, install, and use `l0c` on Windows, read the next section.
 - If you are developing Dea/L0 itself, read the developer section after that.
 - The rest is a technical addendum about generated launchers, shell behavior, and current Windows-specific caveats.
@@ -223,9 +226,9 @@ What `l0-env.sh` does:
 
 Important caveat:
 
-- The repo-local `l0-env.sh` only auto-sources `.venv/bin/activate`.
-- If your Windows virtual environment was created in `.venv/Scripts`, the script may not activate it automatically.
-- That does not block `l0c-stage1`, because the Stage 1 wrappers also probe `.venv/Scripts/python.exe` directly.
+- The repo-local `l0-env.sh` only auto-sources the shared monorepo `../.venv/bin/activate`.
+- If your Windows virtual environment was created in `../.venv/Scripts`, the script may not activate it automatically.
+- That does not block `l0c-stage1`, because the Stage 1 wrappers also probe `../.venv/Scripts/python.exe` directly.
 
 ## `cmd.exe` usage
 

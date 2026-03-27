@@ -13,7 +13,7 @@ repos:
     rev: 1.0.0
     hooks:
       - id: mdformat
+        exclude: ^tools/.*\.md$
         additional_dependencies:
           - mdformat-gfm
           - mdformat-frontmatter
-          - mdformat-pyproject

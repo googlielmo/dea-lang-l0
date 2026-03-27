@@ -3,6 +3,7 @@
 #######################################
 
 # Byte-compiled / optimized / DLL files
+l0/__pycache__/
 __pycache__/
 *.py[codz]
 *$py.class
@@ -12,8 +13,10 @@ __pycache__/
 
 # Distribution / packaging
 .Python
+l0/build/
 build/
 develop-eggs/
+l0/dist/
 dist/
 downloads/
 eggs/
@@ -41,12 +44,18 @@ pip-log.txt
 pip-delete-this-directory.txt
 
 # Unit test / coverage reports
+l0/htmlcov/
 htmlcov/
 .tox/
+l0/.tox/
 .nox/
+l0/.nox/
 .coverage
 .coverage.*
+l0/.coverage
+l0/.coverage.*
 .cache
+l0/.cache
 nosetests.xml
 coverage.xml
 *.cover
@@ -55,6 +64,10 @@ coverage.xml
 .pytest_cache/
 pytest-of-*/
 cover/
+l0/.hypothesis/
+l0/.pytest_cache/
+l0/pytest-of-*/
+l0/cover/
 
 # Translations
 *.mo
@@ -74,7 +87,7 @@ instance/
 .scrapy
 
 # Sphinx documentation
-docs/_build/
+l0/docs/_build/
 
 # PyBuilder
 .pybuilder/
@@ -161,14 +174,17 @@ venv.bak/
 
 # mypy
 .mypy_cache/
+l0/.mypy_cache/
 .dmypy.json
 dmypy.json
 
 # Pyre type checker
 .pyre/
+l0/.pyre/
 
 # pytype static type analyzer
 .pytype/
+l0/.pytype/
 
 # Cython debug symbols
 cython_debug/
@@ -195,6 +211,7 @@ cython_debug/
 
 # Ruff stuff:
 .ruff_cache/
+l0/.ruff_cache/
 
 # PyPI configuration file
 .pypirc
@@ -389,7 +406,7 @@ build-*/
 CMakeFiles/
 CMakeCache.txt
 cmake_install.cmake
-Makefile
+# Track the root monorepo Makefile and per-level tracked Makefiles.
 install_manifest.txt
 compile_commands.json
 

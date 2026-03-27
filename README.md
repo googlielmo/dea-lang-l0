@@ -1,14 +1,15 @@
-# The Dea Programming Language
+# Welcome to Dea!
 
 > _C-family syntax, UB-free semantics, ARC strings, sum types and pattern matching._
 
-_**Dea is a systems programming language that advances through staged self-hosting levels.**_
+_**Dea is a systems programming language built through a staged bootstrap chain: each compiler level is compiled by the
+previous one.**_
 
-**L0 is now self-hosted.** It is the current implementation base, and future levels are intended to be bootstrapped from
-it in sequence.
+**Level 0 is now self-hosted.** It is the compiler base that will be used to compile L1. L1 will subsequently self-host
+to build L2, and the process will repeat for successive levels.
 
 The design is conservative by choice: a small, precisely specified language whose semantics leave no room for undefined
-behavior. Operations are either well-defined or rejected, at compile time or with a named runtime error.
+behavior. Operations are either well-defined or rejected - at compile time or with a named runtime error.
 
 _Tertium non datur._
 
@@ -52,12 +53,13 @@ L0 is in its `1.0.0.dev0` stabilization phase around the first self-hosted Stage
   - Repo-local Dea build workflow: `make use-dev-stage2` builds, installs, and selects the Stage 2 compiler under
     `build/dea/bin` for development use.
 
-  - Install available via `make PREFIX=/tmp/l0-install install`; this installs the self-hosted Stage 2 compiler (
-    `S1 -> S2`, then `S2 -> S2`) plus copied `shared/l0/stdlib` and `shared/runtime` assets.
+  - Install available via `make PREFIX=/tmp/l0-install install`; this installs the self-hosted Stage 2 compiler
+    (`S1 -> S2`, then `S2 -> S2`) plus copied `shared/l0/stdlib` and `shared/runtime` assets.
 
   - Fixed-point self-hosting verified: retained generated C matches across self-builds, and native compiler-binary
-    identity is also checked on the validated reproducibility matrix. See `compiler/stage2_l0/README.md` for the
-    documented `tcc` and Windows exceptions.
+    identity is also checked on the validated reproducibility matrix. See
+    [`l0/compiler/stage2_l0/README.md`](l0/compiler/stage2_l0/README.md) for the documented `tcc` and Windows
+    exceptions.
 
 - **Built-in Observability:** Language developers need to know what memory is doing. L0 ships with native compiler flags
   to trace ARC events and allocations directly to stderr. Today these are fully usable through the Stage 1 driver and
@@ -85,7 +87,20 @@ l0c --run --trace-arc --trace-memory app.l0
   statically and at runtime: `300 as byte` is a compiler error, `my_opt_str as string` panics on null. Use
   `unwrap_or_s(my_opt_str, "default")` if null is a valid case.
 
+## Repository layout
+
+The repository root contains the shared virtual environment and build artifacts, while `l0/` contains the compiler
+source and the main entrypoints for development and installation workflows.
+
+Monorepo release tags are level-prefixed. Pre-monorepo bare tags such as `v0.9.0` and `v0.9.1` remain historical
+references, while current L0 releases use `l0-vX.Y.Z`. The repo-level release-tag policy lives in
+[`MONOREPO.md`](MONOREPO.md).
+
 ## Getting Started
+
+First, clone the repository and `cd` into `l0/`.
+
+All L0 workflow commands described below are designed to be run from [`l0/`](l0/) unless they explicitly say otherwise.
 
 ### Prerequisites for Stage 1
 
@@ -120,17 +135,24 @@ managers provide outdated versions.
 
 ### Install
 
-Clone this repository and `cd` into it. Then create a virtual environment and install dependencies:
+From the repository root, create the shared repo-local virtual environment and then enter `l0/`:
 
 ```shell
-make venv                # create or reuse local .venv; prefers uv when available
+make venv
+cd l0
+```
+
+You can also enter `l0/` directly and use the level-local entrypoint:
+
+```shell
+make venv                # create or reuse ../.venv; prefers uv when available
 ```
 
 For Windows-specific setup, generated launchers, MSYS2 bash usage, and native-shell (`cmd.exe` / PowerShell) usage, see
 [README-WINDOWS.md](README-WINDOWS.md).
 
-If you prefer to manage the environment manually, `uv sync --group dev --group docs` is the recommended direct command;
-a plain `python3 -m venv .venv` workflow also works.
+If you prefer to manage the environment manually, `UV_PROJECT_ENVIRONMENT=../.venv uv sync --group dev --group docs` is
+the recommended direct command; a plain `python3 -m venv ../.venv` workflow also works.
 
 For an optional reproducible Linux test environment, use the explicit Docker wrapper:
 
@@ -207,8 +229,8 @@ l0c --run -P ./src -P ./lib main        # -P adds a project root to search for m
 The compiler resolves modules from system roots (stdlib) then project roots in order.
 
 Environment-variable defaults and launcher-specific path behavior are documented in
-[compiler/stage2_l0/README.md](compiler/stage2_l0/README.md),
-[docs/reference/project-status.md](docs/reference/project-status.md), and [README-WINDOWS.md](README-WINDOWS.md).
+[l0/compiler/stage2_l0/README.md](l0/compiler/stage2_l0/README.md),
+[l0/docs/reference/project-status.md](l0/docs/reference/project-status.md), and [README-WINDOWS.md](README-WINDOWS.md).
 
 ### Examples
 
@@ -218,16 +240,20 @@ l0c -P examples --run hamurabi
 
 The `examples/` directory covers most language features and is worth reading as code.
 
-[Hamurabi](examples/hamurabi.l0) is a faithful L0 port of the 1968 resource-management game - ancient Sumeria, grain
+[Hamurabi](l0/examples/hamurabi.l0) is a faithful L0 port of the 1968 resource-management game - ancient Sumeria, grain
 storage, and all.
 
-[optional_config](examples/optional_config.l0) is a smaller example showing optional values in a practical setting:
+[optional_config](l0/examples/optional_config.l0) is a smaller example showing optional values in a practical setting:
 parse a retry count from the command line or `APP_RETRIES`, validate it, and fall back to a default.
 
 ### A more advanced example
 
+The next example is a simple prefix notation calculator that demonstrates recursive data structures, pattern matching,
+and scoped resource management using the `with` statement. It also shows how to use the `?` operator to propagate `null`
+on parse failure without needing to check for it at every step.
+
 <details>
-<summary>A simple prefix notation calculator</summary>
+<summary>Click here to show the source code.</summary>
 <p>
 
 ```l0
@@ -314,11 +340,11 @@ func main() -> int {
 
 </details>
 
-This program is available in [examples/demo.l0](examples/demo.l0). You can run it from the repository root as follows:
+This program is available in [l0/examples/demo.l0](l0/examples/demo.l0). You can run it from within `l0/` as follows:
 
 ```shell
 l0c examples/demo.l0 -o demo
-./demo mul 6 add 5 2 
+./demo mul 6 add 5 2
 ```
 
 It will parse the expression `mul 6 add 5 2` as a tree, evaluate it to `6 * (5 + 2)`, and print `= 42`.
@@ -357,7 +383,7 @@ narrowing conversions. No assignment-as-expression.
 
 ## Grammar
 
-The authoritative grammar is in [docs/reference/grammar.md](docs/reference/grammar.md).
+The authoritative grammar is in [l0/docs/reference/grammar.md](l0/docs/reference/grammar.md).
 
 Types compose as: `T*`, `T**`, `T?`, `T*?`. Expressions follow C precedence, extended with the postfix `?` operator and
 `as` casts.
@@ -371,11 +397,11 @@ For the full compiler workflow, bootstrap/install layout, test targets, and curr
 
 References:
 
-- [Architecture and data flow](docs/reference/architecture.md)
-- [Design decisions](docs/reference/design-decisions.md)
-- [Ownership and memory management](docs/reference/ownership.md)
-- [Stage 1 contract](docs/specs/compiler/stage1-contract.md)
-- [Shared CLI contract](docs/specs/compiler/cli-contract.md)
+- [Architecture and data flow](l0/docs/reference/architecture.md)
+- [Design decisions](l0/docs/reference/design-decisions.md)
+- [Ownership and memory management](l0/docs/reference/ownership.md)
+- [Stage 1 contract](l0/docs/specs/compiler/stage1-contract.md)
+- [Shared CLI contract](l0/docs/specs/compiler/cli-contract.md)
 - [Contributing guide](CONTRIBUTING.md) for developer workflow, setup, and validation commands
 
 ## CLI
@@ -407,14 +433,14 @@ l0c --run --trace-arc --trace-memory app  # trace ARC and allocation to stderr
 l0c -c clang -C "-Og -DDEBUG" hello.l0    # use a specific C compiler with custom flags
 ```
 
-Full CLI contract, i.e., mode flags, options, targets, identity strings, exit codes, and stage-specific differences:
-[docs/specs/compiler/cli-contract.md](docs/specs/compiler/cli-contract.md).
+Full CLI contract — mode flags, options, targets, identity strings, exit codes, and stage-specific differences:
+[l0/docs/specs/compiler/cli-contract.md](l0/docs/specs/compiler/cli-contract.md).
 
-Trace output contract: [docs/specs/runtime/trace.md](docs/specs/runtime/trace.md).
+Trace output contract: [l0/docs/specs/runtime/trace.md](l0/docs/specs/runtime/trace.md).
 
 ## Project status
 
-[docs/reference/project-status.md](docs/reference/project-status.md).
+[l0/docs/reference/project-status.md](l0/docs/reference/project-status.md).
 
 ## Contributing
 

@@ -1,0 +1,91 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+# Copyright (c) 2026 gwz
+
+name: L0 Validate Documentation
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/**"
+      - "README.md"
+      - "README-WINDOWS.md"
+      - "CONTRIBUTING.md"
+      - "CLAUDE.md"
+      - "THIRD_PARTY_NOTICES"
+      - "tools/**"
+      - "l0/compiler/stage1_py/**"
+      - "l0/compiler/docgen/**"
+      - "l0/compiler/stage2_l0/**"
+      - "l0/compiler/shared/**"
+      - "l0/docs/**"
+      - "l0/README.md"
+      - "l0/CLAUDE.md"
+      - "l0/pyproject.toml"
+      - "l0/scripts/docs/**"
+      - "l0/scripts/gen-docs.sh"
+      - "l0/uv.lock"
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - dea-dev
+    paths:
+      - ".github/workflows/**"
+      - "README.md"
+      - "README-WINDOWS.md"
+      - "CONTRIBUTING.md"
+      - "CLAUDE.md"
+      - "THIRD_PARTY_NOTICES"
+      - "tools/**"
+      - "l0/compiler/stage1_py/**"
+      - "l0/compiler/docgen/**"
+      - "l0/compiler/stage2_l0/**"
+      - "l0/compiler/shared/**"
+      - "l0/docs/**"
+      - "l0/README.md"
+      - "l0/CLAUDE.md"
+      - "l0/pyproject.toml"
+      - "l0/scripts/docs/**"
+      - "l0/scripts/gen-docs.sh"
+      - "l0/uv.lock"
+
+jobs:
+  validate-docs:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: l0
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-suffix: docs-py3.14
+
+      - name: Install docs toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y doxygen graphviz make
+
+      - name: Sync docs dependencies
+        run: uv sync --group docs
+
+      - name: Build docs strictly
+        run: ./scripts/gen-docs.sh --strict
+
+      - name: Show undocumented functions report
+        run: cat build/docs/undocumented-functions.txt
+
+      - name: Export Chirpy Markdown
+        run: |
+          python -m compiler.docgen.l0_docgen_blog \
+            --input build/docs/markdown \
+            --output build/docs/blog-export

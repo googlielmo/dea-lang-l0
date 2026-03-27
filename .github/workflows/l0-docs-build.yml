@@ -1,0 +1,79 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+# Copyright (c) 2026 gwz
+
+name: L0 Build Documentation
+
+on:
+  workflow_call:
+    inputs:
+      release_tag:
+        required: false
+        type: string
+        default: ""
+
+jobs:
+  build-docs:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: l0
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-suffix: docs-build-py3.14
+
+      - name: Install docs and TeX toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            doxygen \
+            graphviz \
+            make \
+            texlive-latex-recommended \
+            texlive-latex-extra \
+            texlive-fonts-recommended
+
+      - name: Sync docs dependencies
+        run: uv sync --group docs
+
+      - name: Build HTML, Markdown, LaTeX, and PDF
+        env:
+          L0_DOCS_RELEASE_TAG: ${{ inputs.release_tag }}
+        run: ./scripts/gen-docs.sh --pdf --strict
+
+      - name: Stage Pages site
+        run: |
+          pdf_name="dea_l0_api_reference.pdf"
+          rm -rf build/docs/pages-site
+          mkdir -p build/docs/pages-site
+          cp -R build/docs/html/. build/docs/pages-site/
+          mkdir -p build/docs/pages-site/pdf
+          cp "build/docs/pdf/$pdf_name" "build/docs/pages-site/pdf/$pdf_name"
+          touch build/docs/pages-site/.nojekyll
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: l0/build/docs/pages-site
+
+      - name: Upload generated Markdown artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: docs-markdown
+          path: l0/build/docs/markdown
+
+      - name: Upload generated PDF artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: docs-pdf
+          path: l0/build/docs/pdf/dea_l0_api_reference.pdf

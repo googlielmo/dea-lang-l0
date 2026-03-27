@@ -3,6 +3,9 @@
 Thanks for contributing! This document provides guidelines for contributing to the Dea/L0 project, including development
 setup, coding conventions, and testing.
 
+Dea/L0 now lives under `l0/` inside the Dea monorepo. Unless a section says otherwise, run the commands in this document
+from the `l0/` directory.
+
 ## Scope and status
 
 Dea/L0 is experimental. The language, compiler CLI, and runtime APIs may change without notice.
@@ -29,15 +32,15 @@ as distribution packages tend to ship an outdated version.
 
 ### Setting up the development environment
 
-For normal development, start with `make venv`: it validates the Python version, creates the Python virtual environment
-under `.venv`, and installs all dev + docs dependencies from `pyproject.toml`.
+For normal development, start with `make venv`: it validates the Python version, creates the shared monorepo virtual
+environment under `../.venv`, and installs all dev + docs dependencies from `pyproject.toml`.
 
 ### Pre-commit hooks
 
-After running `make venv`, install the hooks once:
+After running `make venv`, install the monorepo hooks once from the repository root:
 
 ```bash
-pre-commit install
+uv run --directory l0 --group dev pre-commit install -c .pre-commit-config.yaml
 ```
 
 Two hooks run on every commit:
@@ -76,7 +79,7 @@ L0_CC=gcc make test-stage2
 
 ### Running tests
 
-From the repository root:
+From the `l0/` directory:
 
 ```bash
 make test-stage1  # runs the Stage 1 test suite (Python compiler)
@@ -86,8 +89,8 @@ make test-stage2  # runs the Stage 2 test suite (L0 compiler)
 For Stage 1 (`compiler/stage1_py`) changes, you can also run specific tests with `pytest`:
 
 ```bash
-./.venv/bin/python -m pytest compiler/stage1_py/tests/lexer/test_lexer.py
-./.venv/bin/python -m pytest -k "test_name" compiler/stage1_py/tests
+../.venv/bin/python -m pytest compiler/stage1_py/tests/lexer/test_lexer.py
+../.venv/bin/python -m pytest -k "test_name" compiler/stage1_py/tests
 ```
 
 For Stage 2 (`compiler/stage2_l0`) changes, run one of the following Make targets depending on your needs:
@@ -99,7 +102,7 @@ make test-stage2-trace  # runs the Stage 2 L0-based tests with trace collection 
 make triple-test  # runs only the triple-bootstrap test
 ```
 
-These Make targets are self-contained repo-local workflows: they ensure `./.venv`, prepare the Stage 2 artifact under
+These Make targets are self-contained repo-local workflows: they ensure `../.venv`, prepare the Stage 2 artifact under
 `DEA_BUILD_DIR` (defaults to `./build/dea`), and ignore any previously sourced installed-prefix `L0_*` env.
 
 `make test-stage2-trace` is an important finalization gate for Stage 2 changes because it checks runtime trace health

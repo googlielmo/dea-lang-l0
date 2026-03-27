@@ -1,0 +1,29 @@
+[project]
+name = "l0c"
+version = "1.0.0.dev0"
+description = "L0 language compiler"
+authors = [{ name = "gwz (googlielmo)", email = "googlielmo@gmail.com" }]
+requires-python = ">=3.14"
+dependencies = []
+
+[tool.uv]
+package = false
+
+[dependency-groups]
+dev = [
+    "pre-commit>=4.5.0",
+    "pytest>=9.0.2",
+    "pytest-xdist>=3.5",
+    "mdformat>=1.0.0",
+    "mdformat-gfm>=0.3",
+    "mdformat-frontmatter>=2.0",
+]
+docs = [
+    "jinja2>=3.1.6",
+    "PyYAML>=6.0.2",
+    "pygments>=2.19.2",
+]
+
+[tool.pytest.ini_options]
+addopts = "-n auto"
+testpaths = ["compiler/stage1_py/tests"]

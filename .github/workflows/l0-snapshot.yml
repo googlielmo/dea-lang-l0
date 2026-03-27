@@ -1,0 +1,292 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+# Copyright (c) 2026 gwz
+
+name: L0 Snapshot Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Branch, tag, or commit to snapshot"
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  prepare-snapshot:
+    runs-on: ubuntu-latest
+    outputs:
+      snapshot_ref: ${{ steps.snapshot.outputs.snapshot_ref }}
+      snapshot_tag: ${{ steps.snapshot.outputs.snapshot_tag }}
+      snapshot_version: ${{ steps.snapshot.outputs.snapshot_version }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.ref != '' && inputs.ref || github.event.repository.default_branch }}
+
+      - name: Create snapshot tag
+        id: snapshot
+        run: |
+          short_hash="$(git rev-parse --short HEAD)"
+          stamp="$(date -u +%Y%m%d-%H%M)"
+          snapshot_version="l0-snapshot-${stamp}-${short_hash}"
+          snapshot_tag="${snapshot_version}"
+
+          if git rev-parse -q --verify "refs/tags/${snapshot_tag}" >/dev/null 2>&1; then
+            existing_commit="$(git rev-list -n 1 "${snapshot_tag}")"
+            head_commit="$(git rev-parse HEAD)"
+            if [ "$existing_commit" != "$head_commit" ]; then
+              echo "Error: ${snapshot_tag} already exists on ${existing_commit}, expected ${head_commit}." >&2
+              exit 1
+            fi
+          else
+            git tag "${snapshot_tag}"
+            git push origin "refs/tags/${snapshot_tag}"
+          fi
+
+          {
+            echo "snapshot_ref=${snapshot_tag}"
+            echo "snapshot_tag=${snapshot_tag}"
+            echo "snapshot_version=${snapshot_version}"
+          } >> "$GITHUB_OUTPUT"
+
+  build-dist:
+    needs: prepare-snapshot
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            os: linux
+            arch: x86_64
+            c_compiler: gcc
+          - runner: macos-15-intel
+            os: darwin
+            arch: x86_64
+            c_compiler: clang
+          - runner: macos-latest
+            os: darwin
+            arch: arm64
+            c_compiler: clang
+          - runner: windows-latest
+            os: windows
+            arch: x86_64
+            c_compiler: gcc
+    runs-on: ${{ matrix.runner }}
+    defaults:
+      run:
+        working-directory: l0
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          ref: ${{ needs.prepare-snapshot.outputs.snapshot_ref }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-suffix: snapshot-${{ matrix.os }}-${{ matrix.arch }}-py3.14
+
+      - name: Install Linux build toolchain
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential clang make
+
+      - name: Set up MSYS2 MinGW-w64 toolchain
+        if: runner.os == 'Windows'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          path-type: inherit
+          install: >-
+            make
+            mingw-w64-x86_64-gcc
+
+      - name: Build distribution archive
+        if: runner.os != 'Windows'
+        env:
+          L0_CC: ${{ matrix.c_compiler }}
+          DEA_BUILD_ID: gha-${{ github.run_id }}.${{ github.run_attempt }}-snapshot-${{ matrix.os }}-${{ matrix.arch }}
+          SNAPSHOT_VERSION: ${{ needs.prepare-snapshot.outputs.snapshot_version }}
+        run: |
+          mkdir -p build
+          printf '%s\n' "$SNAPSHOT_VERSION" > VERSION
+          make dist | tee build/dist.log
+
+      - name: Build distribution archive
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        env:
+          L0_CC: ${{ matrix.c_compiler }}
+          DEA_BUILD_ID: gha-${{ github.run_id }}.${{ github.run_attempt }}-snapshot-${{ matrix.os }}-${{ matrix.arch }}
+          SNAPSHOT_VERSION: ${{ needs.prepare-snapshot.outputs.snapshot_version }}
+        run: |
+          mkdir -p build
+          printf '%s\n' "$SNAPSHOT_VERSION" > VERSION
+          make dist | tee build/dist.log
+
+      - name: Resolve distribution archive path
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import os
+          import re
+
+          log_path = Path("build/dist.log")
+          text = log_path.read_text(encoding="utf-8")
+          match = re.search(r"created distribution archive at (.+)", text)
+          if match is None:
+              raise SystemExit(f"could not parse distribution archive from {log_path}")
+          archive_path = Path(match.group(1).strip())
+          github_env = Path(os.environ["GITHUB_ENV"])
+          with github_env.open("a", encoding="utf-8") as handle:
+              handle.write(f"DIST_ARCHIVE_PATH={archive_path.as_posix()}\n")
+              handle.write(f"DIST_ARCHIVE_NAME={archive_path.name}\n")
+          PY
+
+      - name: Smoke-test distribution archive
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import os
+          import subprocess
+          import sys
+          import tarfile
+          import tempfile
+          import zipfile
+
+          archive_path = Path(os.environ["DIST_ARCHIVE_PATH"])
+          if not archive_path.is_file():
+              raise SystemExit(f"missing archive: {archive_path}")
+
+          smoke_root = Path(tempfile.mkdtemp(prefix="snapshot-smoke.", dir="build"))
+          try:
+              if archive_path.suffix == ".zip":
+                  with zipfile.ZipFile(archive_path) as archive:
+                      archive.extractall(smoke_root)
+              else:
+                  with tarfile.open(archive_path, "r:gz") as archive:
+                      archive.extractall(smoke_root)
+
+              dist_root = smoke_root / "dea-l0"
+              version_path = dist_root / "VERSION"
+              if not version_path.is_file():
+                  raise SystemExit(f"missing VERSION file in {dist_root}")
+
+              for expected in ["README.md", "examples", "docs/reference", "docs/reference/grammar.md"]:
+                  if not (dist_root / expected).exists():
+                      raise SystemExit(f"missing expected path in dist: {dist_root / expected}")
+              windows_readme = dist_root / "README-WINDOWS.md"
+              if archive_path.suffix == ".zip":
+                  if not windows_readme.is_file():
+                      raise SystemExit(f"missing expected path in dist: {windows_readme}")
+              elif windows_readme.exists():
+                  raise SystemExit(f"unexpected path in dist: {windows_readme}")
+
+              for unexpected in [
+                  "CONTRIBUTING.md",
+                  "docs/user",
+                  "docs/reference/blog-poll-workflow.yml",
+                  "docs/reference/grammar/l0.md",
+              ]:
+                  if (dist_root / unexpected).exists():
+                      raise SystemExit(f"unexpected path in dist: {dist_root / unexpected}")
+
+              readme_text = (dist_root / "README.md").read_text(encoding="utf-8")
+              for unexpected in ["MONOREPO.md", "CONTRIBUTING.md", "compiler/stage2_l0/README.md", "cd` into `l0/"]:
+                  if unexpected in readme_text:
+                      raise SystemExit(f"unexpected README content in dist: {unexpected}")
+
+              launcher = dist_root / "bin" / "l0c"
+              if os.name == "nt":
+                  launcher = launcher.with_suffix(".cmd")
+              completed = subprocess.run(
+                  [str(launcher), "--version"],
+                  check=False,
+                  stdout=subprocess.PIPE,
+                  stderr=subprocess.STDOUT,
+                  text=True,
+                  encoding="utf-8",
+                  errors="replace",
+              )
+              if completed.returncode != 0:
+                  raise SystemExit(completed.stdout)
+              sys.stdout.write(completed.stdout)
+          finally:
+              pass
+          PY
+
+      - name: Upload distribution artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: dea-l0-dist-${{ matrix.os }}-${{ matrix.arch }}
+          path: l0/${{ env.DIST_ARCHIVE_PATH }}
+
+  publish-release:
+    needs:
+      - prepare-snapshot
+      - build-dist
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: l0
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          ref: ${{ needs.prepare-snapshot.outputs.snapshot_ref }}
+
+      - name: Download distribution artifacts
+        uses: actions/download-artifact@v6
+        with:
+          pattern: dea-l0-dist-*
+          merge-multiple: true
+          path: l0/build/release-assets
+
+      - name: Generate checksums
+        run: |
+          cd build/release-assets
+          sha256sum ./*.tar.gz ./*.zip > SHA256SUMS
+
+      - name: Generate release notes
+        env:
+          CURRENT_TAG: ${{ needs.prepare-snapshot.outputs.snapshot_tag }}
+        run: |
+          prev_tag="$(git tag --merged HEAD --sort=-v:refname | grep -E '^(l0-v|l0-snapshot-)' | grep -Fxv "$CURRENT_TAG" | head -n 1 || true)"
+          if [ -z "$prev_tag" ]; then
+            prev_tag="$(git tag --merged HEAD --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1 || true)"
+          fi
+          if [ -n "$prev_tag" ]; then
+            git log --pretty=format:'- %s (%h)' "$prev_tag..$CURRENT_TAG" > build/release-notes.md
+          else
+            git log --pretty=format:'- %s (%h)' "$CURRENT_TAG" > build/release-notes.md
+          fi
+
+      - name: Publish GitHub pre-release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CURRENT_TAG: ${{ needs.prepare-snapshot.outputs.snapshot_tag }}
+          CURRENT_TITLE: ${{ needs.prepare-snapshot.outputs.snapshot_version }}
+        run: |
+          if gh release view "$CURRENT_TAG" >/dev/null 2>&1; then
+            gh release upload "$CURRENT_TAG" build/release-assets/* --clobber
+            gh release edit "$CURRENT_TAG" --title "$CURRENT_TITLE" --notes-file build/release-notes.md --prerelease
+          else
+            gh release create "$CURRENT_TAG" build/release-assets/* --title "$CURRENT_TITLE" --notes-file build/release-notes.md --prerelease
+          fi
