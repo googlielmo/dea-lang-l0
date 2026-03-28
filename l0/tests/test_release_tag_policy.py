@@ -31,7 +31,7 @@ def assert_contains(text: str, needle: str, *, context: str) -> None:
 def check_release_workflow() -> None:
     text = read_text(".github/workflows/l0-release.yml")
     assert_contains(text, '- "l0-v*"', context="l0-release.yml")
-    assert_contains(text, '${RELEASE_VERSION#l0-v}', context="l0-release.yml")
+    assert_contains(text, "printf 'dea/l0 %s\\n' \"${RELEASE_VERSION#l0-v}\" > VERSION", context="l0-release.yml")
     assert_contains(text, "name: dea-l0-dist-${{ matrix.os }}-${{ matrix.arch }}", context="l0-release.yml")
     assert_contains(text, "pattern: dea-l0-dist-*", context="l0-release.yml")
     assert_contains(
@@ -49,6 +49,7 @@ def check_release_workflow() -> None:
 def check_snapshot_workflow() -> None:
     text = read_text(".github/workflows/l0-snapshot.yml")
     assert_contains(text, 'snapshot_version="l0-snapshot-${stamp}-${short_hash}"', context="l0-snapshot.yml")
+    assert_contains(text, "printf 'dea/l0 %s\\n' \"${SNAPSHOT_VERSION#l0-}\" > VERSION", context="l0-snapshot.yml")
     assert_contains(text, "name: dea-l0-dist-${{ matrix.os }}-${{ matrix.arch }}", context="l0-snapshot.yml")
     assert_contains(text, "pattern: dea-l0-dist-*", context="l0-snapshot.yml")
     assert_contains(

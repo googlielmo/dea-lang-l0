@@ -140,7 +140,7 @@ invocation, including on CLI usage failures where the identity is known before a
 | Stage   | Identity string                        |
 | ------- | -------------------------------------- |
 | Stage 1 | `Dea language / L0 compiler (Stage 1)` |
-| Stage 2 | `Dea language / L0 compiler (Stage 2)` |
+| Stage 2 | `Dea language / L0 compiler`           |
 
 ## 8. Exit Codes
 

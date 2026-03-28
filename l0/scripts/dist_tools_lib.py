@@ -87,6 +87,8 @@ class Stage2BuildProvenance:
     build_time: str
     host: str
     compiler_banner: str
+    release_version: str
+    source_url: str
     has_embedded_version: bool
 
 
@@ -339,6 +341,30 @@ def _derive_build_id(env: dict[str, str], commit_short: str, build_stamp: str) -
     return f"local-{build_stamp}"
 
 
+_DEFAULT_SOURCE_URL = "https://github.com/googlielmo/dea-lang-l0"
+
+
+def _source_url(repo_root: Path, git_env: dict[str, str], env: dict[str, str]) -> str:
+    """Derive the canonical source repository URL.
+
+    Resolution order: GITHUB_REPOSITORY env var, git remote origin, hardcoded default.
+    """
+
+    gh_repo = env.get("GITHUB_REPOSITORY", "").strip()
+    if gh_repo:
+        return f"https://github.com/{gh_repo}"
+
+    remote = _git_output(repo_root, git_env, "remote", "get-url", "origin")
+    if remote:
+        url = remote.removesuffix(".git")
+        if url.startswith("https://"):
+            return url
+        if url.startswith("git@github.com:"):
+            return "https://github.com/" + url.removeprefix("git@github.com:")
+
+    return _DEFAULT_SOURCE_URL
+
+
 def collect_stage2_build_provenance(repo_root: Path, env: dict[str, str]) -> tuple[Stage2BuildProvenance, str]:
     """Capture one build-provenance snapshot for Stage 2 artifact-producing flows."""
 
@@ -367,6 +393,11 @@ def collect_stage2_build_provenance(repo_root: Path, env: dict[str, str]) -> tup
     host = _host_platform_text(repo_root, env)
     compiler_banner = _compiler_banner_text(repo_root, env, resolved_compiler)
     build_id = _derive_build_id(env, commit_short, build_stamp)
+    release_version = env.get("DEA_DIST_VERSION", "").strip()
+    if not release_version:
+        release_version = f"dev-{commit_short}"
+
+    source_url = _source_url(repo_root, git_env, env)
 
     required_fields = (build_id, build_time, host, compiler_banner)
     has_embedded_version = all(field and field != "unknown" for field in required_fields)
@@ -379,6 +410,8 @@ def collect_stage2_build_provenance(repo_root: Path, env: dict[str, str]) -> tup
         build_time=build_time,
         host=host,
         compiler_banner=compiler_banner,
+        release_version=release_version,
+        source_url=source_url,
         has_embedded_version=has_embedded_version,
     ), resolved_compiler
 
@@ -427,6 +460,23 @@ func build_info_compiler() -> string {{
     return {_render_l0_string(provenance.compiler_banner)};
 }}
 
+func build_info_release_version() -> string {{
+    return {_render_l0_string(provenance.release_version)};
+}}
+
+func build_info_identity_with_version(identity: string) -> string {{
+    if (!build_info_has_embedded_version()) {{
+        return identity;
+    }}
+
+    with (let sb = sb_create() => sb_free(sb)) {{
+        sb_append(sb, identity);
+        sb_append(sb, " ");
+        sb_append(sb, build_info_release_version());
+        return sb_to_string(sb);
+    }}
+}}
+
 func build_info_version_text(identity: string) -> string? {{
     if (!build_info_has_embedded_version()) {{
         return null;
@@ -434,6 +484,8 @@ func build_info_version_text(identity: string) -> string? {{
 
     with (let sb = sb_create() => sb_free(sb)) {{
         sb_append(sb, identity);
+        sb_append(sb, " ");
+        sb_append(sb, build_info_release_version());
         sb_append(sb, "\\nbuild: ");
         sb_append(sb, build_info_build_id());
         sb_append(sb, "\\nbuild time: ");
@@ -899,12 +951,26 @@ def copy_prefix_shared_assets(layout: PrefixLayout) -> None:
     copy_tree(REPO_ROOT / "compiler" / "shared" / "runtime", layout.runtime_dir)
 
 
-def copy_distribution_version_file(layout: PrefixLayout) -> None:
-    """Copy the optional repo-root `VERSION` file into one distribution tree."""
+def write_distribution_version_file(layout: PrefixLayout, provenance: Stage2BuildProvenance) -> None:
+    """Write the key-value `VERSION` metadata file into one distribution tree."""
 
-    version_path = REPO_ROOT / "VERSION"
-    if version_path.is_file():
-        copy_file(version_path, layout.prefix_dir / "VERSION")
+    host_parts = provenance.host.split()
+    os_name = host_parts[0] if len(host_parts) >= 1 else "unknown"
+    arch = host_parts[2] if len(host_parts) >= 3 else "unknown"
+    commit_text = format_commit_for_version(provenance.commit_full, provenance.tree_state)
+
+    lines = [
+        f"name: dea/l0",
+        f"version: {provenance.release_version}",
+        f"build: {provenance.build_id}",
+        f"commit: {commit_text}",
+        f"os: {os_name}",
+        f"arch: {arch}",
+        f"author: googlielmo a.k.a. gwz <googlielmo@gmail.com>",
+        f"license: MIT OR Apache-2.0",
+        f"source: {provenance.source_url}",
+    ]
+    (layout.prefix_dir / "VERSION").write_text("\n".join(lines) + "\n")
 
 
 def copy_distribution_extras(layout: PrefixLayout) -> None:
@@ -1038,11 +1104,12 @@ def create_stage2_distribution(
     layout: PrefixLayout,
     stage2_native_source: Path,
     archive_base_name: str,
+    provenance: Stage2BuildProvenance,
 ) -> DistributionArchive:
     """Create one relocatable distribution tree plus a host-native archive."""
 
     install_prefix_stage2(layout, stage2_native_source)
-    copy_distribution_version_file(layout)
+    write_distribution_version_file(layout, provenance)
     copy_distribution_extras(layout)
     archive_path = create_distribution_archive(layout.prefix_dir, archive_base_name)
     return DistributionArchive(dist_dir=layout.prefix_dir, archive_path=archive_path)

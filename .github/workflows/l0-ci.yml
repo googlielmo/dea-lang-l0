@@ -30,7 +30,7 @@ on:
           - macos-arm64
           - windows
       c_compiler:
-        description: C compiler to use for the Linux validation run
+        description: C compiler to use for manual Linux or Windows validation runs
         required: true
         default: gcc
         type: choice
@@ -81,6 +81,7 @@ jobs:
 
   test-all:
     needs: select-matrix
+    name: test-all (${{ matrix.runner }}, ${{ matrix.os }}, ${{ matrix.arch }}, ${{ github.event_name == 'workflow_dispatch' && (matrix.os == 'linux' || matrix.os == 'windows') && inputs.c_compiler || matrix.c_compiler }}, ${{ matrix.platform }})
     strategy:
       fail-fast: false
       matrix: ${{ fromJson(needs.select-matrix.outputs.matrix) }}
@@ -97,11 +98,21 @@ jobs:
         with:
           python-version: "3.14"
 
+      - name: Select C compiler
+        id: select-cc
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && { [ "${{ matrix.os }}" = "linux" ] || [ "${{ matrix.os }}" = "windows" ]; }; then
+            echo "value=${{ inputs.c_compiler }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=${{ matrix.c_compiler }}" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Set up uv
         uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
-          cache-suffix: ci-${{ matrix.os }}-${{ matrix.arch }}-py3.14
+          cache-suffix: ci-${{ matrix.os }}-${{ matrix.arch }}-${{ steps.select-cc.outputs.value }}-py3.14
 
       - name: Install Linux build toolchain
         if: matrix.os == 'linux'
@@ -118,16 +129,7 @@ jobs:
           install: >-
             make
             mingw-w64-x86_64-gcc
-
-      - name: Select C compiler
-        id: select-cc
-        shell: bash
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ matrix.os }}" = "linux" ]; then
-            echo "value=${{ inputs.c_compiler }}" >> "$GITHUB_OUTPUT"
-          else
-            echo "value=${{ matrix.c_compiler }}" >> "$GITHUB_OUTPUT"
-          fi
+            mingw-w64-x86_64-clang
 
       - name: Select Make target
         id: select-make-target
@@ -156,7 +158,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v6
         with:
-          name: workdir-${{ matrix.os }}-${{ matrix.arch }}
+          name: workdir-${{ matrix.os }}-${{ matrix.arch }}-${{ steps.select-cc.outputs.value }}
           path: |
             l0
             !l0/.git/**

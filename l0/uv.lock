@@ -78,7 +78,7 @@ wheels = [
 
 [[package]]
 name = "l0c"
-version = "1.0.0.dev0"
+version = "1.0.0"
 source = { virtual = "." }
 
 [package.dev-dependencies]

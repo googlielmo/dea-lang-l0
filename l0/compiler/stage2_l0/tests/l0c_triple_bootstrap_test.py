@@ -497,7 +497,7 @@ def assert_fallback_version(name: str, compiler_path: Path, *, env: dict[str, st
         artifact_dir=artifact_dir,
     )
     version_text = read_text(version_log).strip()
-    expected = "Dea language / L0 compiler (Stage 2)"
+    expected = "Dea language / L0 compiler"
     if version_text != expected:
         fail(
             "\n".join(

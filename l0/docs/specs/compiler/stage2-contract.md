@@ -18,10 +18,11 @@ driver execution. This document records the Stage 2-specific parts of the extern
 ## 2. `--version` Provenance Output
 
 Repo-local (`make install-dev-stage2`) and install-prefix (`make install`) Stage 2 artifacts embed build provenance.
-When provenance is present, `--version` prints the identity line followed by five fields:
+When provenance is present, `--version` prints the identity line (optionally suffixed with the release version) followed
+by five fields:
 
 ```
-Dea language / L0 compiler (Stage 2)
+Dea language / L0 compiler <release-version>
 build: <build-id>
 build time: <utc-timestamp>
 commit: <git-hash>[+dirty]
@@ -29,11 +30,16 @@ host: <kernel> <release> <machine>
 compiler: <cc-banner>
 ```
 
+The release version is appended to the identity line when the `DEA_DIST_VERSION` environment variable was set at build
+time (CI release and snapshot workflows set this automatically). For local dev builds, the version defaults to
+`dev-<short-hash>`. When neither provenance nor a version string is available, `--version` prints only the bare identity
+line.
+
 These fields are **informational**; their format is not guaranteed stable for machine parsing.
 
 ### 2.1 Field formats
 
-**`build:`** atoken identifying the build context.
+**`build:`** a token identifying the build context.
 
 - Precedence: `DEA_BUILD_ID` environment variable (if set) > GitHub Actions composite id > `<short-hash>-<stamp>` >
   `local-<stamp>`, where `<stamp>` is `YYYYMMDDTHHMMSSz` (UTC).

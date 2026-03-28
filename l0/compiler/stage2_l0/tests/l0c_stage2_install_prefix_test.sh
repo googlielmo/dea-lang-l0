@@ -103,7 +103,7 @@ assert_not_contains() {
 
 assert_version_report() {
     local path="$1"
-    assert_contains "$path" "Dea language / L0 compiler (Stage 2)"
+    assert_contains "$path" "Dea language / L0 compiler"
     assert_contains "$path" "build: "
     assert_contains "$path" "build time: "
     assert_contains "$path" "commit: "

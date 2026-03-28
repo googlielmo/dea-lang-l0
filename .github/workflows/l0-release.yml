@@ -75,7 +75,7 @@ jobs:
           RELEASE_VERSION: ${{ github.ref_name }}
         run: |
           mkdir -p build
-          printf '%s\n' "${RELEASE_VERSION#l0-v}" > VERSION
+          export DEA_DIST_VERSION="${RELEASE_VERSION#l0-v}"
           make dist | tee build/dist.log
 
       - name: Build distribution archive
@@ -87,7 +87,7 @@ jobs:
           RELEASE_VERSION: ${{ github.ref_name }}
         run: |
           mkdir -p build
-          printf '%s\n' "${RELEASE_VERSION#l0-v}" > VERSION
+          export DEA_DIST_VERSION="${RELEASE_VERSION#l0-v}"
           make dist | tee build/dist.log
 
       - name: Resolve distribution archive path
@@ -139,6 +139,10 @@ jobs:
               version_path = dist_root / "VERSION"
               if not version_path.is_file():
                   raise SystemExit(f"missing VERSION file in {dist_root}")
+              version_text = version_path.read_text(encoding="utf-8")
+              for key in ("name:", "version:", "build:", "commit:", "os:", "arch:", "author:", "license:", "source:"):
+                  if key not in version_text:
+                      raise SystemExit(f"missing {key!r} in VERSION file:\n{version_text}")
 
               for expected in ["README.md", "examples", "docs/reference", "docs/reference/grammar.md"]:
                   if not (dist_root / expected).exists():
@@ -190,6 +194,7 @@ jobs:
   build-docs:
     uses: ./.github/workflows/l0-docs-build.yml
     with:
+      source_ref: ${{ github.ref_name }}
       release_tag: ${{ github.ref_name }}
 
   publish-release:
@@ -226,7 +231,7 @@ jobs:
           cd build/release-assets
           pdf_name="dea_l0_api_reference-$CURRENT_TAG.pdf"
           mv dea_l0_api_reference.pdf "$pdf_name"
-          sha256sum *.tar.gz *.zip "$pdf_name" > SHA256SUMS
+          sha256sum ./*.tar.gz ./*.zip "$pdf_name" > SHA256SUMS
 
       - name: Generate release notes
         env:

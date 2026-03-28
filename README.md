@@ -1,9 +1,11 @@
-# Welcome to Dea!
+# The Dea Programming Language.
 
 > _C-family syntax, UB-free semantics, ARC strings, sum types and pattern matching._
 
-_**Dea is a systems programming language built through a staged bootstrap chain: each compiler level is compiled by the
-previous one.**_
+Welcome to the **Dea** programming language!
+
+Dea is a systems programming language built through a staged bootstrap chain: each compiler level is compiled by the
+previous one.
 
 **Level 0 is now self-hosted.** It is the compiler base that will be used to compile L1. L1 will subsequently self-host
 to build L2, and the process will repeat for successive levels.
@@ -42,7 +44,7 @@ the semantics are enforced by L0 itself.
 
 ## Project status and directions
 
-L0 is in its `1.0.0.dev0` stabilization phase around the first self-hosted Stage 2 toolchain.
+L0 `1.0.0` ships the first self-hosted Stage 2 toolchain.
 
 - Stage 1: complete and usable.
 
@@ -455,4 +457,4 @@ Third-party notices: [`THIRD_PARTY_NOTICES`](THIRD_PARTY_NOTICES).
 
 ## Author
 
-`gwz` ([@googlielmo](https://github.com/googlielmo)).
+[@googlielmo](https://github.com/googlielmo) a.k.a. `gwz`

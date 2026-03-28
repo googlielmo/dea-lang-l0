@@ -108,7 +108,7 @@ if ! clean_env_run "$STAGE2_L0C" -v --build -P "$FIXTURE_ROOT_EXPECTED" ok_main 
 fi
 
 assert_empty "$V_STDOUT"
-assert_contains "$V_STDERR" "Dea language / L0 compiler (Stage 2)"
+assert_contains "$V_STDERR" "Dea language / L0 compiler"
 assert_contains "$V_STDERR" "System root(s): '$SYSTEM_ROOT_EXPECTED'"
 assert_contains "$V_STDERR" "Project root(s): '$FIXTURE_ROOT_EXPECTED'"
 assert_contains "$V_STDERR" "Starting analysis for entry module 'ok_main'"

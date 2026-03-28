@@ -14,10 +14,18 @@ unless noted otherwise.
 The recommended Windows path today is:
 
 - MSYS2 `MINGW64`
-- MinGW-w64 GCC
+- MinGW-w64 GCC or Clang
 - GNU Make on `PATH`
 
 This is the validated Dea/L0 `1.0.0` Windows path. MSVC-family builds remain outside the validated release matrix.
+Native `cmd.exe` and PowerShell entrypoints are supported; the MSYS2 requirement comes from the supported backend C
+toolchain, not from the `.cmd` launchers themselves.
+
+Install the validated toolchain packages from MSYS2 with:
+
+```bash
+pacman -S mingw-w64-x86_64-gcc mingw-w64-x86_64-clang make
+```
 
 To build and install the Stage 2 compiler from the repo:
 
@@ -49,6 +57,10 @@ cmd /d /c "call C:\l0-install\bin\l0-env.cmd && l0c --version"
 # or invoke the selected launcher directly:
 & "C:\l0-install\bin\l0c.cmd" --version
 ```
+
+You do not need to open the MSYS2 shell just to invoke `l0c.cmd`. You still need the validated MSYS2 `MINGW64` /
+MinGW-w64 GCC or Clang toolchain installed for normal `--build` and `--run` workflows, because those paths require a
+supported C compiler.
 
 Notes:
 

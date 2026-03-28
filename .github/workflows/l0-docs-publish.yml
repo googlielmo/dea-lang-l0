@@ -9,6 +9,11 @@ on:
       - published
   workflow_dispatch:
     inputs:
+      ref:
+        description: "Branch, tag, or commit to build docs from"
+        required: false
+        default: ""
+        type: string
       publish_pages:
         description: "Deploy standalone HTML + PDF to GitHub Pages"
         required: true
@@ -40,11 +45,45 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  resolve-targets:
+    runs-on: ubuntu-latest
+    outputs:
+      source_ref: ${{ steps.resolve.outputs.source_ref }}
+      target_release_tag: ${{ steps.resolve.outputs.target_release_tag }}
+    steps:
+      - name: Resolve source ref and release tag
+        id: resolve
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          INPUT_REF: ${{ inputs.ref }}
+          INPUT_RELEASE_TAG: ${{ inputs.release_tag }}
+          DEFAULT_REF: ${{ github.ref_name }}
+        run: |
+          if [ "$EVENT_NAME" = "release" ]; then
+            echo "source_ref=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
+            echo "target_release_tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          source_ref="$INPUT_REF"
+          if [ -z "$source_ref" ] && [ -n "$INPUT_RELEASE_TAG" ]; then
+            source_ref="$INPUT_RELEASE_TAG"
+          fi
+          if [ -z "$source_ref" ]; then
+            source_ref="$DEFAULT_REF"
+          fi
+
+          echo "source_ref=$source_ref" >> "$GITHUB_OUTPUT"
+          echo "target_release_tag=$INPUT_RELEASE_TAG" >> "$GITHUB_OUTPUT"
+
   build-docs:
+    needs: resolve-targets
     if: github.event_name == 'workflow_dispatch' || startsWith(github.event.release.tag_name, 'l0-v')
     uses: ./.github/workflows/l0-docs-build.yml
     with:
-      release_tag: ${{ github.event_name == 'release' && github.event.release.tag_name || inputs.release_tag }}
+      source_ref: ${{ needs.resolve-targets.outputs.source_ref }}
+      release_tag: ${{ needs.resolve-targets.outputs.target_release_tag }}
 
   deploy-pages:
     needs: build-docs
@@ -63,7 +102,9 @@ jobs:
         uses: actions/deploy-pages@v4
 
   upload-release-pdf:
-    needs: build-docs
+    needs:
+      - resolve-targets
+      - build-docs
     if: >-
       (github.event_name == 'release' && startsWith(github.event.release.tag_name, 'l0-v')) ||
       (github.event_name == 'workflow_dispatch' && inputs.upload_pdf_to_release)
@@ -75,25 +116,19 @@ jobs:
           name: docs-pdf
           path: l0/build/docs/pdf
 
-      - name: Resolve release tag
+      - name: Require target release tag
         env:
-          EVENT_NAME: ${{ github.event_name }}
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
-          INPUT_RELEASE_TAG: ${{ inputs.release_tag }}
+          TARGET_RELEASE_TAG: ${{ needs.resolve-targets.outputs.target_release_tag }}
         run: |
-          if [ "$EVENT_NAME" = "release" ]; then
-            echo "TARGET_RELEASE_TAG=$RELEASE_TAG" >> "$GITHUB_ENV"
-            exit 0
-          fi
-          if [ -z "$INPUT_RELEASE_TAG" ]; then
+          if [ -z "$TARGET_RELEASE_TAG" ]; then
             echo "Error: release_tag is required when upload_pdf_to_release=true on workflow_dispatch." >&2
             exit 1
           fi
-          echo "TARGET_RELEASE_TAG=$INPUT_RELEASE_TAG" >> "$GITHUB_ENV"
 
       - name: Upload PDF to GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
+          TARGET_RELEASE_TAG: ${{ needs.resolve-targets.outputs.target_release_tag }}
         run: |
           stable_pdf="build/docs/pdf/dea_l0_api_reference.pdf"
           release_pdf="build/docs/pdf/dea_l0_api_reference-$TARGET_RELEASE_TAG.pdf"
@@ -102,6 +137,7 @@ jobs:
 
   upload-blog-export:
     needs:
+      - resolve-targets
       - build-docs
       - deploy-pages
     if: >-
@@ -124,6 +160,8 @@ jobs:
     steps:
       - name: Check out source repository
         uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.resolve-targets.outputs.source_ref }}
 
       - name: Set up Python
         uses: actions/setup-python@v6
@@ -169,31 +207,11 @@ jobs:
           name: blog-export
           path: l0/blog-export.tar.gz
 
-      - name: Resolve release tag
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
-          INPUT_RELEASE_TAG: ${{ inputs.release_tag }}
-        run: |
-          if [ "$EVENT_NAME" = "release" ]; then
-            echo "TARGET_RELEASE_TAG=$RELEASE_TAG" >> "$GITHUB_ENV"
-            exit 0
-          fi
-          if [ -n "$INPUT_RELEASE_TAG" ]; then
-            echo "TARGET_RELEASE_TAG=$INPUT_RELEASE_TAG" >> "$GITHUB_ENV"
-            exit 0
-          fi
-          fallback="$(git describe --tags --abbrev=0 --match 'l0-v*' 2>/dev/null || true)"
-          if [ -n "$fallback" ]; then
-            echo "TARGET_RELEASE_TAG=$fallback" >> "$GITHUB_ENV"
-          else
-            echo "::warning::No release tag found; skipping archive upload."
-          fi
-
       - name: Upload blog export to release
-        if: env.TARGET_RELEASE_TAG != ''
+        if: needs.resolve-targets.outputs.target_release_tag != ''
         env:
           GH_TOKEN: ${{ github.token }}
+          TARGET_RELEASE_TAG: ${{ needs.resolve-targets.outputs.target_release_tag }}
         run: gh release upload "$TARGET_RELEASE_TAG" blog-export.tar.gz --clobber --repo "$GITHUB_REPOSITORY"
 
       - name: Fire repository_dispatch (optional)
@@ -201,6 +219,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.BLOG_PUSH_TOKEN }}
           BLOG_REPO: ${{ vars.BLOG_REPO }}
+          TARGET_RELEASE_TAG: ${{ needs.resolve-targets.outputs.target_release_tag }}
         run: |
           if [ -z "$GH_TOKEN" ]; then
             echo "::warning::BLOG_REPO is set but BLOG_PUSH_TOKEN is missing; skipping dispatch."

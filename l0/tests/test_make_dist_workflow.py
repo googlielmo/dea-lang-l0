@@ -145,6 +145,12 @@ def assert_contains(path: Path, needle: str) -> None:
         fail(f"expected {needle!r} in {path}")
 
 
+def assert_text_equals(path: Path, expected: str) -> None:
+    text = path.read_text(encoding="utf-8")
+    if text != expected:
+        fail(f"expected exact contents {expected!r} in {path}, got {text!r}")
+
+
 def assert_not_contains(path: Path, needle: str) -> None:
     text = path.read_text(encoding="utf-8")
     if needle in text:
@@ -154,13 +160,6 @@ def assert_not_contains(path: Path, needle: str) -> None:
 def assert_missing(path: Path) -> None:
     if path.exists() or path.is_symlink():
         fail(f"did not expect path: {path}")
-
-
-def maybe_restore_file(path: Path, original: str | None) -> None:
-    if original is None:
-        path.unlink(missing_ok=True)
-        return
-    path.write_text(original, encoding="utf-8")
 
 
 def clean_env() -> dict[str, str]:
@@ -201,7 +200,7 @@ def extract_archive(archive_path: Path, destination: Path) -> None:
 
 def assert_version_report(text: str) -> None:
     for expected in (
-        "Dea language / L0 compiler (Stage 2)",
+        "Dea language / L0 compiler",
         "build: ",
         "build time: ",
         "commit: ",
@@ -242,13 +241,8 @@ def main() -> int:
     BUILD_TESTS_ROOT.mkdir(parents=True, exist_ok=True)
     extract_root = Path(tempfile.mkdtemp(prefix="make_dist_unpack.", dir=BUILD_TESTS_ROOT))
     project_dir = Path(tempfile.mkdtemp(prefix="make_dist_project.", dir=BUILD_TESTS_ROOT))
-    version_path = REPO_ROOT / "VERSION"
-    original_version: str | None = None
-    if version_path.exists():
-        original_version = version_path.read_text(encoding="utf-8")
 
     try:
-        version_path.write_text("2026-03-16\n", encoding="utf-8")
         build_env = os.environ.copy()
         build_env.pop("L0_CFLAGS", None)
         output = run_checked(["make", "dist"], env=build_env)
@@ -290,7 +284,15 @@ def main() -> int:
         assert_exists(archive_path)
         assert_not_contains(dist_dir / "bin" / "l0c-stage2", str(REPO_ROOT))
         assert_not_contains(dist_dir / "bin" / "l0-env.sh", str(REPO_ROOT))
-        assert_contains(dist_dir / "VERSION", "2026-03-16")
+        assert_contains(dist_dir / "VERSION", "name: dea/l0")
+        assert_contains(dist_dir / "VERSION", "version: ")
+        assert_contains(dist_dir / "VERSION", "build: ")
+        assert_contains(dist_dir / "VERSION", "commit: ")
+        assert_contains(dist_dir / "VERSION", "os: ")
+        assert_contains(dist_dir / "VERSION", "arch: ")
+        assert_contains(dist_dir / "VERSION", "author: ")
+        assert_contains(dist_dir / "VERSION", "license: MIT OR Apache-2.0")
+        assert_contains(dist_dir / "VERSION", "source: https://github.com/")
         assert_not_contains(dist_dir / "README.md", "MONOREPO.md")
         assert_not_contains(dist_dir / "README.md", "CONTRIBUTING.md")
         assert_not_contains(dist_dir / "README.md", "compiler/stage2_l0/README.md")
@@ -316,7 +318,15 @@ def main() -> int:
         assert_missing(unpacked_dist / "CONTRIBUTING.md")
         assert_exists(unpacked_dist / "shared" / "l0" / "stdlib" / "std" / "io.l0")
         assert_contains(unpacked_dist / "bin" / "l0-env.sh", 'export L0_HOME="${PREFIX_DIR}"')
-        assert_contains(unpacked_dist / "VERSION", "2026-03-16")
+        assert_contains(unpacked_dist / "VERSION", "name: dea/l0")
+        assert_contains(unpacked_dist / "VERSION", "version: ")
+        assert_contains(unpacked_dist / "VERSION", "build: ")
+        assert_contains(unpacked_dist / "VERSION", "commit: ")
+        assert_contains(unpacked_dist / "VERSION", "os: ")
+        assert_contains(unpacked_dist / "VERSION", "arch: ")
+        assert_contains(unpacked_dist / "VERSION", "author: ")
+        assert_contains(unpacked_dist / "VERSION", "license: MIT OR Apache-2.0")
+        assert_contains(unpacked_dist / "VERSION", "source: https://github.com/")
         assert_not_contains(unpacked_dist / "README.md", "MONOREPO.md")
         assert_not_contains(unpacked_dist / "README.md", "CONTRIBUTING.md")
         assert_not_contains(unpacked_dist / "README.md", "compiler/stage2_l0/README.md")
@@ -354,7 +364,6 @@ def main() -> int:
         if "Hello, World!" not in hello_output:
             fail(f"expected Hello, World! from built binary, got:\n{hello_output}")
     finally:
-        maybe_restore_file(version_path, original_version)
         shutil.rmtree(extract_root, ignore_errors=True)
         shutil.rmtree(project_dir, ignore_errors=True)
 

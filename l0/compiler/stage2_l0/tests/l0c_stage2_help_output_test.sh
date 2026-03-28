@@ -43,7 +43,7 @@ assert_empty() {
 
 assert_version_report() {
     local path="$1"
-    assert_contains "$path" "Dea language / L0 compiler (Stage 2)"
+    assert_contains "$path" "Dea language / L0 compiler"
     assert_contains "$path" "build: "
     assert_contains "$path" "build time: "
     assert_contains "$path" "commit: "
@@ -65,7 +65,7 @@ if ! env -i PATH="$PATH" "$DEA_BUILD_DIR/bin/l0c-stage2" --help >"$HELP_STDOUT" 
 fi
 
 assert_contains "$HELP_STDOUT" "usage: l0c [-h]"
-assert_contains "$HELP_STDOUT" "Dea language / L0 compiler (Stage 2)"
+assert_contains "$HELP_STDOUT" "Dea language / L0 compiler"
 assert_contains "$HELP_STDOUT" "  -h, --help            show this help message and exit"
 assert_contains "$HELP_STDOUT" "  --version             show compiler version and exit"
 assert_not_contains "$HELP_STDOUT" "commit: "
@@ -96,7 +96,7 @@ if ! env -i PATH="$PATH" "$DEA_BUILD_DIR/bin/l0c-stage2" -v --check -P examples 
     fail "-v --check should exit successfully"
 fi
 
-assert_contains "$VERBOSE_STDERR" "Dea language / L0 compiler (Stage 2)"
+assert_contains "$VERBOSE_STDERR" "Dea language / L0 compiler"
 
 VERBOSE_FAIL_STDOUT="$TMP_DIR/verbose-fail.stdout"
 VERBOSE_FAIL_STDERR="$TMP_DIR/verbose-fail.stderr"
@@ -109,7 +109,7 @@ if [ "$RC" -ne 2 ]; then
 fi
 
 assert_empty "$VERBOSE_FAIL_STDOUT"
-assert_contains "$VERBOSE_FAIL_STDERR" "Dea language / L0 compiler (Stage 2)"
+assert_contains "$VERBOSE_FAIL_STDERR" "Dea language / L0 compiler"
 assert_contains "$VERBOSE_FAIL_STDERR" "usage: l0c [-h] [--version]"
 assert_contains "$VERBOSE_FAIL_STDERR" "error: [L0C-2021] missing required target module/file name"
 

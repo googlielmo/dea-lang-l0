@@ -245,6 +245,7 @@ def main() -> int:
                             parse_build_time_utc(overlay.provenance.build_time),
                             overlay.provenance.host,
                         ),
+                        overlay.provenance,
                     )
                     print_progress(f"stage 4/4: wrote distribution archive at {render_display_path(distribution.archive_path)}")
                     print_progress(f"created distribution directory at {render_display_path(distribution.dist_dir)}")

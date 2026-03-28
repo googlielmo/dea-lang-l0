@@ -64,6 +64,35 @@ func build_info_compiler() -> string {
 }
 
 /**
+ * Return the recorded release version string.
+ *
+ * @return Release version such as `"1.2.3"` or `"dev-abc1234"`, or `"unknown"` for fallback builds.
+ */
+func build_info_release_version() -> string {
+    return "unknown";
+}
+
+/**
+ * Return the compiler identity with version suffix when provenance is embedded.
+ *
+ * @param identity Stable Stage 2 compiler identity line.
+ * @return Identity with version (e.g., `"Dea language / L0 compiler 1.0.0"`),
+ *         or plain identity for fallback builds.
+ */
+func build_info_identity_with_version(identity: string) -> string {
+    if (!build_info_has_embedded_version()) {
+        return identity;
+    }
+
+    with (let sb = sb_create() => sb_free(sb)) {
+        sb_append(sb, identity);
+        sb_append(sb, " ");
+        sb_append(sb, build_info_release_version());
+        return sb_to_string(sb);
+    }
+}
+
+/**
  * Build the multiline Stage 2 `--version` report when provenance is embedded.
  *
  * @param identity Stable Stage 2 compiler identity line.
@@ -76,6 +105,8 @@ func build_info_version_text(identity: string) -> string? {
 
     with (let sb = sb_create() => sb_free(sb)) {
         sb_append(sb, identity);
+        sb_append(sb, " ");
+        sb_append(sb, build_info_release_version());
         sb_append(sb, "\nbuild: ");
         sb_append(sb, build_info_build_id());
         sb_append(sb, "\nbuild time: ");

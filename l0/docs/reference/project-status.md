@@ -66,7 +66,8 @@ filesystem access, time, randomness, assertions, optionals, and the current cont
 The `1.0.0` support promise is:
 
 - Tier 1 hosts: Linux and macOS for Stage 1 and Stage 2 workflows.
-- Tier 1 Windows toolchain: MSYS2 `MINGW64` with MinGW-w64/GCC for build, test, install, and distribution workflows.
+- Tier 1 Windows toolchain: MSYS2 `MINGW64` with MinGW-w64 GCC or Clang for build, test, install, and distribution
+  workflows.
 - Tier 2 / experimental: MSVC-family builds remain outside the `1.0.0` validated matrix.
 
 ## Known Limitations and Constraints
@@ -81,7 +82,7 @@ These remain true in the `1.0.0` language/compiler contract:
 
 ## 1.0 Stabilization Notes
 
-The remaining `1.0.0` work is release-definition work, not major compiler-surface expansion:
+Dea/L0 `1.0.0` is the stability baseline for the `1.0.x` line:
 
 1. Keep the current Stage 1/Stage 2 CLI, semantics, and stdlib surface stable for the `1.0.x` line.
 2. Keep the existing validation gates (`make test-all`, `make triple-test`, workflow/distribution checks, and strict

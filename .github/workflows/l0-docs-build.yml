@@ -6,6 +6,10 @@ name: L0 Build Documentation
 on:
   workflow_call:
     inputs:
+      source_ref:
+        required: false
+        type: string
+        default: ""
       release_tag:
         required: false
         type: string
@@ -20,6 +24,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.source_ref != '' && inputs.source_ref || github.sha }}
 
       - name: Set up Python
         uses: actions/setup-python@v6

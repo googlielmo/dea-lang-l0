@@ -21,6 +21,7 @@ import backend;
 import sem_context;
 import driver;
 import build_driver;
+import build_info;
 import cli_args;
 import codegen_options;
 import diag_print;
@@ -761,7 +762,7 @@ func run_with_argv(argv: VectorString*) -> int {
         with (
             let err_cfg = log_config_create(log_level_from_verbosity(parsed.verbosity), parsed.rich_log) => drop err_cfg
         ) {
-            log_info(err_cfg, cli_compiler_identity_text());
+            log_info(err_cfg, build_info_identity_with_version(cli_compiler_identity_text()));
         }
         cli_print_usage(true);
         dp_print_collector(parsed.diags);
@@ -773,7 +774,7 @@ func run_with_argv(argv: VectorString*) -> int {
     parsed.options = null;
 
     with (let cfg = log_config_create(log_level_from_verbosity(opts.verbosity), opts.log) => drop cfg) {
-        log_info(cfg, cli_compiler_identity_text());
+        log_info(cfg, build_info_identity_with_version(cli_compiler_identity_text()));
 
         let rc = 1;
         match (opts.mode) {

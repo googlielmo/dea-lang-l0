@@ -1,4 +1,10 @@
-# Dea/L<sub>0</sub>
+# The Dea Programming Language.
+
+> _C-family syntax, UB-free semantics, ARC strings, sum types and pattern matching._
+
+Welcome to the **Dea** programming language!
+
+## Dea/L<sub>0</sub>
 
 This archive contains the standalone Dea/L0 `1.0.0` compiler distribution.
 
@@ -29,6 +35,9 @@ Or use the installed examples as a starting point for your own project:
 ```bash
 l0c --build -P examples -o hello examples/hello.l0
 ```
+
+On Windows, see [README-WINDOWS.md](README-WINDOWS.md) before using `--build` or `--run`; the validated Windows path
+still depends on the supported MSYS2 `MINGW64` / MinGW-w64 GCC or Clang toolchain.
 
 ## Reference docs
 
