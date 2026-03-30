@@ -252,8 +252,9 @@ def main() -> int:
             fail(f"could not find distribution directory in output:\n{output}")
         if archive_match is None:
             fail(f"could not find distribution archive in output:\n{output}")
-        if "gen-dea-build-tools: L0_CFLAGS=-O2" not in output:
-            fail(f"expected default dist L0_CFLAGS=-O2 in output:\n{output}")
+        expected_cflags = "gen-dea-build-tools: L0_CFLAGS='-O2 -static'" if is_windows_host() else "gen-dea-build-tools: L0_CFLAGS=-O2"
+        if expected_cflags not in output:
+            fail(f"expected '{expected_cflags}' in output:\n{output}")
 
         dist_dir = Path(dist_match.group(1).strip())
         archive_path = Path(archive_match.group(1).strip())

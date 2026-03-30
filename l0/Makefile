@@ -13,6 +13,14 @@ PYTHON ?= $(shell if [ -x "$(VENV_DIR)/bin/python" ]; then printf '%s' "$(VENV_D
 DEA_BUILD_DIR ?= build/dea
 DOCKER_IMAGE ?= l0-test
 
+# On Windows (MinGW), statically link GCC runtime libraries in distribution and
+# install builds so the resulting l0c binary does not depend on libwinpthread-1.dll.
+ifeq ($(OS),Windows_NT)
+DIST_L0_CFLAGS_DEFAULT := -O2 -static
+else
+DIST_L0_CFLAGS_DEFAULT := -O2
+endif
+
 # Extract dev + docs dependencies from pyproject.toml (requires Python 3.14+ for tomllib).
 PIP_DEPS_CMD = import tomllib,pathlib;\
 	g=tomllib.loads(pathlib.Path('pyproject.toml').read_text()).get('dependency-groups',{});\
@@ -137,7 +145,7 @@ install:
 		printf '%s\n' 'make install: PREFIX is required; example: make PREFIX=/tmp/l0-install L0_CC=gcc install' >&2; \
 		exit 2; \
 	fi
-	L0_CFLAGS="$${L0_CFLAGS:--O2}" $(PYTHON) ./scripts/gen_dist_tools.py install-prefix --prefix "$(PREFIX)"
+	L0_CFLAGS="$${L0_CFLAGS:-$(DIST_L0_CFLAGS_DEFAULT)}" $(PYTHON) ./scripts/gen_dist_tools.py install-prefix --prefix "$(PREFIX)"
 	@printf 'Installed Stage 2 compiler version:\n'
 	@"$(PREFIX)/bin/l0c-stage2" --version
 	@printf '\n------------------------------------------------------------------------------\n'
@@ -157,7 +165,7 @@ list-installed:
 	@$(PYTHON) ./scripts/gen_dist_tools.py list-installed --prefix "$(PREFIX)"
 
 dist: venv
-	L0_CFLAGS="$${L0_CFLAGS:--O2}" $(PYTHON) ./scripts/gen_dist_tools.py make-dist
+	L0_CFLAGS="$${L0_CFLAGS:-$(DIST_L0_CFLAGS_DEFAULT)}" $(PYTHON) ./scripts/gen_dist_tools.py make-dist
 
 use-dev-stage1: install-dev-stage1
 	$(PYTHON) ./scripts/gen_dist_tools.py set-alias --dea-build-dir "$(DEA_BUILD_DIR)" --stage stage1
