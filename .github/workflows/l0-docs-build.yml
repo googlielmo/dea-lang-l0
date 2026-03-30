@@ -14,6 +14,10 @@ on:
         required: false
         type: string
         default: ""
+      build_pdf:
+        required: false
+        type: boolean
+        default: true
 
 jobs:
   build-docs:
@@ -38,13 +42,18 @@ jobs:
           enable-cache: true
           cache-suffix: docs-build-py3.14
 
-      - name: Install docs and TeX toolchain
+      - name: Install docs toolchain
         run: |
           sudo apt-get update
           sudo apt-get install -y \
             doxygen \
             graphviz \
-            make \
+            make
+
+      - name: Install TeX toolchain
+        if: inputs.build_pdf
+        run: |
+          sudo apt-get install -y \
             texlive-latex-recommended \
             texlive-latex-extra \
             texlive-fonts-recommended
@@ -55,7 +64,7 @@ jobs:
       - name: Build HTML, Markdown, LaTeX, and PDF
         env:
           L0_DOCS_RELEASE_TAG: ${{ inputs.release_tag }}
-        run: ./scripts/gen-docs.sh --pdf --strict
+        run: ./scripts/gen-docs.sh ${{ inputs.build_pdf && '--pdf' || '' }} --strict
 
       - name: Stage Pages site
         run: |
@@ -63,8 +72,10 @@ jobs:
           rm -rf build/docs/pages-site
           mkdir -p build/docs/pages-site
           cp -R build/docs/html/. build/docs/pages-site/
-          mkdir -p build/docs/pages-site/pdf
-          cp "build/docs/pdf/$pdf_name" "build/docs/pages-site/pdf/$pdf_name"
+          if [ -f "build/docs/pdf/$pdf_name" ]; then
+            mkdir -p build/docs/pages-site/pdf
+            cp "build/docs/pdf/$pdf_name" "build/docs/pages-site/pdf/$pdf_name"
+          fi
           touch build/docs/pages-site/.nojekyll
 
       - name: Upload Pages artifact
@@ -79,6 +90,7 @@ jobs:
           path: l0/build/docs/markdown
 
       - name: Upload generated PDF artifact
+        if: inputs.build_pdf
         uses: actions/upload-artifact@v6
         with:
           name: docs-pdf

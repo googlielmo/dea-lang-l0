@@ -84,6 +84,11 @@ jobs:
     with:
       source_ref: ${{ needs.resolve-targets.outputs.source_ref }}
       release_tag: ${{ needs.resolve-targets.outputs.target_release_tag }}
+      build_pdf: >-
+        ${{
+          github.event_name == 'release' ||
+          (github.event_name == 'workflow_dispatch' && (inputs.publish_pages == true || inputs.upload_pdf_to_release == true))
+        }}
 
   deploy-pages:
     needs: build-docs
@@ -140,10 +145,12 @@ jobs:
       - resolve-targets
       - build-docs
       - deploy-pages
+      - upload-release-pdf
     if: >-
       always() &&
       needs.build-docs.result == 'success' &&
       (needs.deploy-pages.result == 'success' || needs.deploy-pages.result == 'skipped') &&
+      (needs.upload-release-pdf.result == 'success' || needs.upload-release-pdf.result == 'skipped') &&
       ((github.event_name == 'release' && startsWith(github.event.release.tag_name, 'l0-v')) ||
       (github.event_name == 'workflow_dispatch' && inputs.publish_blog))
     runs-on: ubuntu-latest
@@ -151,17 +158,17 @@ jobs:
       run:
         working-directory: l0
     env:
+      GH_TOKEN: ${{ github.token }}
       BLOG_DOCS_PREFIX: ${{ vars.BLOG_DOCS_PREFIX }}
       BLOG_TAB_TITLE: ${{ vars.BLOG_TAB_TITLE }}
       BLOG_TAB_ICON: ${{ vars.BLOG_TAB_ICON }}
       BLOG_TAB_ORDER: ${{ vars.BLOG_TAB_ORDER }}
       DOCS_SITE_URL_OVERRIDE: ${{ vars.DOCS_SITE_URL }}
       PAGE_URL: ${{ needs.deploy-pages.outputs.page_url }}
+      TARGET_RELEASE_TAG: ${{ needs.resolve-targets.outputs.target_release_tag }}
     steps:
       - name: Check out source repository
         uses: actions/checkout@v6
-        with:
-          ref: ${{ needs.resolve-targets.outputs.source_ref }}
 
       - name: Set up Python
         uses: actions/setup-python@v6
@@ -187,7 +194,18 @@ jobs:
           else
             html_site_url="https://${GITHUB_REPOSITORY_OWNER}.github.io/${GITHUB_REPOSITORY#*/}"
           fi
-          pdf_url="${html_site_url%/}/pdf/dea_l0_api_reference.pdf"
+          if [ -n "$TARGET_RELEASE_TAG" ]; then
+            pdf_asset=$(gh release view "$TARGET_RELEASE_TAG" --json assets \
+              -q '.assets[] | select(.name | endswith(".pdf")) | .name' \
+              --repo "$GITHUB_REPOSITORY" 2>/dev/null || true)
+            if [ -n "$pdf_asset" ]; then
+              pdf_url="https://github.com/${GITHUB_REPOSITORY}/releases/download/${TARGET_RELEASE_TAG}/${pdf_asset}"
+            else
+              pdf_url="${html_site_url%/}/pdf/dea_l0_api_reference.pdf"
+            fi
+          else
+            pdf_url="${html_site_url%/}/pdf/dea_l0_api_reference.pdf"
+          fi
           python -m compiler.docgen.l0_docgen_blog \
             --input build/docs/markdown \
             --output build/docs/blog-export \
@@ -196,7 +214,8 @@ jobs:
             --tab-icon "$tab_icon" \
             --tab-order "$tab_order" \
             --html-site-url "$html_site_url" \
-            --pdf-url "$pdf_url"
+            --pdf-url "$pdf_url" \
+            --release-tag "$TARGET_RELEASE_TAG"
 
       - name: Create blog export archive
         run: tar -czf blog-export.tar.gz -C build/docs/blog-export .

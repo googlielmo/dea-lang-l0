@@ -167,5 +167,48 @@ Token docs.
     assert "permalink: /api/" in tab
     assert "[Standalone HTML reference](https://example.com/api/)" in tab
     assert "[PDF reference](https://example.com/api/pdf/dea_l0_api_reference.pdf)" in tab
+    assert "**Release" not in tab
     assert "- [compiler/stage1_py/demo.py]({{ '/api/reference/compiler/stage1_py/demo/' | relative_url }})" in tab
     assert not (output_dir / "api/reference/docs-mainpage-html.md").exists()
+
+
+def test_parse_args_accepts_release_tag(tmp_path: Path) -> None:
+    args = parse_args(["--input", str(tmp_path / "in"), "--output", str(tmp_path / "out"), "--release-tag", "v0.9.1"])
+    assert args.release_tag == "v0.9.1"
+
+
+def test_export_markdown_tree_shows_release_tag(tmp_path: Path) -> None:
+    input_dir = tmp_path / "markdown"
+    output_dir = tmp_path / "blog-export"
+    (input_dir / "compiler/stage1_py").mkdir(parents=True)
+
+    (input_dir / "index.md").write_text(
+        "# Index\n\n## Stage 1\n\n"
+        "- [`compiler/stage1_py/demo.py`](compiler/stage1_py/demo.md)\n\n"
+        "## Stage 2\n\n## Shared\n",
+        encoding="utf-8",
+    )
+    (input_dir / "compiler/stage1_py/demo.md").write_text(
+        "# compiler/stage1_py/demo.py\n\nSource: `compiler/stage1_py/demo.py`\n\nDemo.\n",
+        encoding="utf-8",
+    )
+
+    export_markdown_tree(
+        input_dir,
+        output_dir,
+        docs_prefix="api/reference",
+        tab_title="API",
+        tab_icon="fas fa-book",
+        tab_order=5,
+        html_site_url="https://example.com/api/",
+        pdf_url="https://github.com/googlielmo/dea-lang-l0/releases/download/v0.9.1/refman.pdf",
+        release_tag="v0.9.1",
+    )
+
+    tab = (output_dir / "_tabs/api.md").read_text(encoding="utf-8")
+    assert "**Release v0.9.1**" in tab
+    assert "[PDF reference](https://github.com/googlielmo/dea-lang-l0/releases/download/v0.9.1/refman.pdf)" in tab
+    # Release tag appears before the links.
+    tag_pos = tab.index("**Release v0.9.1**")
+    link_pos = tab.index("[Standalone HTML reference]")
+    assert tag_pos < link_pos

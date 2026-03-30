@@ -38,6 +38,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--tab-order", type=int, default=5, help="Order for the generated Chirpy tab page.")
     parser.add_argument("--html-site-url", default="", help="Standalone HTML site URL.")
     parser.add_argument("--pdf-url", default="", help="Published PDF URL.")
+    parser.add_argument("--release-tag", default="", help="Release tag for version display.")
     return parser.parse_args(argv)
 
 
@@ -150,6 +151,7 @@ def export_markdown_tree(
     tab_order: int,
     html_site_url: str = "",
     pdf_url: str = "",
+    release_tag: str = "",
 ) -> None:
     """Export generated Markdown into a Chirpy-friendly directory tree."""
     docs_prefix = _normalize_docs_prefix(docs_prefix)
@@ -218,6 +220,9 @@ def export_markdown_tree(
         "Generated API reference synchronized from the Dea/L0 compiler repository.",
         "",
     ]
+    if release_tag:
+        tab_lines.append(f"**Release {release_tag}**")
+        tab_lines.append("")
     if html_site_url:
         tab_lines.append(f"- [Standalone HTML reference]({html_site_url})")
     if pdf_url:
@@ -245,6 +250,7 @@ def main(argv: list[str] | None = None) -> int:
         tab_order=args.tab_order,
         html_site_url=args.html_site_url,
         pdf_url=args.pdf_url,
+        release_tag=args.release_tag,
     )
     return 0
 
