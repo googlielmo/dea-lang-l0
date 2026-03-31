@@ -123,7 +123,8 @@ venv: _check-python
 		"$(VENV_PYTHON)" -m pip install $$("$(VENV_PYTHON)" -c "$(PIP_DEPS_CMD)"); \
 	else \
 		$(PYTHON) -m venv "$(VENV_DIR)"; \
-		"$(VENV_PYTHON)" -m pip install $$("$(VENV_PYTHON)" -c "$(PIP_DEPS_CMD)"); \
+		_vp="$$(if [ -x "$(VENV_DIR)/bin/python" ]; then printf '%s' "$(VENV_DIR)/bin/python"; else printf '%s' "$(VENV_DIR)/Scripts/python.exe"; fi)"; \
+		"$$_vp" -m pip install $$("$$_vp" -c "$(PIP_DEPS_CMD)"); \
 	fi
 
 install-dev-stage1:

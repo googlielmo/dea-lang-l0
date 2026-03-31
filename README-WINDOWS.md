@@ -18,8 +18,8 @@ The recommended Windows path today is:
 - GNU Make on `PATH`
 
 This is the validated Dea/L0 `1.0.0` Windows path. MSVC-family builds remain outside the validated release matrix.
-Native `cmd.exe` and PowerShell entrypoints are supported; the MSYS2 requirement comes from the supported backend C
-toolchain, not from the `.cmd` launchers themselves.
+Native `cmd.exe` entrypoints are supported; the MSYS2 requirement comes from the supported backend C toolchain, not from
+the `.cmd` launchers themselves.
 
 Install the validated toolchain packages from MSYS2 with:
 
@@ -50,13 +50,14 @@ call C:\l0-install\bin\l0-env.cmd
 l0c --version
 ```
 
-### From PowerShell
+`l0-env.cmd` automatically puts the MSYS2 `mingw64\bin` directory on `PATH` so that the C compiler (GCC or Clang) and
+its support DLLs are visible to `l0c`. It probes for the MSYS2 install in this order:
 
-```powershell
-cmd /d /c "call C:\l0-install\bin\l0-env.cmd && l0c --version"
-# or invoke the selected launcher directly:
-& "C:\l0-install\bin\l0c.cmd" --version
-```
+1. `%MSYS2_ROOT%\mingw64\bin` (set this if MSYS2 is not in the default location).
+2. The Windows registry (`HKCU\Software\MSYS2`, then `HKLM\Software\MSYS2`).
+3. The default path `C:\msys64\mingw64\bin`.
+
+If none of these resolve, a warning is printed and you must add `mingw64\bin` to `PATH` manually.
 
 You do not need to open the MSYS2 shell just to invoke `l0c.cmd`. You still need the validated MSYS2 `MINGW64` /
 MinGW-w64 GCC or Clang toolchain installed for normal `--build` and `--run` workflows, because those paths require a
@@ -64,7 +65,7 @@ supported C compiler.
 
 Notes:
 
-- The installed Windows entry point is `l0c.cmd`; native Windows shells resolve bare `l0c` to that launcher.
+- The installed Windows entry point is `l0c.cmd`; `cmd.exe` resolves bare `l0c` to that launcher.
 - `l0-env.cmd` is generated for native `cmd.exe` activation.
 - `l0-env.sh` remains the MSYS2/bash activation helper.
 
@@ -88,12 +89,13 @@ source build/dea/bin/l0-env.sh
 l0c --version
 ```
 
-Native Windows shell summary:
+`cmd.exe` summary:
 
 - Repo-local Stage 1 and Stage 2 both work through `build\dea\bin\l0c.cmd` after `make use-dev-stage1` or
   `make use-dev-stage2`.
 - Installed Stage 2 works through `<PREFIX>\bin\l0-env.cmd` followed by `l0c`, or through the direct launcher
   `<PREFIX>\bin\l0c.cmd`.
+- `l0-env.cmd` auto-detects MinGW-w64 GCC. Set `MSYS2_ROOT` if MSYS2 is installed in a non-default location.
 
 ## Technical addendum
 
@@ -102,16 +104,14 @@ layout in detail.
 
 ### Supported workflow
 
-| Scenario                                        | Recommended entry point on Windows                                    |
-| ----------------------------------------------- | --------------------------------------------------------------------- |
-| Source-tree Stage 1 from MSYS2 bash             | `./scripts/l0c`                                                       |
-| Source-tree Stage 1 from `cmd.exe` / PowerShell | `scripts\\l0c.cmd`                                                    |
-| Repo-local Stage 1 or Stage 2 from MSYS2 bash   | `source build/dea/bin/l0-env.sh` then `l0c`                           |
-| Repo-local Stage 1 or Stage 2 from `cmd.exe`    | `call build\\dea\\bin\\l0-env.cmd` then `l0c`                         |
-| Repo-local Stage 1 or Stage 2 from PowerShell   | `build\\dea\\bin\\l0c.cmd` directly, or a one-shot `cmd /d /c` bridge |
-| Installed Stage 2 from MSYS2 bash               | `source <PREFIX>/bin/l0-env.sh` then `l0c`                            |
-| Installed Stage 2 from `cmd.exe`                | `call <PREFIX>\\bin\\l0-env.cmd` then `l0c`                           |
-| Installed Stage 2 from PowerShell               | `<PREFIX>\\bin\\l0c.cmd` directly, or a one-shot `cmd /d /c` bridge   |
+| Scenario                                      | Recommended entry point on Windows            |
+| --------------------------------------------- | --------------------------------------------- |
+| Source-tree Stage 1 from MSYS2 bash           | `./scripts/l0c`                               |
+| Source-tree Stage 1 from `cmd.exe`            | `scripts\\l0c.cmd`                            |
+| Repo-local Stage 1 or Stage 2 from MSYS2 bash | `source build/dea/bin/l0-env.sh` then `l0c`   |
+| Repo-local Stage 1 or Stage 2 from `cmd.exe`  | `call build\\dea\\bin\\l0-env.cmd` then `l0c` |
+| Installed Stage 2 from MSYS2 bash             | `source <PREFIX>/bin/l0-env.sh` then `l0c`    |
+| Installed Stage 2 from `cmd.exe`              | `call <PREFIX>\\bin\\l0-env.cmd` then `l0c`   |
 
 ## What the Windows targets generate
 
@@ -168,7 +168,6 @@ Practical result:
 
 - In MSYS2 bash, `source build/dea/bin/l0-env.sh` then `l0c ...` works.
 - In `cmd.exe`, `call build\\dea\\bin\\l0-env.cmd` then `l0c ...` works.
-- In PowerShell, `build\\dea\\bin\\l0c.cmd` works directly.
 
 ### `make use-dev-stage2`
 
@@ -246,7 +245,7 @@ Important caveat:
 
 `l0-env.sh` is not for `cmd.exe`. The supported native activation pattern is:
 
-1. `call` the generated `l0-env.cmd`
+1. `call` the generated `l0-env.cmd` (this also puts MinGW-w64 GCC on `PATH` automatically)
 2. run `l0c`
 
 Direct `.cmd` launcher invocation also works when you do not want a shell-local activation step.
@@ -298,48 +297,6 @@ Direct stage-specific invocation also works:
 build\dea\bin\l0c-stage1.cmd --version
 ```
 
-## PowerShell usage
-
-There is no generated `l0-env.ps1` today. In PowerShell, either invoke the generated `.cmd` launcher directly or use a
-one-shot `cmd.exe /d /c` bridge when you want `l0-env.cmd` semantics.
-
-### Repo-local Stage 2 in PowerShell
-
-After you have already run `make install-dev-stage2` and `make use-dev-stage2` from MSYS2 bash or another shell with GNU
-Make available:
-
-```powershell
-cmd /d /c "call $PWD\build\dea\bin\l0-env.cmd && l0c --version"
-```
-
-Direct invocation:
-
-```powershell
-& "$PWD\build\dea\bin\l0c.cmd" --version
-```
-
-### Installed Stage 2 in PowerShell
-
-After the prefix has already been created with `make install`:
-
-```powershell
-cmd /d /c "call C:\l0-install\bin\l0-env.cmd && l0c --version"
-```
-
-Direct invocation:
-
-```powershell
-& "C:\l0-install\bin\l0c.cmd" --version
-```
-
-### Stage 1 in PowerShell
-
-After `make use-dev-stage1`, use the selected repo-local batch wrapper:
-
-```powershell
-& "$PWD\build\dea\bin\l0c.cmd" --version
-```
-
 ## Why both `l0c-stage2.cmd` and `l0c.cmd` exist
 
 They are not redundant by role.
@@ -365,8 +322,8 @@ The Windows-specific difference is implementation, not intent:
 
 ## Native-shell command resolution
 
-In `cmd.exe` and PowerShell, bare `l0c` works by resolving `l0c.cmd` via the normal Windows executable-extension lookup
-rules (`PATHEXT`).
+In `cmd.exe`, bare `l0c` works by resolving `l0c.cmd` via the normal Windows executable-extension lookup rules
+(`PATHEXT`).
 
 That is why there is no `l0c.exe` wrapper in the generated layout:
 
@@ -375,7 +332,6 @@ That is why there is no `l0c.exe` wrapper in the generated layout:
 
 ## Current limitations
 
-- There is no generated `l0-env.ps1`; PowerShell relies on direct `.cmd` launchers or a `cmd.exe` bridge.
 - `l0-env.sh` remains the MSYS2/bash activation story.
 - The source-tree fallback `scripts\\l0c.cmd` still exists for direct Stage 1 use outside the repo-local selected-alias
   workflow.

@@ -150,7 +150,7 @@ You can also enter `l0/` directly and use the level-local entrypoint:
 make venv                # create or reuse ../.venv; prefers uv when available
 ```
 
-For Windows-specific setup, generated launchers, MSYS2 bash usage, and native-shell (`cmd.exe` / PowerShell) usage, see
+For Windows-specific setup, generated launchers, MSYS2 bash usage, and native `cmd.exe` usage, see
 [README-WINDOWS.md](README-WINDOWS.md).
 
 If you prefer to manage the environment manually, `UV_PROJECT_ENVIRONMENT=../.venv uv sync --group dev --group docs` is

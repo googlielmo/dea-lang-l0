@@ -743,6 +743,36 @@ hash -r 2>/dev/null || true
 #export L0_CC="clang"
 """
 
+# Batch block appended to l0-env.cmd on Windows to put the MSYS2 mingw64\bin
+# directory on PATH.  This makes GCC/Clang and their support DLLs visible to
+# l0c from a plain cmd.exe session.  Probe order: MSYS2_ROOT env var, Windows
+# registry (HKCU then HKLM), default C:\msys64 path.
+_MINGW_PROBE_CMD = r"""
+rem -- Put MSYS2 mingw64\bin on PATH (compiler + DLLs) for --build and --run.
+set "_MINGW_BIN="
+if defined MSYS2_ROOT if exist "%MSYS2_ROOT%\mingw64\bin\" set "_MINGW_BIN=%MSYS2_ROOT%\mingw64\bin"
+if defined _MINGW_BIN goto :_mingw_set
+for /f "tokens=2*" %%A in ('reg query "HKCU\Software\MSYS2" /v "InstallDir" 2^>nul') do (
+    if exist "%%B\mingw64\bin\" set "_MINGW_BIN=%%B\mingw64\bin"
+)
+if defined _MINGW_BIN goto :_mingw_set
+for /f "tokens=2*" %%A in ('reg query "HKLM\Software\MSYS2" /v "InstallDir" 2^>nul') do (
+    if exist "%%B\mingw64\bin\" set "_MINGW_BIN=%%B\mingw64\bin"
+)
+if defined _MINGW_BIN goto :_mingw_set
+if exist "C:\msys64\mingw64\bin\" set "_MINGW_BIN=C:\msys64\mingw64\bin"
+if defined _MINGW_BIN goto :_mingw_set
+echo [l0-env] warning: MSYS2 mingw64 not found. Set MSYS2_ROOT or add mingw64\bin to PATH. 1>&2
+goto :_mingw_done
+:_mingw_set
+set "PATH_PADDED=;%PATH%;"
+if /I not "%PATH_PADDED%"=="%PATH_PADDED:;%_MINGW_BIN%;=%" goto :_mingw_done
+set "PATH=%_MINGW_BIN%;%PATH%"
+:_mingw_done
+set "_MINGW_BIN="
+set "PATH_PADDED="
+"""
+
 
 def render_env_cmd_script(layout: DeaBuildLayout) -> str:
     """Return the repo-local Windows activation script."""
@@ -762,7 +792,7 @@ if /I "%PATH_PADDED%"=="%PATH_PADDED:;%SCRIPT_DIR%;=%" (
     )
 )
 set "PATH_PADDED="
-"""
+{_MINGW_PROBE_CMD}"""
 
 
 def render_prefix_stage2_wrapper() -> str:
@@ -840,7 +870,7 @@ hash -r 2>/dev/null || true
 def render_prefix_env_cmd_script() -> str:
     """Return the prefix-relative Windows activation script."""
 
-    return """@echo off
+    return f"""@echo off
 set "SCRIPT_DIR=%~dp0"
 set "SCRIPT_DIR=%SCRIPT_DIR:~0,-1%"
 for %%I in ("%SCRIPT_DIR%\\..") do set "PREFIX_ROOT=%%~fI"
@@ -854,7 +884,7 @@ if /I "%PATH_PADDED%"=="%PATH_PADDED:;%SCRIPT_DIR%;=%" (
     )
 )
 set "PATH_PADDED="
-"""
+{_MINGW_PROBE_CMD}"""
 
 
 def write_stage1_wrapper(layout: DeaBuildLayout) -> Path:
