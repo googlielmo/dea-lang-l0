@@ -39,7 +39,21 @@ def repo_venv_bin_dir() -> Path:
 
 
 REPO_VENV_BIN = repo_venv_bin_dir()
-REPO_VENV_PYTHON = REPO_VENV_BIN / ("python.exe" if REPO_VENV_BIN.name == "Scripts" else "python")
+
+
+def _repo_venv_python() -> Path:
+    """Return the Python executable inside the repo-local virtualenv."""
+
+    if REPO_VENV_BIN.name == "Scripts":
+        return REPO_VENV_BIN / "python.exe"
+    # MSYS2 MinGW Python creates bin/python.exe, not bin/python.
+    exe = REPO_VENV_BIN / "python.exe"
+    if exe.is_file():
+        return exe
+    return REPO_VENV_BIN / "python"
+
+
+REPO_VENV_PYTHON = _repo_venv_python()
 
 
 def source_tree_l0c_command() -> list[str]:

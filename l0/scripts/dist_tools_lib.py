@@ -636,6 +636,7 @@ for %%I in ("%REPO_ROOT%\\..") do set "MONOREPO_ROOT=%%~fI"
 set "PYTHON_BIN=%PYTHON%"
 
 if not defined PYTHON_BIN if exist "%MONOREPO_ROOT%\\.venv\\Scripts\\python.exe" set "PYTHON_BIN=%MONOREPO_ROOT%\\.venv\\Scripts\\python.exe"
+if not defined PYTHON_BIN if exist "%MONOREPO_ROOT%\\.venv\\bin\\python.exe" set "PYTHON_BIN=%MONOREPO_ROOT%\\.venv\\bin\\python.exe"
 if not defined PYTHON_BIN if exist "%MONOREPO_ROOT%\\.venv\\bin\\python" set "PYTHON_BIN=%MONOREPO_ROOT%\\.venv\\bin\\python"
 if not defined PYTHON_BIN set "PYTHON_BIN=python"
 

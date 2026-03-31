@@ -461,8 +461,7 @@ def test_codegen_line_directives_and_mangling(codegen_single):
     assert "_tmp__v" in c_code
 
 
-def test_codegen_line_directives_escape_windows_paths(analyze_single):
-    from pathlib import PureWindowsPath
+def test_codegen_line_directives_escape_backslashes(analyze_single):
     from l0_backend import Backend
 
     result = analyze_single(
@@ -475,7 +474,9 @@ def test_codegen_line_directives_escape_windows_paths(analyze_single):
     )
 
     assert not result.has_errors()
-    result.cu.modules["main"].filename = str(PureWindowsPath(r"D:\tmp\project\main.l0"))
+    # Use a raw string directly — PureWindowsPath uses forward slashes on
+    # MSYS2 MinGW Python, which would defeat the backslash-escaping test.
+    result.cu.modules["main"].filename = r"D:\tmp\project\main.l0"
     c_code = Backend(result).generate()
 
     assert '#line 4 "D:\\\\tmp\\\\project\\\\main.l0"' in c_code
