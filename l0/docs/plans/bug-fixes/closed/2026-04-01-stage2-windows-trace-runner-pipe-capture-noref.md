@@ -3,7 +3,7 @@
 ## Remove Windows trace-runner serialization by capturing through pipes
 
 - Date: 2026-04-01
-- Status: In Progress
+- Status: Closed (implemented)
 - Title: Remove the Windows-only Stage 2 trace-runner serialization fallback
 - Kind: Bug Fix
 - Severity: Medium
