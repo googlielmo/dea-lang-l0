@@ -62,9 +62,24 @@ def fake_which(tool: str, path: str | None = None) -> str | None:
     return None
 
 
-def main() -> int:
+def local_fallback_env() -> dict[str, str]:
     env = os.environ.copy()
+    for name in (
+        "DEA_BUILD_ID",
+        "GITHUB_ACTIONS",
+        "GITHUB_RUN_ID",
+        "GITHUB_RUN_ATTEMPT",
+        "GITHUB_JOB",
+        "RUNNER_OS",
+        "RUNNER_ARCH",
+    ):
+        env.pop(name, None)
     env["L0_CC"] = "gcc"
+    return env
+
+
+def main() -> int:
+    env = local_fallback_env()
 
     with (
         patch("dist_tools_lib.subprocess.run", side_effect=fake_subprocess_run),
@@ -91,6 +106,31 @@ def main() -> int:
     if not provenance.has_embedded_version:
         fail("expected embedded version output to remain enabled without git metadata")
 
+    gha_env = local_fallback_env()
+    gha_env.update(
+        {
+            "GITHUB_ACTIONS": "true",
+            "GITHUB_RUN_ID": "23854449995",
+            "GITHUB_RUN_ATTEMPT": "1",
+            "GITHUB_JOB": "test-all",
+            "RUNNER_OS": "Linux",
+            "RUNNER_ARCH": "X64",
+        }
+    )
+    with (
+        patch("dist_tools_lib.subprocess.run", side_effect=fake_subprocess_run),
+        patch("dist_tools_lib.os.name", "posix"),
+    ):
+        gha_provenance, gha_resolved_compiler = collect_stage2_build_provenance(REPO_ROOT, gha_env)
+    if gha_resolved_compiler != "gcc":
+        fail(f"expected GHA resolved compiler 'gcc', got {gha_resolved_compiler!r}")
+    if gha_provenance.build_id != "gha-23854449995.1-test-all-Linux-X64":
+        fail(f"expected GitHub Actions build id, got {gha_provenance.build_id!r}")
+    if gha_provenance.commit_full != "unknown":
+        fail(f"expected unknown commit without git in GHA env, got {gha_provenance.commit_full!r}")
+    if gha_provenance.tree_state != "unknown":
+        fail(f"expected unknown tree state without git in GHA env, got {gha_provenance.tree_state!r}")
+
     rendered = render_stage2_build_info_module(provenance)
     for expected in ("build: ", "build time: ", "commit: ", "host: ", "compiler: "):
         if expected not in rendered:
@@ -107,6 +147,8 @@ def main() -> int:
         fail("unexpected archive basename")
 
     path_env = os.environ.copy()
+    path_env.pop("L0_CC", None)
+    path_env.pop("CC", None)
     path_env.pop("PATH", None)
     path_env["Path"] = "C:\\msys64\\ucrt64\\bin"
     with patch("dist_tools_lib.shutil.which", side_effect=fake_which):

@@ -9,10 +9,27 @@
 from __future__ import annotations
 
 from pathlib import Path
-import sys
 
 
-REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+def resolve_workflow_root() -> Path | None:
+    start = Path(__file__).resolve().parent
+    for candidate in (start, *start.parents):
+        if (candidate / ".github" / "workflows" / "l0-release.yml").is_file():
+            return candidate
+    return None
+
+
+def resolve_monorepo_root(workflow_root: Path | None) -> Path | None:
+    if workflow_root is None:
+        return None
+    for candidate in (workflow_root, *workflow_root.parents):
+        if (candidate / "MONOREPO.md").is_file():
+            return candidate
+    return None
+
+
+WORKFLOW_ROOT = resolve_workflow_root()
+MONOREPO_ROOT = resolve_monorepo_root(WORKFLOW_ROOT)
 
 
 def fail(message: str) -> None:
@@ -20,7 +37,15 @@ def fail(message: str) -> None:
 
 
 def read_text(path: str) -> str:
-    return (REPO_ROOT / path).read_text(encoding="utf-8")
+    if WORKFLOW_ROOT is None:
+        fail(f"workflow root unavailable for {path}")
+    return (WORKFLOW_ROOT / path).read_text(encoding="utf-8")
+
+
+def read_monorepo_text(path: str) -> str:
+    if MONOREPO_ROOT is None:
+        fail(f"monorepo root unavailable for {path}")
+    return (MONOREPO_ROOT / path).read_text(encoding="utf-8")
 
 
 def assert_contains(text: str, needle: str, *, context: str) -> None:
@@ -71,18 +96,25 @@ def check_docs_publish_workflow() -> None:
 
 
 def check_docs() -> None:
-    monorepo = read_text("MONOREPO.md")
+    if MONOREPO_ROOT is None:
+        return
+
+    monorepo = read_monorepo_text("MONOREPO.md")
     assert_contains(monorepo, "Pre-monorepo history keeps its original bare tags.", context="MONOREPO.md")
     assert_contains(monorepo, "`v0.9.0`, `v0.9.1`, and older", context="MONOREPO.md")
     assert_contains(monorepo, "`l0-vX.Y.Z`", context="MONOREPO.md")
     assert_contains(monorepo, "`l1-vX.Y.Z`", context="MONOREPO.md")
 
-    readme = read_text("README.md")
+    readme = read_monorepo_text("README.md")
     assert_contains(readme, "Pre-monorepo bare tags such as `v0.9.0` and `v0.9.1` remain historical", context="README.md")
     assert_contains(readme, "current L0 releases use `l0-vX.Y.Z`", context="README.md")
 
 
 def main() -> int:
+    if WORKFLOW_ROOT is None:
+        print("test_release_tag_policy: SKIP (workflow files unavailable in this checkout)")
+        return 0
+
     check_release_workflow()
     check_snapshot_workflow()
     check_docs_publish_workflow()
