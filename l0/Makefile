@@ -12,6 +12,9 @@ VENV_PYTHON := $(shell if [ -x "$(VENV_DIR)/bin/python" ]; then printf '%s' "$(V
 PYTHON ?= $(shell if [ -x "$(VENV_DIR)/bin/python" ]; then printf '%s' "$(VENV_DIR)/bin/python"; elif [ -x "$(VENV_DIR)/Scripts/python.exe" ]; then printf '%s' "$(VENV_DIR)/Scripts/python.exe"; else printf '%s' $(HOST_PYTHON); fi)
 DEA_BUILD_DIR ?= build/dea
 DOCKER_IMAGE ?= l0-test
+VENV_UV_FLAGS := --quiet
+VENV_PIP_FLAGS := --quiet --disable-pip-version-check
+VENV_QUIET_LABEL := (quiet)
 
 # On Windows (MinGW), statically link GCC runtime libraries in distribution and
 # install builds so the resulting l0c binary does not depend on libwinpthread-1.dll.
@@ -44,6 +47,7 @@ PIP_DEPS_CMD = import tomllib,pathlib;\
 	triple-test \
 	test-dea-build \
 	test-dist-fallback \
+	test-release-tags \
 	test-workflows \
 	refresh-goldens \
 	list-installed \
@@ -75,8 +79,9 @@ help:
 		'' \
 		'Workflow testing:' \
 		'  test-dist          Validate the `make dist` packaging workflow end to end.' \
-		'  test-dea-build     Validate the Make Dea build and install-prefix workflows.' \
+		'  test-dea-build     Validate the Dea build and install-prefix workflows.' \
 		'  test-dist-fallback Validate Stage 2 provenance fallback without Git.' \
+		'  test-release-tags  Validate the monorepo release-tag policy wiring.' \
 		'  test-workflows     Run all workflow and distribution tests.' \
 		'' \
 		'Docker:' \
@@ -116,16 +121,16 @@ _check-python:
 venv: _check-python
 	@if command -v uv >/dev/null 2>&1; then \
 		if [ -x "$(VENV_PYTHON)" ]; then \
-			printf '%s\n' 'make venv: syncing existing ../.venv with uv'; \
+			printf '%s\n' 'make venv: syncing existing ../.venv with uv $(VENV_QUIET_LABEL)'; \
 		fi; \
-		UV_PROJECT_ENVIRONMENT="$(VENV_DIR)" uv sync --group dev --group docs; \
+		UV_PROJECT_ENVIRONMENT="$(VENV_DIR)" uv sync $(VENV_UV_FLAGS) --group dev --group docs; \
 	elif [ -x "$(VENV_PYTHON)" ]; then \
-		printf '%s\n' 'make venv: refreshing existing ../.venv with pip'; \
-		"$(VENV_PYTHON)" -m pip install $$("$(VENV_PYTHON)" -c "$(PIP_DEPS_CMD)"); \
+		printf '%s\n' 'make venv: refreshing existing ../.venv with pip $(VENV_QUIET_LABEL)'; \
+		"$(VENV_PYTHON)" -m pip install $(VENV_PIP_FLAGS) $$("$(VENV_PYTHON)" -c "$(PIP_DEPS_CMD)"); \
 	else \
 		$(PYTHON) -m venv "$(VENV_DIR)"; \
 		_vp="$$(if [ -x "$(VENV_DIR)/bin/python" ]; then printf '%s' "$(VENV_DIR)/bin/python"; else printf '%s' "$(VENV_DIR)/Scripts/python.exe"; fi)"; \
-		"$$_vp" -m pip install $$("$$_vp" -c "$(PIP_DEPS_CMD)"); \
+		"$$_vp" -m pip install $(VENV_PIP_FLAGS) $$("$$_vp" -c "$(PIP_DEPS_CMD)"); \
 	fi
 
 install-dev-stage1:
@@ -203,7 +208,7 @@ test-stage2-trace: venv install-dev-stage2
 test-dist: venv
 	"$(VENV_PYTHON)" ./tests/test_make_dist_workflow.py
 
-test-all: test-stage1 test-stage2 test-stage2-trace test-dist test-dea-build
+test-all: test-stage1 test-stage2 test-stage2-trace test-workflows
 
 triple-test: venv install-dev-stage2
 	DEA_BUILD_DIR="$(DEA_BUILD_DIR)" "$(VENV_PYTHON)" ./compiler/stage2_l0/tests/l0c_triple_bootstrap_test.py
@@ -218,6 +223,7 @@ test-release-tags: venv
 	"$(VENV_PYTHON)" ./tests/test_release_tag_policy.py
 
 test-workflows: test-dist test-dea-build test-dist-fallback test-release-tags
+	@printf 'All workflow tests passed!\n'
 
 refresh-goldens: venv
 	"$(VENV_PYTHON)" ./scripts/refresh_stage2_backend_goldens.py

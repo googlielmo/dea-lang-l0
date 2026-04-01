@@ -3,7 +3,7 @@
 ## Monorepo restructuring for multi-level language development
 
 - Date: 2026-03-24
-- Status: In Progress
+- Status: Implemented
 - Title: Restructure repository into a monorepo layout supporting Dea/L0, L1, and future language levels
 - Kind: Refactor
 - Severity: Medium
@@ -25,6 +25,9 @@ Restructure the single-language repository into a monorepo where each language l
 self-contained subtree. Shared vendor tools and monorepo policy files live at the repository root. While the repository
 is still effectively L0-only, the root `README.md` remains the main public landing page, and monorepo-specific guidance
 lives in `MONOREPO.md`.
+
+The landed monorepo keeps the canonical L0 overview and current L0-only contributor/platform guidance at the repository
+root (`README.md`, `CONTRIBUTING.md`, and `README-WINDOWS.md`), while `l0/README.md` remains the short subtree pointer.
 
 ## Goals
 

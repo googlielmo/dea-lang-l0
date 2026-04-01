@@ -232,6 +232,9 @@ rg -n 'XXX-NNNN' compiler/stage1_py compiler/stage2_l0 docs
 - Multiline commits: sentence-case summary with period, then factual body as bullets with "- " prefix, sentence-case,
   ending with a period. Each bullet is a single line — no line breaks within a bullet regardless of length; no column
   limit.
+- Before committing, run
+  `uv run --group dev pre-commit run --hook-stage pre-commit -c ../.pre-commit-config.yaml --files $(git diff --cached --name-only --diff-filter=ACMR --relative)`
+  from `l0/`. If hooks rewrite files, stage the rewritten files before retrying `git commit`.
 - For multiline commit messages, write the message to a temporary file and use `git commit -F <file>` to avoid shell
   escaping issues (especially with backticks).
 - When writing shell helpers around `git commit` or other multi-step commands, avoid assigning to `zsh` special
