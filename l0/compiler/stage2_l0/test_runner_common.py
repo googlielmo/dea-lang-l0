@@ -67,6 +67,16 @@ def source_tree_l0c_command() -> list[str]:
     return ["./scripts/l0c"]
 
 
+def is_windows_host() -> bool:
+    """Return whether the current host should follow Windows runner behavior."""
+
+    if os.name == "nt":
+        return True
+    if os.environ.get("OS") == "Windows_NT":
+        return True
+    return bool(os.environ.get("MSYSTEM", "").strip())
+
+
 def is_windows_wsl_bash_path(path: Path) -> bool:
     """Return whether `path` is the legacy Windows WSL bash shim."""
 
@@ -303,6 +313,41 @@ def resolve_job_count() -> int:
 
     cpu_count = os.cpu_count() or 1
     return max(1, min(cpu_count, DEFAULT_MAX_JOBS))
+
+
+def resolve_trace_job_count() -> int:
+    """Return the worker count for the Stage 2 trace runner."""
+
+    return resolve_job_count()
+
+
+def run_captured_binary_output(
+        command: list[str],
+        *,
+        cwd: Path,
+        env: dict[str, str] | None = None,
+        stdout_path: Path | None = None,
+        stderr_path: Path | None = None,
+) -> subprocess.CompletedProcess[bytes]:
+    """Run one subprocess, capture binary stdout/stderr, and optionally write artifacts."""
+
+    completed = subprocess.run(
+        command,
+        cwd=cwd,
+        env=env,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+
+    stdout_bytes = completed.stdout if completed.stdout is not None else b""
+    stderr_bytes = completed.stderr if completed.stderr is not None else b""
+    if stdout_path is not None:
+        stdout_path.write_bytes(stdout_bytes)
+    if stderr_path is not None:
+        stderr_path.write_bytes(stderr_bytes)
+    return completed
 
 
 def build_normal_test_command(case: TestCase, python_path: Path) -> list[str]:

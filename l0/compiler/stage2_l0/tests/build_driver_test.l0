@@ -108,7 +108,11 @@ func test_compiler_flag_family_detection() {
 func test_get_optimize_flag_defaults_and_overrides() {
     with (let empty = vs_create(1) => vs_free(empty)) {
         let gcc_opt = bd_get_optimize_flag("gcc", empty);
-        assert(gcc_opt != null && eq_s(gcc_opt as string, "-O1"), "gcc default optimize flag mismatch");
+        let expected = "-O1";
+        if (bd_is_windows()) {
+            expected = "-O0";
+        }
+        assert(gcc_opt != null && eq_s(gcc_opt as string, expected), "gcc default optimize flag mismatch");
     }
 
     with (let debug_words = vs_create(1) => vs_free(debug_words)) {

@@ -585,6 +585,13 @@ func bd_get_optimize_flag(family: string, extra_opts: VectorString*) -> string? 
         return null;
     }
 
+    // MinGW/GCC on Windows has shown optimizer-sensitive miscompiles in
+    // teardown-heavy traces. Keep the automatic default conservative there;
+    // users can still opt in explicitly with -O*.
+    if (bd_is_windows() && eq_s(family, "gcc")) {
+        return "-O0";
+    }
+
     if (eq_s(family, "gcc") || eq_s(family, "tcc")) {
         return "-O1";
     }

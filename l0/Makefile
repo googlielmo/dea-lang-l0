@@ -70,7 +70,7 @@ help:
 		'  test-all           Run the full Stage 1, Stage 2, workflow, and distribution validation suite.' \
 		'  test-stage1        Validate the Stage 1 Python compiler test suite.' \
 		'  test-stage2        Validate the Stage 2 compiler test suite; pass TESTS="name1 name2" to run selected cases.' \
-		'  test-stage2-trace  Validate Stage 2 ARC and memory tracing behavior.' \
+		'  test-stage2-trace  Validate Stage 2 ARC and memory tracing behavior; pass TESTS="name1 name2" to run selected cases.' \
 		'  triple-test        Run the Stage 2 triple-bootstrap check on its own.' \
 		'' \
 		'Workflow testing:' \
@@ -100,8 +100,9 @@ help:
 		'                     Repo-local build root. Must stay inside the repository.' \
 		'                     Example: make DEA_BUILD_DIR=build/dev-dea install-dev-stages' \
 		'  TESTS=""' \
-		'                     Optional Stage 2 test names for `test-stage2`; blank runs the full suite.' \
+		'                     Optional Stage 2 test names for `test-stage2` or `test-stage2-trace`; blank runs the full suite.' \
 		'                     Example: make test-stage2 TESTS="driver_test l0c_build_run_test"' \
+		'                     Example: make test-stage2-trace TESTS="l0c_lib_test type_resolve_test"' \
 		'  DOCKER_IMAGE=l0-test' \
 		'                     Docker image tag used by `make docker`.' \
 		'  DOCKER_L0_CC=<compiler>' \
@@ -197,7 +198,7 @@ test-stage2: venv install-dev-stage2
 	DEA_BUILD_DIR="$(DEA_BUILD_DIR)" "$(VENV_PYTHON)" ./compiler/stage2_l0/run_tests.py $(TESTS)
 
 test-stage2-trace: venv install-dev-stage2
-	DEA_BUILD_DIR="$(DEA_BUILD_DIR)" "$(VENV_PYTHON)" ./compiler/stage2_l0/run_trace_tests.py
+	DEA_BUILD_DIR="$(DEA_BUILD_DIR)" "$(VENV_PYTHON)" ./compiler/stage2_l0/run_trace_tests.py $(TESTS)
 
 test-dist: venv
 	"$(VENV_PYTHON)" ./tests/test_make_dist_workflow.py

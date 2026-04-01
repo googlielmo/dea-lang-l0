@@ -230,7 +230,7 @@ def test_build_uses_a_exe_by_default_on_windows(tmp_path, monkeypatch):
     rc = cmd_build(_build_args(tmp_path, "main", c_compiler="gcc", output=None))
 
     assert rc == 0
-    assert captured["cmd"][-1] == "-O1"
+    assert captured["cmd"][-1] == "-O0"
     assert "a.exe" in captured["cmd"]
     assert "a.out" not in captured["cmd"]
 

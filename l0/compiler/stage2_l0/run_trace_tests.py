@@ -24,9 +24,11 @@ from test_runner_common import (
     discover_trace_l0_tests,
     first_lines,
     require_repo_stage2_test_env,
-    resolve_job_count,
+    resolve_trace_job_count,
+    run_captured_binary_output,
     source_tree_l0c_command,
 )
+from run_tests import select_cases
 
 TRACE_CHECKER = SCRIPT_DIR / "check_trace_log.py"
 
@@ -61,6 +63,12 @@ def parse_args() -> argparse.Namespace:
         type=int,
         default=5,
         help="Pass through to check_trace_log.py detail limit (default: 5).",
+    )
+    parser.add_argument(
+        "tests",
+        nargs="*",
+        metavar="TEST",
+        help="Optional Stage 2 trace test name(s) to run. Match `tests/` file names exactly or omit the extension.",
     )
     return parser.parse_args()
 
@@ -98,28 +106,21 @@ def run_one(
     trace_path = artifact_dir / f"{case_name}.stderr.log"
     report_path = artifact_dir / f"{case_name}.trace_report.txt"
 
-    with out_path.open("w", encoding="utf-8") as stdout_file, trace_path.open("w", encoding="utf-8") as stderr_file:
-        run_result = subprocess.run(
-            [
-                *source_tree_l0c_command(),
-                "--trace-memory",
-                "--trace-arc",
-                "-P",
-                "compiler/stage2_l0/src",
-                "--run",
-                str(case_path),
-            ],
-            cwd=REPO_ROOT,
-            env=repo_env,
-            stdin=subprocess.DEVNULL,
-            stdout=stdout_file,
-            stderr=stderr_file,
-            check=False,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-        )
-
+    run_result = run_captured_binary_output(
+        [
+            *source_tree_l0c_command(),
+            "--trace-memory",
+            "--trace-arc",
+            "-P",
+            "compiler/stage2_l0/src",
+            "--run",
+            str(case_path),
+        ],
+        cwd=REPO_ROOT,
+        env=repo_env,
+        stdout_path=out_path,
+        stderr_path=trace_path,
+    )
     trace_text = read_text(trace_path)
     if run_result.returncode != 0:
         return TraceResult(
@@ -180,7 +181,7 @@ def main() -> int:
 
     args = parse_args()
     try:
-        jobs = resolve_job_count()
+        jobs = resolve_trace_job_count()
     except ValueError as exc:
         print(f"run_trace_tests.py: {exc}", file=sys.stderr, flush=True)
         return 2
@@ -190,7 +191,11 @@ def main() -> int:
         print(f"run_trace_tests.py: {exc}", file=sys.stderr, flush=True)
         return 2
 
-    cases = discover_trace_l0_tests()
+    try:
+        cases = select_cases(discover_trace_l0_tests(), args.tests)
+    except ValueError as exc:
+        print(f"run_trace_tests.py: {exc}", file=sys.stderr, flush=True)
+        return 2
     if not cases:
         print("No tests found in compiler/stage2_l0/tests", flush=True)
         return 0

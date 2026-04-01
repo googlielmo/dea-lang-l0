@@ -498,6 +498,12 @@ def _get_optimize_flag(flag_family, extra_opts) -> Optional[str]:
         elif flag_family == "msvc":
             return "/Od"
 
+    # MinGW/GCC on Windows has shown optimizer-sensitive miscompiles in some
+    # Stage 2 teardown-heavy traces. Keep the automatic default conservative on
+    # that host; callers can still opt in explicitly with -O*.
+    if _is_windows_host() and flag_family == "gcc":
+        return "-O0"
+
     # Default quick optimization level for non-debug builds (can be overridden with --c-options/-C or L0_CFLAGS)
     if flag_family in {"gcc", "tcc"}:
         return "-O1"

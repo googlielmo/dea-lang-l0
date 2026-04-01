@@ -66,17 +66,15 @@ def run_case(name: str, expected_rc: int, expected_stdout_substr: str, artifact_
     if argv:
         command.extend(["--", *argv])
 
-    with out_path.open("w", encoding="utf-8") as stdout_file, trace_path.open("w", encoding="utf-8") as stderr_file:
-        run_result = subprocess.run(
-            command,
-            cwd=REPO_ROOT,
-            stdout=stdout_file,
-            stderr=stderr_file,
-            check=False,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-        )
+    run_result = subprocess.run(
+        command,
+        cwd=REPO_ROOT,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    out_path.write_bytes(run_result.stdout if run_result.stdout is not None else b"")
+    trace_path.write_bytes(run_result.stderr if run_result.stderr is not None else b"")
 
     if run_result.returncode != expected_rc:
         fail(f"{name} expected exit code {expected_rc}, got {run_result.returncode}", artifact_dir)

@@ -135,7 +135,11 @@ def select_cases(cases: list[TestCase], requested: list[str]) -> list[TestCase]:
             parts.append(f"ambiguous Stage 2 test name(s): {'; '.join(ambiguous)}")
         raise ValueError("; ".join(parts))
 
-    return [case for case in cases if case.index in selected_indexes]
+    selected = [case for case in cases if case.index in selected_indexes]
+    return [
+        TestCase(index=index, name=case.name, path=case.path, kind=case.kind)
+        for index, case in enumerate(selected)
+    ]
 
 
 def submission_priority(case: TestCase) -> tuple[int, int]:

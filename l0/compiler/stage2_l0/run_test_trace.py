@@ -14,7 +14,14 @@ import datetime as dt
 import subprocess
 import sys
 
-from test_runner_common import REPO_ROOT, SCRIPT_DIR, discover_l0_tests, require_repo_stage2_test_env, source_tree_l0c_command
+from test_runner_common import (
+    REPO_ROOT,
+    SCRIPT_DIR,
+    discover_l0_tests,
+    require_repo_stage2_test_env,
+    run_captured_binary_output,
+    source_tree_l0c_command,
+)
 
 TESTS_DIR = SCRIPT_DIR / "tests"
 
@@ -100,28 +107,21 @@ def main() -> int:
     stderr_path.parent.mkdir(parents=True, exist_ok=True)
     stdout_path.parent.mkdir(parents=True, exist_ok=True)
 
-    with stdout_path.open("w", encoding="utf-8") as stdout_file, stderr_path.open("w", encoding="utf-8") as stderr_file:
-        result = subprocess.run(
-            [
-                *source_tree_l0c_command(),
-                "-P",
-                "compiler/stage2_l0/src",
-                "--run",
-                "--trace-arc",
-                "--trace-memory",
-                str(test_path.relative_to(REPO_ROOT)),
-            ],
-            cwd=REPO_ROOT,
-            env=repo_env,
-            stdin=subprocess.DEVNULL,
-            stdout=stdout_file,
-            stderr=stderr_file,
-            check=False,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-        )
-
+    result = run_captured_binary_output(
+        [
+            *source_tree_l0c_command(),
+            "-P",
+            "compiler/stage2_l0/src",
+            "--run",
+            "--trace-arc",
+            "--trace-memory",
+            str(test_path.relative_to(REPO_ROOT)),
+        ],
+        cwd=REPO_ROOT,
+        env=repo_env,
+        stdout_path=stdout_path,
+        stderr_path=stderr_path,
+    )
     print(f"trace_stderr={stderr_path}")
     print(f"trace_stdout={stdout_path}")
     print(f"exit_code={result.returncode}")

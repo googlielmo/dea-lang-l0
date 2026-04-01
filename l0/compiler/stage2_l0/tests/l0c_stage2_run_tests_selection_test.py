@@ -44,6 +44,9 @@ def test_select_cases_supports_optional_extensions() -> str | None:
     actual = [case.path.name for case in selected]
     if actual != expected:
         return f"expected optional-extension selection to preserve discovery order, got {actual!r}"
+    indexes = [case.index for case in selected]
+    if indexes != [0, 1, 2]:
+        return f"expected selected cases to be reindexed contiguously, got {indexes!r}"
     return None
 
 

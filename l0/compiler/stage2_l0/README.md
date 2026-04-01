@@ -97,14 +97,16 @@ Run Stage 2 L0 tests:
 make DEA_BUILD_DIR=build/dev-dea test-stage2
 make DEA_BUILD_DIR=build/dev-dea test-stage2 TESTS="driver_test l0c_build_run_test"
 make DEA_BUILD_DIR=build/dev-dea test-stage2-trace
+make DEA_BUILD_DIR=build/dev-dea test-stage2-trace TESTS="l0c_lib_test type_resolve_test"
 make DEA_BUILD_DIR=build/dev-dea triple-test
 ```
 
 These Make targets are self-contained repo-local workflows: they ensure `../.venv`, prepare the Stage 2 artifact under
 `DEA_BUILD_DIR`, and scrub installed-prefix `L0_*` env leakage before running.
 
-`make test-stage2` also accepts `TESTS="..."`. Leave it blank to run the full suite; otherwise pass one or more Stage 2
-test names separated by spaces, using either the exact file name or the extensionless stem.
+`make test-stage2` and `make test-stage2-trace` also accept `TESTS="..."`. Leave it blank to run the full suite;
+otherwise pass one or more Stage 2 test names separated by spaces, using either the exact file name or the extensionless
+stem. `test-stage2-trace` only matches trace-eligible `*.l0` cases.
 
 If you invoke the Python helpers directly instead, prepare the repo-local env first:
 
@@ -113,6 +115,7 @@ make venv
 make DEA_BUILD_DIR=build/dev-dea install-dev-stage2
 ../.venv/bin/python ./compiler/stage2_l0/run_tests.py
 ../.venv/bin/python ./compiler/stage2_l0/run_trace_tests.py
+../.venv/bin/python ./compiler/stage2_l0/run_trace_tests.py l0c_lib_test type_resolve_test
 ../.venv/bin/python ./compiler/stage2_l0/run_test_trace.py parser_test
 ../.venv/bin/python ./compiler/stage2_l0/run_tests.py driver_test l0c_build_run_test
 ```
@@ -121,6 +124,9 @@ make DEA_BUILD_DIR=build/dev-dea install-dev-stage2
 `compiler/stage2_l0/tests/`. Pass optional positional test names to run only those cases; match either the exact file
 name or omit the extension (for example `driver_test` or `l0c_build_run_test.sh`). It uses a bounded auto-detected
 worker count by default; override with `L0_TEST_JOBS=<n>`.
+
+`run_trace_tests.py` executes the trace-eligible `*.l0` Stage 2 cases under `compiler/stage2_l0/tests/`. It accepts the
+same optional positional test-name filters as `run_tests.py`, but only for trace-compatible `.l0` cases.
 
 Options:
 
