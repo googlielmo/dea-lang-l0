@@ -69,3 +69,36 @@ def test_return_wrong_type(analyze_single):
 
     assert result.has_errors()
     assert has_error_code(result.diagnostics, "TYP-0315")
+
+
+def test_return_void_in_non_void_function(analyze_single):
+    result = analyze_single(
+        "main",
+        """
+        module main;
+
+        func f() -> int {
+            return;
+        }
+        """,
+    )
+
+    assert result.has_errors()
+    assert has_error_code(result.diagnostics, "TYP-0315")
+
+
+def test_invalid_return_expr_does_not_add_return_type_mismatch(analyze_single):
+    result = analyze_single(
+        "main",
+        """
+        module main;
+
+        func f() -> int {
+            return missing_name;
+        }
+        """,
+    )
+
+    assert result.has_errors()
+    assert has_error_code(result.diagnostics, "TYP-0159")
+    assert not has_error_code(result.diagnostics, "TYP-0315")

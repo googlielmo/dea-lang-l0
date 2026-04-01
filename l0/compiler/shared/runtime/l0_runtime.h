@@ -880,8 +880,7 @@ static l0_bool rt_string_equals(l0_string a, l0_string b) {
     char *a_data = _rt_string_bytes(a);
     char *b_data = _rt_string_bytes(b);
     if (a_data == NULL || b_data == NULL) {
-        /* TODO: panic? - one is null but has non-zero length (shouldn't happen) */
-        return 0;
+        _rt_panic("rt_string_equals: invalid state - string data is null");
     }
     return memcmp(a_data, b_data, (size_t)a_len) == 0 ? 1 : 0;
 }

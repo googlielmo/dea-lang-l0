@@ -1516,10 +1516,10 @@ class ExpressionTypeChecker:
 
         # Explicit int -> byte casts with compile-time-known values are checked in analysis.
         if (
-            isinstance(expr_ty, BuiltinType)
-            and expr_ty.name == "int"
-            and isinstance(target_ty, BuiltinType)
-            and target_ty.name == "byte"
+                isinstance(expr_ty, BuiltinType)
+                and expr_ty.name == "int"
+                and isinstance(target_ty, BuiltinType)
+                and target_ty.name == "byte"
         ):
             const_int = self._get_const_int_for_explicit_cast(expr.expr)
             if const_int is not None and (const_int < 0 or const_int > 255):
@@ -1530,11 +1530,11 @@ class ExpressionTypeChecker:
 
         # Explicit unwrap from nullable pointer to pointer cannot be proven-null.
         if (
-            isinstance(expr_ty, NullableType)
-            and isinstance(expr_ty.inner, PointerType)
-            and isinstance(target_ty, PointerType)
-            and self._types_equal(target_ty, expr_ty.inner)
-            and self._is_const_null_for_explicit_cast(expr.expr)
+                isinstance(expr_ty, NullableType)
+                and isinstance(expr_ty.inner, PointerType)
+                and isinstance(target_ty, PointerType)
+                and self._types_equal(target_ty, expr_ty.inner)
+                and self._is_const_null_for_explicit_cast(expr.expr)
         ):
             return self._error(
                 expr,
@@ -1580,18 +1580,15 @@ class ExpressionTypeChecker:
 
         expected = self._current_func_type.result
         if stmt.value is None:
-            actual = self.void_type
-            if not self._can_assign(expected, actual):
-                self._error(stmt, f"[TYP-0315] return value type mismatch: expected '{format_type(expected)}', got 'void'")
+            if not self._can_assign(expected, self.void_type):
+                self._error(stmt,
+                            f"[TYP-0315] return value type mismatch: expected '{format_type(expected)}', got 'void'")
         else:
-            # Use expected type as widening context for return value
-            actual = self._infer_expr(stmt.value,
-                                      widening_type=expected,
-                                      context_code="TYP-0315",
-                                      context_descriptor="return value")
-            # If _infer_expr returns None, it already reported the error
-            if actual is None:
-                return # TODO review
+            # Use expected type as widening context for return value, and delegate type checking to _infer_expr
+            self._infer_expr(stmt.value,
+                             widening_type=expected,
+                             context_code="TYP-0315",
+                             context_descriptor="return value")
 
     # ------------------------------------------------------------------
     # Helpers: TypeRef resolution (mirrors SignatureResolver logic)

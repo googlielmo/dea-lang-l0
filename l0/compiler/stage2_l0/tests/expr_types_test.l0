@@ -106,6 +106,35 @@ func test_typing_err() {
 }
 
 /**
+ * Tests bare `return;` in a non-void function.
+ */
+func test_return_void_in_non_void() {
+    let sp = make_paths();
+    with (let cfg = log_config_create(LL_SILENT, false) => drop cfg) {
+        let result = analysis_analyze_entry(sp, "typing_return_void_in_non_void", cfg);
+        assert(analysis_has_errors(result), "expected typing errors for typing_return_void_in_non_void");
+        assert(has_diag_code(result, "TYP-0315"), "expected return type mismatch error for bare return");
+        analysis_result_free(result);
+    }
+    sp_free(sp);
+}
+
+/**
+ * Tests that an invalid return expression does not add a secondary mismatch.
+ */
+func test_return_invalid_expr() {
+    let sp = make_paths();
+    with (let cfg = log_config_create(LL_SILENT, false) => drop cfg) {
+        let result = analysis_analyze_entry(sp, "typing_return_invalid_expr", cfg);
+        assert(analysis_has_errors(result), "expected typing errors for typing_return_invalid_expr");
+        assert(has_diag_code(result, "TYP-0189"), "expected missing identifier error");
+        assert(!has_diag_code(result, "TYP-0315"), "did not expect return type mismatch on invalid return expr");
+        analysis_result_free(result);
+    }
+    sp_free(sp);
+}
+
+/**
  * Tests successful typing for postfix try expressions.
  */
 func test_typing_try_ok() {
@@ -182,15 +211,49 @@ func test_typing_new_err() {
 }
 
 /**
+ * Tests `drop` diagnostics for invalid local uses.
+ */
+func test_typing_drop_err() {
+    let sp = make_paths();
+    with (let cfg = log_config_create(LL_SILENT, false) => drop cfg) {
+        let result = analysis_analyze_entry(sp, "typing_drop_err", cfg);
+        assert(analysis_has_errors(result), "expected typing errors for typing_drop_err");
+        assert(has_diag_code(result, "TYP-0060"), "expected unknown-variable drop error");
+        assert(has_diag_code(result, "TYP-0061"), "expected non-pointer drop error");
+        analysis_result_free(result);
+    }
+    sp_free(sp);
+}
+
+/**
+ * Tests `drop` flow diagnostics for second drop and later use.
+ */
+func test_typing_drop_flow_err() {
+    let sp = make_paths();
+    with (let cfg = log_config_create(LL_SILENT, false) => drop cfg) {
+        let result = analysis_analyze_entry(sp, "typing_drop_flow_err", cfg);
+        assert(analysis_has_errors(result), "expected typing errors for typing_drop_flow_err");
+        assert(has_diag_code(result, "TYP-0062"), "expected second-drop diagnostic");
+        assert(has_diag_code(result, "TYP-0150"), "expected use-after-drop diagnostic");
+        analysis_result_free(result);
+    }
+    sp_free(sp);
+}
+
+/**
  * Main entry point for the module.
  */
 func main() {
     test_typing_ok();
     test_typing_err();
+    test_return_void_in_non_void();
+    test_return_invalid_expr();
     test_typing_try_ok();
     test_typing_try_err();
     test_typing_equality_unsupported();
     test_typing_new_ok();
     test_typing_new_err();
+    test_typing_drop_err();
+    test_typing_drop_flow_err();
     printl_s("expr_types_test: all tests passed");
 }
