@@ -56,6 +56,9 @@ def assert_contains(text: str, needle: str, *, context: str) -> None:
 def check_release_workflow() -> None:
     text = read_text(".github/workflows/l0-release.yml")
     assert_contains(text, '- "l0-v*"', context="l0-release.yml")
+    assert_contains(text, 'gh api "repos/$GITHUB_REPOSITORY/pages"', context="l0-release.yml")
+    assert_contains(text, "pages_enabled=true", context="l0-release.yml")
+    assert_contains(text, "pages_enabled=false", context="l0-release.yml")
     assert_contains(text, 'export DEA_DIST_VERSION="${RELEASE_VERSION#l0-v}"', context="l0-release.yml")
     assert_contains(text, "name: dea-l0-dist-${{ matrix.os }}-${{ matrix.arch }}", context="l0-release.yml")
     assert_contains(text, "pattern: dea-l0-dist-*", context="l0-release.yml")
@@ -98,6 +101,9 @@ def check_docs_publish_workflow() -> None:
     text = read_text(".github/workflows/l0-docs-publish.yml")
     assert_contains(text, "startsWith(github.event.release.tag_name, 'l0-v')", context="l0-docs-publish.yml")
     assert_contains(text, "RELEASE_TAG: ${{ github.event.release.tag_name }}", context="l0-docs-publish.yml")
+    assert_contains(text, 'gh api "repos/$GITHUB_REPOSITORY/pages"', context="l0-docs-publish.yml")
+    assert_contains(text, "pages_enabled=true", context="l0-docs-publish.yml")
+    assert_contains(text, "pages_enabled=false", context="l0-docs-publish.yml")
 
 
 def check_docs() -> None:

@@ -77,6 +77,23 @@ jobs:
           echo "source_ref=$source_ref" >> "$GITHUB_OUTPUT"
           echo "target_release_tag=$INPUT_RELEASE_TAG" >> "$GITHUB_OUTPUT"
 
+  check-pages-availability:
+    runs-on: ubuntu-latest
+    outputs:
+      pages_enabled: ${{ steps.probe.outputs.pages_enabled }}
+    steps:
+      - name: Check GitHub Pages availability
+        id: probe
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh api "repos/$GITHUB_REPOSITORY/pages" >/dev/null 2>&1; then
+            echo "pages_enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::GitHub Pages is unavailable or not activated for $GITHUB_REPOSITORY; skipping Pages deployment."
+            echo "pages_enabled=false" >> "$GITHUB_OUTPUT"
+          fi
+
   build-docs:
     needs: resolve-targets
     if: github.event_name == 'workflow_dispatch' || startsWith(github.event.release.tag_name, 'l0-v')
@@ -91,10 +108,13 @@ jobs:
         }}
 
   deploy-pages:
-    needs: build-docs
+    needs:
+      - check-pages-availability
+      - build-docs
     if: >-
-      (github.event_name == 'release' && startsWith(github.event.release.tag_name, 'l0-v')) ||
-      (github.event_name == 'workflow_dispatch' && inputs.publish_pages)
+      needs.check-pages-availability.outputs.pages_enabled == 'true' &&
+      ((github.event_name == 'release' && startsWith(github.event.release.tag_name, 'l0-v')) ||
+      (github.event_name == 'workflow_dispatch' && inputs.publish_pages))
     runs-on: ubuntu-latest
     environment:
       name: github-pages

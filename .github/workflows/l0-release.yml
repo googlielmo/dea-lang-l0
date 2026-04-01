@@ -14,6 +14,23 @@ permissions:
   id-token: write
 
 jobs:
+  check-pages-availability:
+    runs-on: ubuntu-latest
+    outputs:
+      pages_enabled: ${{ steps.probe.outputs.pages_enabled }}
+    steps:
+      - name: Check GitHub Pages availability
+        id: probe
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh api "repos/$GITHUB_REPOSITORY/pages" >/dev/null 2>&1; then
+            echo "pages_enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::GitHub Pages is unavailable or not activated for $GITHUB_REPOSITORY; skipping Pages deployment."
+            echo "pages_enabled=false" >> "$GITHUB_OUTPUT"
+          fi
+
   build-dist:
     strategy:
       fail-fast: false
@@ -204,7 +221,10 @@ jobs:
       release_tag: ${{ github.ref_name }}
 
   deploy-pages:
-    needs: build-docs
+    needs:
+      - check-pages-availability
+      - build-docs
+    if: needs.check-pages-availability.outputs.pages_enabled == 'true'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
