@@ -113,6 +113,7 @@ jobs:
           path-type: inherit
           install: >-
             make
+            diffutils
             mingw-w64-x86_64-gcc
 
       - name: Build distribution archive

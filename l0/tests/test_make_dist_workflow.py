@@ -59,12 +59,16 @@ def _format_file_context(path: Path) -> str:
         lines.append(f"path parent entries: {siblings}")
     if path.is_file():
         try:
-            text = path.read_text(encoding="utf-8", errors="replace")
+            raw = path.read_bytes()
         except OSError as exc:
             lines.append(f"path read failed: {exc}")
         else:
-            lines.append("path contents:")
-            lines.extend(f"  {line}" for line in text.splitlines())
+            if b"\x00" in raw[:512]:
+                lines.append(f"path is binary ({len(raw)} bytes), skipping contents")
+            else:
+                text = raw.decode("utf-8", errors="replace")
+                lines.append("path contents:")
+                lines.extend(f"  {line}" for line in text.splitlines())
     return "\n".join(lines)
 
 
@@ -171,7 +175,7 @@ def clean_env() -> dict[str, str]:
     if "PATH" not in env and "Path" not in env:
         env["PATH"] = ""
     if is_windows_host():
-        for name in ("PATHEXT", "SYSTEMROOT", "SystemRoot", "COMSPEC", "ComSpec", "WINDIR", "OS", "MSYSTEM"):
+        for name in ("PATHEXT", "SYSTEMROOT", "SystemRoot", "COMSPEC", "ComSpec", "WINDIR", "OS", "MSYSTEM", "TEMP", "TMP"):
             value = os.environ.get(name)
             if value:
                 env[name] = value

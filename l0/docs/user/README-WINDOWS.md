@@ -18,8 +18,8 @@ The validated Windows workflow for Dea/L0 `1.0.0` requires a supported backend C
 Install the toolchain packages with:
 
 ```bash
-pacman -S mingw-w64-x86_64-gcc make
-# or use Clang instead: pacman -S mingw-w64-x86_64-clang make
+pacman -S mingw-w64-x86_64-gcc make diffutils
+# or use Clang instead: pacman -S mingw-w64-x86_64-clang make diffutils
 ```
 
 Native `cmd.exe` launchers are supported. MSYS2 `MINGW64` is required as the Dea compiler's `--build` and `--run`

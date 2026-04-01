@@ -24,7 +24,7 @@ the `.cmd` launchers themselves.
 Install the validated toolchain packages from MSYS2 with:
 
 ```bash
-pacman -S mingw-w64-x86_64-gcc mingw-w64-x86_64-clang make
+pacman -S mingw-w64-x86_64-gcc mingw-w64-x86_64-clang make diffutils
 ```
 
 To build and install the Stage 2 compiler from the repo:

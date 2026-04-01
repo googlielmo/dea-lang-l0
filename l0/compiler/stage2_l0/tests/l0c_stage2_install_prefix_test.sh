@@ -49,7 +49,7 @@ stage2_launcher_path() {
 
 clean_env_run() {
     if is_windows_host; then
-        env -i PATH="$PATH" SYSTEMROOT="${SYSTEMROOT:-}" COMSPEC="${COMSPEC:-}" WINDIR="${WINDIR:-}" "$@"
+        env -i PATH="$PATH" SYSTEMROOT="${SYSTEMROOT:-}" COMSPEC="${COMSPEC:-}" WINDIR="${WINDIR:-}" OS="${OS:-}" TEMP="${TEMP:-}" TMP="${TMP:-}" "$@"
     else
         env -i PATH="$PATH" "$@"
     fi
@@ -182,7 +182,7 @@ clean_env_run "$(stage2_launcher_path "$PREFIX_DIR/bin/l0c-stage2")" --build -P 
 "$HELLO_BIN" >"$RUN_OUTPUT"
 assert_contains "$RUN_OUTPUT" "Hello, World!"
 
-env -i PATH="$PATH" bash -lc "source \"$PREFIX_DIR/bin/l0-env.sh\" && [ \"\$L0_HOME\" = \"$PREFIX_DIR\" ] && [ -z \"\${L0_SYSTEM-}\" ] && [ -z \"\${L0_RUNTIME_INCLUDE-}\" ] && l0c --run -P \"$(native_path "$PROJECT_DIR")\" hello" >"$ENV_RUN_OUTPUT"
+clean_env_run bash -lc "source \"$PREFIX_DIR/bin/l0-env.sh\" && [ \"\$L0_HOME\" = \"$PREFIX_DIR\" ] && [ -z \"\${L0_SYSTEM-}\" ] && [ -z \"\${L0_RUNTIME_INCLUDE-}\" ] && l0c --run -P \"$(native_path "$PROJECT_DIR")\" hello" >"$ENV_RUN_OUTPUT"
 assert_contains "$ENV_RUN_OUTPUT" "Hello, World!"
 
 echo "l0c_stage2_install_prefix_test: PASS"

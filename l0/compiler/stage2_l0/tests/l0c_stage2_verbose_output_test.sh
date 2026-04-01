@@ -39,7 +39,7 @@ stage2_launcher_path() {
 
 clean_env_run() {
     if is_windows_host; then
-        env -i PATH="$PATH" SYSTEMROOT="${SYSTEMROOT:-}" COMSPEC="${COMSPEC:-}" WINDIR="${WINDIR:-}" OS="${OS:-}" "$@"
+        env -i PATH="$PATH" SYSTEMROOT="${SYSTEMROOT:-}" COMSPEC="${COMSPEC:-}" WINDIR="${WINDIR:-}" OS="${OS:-}" TEMP="${TEMP:-}" TMP="${TMP:-}" "$@"
     else
         env -i PATH="$PATH" "$@"
     fi

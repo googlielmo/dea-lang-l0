@@ -714,9 +714,13 @@ def cmd_run(args: argparse.Namespace) -> int:
     except KeyboardInterrupt:
         return 130
     finally:
-        # Clean up temporary executable
-        if Path(temp_exe).exists():
-            Path(temp_exe).unlink()
+        # Clean up temporary executable.  On Windows the file may still be
+        # locked briefly after the child process exits; ignore the error.
+        try:
+            if Path(temp_exe).exists():
+                Path(temp_exe).unlink()
+        except OSError:
+            pass
 
 
 def cmd_codegen(args: argparse.Namespace) -> int:

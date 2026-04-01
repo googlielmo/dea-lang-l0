@@ -66,7 +66,10 @@ def main() -> int:
     env = os.environ.copy()
     env["L0_CC"] = "gcc"
 
-    with patch("dist_tools_lib.subprocess.run", side_effect=fake_subprocess_run):
+    with (
+        patch("dist_tools_lib.subprocess.run", side_effect=fake_subprocess_run),
+        patch("dist_tools_lib.os.name", "posix"),
+    ):
         provenance, resolved_compiler = collect_stage2_build_provenance(REPO_ROOT, env)
 
     if resolved_compiler != "gcc":

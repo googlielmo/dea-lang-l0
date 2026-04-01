@@ -681,7 +681,9 @@ func cem_module_filename(self: CEmitter*, module_name: string) -> string {
     if (unit == null) {
         return concat_s(module_name, ".l0");
     }
-    return (unit as DriverUnit*).path;
+    /* Normalize backslashes to forward slashes so that #line directives are
+       deterministic regardless of how the path was provided. */
+    return replace_s((unit as DriverUnit*).path, "\\", "/");
 }
 
 /**

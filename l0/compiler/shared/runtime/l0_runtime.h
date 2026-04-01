@@ -1463,11 +1463,14 @@ static l0_bool rt_time_monotonic_supported(void) {
 
 /**
  * Returns local UTC offset in seconds for `unix_sec`.
- * 
+ *
+ * Computes the offset by comparing `gmtime` and `localtime` breakdowns
+ * directly, avoiding `mktime` which rejects pre-epoch values on some platforms.
+ *
  * @param unix_sec Unix timestamp.
  * @return Optional integer offset.
  *
- * L0 signature: `extern func rt_time_local_offset_sec(unix_sec: int) -> int?;` 
+ * L0 signature: `extern func rt_time_local_offset_sec(unix_sec: int) -> int?;`
  */
 static l0_opt_int rt_time_local_offset_sec(l0_int unix_sec) {
     time_t t = (time_t)unix_sec;
@@ -1479,17 +1482,28 @@ static l0_opt_int rt_time_local_offset_sec(l0_int unix_sec) {
     if (utc_ptr == NULL) {
         return (l0_opt_int){ .has_value = 0 };
     }
-
     struct tm utc_tm = *utc_ptr;
-    utc_tm.tm_isdst = -1;
 
-    errno = 0;
-    time_t local_interpretation = mktime(&utc_tm);
-    if (local_interpretation == (time_t)-1 && errno != 0) {
+    struct tm *local_ptr = localtime(&t);
+    if (local_ptr == NULL) {
         return (l0_opt_int){ .has_value = 0 };
     }
+    struct tm local_tm = *local_ptr;
 
-    long long offset = (long long)t - (long long)local_interpretation;
+    /* Day difference: can only be -1, 0, or +1 for timezone offsets. */
+    int day_diff;
+    if (local_tm.tm_year > utc_tm.tm_year) {
+        day_diff = 1;
+    } else if (local_tm.tm_year < utc_tm.tm_year) {
+        day_diff = -1;
+    } else {
+        day_diff = local_tm.tm_yday - utc_tm.tm_yday;
+    }
+
+    long long offset = (long long)day_diff * 86400
+                     + (long long)(local_tm.tm_hour - utc_tm.tm_hour) * 3600
+                     + (long long)(local_tm.tm_min - utc_tm.tm_min) * 60
+                     + (long long)(local_tm.tm_sec - utc_tm.tm_sec);
     if (offset < INT32_MIN || offset > INT32_MAX) {
         return (l0_opt_int){ .has_value = 0 };
     }

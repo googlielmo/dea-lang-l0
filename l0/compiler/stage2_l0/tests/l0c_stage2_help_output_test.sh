@@ -12,6 +12,21 @@ mkdir -p "$REPO_ROOT/build"
 TMP_DIR="$(mktemp -d "$REPO_ROOT/build/l0c-stage2-help-test.XXXXXX")"
 DEA_BUILD_DIR="$TMP_DIR/dea"
 
+is_windows_host() {
+    case "$(uname -s)" in
+        CYGWIN*|MINGW*|MSYS*) return 0 ;;
+    esac
+    return 1
+}
+
+clean_env_run() {
+    if is_windows_host; then
+        env -i PATH="$PATH" SYSTEMROOT="${SYSTEMROOT:-}" COMSPEC="${COMSPEC:-}" WINDIR="${WINDIR:-}" OS="${OS:-}" TEMP="${TEMP:-}" TMP="${TMP:-}" "$@"
+    else
+        env -i PATH="$PATH" "$@"
+    fi
+}
+
 cleanup() {
     rm -rf "$TMP_DIR"
 }
@@ -60,7 +75,7 @@ DEA_BUILD_DIR="$DEA_BUILD_DIR" ./scripts/build-stage2-l0c.sh >/dev/null
 
 HELP_STDOUT="$TMP_DIR/help.stdout"
 HELP_STDERR="$TMP_DIR/help.stderr"
-if ! env -i PATH="$PATH" "$DEA_BUILD_DIR/bin/l0c-stage2" --help >"$HELP_STDOUT" 2>"$HELP_STDERR"; then
+if ! clean_env_run "$DEA_BUILD_DIR/bin/l0c-stage2" --help >"$HELP_STDOUT" 2>"$HELP_STDERR"; then
     fail "--help should exit successfully"
 fi
 
@@ -73,7 +88,7 @@ assert_empty "$HELP_STDERR"
 
 VERSION_STDOUT="$TMP_DIR/version.stdout"
 VERSION_STDERR="$TMP_DIR/version.stderr"
-if ! env -i PATH="$PATH" "$DEA_BUILD_DIR/bin/l0c-stage2" --version >"$VERSION_STDOUT" 2>"$VERSION_STDERR"; then
+if ! clean_env_run "$DEA_BUILD_DIR/bin/l0c-stage2" --version >"$VERSION_STDOUT" 2>"$VERSION_STDERR"; then
     fail "--version should exit successfully"
 fi
 
@@ -82,7 +97,7 @@ assert_empty "$VERSION_STDERR"
 
 NATIVE_VERSION_STDOUT="$TMP_DIR/native-version.stdout"
 NATIVE_VERSION_STDERR="$TMP_DIR/native-version.stderr"
-if ! env -i PATH="$PATH" "$DEA_BUILD_DIR/bin/l0c-stage2.native" --version >"$NATIVE_VERSION_STDOUT" 2>"$NATIVE_VERSION_STDERR"; then
+if ! clean_env_run "$DEA_BUILD_DIR/bin/l0c-stage2.native" --version >"$NATIVE_VERSION_STDOUT" 2>"$NATIVE_VERSION_STDERR"; then
     fail "native --version should exit successfully"
 fi
 
@@ -92,7 +107,7 @@ cmp -s "$VERSION_STDOUT" "$NATIVE_VERSION_STDOUT" || fail "wrapper and native --
 
 VERBOSE_STDOUT="$TMP_DIR/verbose.stdout"
 VERBOSE_STDERR="$TMP_DIR/verbose.stderr"
-if ! env -i PATH="$PATH" "$DEA_BUILD_DIR/bin/l0c-stage2" -v --check -P examples hello >"$VERBOSE_STDOUT" 2>"$VERBOSE_STDERR"; then
+if ! clean_env_run "$DEA_BUILD_DIR/bin/l0c-stage2" -v --check -P examples hello >"$VERBOSE_STDOUT" 2>"$VERBOSE_STDERR"; then
     fail "-v --check should exit successfully"
 fi
 
@@ -101,7 +116,7 @@ assert_contains "$VERBOSE_STDERR" "Dea language / L0 compiler"
 VERBOSE_FAIL_STDOUT="$TMP_DIR/verbose-fail.stdout"
 VERBOSE_FAIL_STDERR="$TMP_DIR/verbose-fail.stderr"
 set +e
-env -i PATH="$PATH" "$DEA_BUILD_DIR/bin/l0c-stage2" -v >"$VERBOSE_FAIL_STDOUT" 2>"$VERBOSE_FAIL_STDERR"
+clean_env_run "$DEA_BUILD_DIR/bin/l0c-stage2" -v >"$VERBOSE_FAIL_STDOUT" 2>"$VERBOSE_FAIL_STDERR"
 RC=$?
 set -e
 if [ "$RC" -ne 2 ]; then
@@ -116,7 +131,7 @@ assert_contains "$VERBOSE_FAIL_STDERR" "error: [L0C-2021] missing required targe
 NOARGS_STDOUT="$TMP_DIR/noargs.stdout"
 NOARGS_STDERR="$TMP_DIR/noargs.stderr"
 set +e
-env -i PATH="$PATH" "$DEA_BUILD_DIR/bin/l0c-stage2" >"$NOARGS_STDOUT" 2>"$NOARGS_STDERR"
+clean_env_run "$DEA_BUILD_DIR/bin/l0c-stage2" >"$NOARGS_STDOUT" 2>"$NOARGS_STDERR"
 RC=$?
 set -e
 if [ "$RC" -ne 2 ]; then

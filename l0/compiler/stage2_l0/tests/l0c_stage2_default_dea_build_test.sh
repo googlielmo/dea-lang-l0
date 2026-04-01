@@ -34,6 +34,21 @@ assert_no_file() {
     [ ! -e "$path" ] || fail "did not expect path: $path"
 }
 
+is_windows_host() {
+    case "$(uname -s)" in
+        CYGWIN*|MINGW*|MSYS*) return 0 ;;
+    esac
+    return 1
+}
+
+clean_env_run() {
+    if is_windows_host; then
+        env -i PATH="$PATH" SYSTEMROOT="${SYSTEMROOT:-}" COMSPEC="${COMSPEC:-}" WINDIR="${WINDIR:-}" OS="${OS:-}" TEMP="${TEMP:-}" TMP="${TMP:-}" "$@"
+    else
+        env -i PATH="$PATH" "$@"
+    fi
+}
+
 cd "$REPO_ROOT"
 
 DEA_BUILD_DIR="$TEST_DEA_BUILD" ./scripts/build-stage2-l0c.sh >/dev/null
@@ -42,6 +57,6 @@ assert_file "$TEST_DEA_BUILD/bin/l0c-stage2"
 assert_file "$TEST_DEA_BUILD/bin/l0c-stage2.native"
 assert_no_file "$TEST_DEA_BUILD/bin/l0c-stage2.c"
 
-env -i PATH="$PATH" "$TEST_DEA_BUILD/bin/l0c-stage2" --check -P examples hello >/dev/null
+clean_env_run "$TEST_DEA_BUILD/bin/l0c-stage2" --check -P examples hello >/dev/null
 
 echo "l0c_stage2_default_dea_build_test: PASS"

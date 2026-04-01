@@ -144,6 +144,14 @@ def assert_output_not_contains(text: str, unexpected: str) -> None:
         fail(f"did not expect {unexpected!r} in output:\n{text}")
 
 
+def normalize_path_text(value: str | Path) -> str:
+    """Return one path-like value with forward slashes for stable comparisons."""
+
+    if isinstance(value, Path):
+        return value.as_posix()
+    return value.replace("\\", "/")
+
+
 def assert_version_report(text: str) -> None:
     for expected in (
         "Dea language / L0 compiler",
@@ -372,7 +380,10 @@ def main() -> int:
                 env_cmd_path,
                 "echo L0_HOME=%L0_HOME% && l0c --check -P examples hello",
             )
-            assert_output_contains(stage1_env_output, f"L0_HOME={REPO_ROOT / 'compiler'}")
+            assert_output_contains(
+                normalize_path_text(stage1_env_output),
+                f"L0_HOME={normalize_path_text(REPO_ROOT / 'compiler')}",
+            )
         else:
             assert_symlink_target(alias_path, "l0c-stage1")
             source_env_and_check(dea_build_dir)
@@ -397,8 +408,12 @@ def main() -> int:
                 + cmd_quote(str(env_cmd_path))
                 + " && echo PATH=%PATH% && echo L0_HOME=%L0_HOME% && l0c --check -P examples hello",
             )
-            assert_output_contains(stage2_env_output, f"L0_HOME={REPO_ROOT / 'compiler'}")
-            if stage2_env_output.lower().count(str(env_cmd_path.parent).lower()) != 1:
+            normalized_stage2_env_output = normalize_path_text(stage2_env_output)
+            assert_output_contains(
+                normalized_stage2_env_output,
+                f"L0_HOME={normalize_path_text(REPO_ROOT / 'compiler')}",
+            )
+            if normalized_stage2_env_output.lower().count(normalize_path_text(env_cmd_path.parent).lower()) != 1:
                 fail("expected l0-env.cmd to prepend the repo-local bin directory to PATH only once")
         else:
             assert_symlink_target(alias_path, "l0c-stage2")
@@ -432,7 +447,10 @@ def main() -> int:
                 prefix_env_cmd_path,
                 f"echo L0_HOME=%L0_HOME% && l0c --run -P {cmd_quote(str(project_dir))} hello",
             )
-            assert_output_contains(prefix_env_output, f"L0_HOME={prefix_dir}")
+            assert_output_contains(
+                normalize_path_text(prefix_env_output),
+                f"L0_HOME={normalize_path_text(prefix_dir)}",
+            )
             assert_output_contains(prefix_env_output, "Hello, World!")
 
         run_expected_fail(

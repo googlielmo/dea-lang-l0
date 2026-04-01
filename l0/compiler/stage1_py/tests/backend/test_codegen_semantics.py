@@ -461,7 +461,7 @@ def test_codegen_line_directives_and_mangling(codegen_single):
     assert "_tmp__v" in c_code
 
 
-def test_codegen_line_directives_escape_backslashes(analyze_single):
+def test_codegen_line_directives_normalize_backslashes(analyze_single):
     from l0_backend import Backend
 
     result = analyze_single(
@@ -475,11 +475,13 @@ def test_codegen_line_directives_escape_backslashes(analyze_single):
 
     assert not result.has_errors()
     # Use a raw string directly — PureWindowsPath uses forward slashes on
-    # MSYS2 MinGW Python, which would defeat the backslash-escaping test.
+    # MSYS2 MinGW Python, which would defeat the backslash test.
     result.cu.modules["main"].filename = r"D:\tmp\project\main.l0"
     c_code = Backend(result).generate()
 
-    assert '#line 4 "D:\\\\tmp\\\\project\\\\main.l0"' in c_code
+    # Backslashes are normalized to forward slashes for #line directives,
+    # matching Stage 2 behavior and ensuring bootstrap determinism.
+    assert '#line 4 "D:/tmp/project/main.l0"' in c_code
 
 
 # ---------------------------------------------------------------------------
