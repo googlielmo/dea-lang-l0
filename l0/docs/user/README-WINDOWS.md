@@ -6,7 +6,7 @@ Welcome to the **Dea** programming language!
 
 ## Dea/L<sub>0</sub> on Windows
 
-The validated Windows workflow for Dea/L0 `1.0.0` requires a supported backend C toolchain:
+The validated Windows workflow for Dea/L0 `0.9.2` requires a supported backend C toolchain:
 
 - **MSYS2** `MINGW64`: install MSYS2 from https://www.msys2.org/.
 - **MinGW-w64 GCC** (or **Clang**): install `mingw-w64-x86_64-gcc` or `mingw-w64-x86_64-clang` from the MSYS2 package

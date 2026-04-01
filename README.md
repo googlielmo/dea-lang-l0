@@ -44,7 +44,7 @@ the semantics are enforced by L0 itself.
 
 ## Project status and directions
 
-L0 `1.0.0` ships the first self-hosted Stage 2 toolchain.
+L0 `0.9.2` ships the first self-hosted Stage 2 toolchain as the final pre-1.0 monorepo release.
 
 - Stage 1: complete and usable.
 
@@ -125,7 +125,7 @@ The `$CC` environment variable will be checked as a last resort if none of the a
 
 If you need a specific compiler, set `$L0_CC` to its executable name or path. For example:
 
-For the `1.0.0` support matrix, Windows validation is through MSYS2 `MINGW64` with MinGW-w64 GCC. MSVC-family builds are
+For the `0.9.2` support matrix, Windows validation is through MSYS2 `MINGW64` with MinGW-w64 GCC. MSVC-family builds are
 still experimental and are not part of the validated release matrix.
 
 Specific versions of `gcc` and `clang` whose names include version numbers (e.g. `gcc-14`, `clang-22`) are not probed by

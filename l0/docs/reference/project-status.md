@@ -1,9 +1,10 @@
 # L0 Project Status
 
-Version: 2026-03-24
+Version: 2026-04-01
 
-This document summarizes what is implemented in this repository today and what defines the Dea/L0 `1.0.0` stabilization
-target.
+This document summarizes what is implemented in this repository today and what defines the Dea/L0 `0.9.2` pre-1.0
+stabilization point. L0 now lives as one language subtree inside the Dea monorepo; monorepo release tags use the
+`l0-vX.Y.Z` namespace while historical pre-monorepo bare tags remain legacy references.
 
 ## Scope and Canonical References
 
@@ -44,7 +45,9 @@ At a high level, it provides:
 - self-hosted C99 generation, build, and run flows,
 - repo-local, install-prefix, and distribution delivery paths,
 - strict triple-bootstrap validation via `make triple-test`,
-- release packaging plus docs/PDF publishing automation through the repository workflows.
+- embedded provenance in artifact-producing Stage 2 binaries via `--version`,
+- release packaging plus docs/PDF publishing automation through the repository workflows,
+- current parity fixes for Stage 2 return diagnostics, drop-liveness checks, and trace-runner behavior on Windows.
 
 Stage 1 remains the behavioral oracle for equivalent Stage 2 paths.
 
@@ -61,18 +64,33 @@ The standard library now includes the core runtime-facing and bootstrap-facing m
 filesystem access, time, randomness, assertions, optionals, and the current container set. Use
 [standard-library.md](standard-library.md) for the canonical module-by-module reference.
 
+## Delivery and Validation
+
+The current repository state supports three practical ways to use L0:
+
+- source-tree Stage 1 usage through `./scripts/l0c`,
+- repo-local Dea builds under `build/dea/bin` via `make use-dev-stage1` / `make use-dev-stage2`,
+- install-prefix and relocatable distribution archives built from the self-hosted Stage 2 compiler.
+
+Validation is centered on:
+
+- Stage 1 and Stage 2 test suites,
+- strict triple-bootstrap reproducibility checks,
+- workflow/distribution regression tests for build metadata, archives, and release-tag policy,
+- strict docs generation and packaged-reference validation.
+
 ## Platform Support
 
-The `1.0.0` support promise is:
+The `0.9.2` support promise is:
 
 - Tier 1 hosts: Linux and macOS for Stage 1 and Stage 2 workflows.
 - Tier 1 Windows toolchain: MSYS2 `MINGW64` with MinGW-w64 GCC or Clang for build, test, install, and distribution
-  workflows.
-- Tier 2 / experimental: MSVC-family builds remain outside the `1.0.0` validated matrix.
+  workflows, plus generated native `cmd.exe` launchers for invoking the packaged toolchain outside the MSYS2 shell.
+- Tier 2 / experimental: MSVC-family builds remain outside the `0.9.2` validated matrix.
 
 ## Known Limitations and Constraints
 
-These remain true in the `1.0.0` language/compiler contract:
+These remain true in the `0.9.2` language/compiler contract:
 
 1. Backend output is one C translation unit (no multi-object/header split pipeline yet).
 2. Arrays/slices are not implemented; indexing syntax exists but unsupported targets are rejected.
@@ -80,17 +98,24 @@ These remain true in the `1.0.0` language/compiler contract:
 4. No generics, traits, or macros.
 5. Reserved/future keywords and operators are lexed for diagnostics and staged evolution.
 
-## 1.0 Stabilization Notes
+## 0.9.2 Stabilization Notes
 
-Dea/L0 `1.0.0` is the stability baseline for the `1.0.x` line:
+Dea/L0 `0.9.2` is the final planned pre-1.0 release line:
 
-1. Keep the current Stage 1/Stage 2 CLI, semantics, and stdlib surface stable for the `1.0.x` line.
+1. Keep the current Stage 1/Stage 2 CLI, semantics, stdlib surface, and monorepo release wiring stable through the
+   `0.9.2` tag.
 2. Keep the existing validation gates (`make test-all`, `make triple-test`, workflow/distribution checks, and strict
    docs generation) as release criteria.
-3. Treat the limitations listed above as explicit L0 scope boundaries, not deferred `1.0.0` blockers.
+3. Treat the recent Windows/MSYS2 fixes, trace-runner hardening, and Stage 2 diagnostic-parity fixes as part of the
+   release baseline rather than as optional follow-up work.
+4. Treat the limitations listed above as explicit L0 scope boundaries for the `0.9.2` release, not as last-minute
+   blockers for the monorepo transition.
 
-## Post-1.0 Direction
+## Path to 1.0
 
-After Dea/L0 `1.0.0`, further language growth belongs to later levels of the language family:
+After Dea/L0 `0.9.2`, the remaining work toward `1.0.0` is expected to stay focused on documentation and residual bug
+fixes rather than new language surface.
+
+Once Dea/L0 `1.0.0` is cut, further language growth belongs to later levels of the language family:
 
 1. Bitwise operators, top-level `const`, and further language extensions are deferred to Dea/L1.

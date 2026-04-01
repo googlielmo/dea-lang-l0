@@ -184,12 +184,12 @@ def assert_provenance_helper_contract() -> None:
             build_time="2026-03-12 23:55:56+00:00",
             host="Darwin 24.6.0 x86_64",
             compiler_banner="gcc-15 (Homebrew GCC 15.2.0_1) 15.2.0",
-            release_version="1.0.0",
+            release_version="0.9.2",
             source_url="https://github.com/googlielmo/dea-lang-l0",
             has_embedded_version=True,
         )
     )
-    for expected in ("build: ", "build time: ", "commit: ", "host: ", "compiler: ", "+dirty", "Darwin 24.6.0 x86_64", "1.0.0"):
+    for expected in ("build: ", "build time: ", "commit: ", "host: ", "compiler: ", "+dirty", "Darwin 24.6.0 x86_64", "0.9.2"):
         assert_output_contains(rendered, expected)
     for unexpected in ("tree: ", "build id: ", "built at: ", "compiler version: "):
         assert_output_not_contains(rendered, unexpected)
