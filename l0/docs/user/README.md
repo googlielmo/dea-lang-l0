@@ -6,7 +6,7 @@ Welcome to the **Dea** programming language!
 
 ## Dea/L<sub>0</sub>
 
-This archive contains the standalone Dea/L0 `0.9.2` compiler distribution.
+This archive contains the standalone Dea/L0 `1.0.0.dev0` compiler distribution.
 
 ## What is included
 

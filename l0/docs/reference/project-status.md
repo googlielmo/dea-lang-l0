@@ -2,9 +2,9 @@
 
 Version: 2026-04-01
 
-This document summarizes what is implemented in this repository today and what defines the Dea/L0 `0.9.2` pre-1.0
-stabilization point. L0 now lives as one language subtree inside the Dea monorepo; monorepo release tags use the
-`l0-vX.Y.Z` namespace while historical pre-monorepo bare tags remain legacy references.
+This document summarizes what is implemented in this repository today and what defines the current Dea/L0 `1.0.0.dev0`
+development branch after the `l0-v0.9.2` release. L0 now lives as one language subtree inside the Dea monorepo; monorepo
+release tags use the `l0-vX.Y.Z` namespace while historical pre-monorepo bare tags remain legacy references.
 
 ## Scope and Canonical References
 
@@ -81,16 +81,16 @@ Validation is centered on:
 
 ## Platform Support
 
-The `0.9.2` support promise is:
+The current development support baseline remains:
 
 - Tier 1 hosts: Linux and macOS for Stage 1 and Stage 2 workflows.
 - Tier 1 Windows toolchain: MSYS2 `MINGW64` with MinGW-w64 GCC or Clang for build, test, install, and distribution
   workflows, plus generated native `cmd.exe` launchers for invoking the packaged toolchain outside the MSYS2 shell.
-- Tier 2 / experimental: MSVC-family builds remain outside the `0.9.2` validated matrix.
+- Tier 2 / experimental: MSVC-family builds remain outside the validated release matrix.
 
 ## Known Limitations and Constraints
 
-These remain true in the `0.9.2` language/compiler contract:
+These remain true on the current `1.0.0.dev0` development branch:
 
 1. Backend output is one C translation unit (no multi-object/header split pipeline yet).
 2. Arrays/slices are not implemented; indexing syntax exists but unsupported targets are rejected.
@@ -98,23 +98,23 @@ These remain true in the `0.9.2` language/compiler contract:
 4. No generics, traits, or macros.
 5. Reserved/future keywords and operators are lexed for diagnostics and staged evolution.
 
-## 0.9.2 Stabilization Notes
+## Post-0.9.2 Development Notes
 
-Dea/L0 `0.9.2` is the final planned pre-1.0 release line:
+The current `1.0.0.dev0` branch starts from the `0.9.2` release baseline:
 
-1. Keep the current Stage 1/Stage 2 CLI, semantics, stdlib surface, and monorepo release wiring stable through the
-   `0.9.2` tag.
+1. Keep the current Stage 1/Stage 2 CLI, semantics, stdlib surface, and monorepo release wiring stable unless a bug fix
+   requires a targeted correction.
 2. Keep the existing validation gates (`make test-all`, `make triple-test`, workflow/distribution checks, and strict
-   docs generation) as release criteria.
-3. Treat the recent Windows/MSYS2 fixes, trace-runner hardening, and Stage 2 diagnostic-parity fixes as part of the
-   release baseline rather than as optional follow-up work.
-4. Treat the limitations listed above as explicit L0 scope boundaries for the `0.9.2` release, not as last-minute
-   blockers for the monorepo transition.
+   docs generation) as the default bar for release-readiness.
+3. Carry forward the recent Windows/MSYS2 fixes, trace-runner hardening, and Stage 2 diagnostic-parity work as part of
+   the normal development baseline.
+4. Treat the limitations listed above as explicit L0 scope boundaries unless a narrowly-scoped `1.0.0` blocker demands
+   otherwise.
 
 ## Path to 1.0
 
-After Dea/L0 `0.9.2`, the remaining work toward `1.0.0` is expected to stay focused on documentation and residual bug
-fixes rather than new language surface.
+After `l0-v0.9.2`, the remaining work toward `1.0.0` is expected to stay focused on documentation and residual bug fixes
+rather than new language surface.
 
 Once Dea/L0 `1.0.0` is cut, further language growth belongs to later levels of the language family:
 
