@@ -59,6 +59,11 @@ def check_release_workflow() -> None:
     assert_contains(text, 'export DEA_DIST_VERSION="${RELEASE_VERSION#l0-v}"', context="l0-release.yml")
     assert_contains(text, "name: dea-l0-dist-${{ matrix.os }}-${{ matrix.arch }}", context="l0-release.yml")
     assert_contains(text, "pattern: dea-l0-dist-*", context="l0-release.yml")
+    assert_contains(text, "name: github-pages", context="l0-release.yml")
+    assert_contains(text, "uses: actions/deploy-pages@v4", context="l0-release.yml")
+    assert_contains(text, "name: docs-markdown", context="l0-release.yml")
+    assert_contains(text, "name: blog-export", context="l0-release.yml")
+    assert_contains(text, 'gh release upload "$CURRENT_TAG" blog-export.tar.gz --clobber --repo "$GITHUB_REPOSITORY"', context="l0-release.yml")
     assert_contains(
         text,
         "prev_tag=\"$(git tag --merged HEAD --sort=-v:refname | grep '^l0-v' | grep -Fxv \"$CURRENT_TAG\" | head -n 1 || true)\"",

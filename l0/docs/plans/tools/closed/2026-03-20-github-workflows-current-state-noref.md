@@ -50,8 +50,9 @@ fills that gap so the repository remains even with the implemented automation.
 ### Release packaging
 
 - `release.yml` builds multi-platform distribution archives for version tags matching `v*`.
-- It injects a `VERSION` file, builds `make dist`, smoke-tests the resulting archive, uploads per-platform artifacts,
-  generates checksums and release notes, and publishes or updates the GitHub Release.
+- It injects a `VERSION` file, builds `make dist`, smoke-tests the resulting archive, builds the docs artifacts, deploys
+  the generated Pages site, uploads the release PDF and Chirpy blog export, generates checksums and release notes, and
+  publishes or updates the GitHub Release.
 - `snapshot.yml` performs the same multi-platform distribution flow for manual snapshot releases, creating a snapshot
   tag and publishing the result as a pre-release.
 

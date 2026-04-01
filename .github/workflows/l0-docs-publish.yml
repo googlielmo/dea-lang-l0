@@ -30,7 +30,7 @@ on:
         default: false
         type: boolean
       release_tag:
-        description: "Release tag for manual PDF upload"
+        description: "Release tag for manual PDF upload and Chirpy blog export"
         required: false
         default: ""
         type: string
