@@ -4,18 +4,22 @@ Version: 2026-04-01
 
 This document summarizes what is implemented in this repository today and what defines the current Dea/L0 `1.0.0.dev0`
 development branch after the `l0-v0.9.2` release. L0 now lives as one language subtree inside the Dea monorepo; monorepo
-release tags use the `l0-vX.Y.Z` namespace while historical pre-monorepo bare tags remain legacy references.
+release tags use the `l0-vX.Y.Z` namespace while historical pre-monorepo bare tags remain legacy references. The
+monorepo now also includes an initial `l1/` bootstrap subtree seeded from the current L0 Stage 2 compiler, while L0
+remains the active release line and the canonical user-facing toolchain today.
 
 ## Scope and Canonical References
 
 Use this file as a status snapshot. For implementation details, use:
 
-- [reference/architecture.md](architecture.md) for pass structure and data flow.
+- [docs/reference/project-status.md](../../../../docs/reference/project-status.md) for the Dea-wide monorepo status
+  snapshot.
+- [architecture.md](architecture.md) for pass structure and data flow.
 - [specs/compiler/stage1-contract.md](../specs/compiler/stage1-contract.md) for external interfaces and guarantees.
-- [reference/c-backend-design.md](c-backend-design.md) for backend lowering and generated C behavior.
+- [c-backend-design.md](c-backend-design.md) for backend lowering and generated C behavior.
 - [specs/runtime/trace.md](../specs/runtime/trace.md) for tracing flags and runtime trace semantics.
-- [reference/grammar.md](grammar.md) for accepted concrete syntax.
-- [reference/standard-library.md](standard-library.md) for current std/sys module APIs.
+- [grammar.md](grammar.md) for accepted concrete syntax.
+- [standard-library.md](standard-library.md) for current std/sys module APIs.
 - [specs/compiler/cli-contract.md](../specs/compiler/cli-contract.md) for the shared CLI contract across stages.
 - [specs/compiler/stage2-contract.md](../specs/compiler/stage2-contract.md) for Stage 2 contract and provenance.
 
@@ -115,6 +119,9 @@ The current `1.0.0.dev0` branch starts from the `0.9.2` release baseline:
 
 After `l0-v0.9.2`, the remaining work toward `1.0.0` is expected to stay focused on documentation and residual bug fixes
 rather than new language surface.
+
+In parallel, the monorepo now carries an early `l1/` tree with `compiler/stage1_l0`, `compiler/stage2_l1`, and shared
+runtime/stdlib scaffolding so later language growth can begin without shifting the current L0 release target.
 
 Once Dea/L0 `1.0.0` is cut, further language growth belongs to later levels of the language family:
 

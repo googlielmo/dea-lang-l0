@@ -1,0 +1,17 @@
+module main;
+
+enum Flag {
+    Off;
+    On;
+}
+
+struct Pair {
+    left: int;
+    right: int;
+}
+
+func main() -> int {
+    let p = Pair(1, sizeof(Pair));
+    let f = On;
+    return p.right + ord(f);
+}

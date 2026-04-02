@@ -2,6 +2,8 @@
 
 Guidance for Claude Code and AI agents working in the `l0/` subtree of the Dea monorepo.
 
+Read `../CLAUDE.md` first for monorepo-wide policy, commit conventions, shared `.venv`, and root planning guidance.
+
 Run commands from the `l0/` directory.
 
 ## Project Overview
@@ -40,7 +42,7 @@ Documentation policy:
 - **Maintenance:** If you change stdlib or ARC behavior, you MUST update the corresponding `.md` in `docs/` in the same
   PR.
 
-Also see: `../CONTRIBUTING.md`, `SECURITY.md`.
+Also see: `../CONTRIBUTING.md`, `../SECURITY.md`.
 
 ## Environment & Setup
 
@@ -227,29 +229,10 @@ rg -n 'XXX-NNNN' compiler/stage1_py compiler/stage2_l0 docs
 - When porting Stage 1 behavior, treat Stage 1 code meaning as the oracle and preserve the same numeric code for the
   equivalent condition.
 
-## Git Conventions
+## Shared Monorepo Policy
 
-- Multiline commits: sentence-case summary with period, then factual body as bullets with "- " prefix, sentence-case,
-  ending with a period. Each bullet is a single line — no line breaks within a bullet regardless of length; no column
-  limit.
-- Before committing, run
-  `uv run --group dev pre-commit run --hook-stage pre-commit -c ../.pre-commit-config.yaml --files $(git diff --cached --name-only --diff-filter=ACMR --relative)`
-  from `l0/`. If hooks rewrite files, stage the rewritten files before retrying `git commit`.
-- For multiline commit messages, write the message to a temporary file and use `git commit -F <file>` to avoid shell
-  escaping issues (especially with backticks).
-- When writing shell helpers around `git commit` or other multi-step commands, avoid assigning to `zsh` special
-  parameters such as `status`; prefer neutral names like `rc` or `exit_code`.
-- No tag-phrases ("for clarity", "for consistency"). State what changed.
-- Use backticks for L0/Python/C code snippets and function/type names in messages.
-- No Co-Authored-By lines.
-- Before committing, verify this file's accuracy (file references current, new modules listed, deleted ones removed).
-
-## Quality Standards
-
-### Documentation Standards
-
-- **Python:** Use Google Style docstrings (Args, Returns, Raises).
-- **C (.h/.c) & L0 (.l0):** Use Doxygen Style (Javadoc format: `/** ... */` with `@param`, `@return`; omit `@brief`).
+Git conventions, documentation standards, and shared plan-placement policy are owned by `../CLAUDE.md`. Follow those
+rules here unless this file defines a narrower L0-specific requirement.
 
 ### Definition of Done
 

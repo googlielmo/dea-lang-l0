@@ -2,8 +2,8 @@
 
 ## Supported versions
 
-This project is experimental. Security fixes, if any, are provided on a best-effort basis for the latest commit on the
-default branch.
+This repository is experimental. Security fixes, if any, are provided on a best-effort basis for the latest commit on
+the default branch.
 
 ## Reporting a vulnerability
 
@@ -26,10 +26,10 @@ is available.
 
 Examples of security-relevant issues:
 
-- Memory safety bugs in the C runtime (`compiler/shared/runtime/`)
+- Memory safety bugs in the L0 C runtime (`l0/compiler/shared/runtime/`)
 - Compiler vulnerabilities that enable arbitrary code execution during compilation
 - Generated C code that introduces exploitable undefined behavior
-- Supply-chain issues in build scripts or release artifacts
+- Supply-chain issues in monorepo build scripts or release artifacts
 
 Non-security bugs (crashes without exploitability, miscompilations without a security angle, feature requests) should be
 filed as normal [GitHub issues](https://github.com/googlielmo/dea-lang-l0/issues).

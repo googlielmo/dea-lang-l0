@@ -1,0 +1,223 @@
+/*
+ * SPDX-License-Identifier: MIT OR Apache-2.0
+ * Copyright (c) 2026 gwz
+ */
+
+module diag_print;
+
+import sys.rt;
+
+import std.fs;
+import std.io;
+import std.string;
+import std.text;
+import std.vector;
+import util.diag;
+
+/**
+ * Return the lowercase display name for a diagnostic severity.
+ *
+ * @param sev Severity to format.
+ * @return Lowercase severity name.
+ */
+func dp_severity_name(sev: DiagnosticSeverity) -> string {
+    match (sev) {
+        Error => { return "error"; }
+        Warning => { return "warning"; }
+        Note => { return "note"; }
+    }
+}
+
+/**
+ * Format the first line of a diagnostic message.
+ *
+ * @param diag Diagnostic to format.
+ * @return Header string containing location, severity, code, and message.
+ */
+func dp_format_header(diag: Diagnostic*) -> string {
+    with (let sb = sb_create() => sb_free(sb)) {
+        // Location prefix: path:line:column
+        if (!is_empty_s(diag.filename)) {
+            sb_append(sb, diag.filename);
+            if (diag.line > 0) {
+                sb_append(sb, ":");
+                sb_append_int(sb, diag.line);
+                if (diag.column > 0) {
+                    sb_append(sb, ":");
+                    sb_append_int(sb, diag.column);
+                }
+            }
+            sb_append(sb, ": ");
+        }
+
+        // Severity
+        sb_append(sb, dp_severity_name(diag.severity));
+        sb_append(sb, ": ");
+
+        // Code bracket (phase not rendered — XXX- prefix identifies the phase)
+        if (!is_empty_s(diag.code)) {
+            sb_append(sb, "[");
+            sb_append(sb, diag.code);
+            sb_append(sb, "] ");
+        }
+
+        // Message
+        sb_append(sb, diag.message);
+
+        return sb_to_string(sb);
+    }
+}
+
+/**
+ * Prints the dp print header.
+ *
+ * @param diag The diag.
+ */
+func dp_print_header(diag: Diagnostic*) {
+    err_printl_s(dp_format_header(diag));
+}
+
+/**
+ * Render a source snippet for a diagnostic.
+ *
+ * @param diag Diagnostic to render.
+ * @param src Source text corresponding to `diag.filename`.
+ */
+func dp_render_snippet(diag: Diagnostic*, src: string) {
+    if (is_empty_s(src)) {
+        return;
+    }
+
+    with (let lines = lines_s(src) => vs_free(lines)) {
+        let line_index = diag.line - 1;
+        if (line_index < 0 || line_index >= vs_size(lines)) {
+            return;
+        }
+
+        let src_line = vs_get(lines, line_index);
+        let line_no = int_to_string(diag.line);
+
+        // gutter_width = max(5, len(line_no_str))
+        let gutter_width = len_s(line_no);
+        if (gutter_width < 5) {
+            gutter_width = 5;
+        }
+
+        // Right-align line number within gutter
+        let pad = repeat_s(" ", gutter_width - len_s(line_no));
+        err_printl_s(concat4_s(pad, line_no, " | ", src_line));
+
+        // Omit caret line when no column info
+        if (diag.column < 1) {
+            return;
+        }
+
+        let start_col = diag.column;
+        let end_col = start_col;
+        if (diag.line_end > 0 && diag.column_end > 0) {
+            if (diag.line_end == diag.line) {
+                if (diag.column_end > start_col) {
+                    end_col = diag.column_end;
+                }
+            } else {
+                end_col = len_s(src_line) + 1;
+            }
+        }
+
+        let caret_width = end_col - start_col;
+        if (caret_width < 1) {
+            caret_width = 1;
+        }
+
+        // Caret line: gutter_width spaces + " | " + offset spaces + carets
+        let caret_prefix = repeat_s(" ", gutter_width + 3 + (start_col - 1));
+        let carets = repeat_s("^", caret_width);
+        err_printl_s(concat_s(caret_prefix, carets));
+    }
+}
+
+/**
+ * Prints the dp print snippet.
+ *
+ * @param diag The diag.
+ */
+func dp_print_snippet(diag: Diagnostic*) {
+    if (is_empty_s(diag.filename) || diag.line <= 0) {
+        return;
+    }
+
+    let src_opt = read_file(diag.filename);
+    if (src_opt == null) {
+        return;
+    }
+
+    dp_render_snippet(diag, src_opt as string);
+}
+
+/**
+ * Return cached source text for a filename, loading and caching it on demand.
+ *
+ * @param cache_names Cached filenames.
+ * @param cache_texts Cached source texts aligned with `cache_names`.
+ * @param filename Filename to load.
+ * @return Cached or newly loaded source text, or an empty string on read failure.
+ */
+func dp_source_cached(cache_names: VectorString*, cache_texts: VectorString*, filename: string) -> string {
+    for (let i = 0; i < vs_size(cache_names); i = i + 1) {
+        if (eq_s(vs_get(cache_names, i), filename)) {
+            return vs_get(cache_texts, i);
+        }
+    }
+
+    let text = "";
+    let src_opt = read_file(filename);
+    if (src_opt != null) {
+        text = src_opt as string;
+    }
+    vs_push(cache_names, filename);
+    vs_push(cache_texts, text);
+    return text;
+}
+
+/**
+ * Prints the dp print diag.
+ *
+ * @param diag The diag.
+ */
+func dp_print_diag(diag: Diagnostic*) {
+    dp_print_header(diag);
+    dp_print_snippet(diag);
+}
+
+/**
+ * Print all diagnostics using caller-provided source-text caches.
+ *
+ * @param dc Diagnostic collector to print.
+ * @param source_names Cached filenames aligned with `source_texts`.
+ * @param source_texts Cached source texts aligned with `source_names`.
+ */
+func dp_print_collector_with_sources(dc: DiagCollector*,
+    source_names: VectorString*, source_texts: VectorString*)
+{
+    for (let i = 0; i < diag_count(dc); i = i + 1) {
+        let d = diag_get(dc, i);
+        dp_print_header(d);
+        if (!is_empty_s(d.filename) && d.line > 0) {
+            dp_render_snippet(d, dp_source_cached(source_names, source_texts, d.filename));
+        }
+    }
+}
+
+/**
+ * Prints the dp print collector.
+ *
+ * @param dc The dc.
+ */
+func dp_print_collector(dc: DiagCollector*) {
+    with (
+        let cache_names = vs_create(4) => vs_free(cache_names),
+        let cache_texts = vs_create(4) => vs_free(cache_texts)
+    ) {
+        dp_print_collector_with_sources(dc, cache_names, cache_texts);
+    }
+}

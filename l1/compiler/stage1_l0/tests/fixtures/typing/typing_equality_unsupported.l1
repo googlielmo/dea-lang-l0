@@ -1,0 +1,20 @@
+/*
+ * SPDX-License-Identifier: MIT OR Apache-2.0
+ * Copyright (c) 2026 gwz
+ */
+
+module typing_equality_unsupported;
+
+/**
+ * Triggers unsupported string equality.
+ */
+func err_string_eq(a: string, b: string) -> bool {
+    return a == b; // TYP-0173
+}
+
+/**
+ * Triggers unsupported string inequality.
+ */
+func err_string_ne(a: string, b: string) -> bool {
+    return a != b; // TYP-0173
+}

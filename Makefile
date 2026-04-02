@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := help
 
-DEA_LEVEL_DIRS ?= l0
+DEA_LEVEL_DIRS ?= l0 l1
 ROOT_CLEAN_PATHS := build .pytest_cache __pycache__ pytest-of-*
 
 .PHONY: help venv clean _check-level-dirs

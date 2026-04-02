@@ -1,0 +1,136 @@
+/*
+ * SPDX-License-Identifier: MIT OR Apache-2.0
+ * Copyright (c) 2026 gwz
+ */
+
+module util.strings;
+
+import sys.rt;
+import std.string;
+import std.text;
+import std.vector;
+
+/**
+ * Return a copied string with the same contents.
+ *
+ * @param s String to clone.
+ * @return New string containing the contents of `s`.
+ */
+func us_clone_s(s: string) -> string {
+    return slice_s(s, 0, len_s(s));
+}
+
+/**
+ * Clone a vector of strings.
+ *
+ * @param src Source vector to copy.
+ * @return New vector containing the same strings in the same order.
+ */
+func us_vs_clone(src: VectorString*) -> VectorString* {
+    let out = vs_create(vs_size(src));
+    for (let i = 0; i < vs_size(src); i = i + 1) {
+        vs_push(out, vs_get(src, i));
+    }
+    return out;
+}
+
+/**
+ * Split a string on one separator byte.
+ *
+ * @param s String to split.
+ * @param sep Separator byte.
+ * @param keep_empty Whether empty fields should be preserved.
+ * @return Vector of split parts.
+ */
+func us_split_char(s: string, sep: byte, keep_empty: bool) -> VectorString* {
+    let sep_s = byte_to_s(sep);
+    if (keep_empty) {
+        return split_s(s, sep_s);
+    }
+
+    with (let parts = split_s(s, sep_s) => vs_free(parts)) {
+        let out = vs_create(vs_size(parts));
+        for (let i = 0; i < vs_size(parts); i = i + 1) {
+            let part = vs_get(parts, i);
+            if (!is_empty_s(part)) {
+                vs_push(out, part);
+            }
+        }
+        return out;
+    }
+}
+
+/**
+ * Split a string on either of two separator bytes, dropping empty fields.
+ *
+ * @param s String to split.
+ * @param sep1 First separator byte.
+ * @param sep2 Second separator byte.
+ * @return Vector of non-empty split parts.
+ */
+func us_split_chars2_non_empty(s: string, sep1: byte, sep2: byte) -> VectorString* {
+    let out = vs_create(4);
+    let n = len_s(s);
+    let start = 0;
+
+    for (let i = 0; i < n; i = i + 1) {
+        let c = char_at_s(s, i);
+        if (c == sep1 || c == sep2) {
+            if (i > start) {
+                vs_push(out, slice_s(s, start, i));
+            }
+            start = i + 1;
+        }
+    }
+
+    if (start < n) {
+        vs_push(out, slice_s(s, start, n));
+    }
+
+    return out;
+}
+
+/**
+ * Split a string on space characters, dropping empty fields.
+ *
+ * @param s String to split.
+ * @return Vector of non-empty split parts.
+ * @see std.string::is_space for the definition of space characters.
+ */
+func us_split_is_space_non_empty(s: string) -> VectorString* {
+    let out = vs_create(4);
+    let n = len_s(s);
+    let start = 0;
+
+    for (let i = 0; i < n; i = i + 1) {
+        let c = char_at_s(s, i);
+        if (is_space(c)) {
+            if (i > start) {
+                vs_push(out, slice_s(s, start, i));
+            }
+            start = i + 1;
+        }
+    }
+
+    if (start < n) {
+        vs_push(out, slice_s(s, start, n));
+    }
+
+    return out;
+}
+
+/**
+ * Strip a leading UTF-8 BOM from a string when present.
+ *
+ * @param s String to normalize.
+ * @return `s` without a leading BOM.
+ */
+func us_strip_utf8_bom(s: string) -> string {
+    if (len_s(s) >= 3 &&
+        char_at_s(s, 0) == (239 as byte) &&
+        char_at_s(s, 1) == (187 as byte) &&
+        char_at_s(s, 2) == (191 as byte)) {
+        return slice_s(s, 3, len_s(s));
+    }
+    return s;
+}

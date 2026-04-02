@@ -1,0 +1,220 @@
+#!/usr/bin/env python3
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+# Copyright (c) 2026 gwz
+#
+
+"""Build the repo-local L1 Stage 1 compiler artifact."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+
+SCRIPTS_ROOT = Path(__file__).resolve().parents[2] / "scripts"
+if str(SCRIPTS_ROOT) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS_ROOT))
+
+from dea_tooling.bootstrap import resolve_bootstrap_compiler
+from dea_tooling.launchers import (
+    render_repo_env_cmd_script,
+    render_repo_env_script,
+    render_repo_native_cmd_wrapper,
+    render_repo_native_wrapper,
+)
+
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+MONOREPO_ROOT = REPO_ROOT.parent
+DEFAULT_L1_BUILD_DIR = "build/l1"
+L1_BUILD_DIR_ENV = "L1_BUILD_DIR"
+L1_BOOTSTRAP_L0C_ENV = "L1_BOOTSTRAP_L0C"
+
+
+@dataclass(frozen=True)
+class L1BuildLayout:
+    """Resolved repo-local L1 build layout paths."""
+
+    repo_root: Path
+    build_dir: Path
+    bin_dir: Path
+    build_relative_from_repo: str
+    repo_relative_from_bin: str
+
+
+def is_windows_host() -> bool:
+    """Return whether the current Python host is Windows."""
+
+    return os.name == "nt"
+
+
+def normalize_l1_build_dir(build_dir_text: str) -> L1BuildLayout:
+    """Return the normalized repo-local L1 build layout."""
+
+    if not build_dir_text.strip():
+        raise ValueError("L1_BUILD_DIR must not be empty")
+
+    raw_path = Path(build_dir_text)
+    build_dir = raw_path.resolve(strict=False) if raw_path.is_absolute() else (REPO_ROOT / raw_path).resolve(strict=False)
+    try:
+        build_dir.relative_to(REPO_ROOT)
+    except ValueError as exc:
+        raise ValueError(f"L1_BUILD_DIR must resolve to a subdirectory inside the L1 repository: {build_dir}") from exc
+    if build_dir == REPO_ROOT:
+        raise ValueError(f"L1_BUILD_DIR must resolve to a subdirectory inside the L1 repository: {build_dir}")
+
+    bin_dir = build_dir / "bin"
+    return L1BuildLayout(
+        repo_root=REPO_ROOT,
+        build_dir=build_dir,
+        bin_dir=bin_dir,
+        build_relative_from_repo=os.path.relpath(build_dir, REPO_ROOT),
+        repo_relative_from_bin=os.path.relpath(REPO_ROOT, bin_dir),
+    )
+
+
+def write_executable(path: Path, text: str) -> None:
+    """Write one UTF-8 executable script."""
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+    path.chmod(path.stat().st_mode | 0o111)
+
+
+def write_relative_alias(path: Path, target_name: str) -> None:
+    """Create one repo-local alias, using a copy on Windows and a symlink elsewhere."""
+
+    if path.exists() or path.is_symlink():
+        path.unlink()
+
+    if is_windows_host():
+        target_path = path.parent / target_name
+        shutil.copy2(target_path, path)
+        cmd_path = path.with_suffix(".cmd")
+        if cmd_path.exists() or cmd_path.is_symlink():
+            cmd_path.unlink()
+        target_cmd = path.parent / f"{target_name}.cmd"
+        if target_cmd.exists():
+            shutil.copy2(target_cmd, cmd_path)
+    else:
+        path.symlink_to(target_name)
+
+
+def write_stage1_wrapper(layout: L1BuildLayout) -> Path:
+    """Write the repo-local L1 Stage 1 wrapper pair."""
+
+    path = layout.bin_dir / "l1c-stage1"
+    write_executable(
+        path,
+        render_repo_native_wrapper(
+            repo_relative_from_bin=layout.repo_relative_from_bin,
+            home_var_name="L1_HOME",
+            native_name="l1c-stage1.native",
+        ),
+    )
+    if is_windows_host():
+        (layout.bin_dir / "l1c-stage1.cmd").write_text(
+            render_repo_native_cmd_wrapper(
+                repo_relative_from_bin=layout.repo_relative_from_bin,
+                home_var_name="L1_HOME",
+                native_name="l1c-stage1.native",
+            ),
+            encoding="utf-8",
+        )
+    return path
+
+
+def write_env_script(layout: L1BuildLayout) -> Path:
+    """Write the repo-local L1 environment script pair."""
+
+    path = layout.bin_dir / "l1-env.sh"
+    write_executable(
+        path,
+        render_repo_env_script(
+            repo_relative_from_bin=layout.repo_relative_from_bin,
+            build_relative_from_repo=layout.build_relative_from_repo,
+            env_script_name="l1-env.sh",
+            env_script_label="l1-env",
+            home_var_name="L1_HOME",
+            compiler_env_var="L1_CC",
+        ),
+    )
+    if is_windows_host():
+        (layout.bin_dir / "l1-env.cmd").write_text(
+            render_repo_env_cmd_script(
+                repo_relative_from_bin=layout.repo_relative_from_bin,
+                env_script_label="l1-env",
+                home_var_name="L1_HOME",
+            ),
+            encoding="utf-8",
+        )
+    return path
+
+
+def build_stage1_artifact(layout: L1BuildLayout, bootstrap_command: list[str], keep_c: bool) -> tuple[Path, Path, Path]:
+    """Build the repo-local L1 Stage 1 compiler artifact."""
+
+    layout.bin_dir.mkdir(parents=True, exist_ok=True)
+
+    native_bin = layout.bin_dir / "l1c-stage1.native"
+    c_output = layout.bin_dir / "l1c-stage1.c"
+
+    build_args = [*bootstrap_command, "--build"]
+    if keep_c:
+        build_args.append("--keep-c")
+    else:
+        c_output.unlink(missing_ok=True)
+    build_args.extend(["-P", "compiler/stage1_l0/src", "-o", str(native_bin), "l1c"])
+
+    build_env = os.environ.copy()
+    build_env["L0_HOME"] = str(MONOREPO_ROOT / "l0" / "compiler")
+    build_env["L0_SYSTEM"] = str(MONOREPO_ROOT / "l0" / "compiler" / "shared" / "l0" / "stdlib")
+    build_env.pop("L0_RUNTIME_INCLUDE", None)
+    build_env.pop("L0_RUNTIME_LIB", None)
+
+    subprocess.run(build_args, cwd=REPO_ROOT, env=build_env, check=True)
+
+    if not keep_c:
+        c_output.unlink(missing_ok=True)
+
+    wrapper_bin = write_stage1_wrapper(layout)
+    write_env_script(layout)
+    native_bin.chmod(native_bin.stat().st_mode | 0o111)
+    write_relative_alias(layout.bin_dir / "l1c", "l1c-stage1")
+    return wrapper_bin, native_bin, c_output
+
+
+def main() -> int:
+    """Program entrypoint."""
+
+    build_dir_text = os.environ.get(L1_BUILD_DIR_ENV, DEFAULT_L1_BUILD_DIR)
+    keep_c = os.environ.get("KEEP_C", "0") == "1"
+
+    try:
+        layout = normalize_l1_build_dir(build_dir_text)
+        _, bootstrap_command = resolve_bootstrap_compiler(
+            override_text=os.environ.get(L1_BOOTSTRAP_L0C_ENV),
+            default_path=MONOREPO_ROOT / "l0" / "build" / "dea" / "bin" / "l0c-stage2",
+            env_var_name=L1_BOOTSTRAP_L0C_ENV,
+            setup_hint="run `make -C l0 use-dev-stage2`",
+        )
+        wrapper_bin, native_bin, c_output = build_stage1_artifact(layout, bootstrap_command, keep_c)
+    except (RuntimeError, ValueError, subprocess.CalledProcessError) as exc:
+        print(f"build-stage1-l1c: {exc}", file=sys.stderr)
+        return 1
+
+    print(f"build-stage1-l1c: wrote {wrapper_bin}")
+    print(f"build-stage1-l1c: wrote {native_bin}")
+    print(f"build-stage1-l1c: wrote {layout.bin_dir / 'l1c'}")
+    print(f"build-stage1-l1c: wrote {layout.bin_dir / 'l1-env.sh'}")
+    if keep_c:
+        print(f"build-stage1-l1c: wrote {c_output}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

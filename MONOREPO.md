@@ -17,10 +17,17 @@ run inside the relevant level directory.
 
 ## Language Levels
 
-| Directory | Description                                                   |
-| --------- | ------------------------------------------------------------- |
-| `l0/`     | Dea/L0 language, compiler, runtime, docs, examples, and tests |
-| `tools/`  | Shared vendor dependencies and monorepo-level tooling         |
+| Directory  | Description                                                   |
+| ---------- | ------------------------------------------------------------- |
+| `l0/`      | Dea/L0 language, compiler, runtime, docs, examples, and tests |
+| `l1/`      | Dea/L1 bootstrap scaffold and compiler seed                   |
+| `scripts/` | Monorepo-owned automation and shared helper modules           |
+| `docs/`    | Dea-wide and monorepo-wide plans and shared documentation     |
+| `tools/`   | Vendored third-party dependencies                             |
+
+Root-level documentation under [`docs/`](docs/) is reserved for Dea-wide and monorepo-wide material such as shared
+plans. Existing user-facing L0 documentation remains under [`l0/`](l0/). Root-owned automation helpers live under
+[`scripts/`](scripts/), while vendored third-party assets remain under [`tools/`](tools/).
 
 ## Release Tags
 
@@ -44,7 +51,7 @@ test, or docs commands.
 - Canonical project overview and quickstart: [`README.md`](README.md)
 - L0 subtree pointer: [`l0/README.md`](l0/README.md)
 - L0 contributor guidance: [`CONTRIBUTING.md`](CONTRIBUTING.md)
-- L0 security policy: [`l0/SECURITY.md`](l0/SECURITY.md)
+- Repository security policy: [`SECURITY.md`](SECURITY.md)
 - L0 AI guidance: [`l0/CLAUDE.md`](l0/CLAUDE.md)
 
 For example:
@@ -57,3 +64,20 @@ make test-all
 ```
 
 Third-party notices for shared vendored assets live at [`THIRD_PARTY_NOTICES`](THIRD_PARTY_NOTICES).
+
+## Working In `l1/`
+
+Dea/L1 currently exists as a bootstrap scaffold inside [`l1/`](l1/). From the monorepo root, `cd l1` before running L1
+bootstrap commands.
+
+- L1 subtree pointer: [`l1/README.md`](l1/README.md)
+- L1 AI guidance: [`l1/CLAUDE.md`](l1/CLAUDE.md)
+
+Typical local bootstrap flow:
+
+```bash
+make venv
+cd l0 && make use-dev-stage2
+cd ../l1
+make build-stage1
+```

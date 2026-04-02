@@ -1,0 +1,206 @@
+/*
+ * SPDX-License-Identifier: MIT OR Apache-2.0
+ * Copyright (c) 2026 gwz
+ */
+
+module name_resolver_test;
+
+import std.io;
+import std.string;
+import std.assert;
+
+import driver;
+import name_resolver;
+import source_paths;
+import util.diag;
+import util.log;
+import symbols;
+
+/**
+ * Returns the root directory for test fixtures.
+ *
+ * @return The semantics fixture directory used by these tests.
+ */
+func fixture_root() -> string {
+    return "compiler/stage1_l0/tests/fixtures/semantics";
+}
+
+/**
+ * Creates and configures source search paths for testing.
+ *
+ * @return Source search paths rooted at the semantics fixtures directory.
+ */
+func make_paths() -> SourceSearchPaths* {
+    let sp = sp_create();
+    sp_add_project_root(sp, fixture_root());
+    return sp;
+}
+
+/**
+ * Checks if a specific diagnostic code is present in the results.
+ *
+ * @param diags The diagnostic collector to inspect.
+ * @param code The diagnostic code to look for.
+ * @return `true` if the diagnostic code is present, otherwise `false`.
+ */
+func has_diag_code(diags: DiagCollector*, code: string) -> bool {
+    for (let i = 0; i < diag_count(diags); i = i + 1) {
+        let d = diag_get(diags, i);
+        if (eq_s(d.code, code)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
+ * Counts diagnostics with one specific code.
+ *
+ * @param diags The diagnostic collector to inspect.
+ * @param code The diagnostic code to count.
+ * @return Number of diagnostics using `code`.
+ */
+func count_diag_code(diags: DiagCollector*, code: string) -> int {
+    let count = 0;
+    for (let i = 0; i < diag_count(diags); i = i + 1) {
+        let d = diag_get(diags, i);
+        if (eq_s(d.code, code)) {
+            count = count + 1;
+        }
+    }
+    return count;
+}
+
+/**
+ * Tests test_name_resolution_ok.
+ */
+func test_name_resolution_ok() {
+    let sp = make_paths();
+    with (let cfg = log_config_create(LL_SILENT, false) => drop cfg,
+          let diags = diag_create() => diag_free(diags)) {
+        let state = driver_analyze_entry(sp, "ok_main", cfg);
+        let names = nr_resolve(state, diags);
+
+        assert(!driver_has_errors(state), "expected no driver errors");
+        assert(diag_count(diags) == 0, "expected no name-resolution diagnostics");
+        assert(nr_env_count(names) == 3, "expected 3 semantic module envs");
+
+        let ok_env = nr_env_find(names, "ok_main");
+        assert(ok_env != null, "expected ok_main env");
+        let env = ok_env as ModuleEnv*;
+
+        assert(nr_module_env_imports_module(env, "shared_types"), "expected shared_types import");
+        assert(nr_module_env_imports_module(env, "shared_more"), "expected shared_more import");
+        assert(nr_module_env_imported(env, "Point") != null, "expected imported struct symbol");
+        assert(nr_module_env_imported(env, "helper_value") != null, "expected imported helper function");
+        assert(nr_module_env_imported(env, "Some") != null, "expected imported enum variant");
+
+        let shared_env = nr_env_find(names, "shared_types");
+        assert(shared_env != null, "expected shared_types env");
+        let some_sym = nr_module_env_local(shared_env as ModuleEnv*, "Some");
+        assert(some_sym != null, "expected enum variant symbol");
+        let sym = some_sym as Symbol*;
+        assert(ord(sym.kind) == ord(SYM_ENUM_VARIANT), "expected enum variant symbol kind");
+        assert(eq_s(sym.owner_name, "OptionInt"), "expected parent enum owner name");
+
+        nr_free(names);
+        driver_state_free(state);
+    }
+    sp_free(sp);
+}
+
+/**
+ * Tests test_ambiguous_import_reports_warning.
+ */
+func test_ambiguous_import_reports_warning() {
+    let sp = make_paths();
+    with (let cfg = log_config_create(LL_SILENT, false) => drop cfg,
+          let diags = diag_create() => diag_free(diags)) {
+        let state = driver_analyze_entry(sp, "amb_main", cfg);
+        let names = nr_resolve(state, diags);
+
+        assert(!driver_has_errors(state), "expected no driver errors");
+        assert(has_diag_code(diags, "RES-0022"), "expected RES-0022 ambiguous import warning");
+
+        let env = nr_env_find(names, "amb_main");
+        assert(env != null, "expected amb_main env");
+        assert(nr_module_env_is_ambiguous(env as ModuleEnv*, "clash"), "expected ambiguous clash symbol");
+        assert(nr_module_env_all(env as ModuleEnv*, "clash") == null, "ambiguous symbol must not be in all-map");
+
+        nr_free(names);
+        driver_state_free(state);
+    }
+    sp_free(sp);
+}
+
+/**
+ * Tests test_duplicate_top_level_reports_error.
+ */
+func test_duplicate_top_level_reports_error() {
+    let sp = make_paths();
+    with (let cfg = log_config_create(LL_SILENT, false) => drop cfg,
+          let diags = diag_create() => diag_free(diags)) {
+        let state = driver_analyze_entry(sp, "dup_main", cfg);
+        let names = nr_resolve(state, diags);
+
+        assert(!driver_has_errors(state), "expected no driver errors");
+        assert(has_diag_code(diags, "RES-0010"), "expected RES-0010 duplicate top-level diagnostic");
+
+        nr_free(names);
+        driver_state_free(state);
+    }
+    sp_free(sp);
+}
+
+/**
+ * Tests test_import_shadow_warning_keeps_qualified_variant_lookup_available.
+ */
+func test_import_shadow_warning_keeps_qualified_variant_lookup_available() {
+    let sp = make_paths();
+    with (let cfg = log_config_create(LL_SILENT, false) => drop cfg,
+          let diags = diag_create() => diag_free(diags)) {
+        let state = driver_analyze_entry(sp, "shadow_warn_main", cfg);
+        let names = nr_resolve(state, diags);
+
+        assert(!driver_has_errors(state), "expected no driver errors");
+        assert(count_diag_code(diags, "RES-0021") == 2, "expected two RES-0021 shadow warnings");
+
+        let saw_uno = false;
+        let saw_due = false;
+        for (let i = 0; i < diag_count(diags); i = i + 1) {
+            let d = diag_get(diags, i);
+            if (!eq_s(d.code, "RES-0021")) {
+                continue;
+            }
+            if (contains_s(d.message, "shadow_warn_uno::Red")) {
+                saw_uno = true;
+            }
+            if (contains_s(d.message, "shadow_warn_due::Red")) {
+                saw_due = true;
+            }
+        }
+        assert(saw_uno, "expected shadow warning for shadow_warn_uno::Red");
+        assert(saw_due, "expected shadow warning for shadow_warn_due::Red");
+
+        let env = nr_env_find(names, "shadow_warn_main");
+        assert(env != null, "expected shadow_warn_main env");
+        assert(nr_module_env_imports_module(env as ModuleEnv*, "shadow_warn_uno"), "expected shadow_warn_uno import");
+        assert(nr_module_env_imports_module(env as ModuleEnv*, "shadow_warn_due"), "expected shadow_warn_due import");
+        assert(nr_module_env_local(env as ModuleEnv*, "Red") != null, "expected local Red symbol to win unqualified lookup");
+
+        nr_free(names);
+        driver_state_free(state);
+    }
+    sp_free(sp);
+}
+
+/**
+ * Main entry point for the module.
+ */
+func main() {
+    test_name_resolution_ok();
+    test_ambiguous_import_reports_warning();
+    test_duplicate_top_level_reports_error();
+    test_import_shadow_warning_keeps_qualified_variant_lookup_available();
+    printl_s("name_resolver_test: all tests passed");
+}

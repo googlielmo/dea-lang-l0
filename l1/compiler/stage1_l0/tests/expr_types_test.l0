@@ -1,0 +1,259 @@
+/*
+ * SPDX-License-Identifier: MIT OR Apache-2.0
+ * Copyright (c) 2026 gwz
+ */
+
+module expr_types_test;
+
+import std.io;
+import std.string;
+import std.assert;
+import std.vector;
+
+import analysis;
+import sem_context;
+import source_paths;
+import util.log;
+
+/**
+ * Returns the root directory for test fixtures.
+ *
+ * @return The typing fixture directory used by these tests.
+ */
+func fixture_root() -> string {
+    return "compiler/stage1_l0/tests/fixtures/typing";
+}
+
+/**
+ * Creates and configures source search paths for testing.
+ *
+ * @return Source search paths rooted at the typing fixtures directory.
+ */
+func make_paths() -> SourceSearchPaths* {
+    let sp = sp_create();
+    sp_add_project_root(sp, fixture_root());
+    return sp;
+}
+
+/**
+ * Checks if a specific diagnostic code is present in the results.
+ *
+ * @param result The analysis result to inspect.
+ * @param code The diagnostic code to look for.
+ * @return `true` if the diagnostic code is present, otherwise `false`.
+ */
+func has_diag_code(result: AnalysisResult*, code: string) -> bool {
+    for (let i = 0; i < analysis_diag_count(result); i = i + 1) {
+        let d = analysis_diag_get(result, i);
+        if (eq_s(d.code, code)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
+ * Counts diagnostics with one specific code.
+ *
+ * @param result The analysis result to inspect.
+ * @param code The diagnostic code to count.
+ * @return Number of diagnostics using `code`.
+ */
+func count_diag_code(result: AnalysisResult*, code: string) -> int {
+    let count = 0;
+    for (let i = 0; i < analysis_diag_count(result); i = i + 1) {
+        let d = analysis_diag_get(result, i);
+        if (eq_s(d.code, code)) {
+            count = count + 1;
+        }
+    }
+    return count;
+}
+
+/**
+ * Tests test_typing_ok.
+ */
+func test_typing_ok() {
+    let sp = make_paths();
+    with (let cfg = log_config_create(LL_SILENT, false) => drop cfg) {
+        let result = analysis_analyze_entry(sp, "typing_ok", cfg);
+        assert(!analysis_has_errors(result), "expected no typing errors for typing_ok");
+        analysis_result_free(result);
+    }
+    sp_free(sp);
+}
+
+/**
+ * Tests test_typing_err.
+ */
+func test_typing_err() {
+    let sp = make_paths();
+    with (let cfg = log_config_create(LL_SILENT, false) => drop cfg) {
+        let result = analysis_analyze_entry(sp, "typing_err", cfg);
+        assert(analysis_has_errors(result), "expected typing errors for typing_err");
+        
+        assert(has_diag_code(result, "TYP-0310"), "expected binary mismatch error");
+        assert(has_diag_code(result, "TYP-0311"), "expected assign mismatch error");
+        assert(has_diag_code(result, "TYP-0189"), "expected unknown identifier error");
+        assert(has_diag_code(result, "TYP-0340"), "expected struct field error");
+        assert(has_diag_code(result, "TYP-0330"), "expected call args count error");
+        assert(has_diag_code(result, "TYP-0315"), "expected return type mismatch error");
+        assert(has_diag_code(result, "TYP-0313"), "expected if condition error");
+        
+        analysis_result_free(result);
+    }
+    sp_free(sp);
+}
+
+/**
+ * Tests bare `return;` in a non-void function.
+ */
+func test_return_void_in_non_void() {
+    let sp = make_paths();
+    with (let cfg = log_config_create(LL_SILENT, false) => drop cfg) {
+        let result = analysis_analyze_entry(sp, "typing_return_void_in_non_void", cfg);
+        assert(analysis_has_errors(result), "expected typing errors for typing_return_void_in_non_void");
+        assert(has_diag_code(result, "TYP-0315"), "expected return type mismatch error for bare return");
+        analysis_result_free(result);
+    }
+    sp_free(sp);
+}
+
+/**
+ * Tests that an invalid return expression does not add a secondary mismatch.
+ */
+func test_return_invalid_expr() {
+    let sp = make_paths();
+    with (let cfg = log_config_create(LL_SILENT, false) => drop cfg) {
+        let result = analysis_analyze_entry(sp, "typing_return_invalid_expr", cfg);
+        assert(analysis_has_errors(result), "expected typing errors for typing_return_invalid_expr");
+        assert(has_diag_code(result, "TYP-0189"), "expected missing identifier error");
+        assert(!has_diag_code(result, "TYP-0315"), "did not expect return type mismatch on invalid return expr");
+        analysis_result_free(result);
+    }
+    sp_free(sp);
+}
+
+/**
+ * Tests successful typing for postfix try expressions.
+ */
+func test_typing_try_ok() {
+    let sp = make_paths();
+    with (let cfg = log_config_create(LL_SILENT, false) => drop cfg) {
+        let result = analysis_analyze_entry(sp, "typing_try_ok", cfg);
+        assert(!analysis_has_errors(result), "expected no typing errors for typing_try_ok");
+        analysis_result_free(result);
+    }
+    sp_free(sp);
+}
+
+/**
+ * Tests postfix try diagnostics.
+ */
+func test_typing_try_err() {
+    let sp = make_paths();
+    with (let cfg = log_config_create(LL_SILENT, false) => drop cfg) {
+        let non_nullable = analysis_analyze_entry(sp, "typing_try_non_nullable", cfg);
+        assert(analysis_has_errors(non_nullable), "expected typing errors for typing_try_non_nullable");
+        assert(has_diag_code(non_nullable, "TYP-0250"), "expected non-nullable try error");
+        analysis_result_free(non_nullable);
+
+        let bad_return = analysis_analyze_entry(sp, "typing_try_bad_return", cfg);
+        assert(analysis_has_errors(bad_return), "expected typing errors for typing_try_bad_return");
+        assert(has_diag_code(bad_return, "TYP-0251"), "expected nullable return type error");
+        analysis_result_free(bad_return);
+    }
+    sp_free(sp);
+}
+
+/**
+ * Tests unsupported equality diagnostics for strings.
+ */
+func test_typing_equality_unsupported() {
+    let sp = make_paths();
+    with (let cfg = log_config_create(LL_SILENT, false) => drop cfg) {
+        let result = analysis_analyze_entry(sp, "typing_equality_unsupported", cfg);
+        assert(analysis_has_errors(result), "expected typing errors for typing_equality_unsupported");
+        assert(count_diag_code(result, "TYP-0173") == 2, "expected both string equality operators to report TYP-0173");
+        analysis_result_free(result);
+    }
+    sp_free(sp);
+}
+
+/**
+ * Tests successful typing for `new` parity cases.
+ */
+func test_typing_new_ok() {
+    let sp = make_paths();
+    with (let cfg = log_config_create(LL_SILENT, false) => drop cfg) {
+        let result = analysis_analyze_entry(sp, "typing_new_ok", cfg);
+        assert(!analysis_has_errors(result), "expected no typing errors for typing_new_ok");
+        analysis_result_free(result);
+    }
+    sp_free(sp);
+}
+
+/**
+ * Tests `new` diagnostics for invalid construction cases.
+ */
+func test_typing_new_err() {
+    let sp = make_paths();
+    with (let cfg = log_config_create(LL_SILENT, false) => drop cfg) {
+        let result = analysis_analyze_entry(sp, "typing_new_err", cfg);
+        assert(analysis_has_errors(result), "expected typing errors for typing_new_err");
+        assert(has_diag_code(result, "TYP-0281"), "expected enum-allocation-without-variant error");
+        assert(has_diag_code(result, "TYP-0283"), "expected struct new arity error");
+        assert(has_diag_code(result, "TYP-0333"), "expected enum variant payload type mismatch error");
+        assert(!has_diag_code(result, "SIG-0010"), "new variant should not be treated as a type name");
+        analysis_result_free(result);
+    }
+    sp_free(sp);
+}
+
+/**
+ * Tests `drop` diagnostics for invalid local uses.
+ */
+func test_typing_drop_err() {
+    let sp = make_paths();
+    with (let cfg = log_config_create(LL_SILENT, false) => drop cfg) {
+        let result = analysis_analyze_entry(sp, "typing_drop_err", cfg);
+        assert(analysis_has_errors(result), "expected typing errors for typing_drop_err");
+        assert(has_diag_code(result, "TYP-0060"), "expected unknown-variable drop error");
+        assert(has_diag_code(result, "TYP-0061"), "expected non-pointer drop error");
+        analysis_result_free(result);
+    }
+    sp_free(sp);
+}
+
+/**
+ * Tests `drop` flow diagnostics for second drop and later use.
+ */
+func test_typing_drop_flow_err() {
+    let sp = make_paths();
+    with (let cfg = log_config_create(LL_SILENT, false) => drop cfg) {
+        let result = analysis_analyze_entry(sp, "typing_drop_flow_err", cfg);
+        assert(analysis_has_errors(result), "expected typing errors for typing_drop_flow_err");
+        assert(has_diag_code(result, "TYP-0062"), "expected second-drop diagnostic");
+        assert(has_diag_code(result, "TYP-0150"), "expected use-after-drop diagnostic");
+        analysis_result_free(result);
+    }
+    sp_free(sp);
+}
+
+/**
+ * Main entry point for the module.
+ */
+func main() {
+    test_typing_ok();
+    test_typing_err();
+    test_return_void_in_non_void();
+    test_return_invalid_expr();
+    test_typing_try_ok();
+    test_typing_try_err();
+    test_typing_equality_unsupported();
+    test_typing_new_ok();
+    test_typing_new_err();
+    test_typing_drop_err();
+    test_typing_drop_flow_err();
+    printl_s("expr_types_test: all tests passed");
+}

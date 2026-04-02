@@ -1,0 +1,397 @@
+/*
+ * SPDX-License-Identifier: MIT OR Apache-2.0
+ * Copyright (c) 2026 gwz
+ */
+
+module driver;
+
+import sys.rt;
+
+import std.fs;
+import std.string;
+import std.text;
+import std.vector;
+import util.diag;
+
+import util.strings;
+import util.log;
+import source_paths;
+import lexer;
+import parser;
+import tokens;
+import ast;
+
+/**
+ * Represents the DriverUnit structure.
+ */
+struct DriverUnit {
+    module_name: string;
+    path: string;
+    parse_result: ParseResult*;
+}
+
+/**
+ * Represents the DriverState structure.
+ */
+struct DriverState {
+    entry_module: string;
+    units: VectorBase*; // DriverUnit*
+    loaded: VectorString*; // used during analysis, inert afterward
+    diags: DiagCollector*;
+    source_names: VectorString*; // source cache: file paths
+    source_texts: VectorString*; // source cache: file contents
+}
+
+/**
+ * Free a loaded driver unit and its parse result.
+ *
+ * @param self Driver unit to free.
+ */
+func dr_unit_free(self: DriverUnit*) {
+    parse_result_free(self.parse_result);
+    drop self;
+}
+
+/**
+ * Free an optional vector of driver units.
+ *
+ * @param units Optional driver-unit vector to free.
+ */
+func dr_units_free(units: VectorBase*?) {
+    if (units == null) {
+        return;
+    }
+
+    let v = units as VectorBase*;
+    for (let i = 0; i < vec_size(v); i = i + 1) {
+        let unit = ptr_vec_get(v, i) as DriverUnit*;
+        dr_unit_free(unit);
+    }
+    vec_free(v);
+}
+
+/**
+ * Free driver state and all owned parse/cache data.
+ *
+ * @param self Driver state to free.
+ */
+func driver_state_free(self: DriverState*) {
+    dr_units_free(self.units);
+    vs_free(self.loaded);
+    diag_free(self.diags);
+    vs_free(self.source_names);
+    vs_free(self.source_texts);
+    drop self;
+}
+
+/**
+ * Report whether driver analysis produced any errors.
+ *
+ * @param self Driver state to inspect.
+ * @return `true` if the driver's diagnostics contain an error.
+ */
+func driver_has_errors(self: DriverState*) -> bool {
+    return diag_has_errors(self.diags);
+}
+
+/**
+ * Return the number of diagnostics collected by the driver.
+ *
+ * @param self Driver state to inspect.
+ * @return Total diagnostic count.
+ */
+func driver_diag_count(self: DriverState*) -> int {
+    return diag_count(self.diags);
+}
+
+/**
+ * Return a driver diagnostic by index.
+ *
+ * @param self Driver state to inspect.
+ * @param index Zero-based diagnostic index.
+ * @return Diagnostic at `index`.
+ */
+func driver_diag_get(self: DriverState*, index: int) -> Diagnostic* {
+    return diag_get(self.diags, index);
+}
+
+/**
+ * Return the number of loaded driver units.
+ *
+ * @param self Driver state to inspect.
+ * @return Loaded module count.
+ */
+func driver_unit_count(self: DriverState*) -> int {
+    return vec_size(self.units);
+}
+
+/**
+ * Return a loaded driver unit by index.
+ *
+ * @param self Driver state to inspect.
+ * @param index Zero-based unit index.
+ * @return Driver unit at `index`.
+ */
+func driver_unit_get(self: DriverState*, index: int) -> DriverUnit* {
+    return ptr_vec_get(self.units, index) as DriverUnit*;
+}
+
+/**
+ * Find a loaded driver unit by module name.
+ *
+ * @param self Driver state to inspect.
+ * @param module_name Module name to search for.
+ * @return Matching driver unit, or `null` if not loaded.
+ */
+func driver_find_unit(self: DriverState*, module_name: string) -> DriverUnit*? {
+    for (let i = 0; i < vec_size(self.units); i = i + 1) {
+        let unit = ptr_vec_get(self.units, i) as DriverUnit*;
+        if (eq_s(unit.module_name, module_name)) {
+            return unit;
+        }
+    }
+    return null;
+}
+
+/**
+ * Return loaded module names in sorted order.
+ *
+ * @param self Driver state to inspect.
+ * @return New vector containing sorted module names.
+ */
+func driver_module_names_sorted(self: DriverState*) -> VectorString* {
+    let out = vs_create(vec_size(self.units));
+    for (let i = 0; i < vec_size(self.units); i = i + 1) {
+        let unit = ptr_vec_get(self.units, i) as DriverUnit*;
+        vs_push(out, unit.module_name);
+    }
+    vs_sort(out);
+    return out;
+}
+
+/**
+ * Copy parse diagnostics into the driver collector.
+ *
+ * @param dst Destination diagnostic collector.
+ * @param pr Parse result providing diagnostics.
+ */
+func dr_copy_parse_diags(dst: DiagCollector*, pr: ParseResult*) {
+    for (let i = 0; i < parse_diag_count(pr); i = i + 1) {
+        diag_copy(dst, parse_diag_get(pr, i));
+    }
+}
+
+/**
+ * Emit a driver diagnostic without a precise source span.
+ *
+ * @param diags Diagnostic collector.
+ * @param code Diagnostic code.
+ * @param message Diagnostic message.
+ * @param filename Filename to attach when known.
+ */
+func dr_emit_error(diags: DiagCollector*, code: string, message: string, filename: string) {
+    diag_error(diags, "Driver", code, message, filename, 0, 0, 0, 0);
+}
+
+/**
+ * Check whether a string vector contains a module name.
+ *
+ * @param items Vector to search.
+ * @param module_name Module name to look for.
+ * @return `true` if `module_name` is present in `items`.
+ */
+func dr_vs_has(items: VectorString*, module_name: string) -> bool {
+    for (let i = 0; i < vs_size(items); i = i + 1) {
+        if (eq_s(vs_get(items, i), module_name)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
+ * Mark a module as loaded if it is not already recorded.
+ *
+ * @param loaded Vector of loaded module names.
+ * @param module_name Module name to record.
+ */
+func dr_mark_loaded(loaded: VectorString*, module_name: string) {
+    if (!dr_vs_has(loaded, module_name)) {
+        vs_push(loaded, module_name);
+    }
+}
+
+/**
+ * Lex and parse one module source file while emitting Stage 1-style debug logs.
+ *
+ * @param path Source path being processed.
+ * @param source Source text to lex and parse.
+ * @param cfg Logging configuration.
+ * @return Parse result for the module.
+ */
+func dr_parse_source(path: string, source: string, cfg: LogConfig*) -> ParseResult* {
+    log_debug(cfg, concat_s("Lexing ", path));
+    let ls = ls_create(source, path);
+    let toks = tokenize(ls);
+    if (toks == null) {
+        return parse_lex_error_result(ls, path);
+    }
+
+    let tv = toks as TokenVector;
+    log_debug(cfg, concat4_s("Lexed ", int_to_string(tv_len(tv)), " token(s) from ", path));
+    log_debug(cfg, concat_s("Parsing ", path));
+    let pr = parse_module_tokens_owned(tv, path);
+    ls_free(ls);
+
+    if (pr.root_module != null) {
+        let mod = pr.root_module as Module*;
+        log_debug(cfg, concat4_s("Parsed module '", mod.name, "' from ", path));
+    }
+
+    return pr;
+}
+
+/**
+ * Revisit the loaded module closure to mirror Stage 1 cache-hit logging.
+ *
+ * @param state Driver state containing loaded modules.
+ * @param search_paths Source search paths used for lookups.
+ * @param module_name Current module name.
+ * @param visited Module names already traversed by this closure walk.
+ * @param cfg Logging configuration.
+ */
+func dr_visit_closure(state: DriverState*, search_paths: SourceSearchPaths*, module_name: string, visited: VectorString*,
+                      cfg: LogConfig*) {
+    let unit_opt = driver_find_unit(state, module_name);
+    if (unit_opt == null) {
+        return;
+    }
+
+    if (dr_vs_has(visited, module_name)) {
+        return;
+    }
+    vs_push(visited, module_name);
+
+    let unit = unit_opt as DriverUnit*;
+    if (unit.parse_result.root_module == null) {
+        return;
+    }
+
+    let mod = unit.parse_result.root_module as Module*;
+    for (let i = 0; i < vec_size(mod.imports); i = i + 1) {
+        let imp = ptr_vec_get(mod.imports, i) as Import*;
+        dr_load_module(state, search_paths, "|", imp.name, cfg);
+        dr_visit_closure(state, search_paths, imp.name, visited, cfg);
+    }
+}
+
+/**
+ * Load one module and its import closure into the driver state.
+ *
+ * @param state Driver state that caches loaded modules and diagnostics.
+ * @param search_paths Source search paths used to resolve module names.
+ * @param loading_chain Import chain encoded with `|name|` sentinels for cycle detection.
+ * @param module_name Module name to load.
+ * @param cfg Logging configuration.
+ * @return `true` if the module was loaded successfully or was already cached.
+ */
+func dr_load_module(state: DriverState*, search_paths: SourceSearchPaths*, loading_chain: string,
+                    module_name: string, cfg: LogConfig*) -> bool {
+    if (dr_vs_has(state.loaded, module_name)) {
+        log_debug(cfg, concat3_s("Module '", module_name, "' already loaded (cache hit)"));
+        return true;
+    }
+
+    log_debug(cfg, concat3_s("Loading module '", module_name, "'"));
+
+    let cycle_token = concat3_s("|", module_name, "|");
+    if (contains_s(loading_chain, cycle_token)) {
+        dr_emit_error(state.diags, "DRV-0030", concat3_s("Cyclic import detected involving '", module_name, "'"), "");
+        return false;
+    }
+
+    let next_loading_chain = concat3_s(loading_chain, module_name, "|");
+    let ok = true;
+
+    let path_opt = sp_resolve(search_paths, module_name);
+    if (path_opt == null) {
+        dr_emit_error(state.diags, "DRV-0010", concat3_s("Module '", module_name, "' not found in system_roots or project_roots"), "");
+        ok = false;
+    } else {
+        let path = path_opt as string;
+        log_debug(cfg, concat4_s("Resolved '", module_name, "' to ", path));
+
+        let source_opt = read_file(path);
+        if (source_opt == null) {
+            dr_emit_error(state.diags, "DRV-0011", concat_s("cannot read source file: ", path), path);
+            ok = false;
+        } else {
+            let source_raw = source_opt as string;
+            let source = us_strip_utf8_bom(source_raw);
+
+            vs_push(state.source_names, path);
+            vs_push(state.source_texts, source);
+
+            let pr = dr_parse_source(path, source, cfg);
+
+            let unit = new DriverUnit(module_name, path, pr);
+            ptr_vec_push(state.units, unit as void*);
+
+            dr_copy_parse_diags(state.diags, pr);
+
+            if (pr.root_module == null) {
+                ok = false;
+            } else {
+                let mod = pr.root_module as Module*;
+                if (!eq_s(mod.name, module_name)) {
+                    let msg = concat4_s("module name mismatch: file ", path, " declares '", mod.name);
+                    dr_emit_error(state.diags, "DRV-0020", concat4_s(msg, "' but was loaded as '", module_name, "'"), path);
+                    ok = false;
+                } else {
+                    for (let i = 0; i < vec_size(mod.imports); i = i + 1) {
+                        let imp = ptr_vec_get(mod.imports, i) as Import*;
+                        let child_ok = dr_load_module(state, search_paths, next_loading_chain, imp.name, cfg);
+                        if (!child_ok) {
+                            ok = false;
+                        }
+                    }
+                }
+            }
+
+            if (parse_has_errors(pr)) {
+                ok = false;
+            }
+        }
+    }
+
+    dr_mark_loaded(state.loaded, module_name);
+    return ok;
+}
+
+/**
+ * Load and parse an entry module and its imports.
+ *
+ * @param search_paths Source search paths used for module resolution.
+ * @param entry_module Entry module name.
+ * @param cfg Logging configuration.
+ * @return Driver state containing parsed modules, caches, and diagnostics.
+ */
+func driver_analyze_entry(search_paths: SourceSearchPaths*, entry_module: string, cfg: LogConfig*) -> DriverState* {
+    log_info(cfg, concat3_s("Starting analysis for entry module '", entry_module, "'"));
+    log_stage(cfg, "Building compilation unit", entry_module);
+    let state = new DriverState(
+        entry_module, ptr_vec_create(8), vs_create(8),
+        diag_create(), vs_create(4), vs_create(4)
+    );
+    dr_load_module(state, search_paths, "|", entry_module, cfg);
+    if (!driver_has_errors(state)) {
+        with (let visited = vs_create(driver_unit_count(state)) => vs_free(visited)) {
+            dr_visit_closure(state, search_paths, entry_module, visited, cfg);
+        }
+        with (let names = driver_module_names_sorted(state) => vs_free(names)) {
+            log_debug(cfg, concat4_s("Compilation unit contains ", int_to_string(vs_size(names)),
+                " module(s): ", join_s(names, ", ")));
+        }
+    }
+    return state;
+}

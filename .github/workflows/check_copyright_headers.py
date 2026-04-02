@@ -17,6 +17,7 @@ MAX_SCAN_LINES = 80
 EXCLUDED_PREFIXES = (
     "tools/",
     "l0/compiler/stage2_l0/tests/fixtures/backend_golden/",
+    "l1/compiler/stage1_l0/tests/fixtures/backend_golden/",
 )
 
 

@@ -22,6 +22,23 @@ import subprocess
 import sys
 import tempfile
 
+SCRIPTS_ROOT = Path(__file__).resolve().parents[2] / "scripts"
+if str(SCRIPTS_ROOT) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS_ROOT))
+
+from dea_tooling.launchers import (
+    render_prefix_env_cmd_script as shared_render_prefix_env_cmd_script,
+    render_prefix_env_script as shared_render_prefix_env_script,
+    render_prefix_native_cmd_wrapper as shared_render_prefix_native_cmd_wrapper,
+    render_prefix_native_wrapper as shared_render_prefix_native_wrapper,
+    render_repo_env_cmd_script as shared_render_repo_env_cmd_script,
+    render_repo_env_script as shared_render_repo_env_script,
+    render_repo_native_cmd_wrapper as shared_render_repo_native_cmd_wrapper,
+    render_repo_native_wrapper as shared_render_repo_native_wrapper,
+    render_repo_python_stage1_cmd_wrapper as shared_render_repo_python_stage1_cmd_wrapper,
+    render_repo_python_stage1_wrapper as shared_render_repo_python_stage1_wrapper,
+)
+
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
@@ -594,73 +611,31 @@ def copy_file(source: Path, destination: Path) -> None:
 def render_stage1_wrapper(layout: DeaBuildLayout) -> str:
     """Return the repo-relative Stage 1 launcher."""
 
-    return f"""#!/bin/sh
-set -eu
-
-script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)
-repo_root=$(CDPATH= cd -- "${{script_dir}}/{layout.repo_relative_from_bin}" && pwd -P)
-monorepo_root=$(CDPATH= cd -- "${{repo_root}}/.." && pwd -P)
-
-export L0_HOME="${{repo_root}}/compiler"
-
-python_bin="${{PYTHON:-}}"
-if [ -z "${{python_bin}}" ] && [ -x "${{monorepo_root}}/.venv/bin/python" ]; then
-    python_bin="${{monorepo_root}}/.venv/bin/python"
-fi
-if [ -z "${{python_bin}}" ] && [ -x "${{monorepo_root}}/.venv/Scripts/python.exe" ]; then
-    python_bin="${{monorepo_root}}/.venv/Scripts/python.exe"
-fi
-if [ -z "${{python_bin}}" ]; then
-    if command -v python3 >/dev/null 2>&1; then
-        python_bin="python3"
-    else
-        python_bin="python"
-    fi
-fi
-
-exec "${{python_bin}}" "${{repo_root}}/compiler/stage1_py/l0c.py" "$@"
-"""
+    return shared_render_repo_python_stage1_wrapper(
+        repo_relative_from_bin=layout.repo_relative_from_bin,
+        home_var_name="L0_HOME",
+        source_entry_relpath="compiler/stage1_py/l0c.py",
+    )
 
 
 def render_stage1_cmd_wrapper(layout: DeaBuildLayout) -> str:
     """Return the repo-local Windows batch Stage 1 launcher."""
 
-    bat_rel = layout.repo_relative_from_bin.replace("/", "\\")
-    return f"""@echo off
-setlocal
-
-set "SCRIPT_DIR=%~dp0"
-set "SCRIPT_DIR=%SCRIPT_DIR:~0,-1%"
-for %%I in ("%SCRIPT_DIR%\\{bat_rel}") do set "REPO_ROOT=%%~fI"
-for %%I in ("%REPO_ROOT%\\..") do set "MONOREPO_ROOT=%%~fI"
-set "PYTHON_BIN=%PYTHON%"
-
-if not defined PYTHON_BIN if exist "%MONOREPO_ROOT%\\.venv\\Scripts\\python.exe" set "PYTHON_BIN=%MONOREPO_ROOT%\\.venv\\Scripts\\python.exe"
-if not defined PYTHON_BIN if exist "%MONOREPO_ROOT%\\.venv\\bin\\python.exe" set "PYTHON_BIN=%MONOREPO_ROOT%\\.venv\\bin\\python.exe"
-if not defined PYTHON_BIN if exist "%MONOREPO_ROOT%\\.venv\\bin\\python" set "PYTHON_BIN=%MONOREPO_ROOT%\\.venv\\bin\\python"
-if not defined PYTHON_BIN set "PYTHON_BIN=python"
-
-set "L0_HOME=%REPO_ROOT%\\compiler"
-
-"%PYTHON_BIN%" "%REPO_ROOT%\\compiler\\stage1_py\\l0c.py" %*
-set "EXITCODE=%ERRORLEVEL%"
-endlocal & exit /b %EXITCODE%
-"""
+    return shared_render_repo_python_stage1_cmd_wrapper(
+        repo_relative_from_bin=layout.repo_relative_from_bin,
+        home_var_name="L0_HOME",
+        source_entry_relpath="compiler/stage1_py/l0c.py",
+    )
 
 
 def render_stage2_wrapper(layout: DeaBuildLayout) -> str:
     """Return the repo-relative Stage 2 launcher."""
 
-    return f"""#!/bin/sh
-set -eu
-
-script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)
-repo_root=$(CDPATH= cd -- "${{script_dir}}/{layout.repo_relative_from_bin}" && pwd -P)
-
-export L0_HOME="${{repo_root}}/compiler"
-
-exec "${{script_dir}}/l0c-stage2.native" "$@"
-"""
+    return shared_render_repo_native_wrapper(
+        repo_relative_from_bin=layout.repo_relative_from_bin,
+        home_var_name="L0_HOME",
+        native_name="l0c-stage2.native",
+    )
 
 
 def render_stage2_cmd_wrapper(
@@ -668,15 +643,11 @@ def render_stage2_cmd_wrapper(
 ) -> str:
     """Return the repo-local Windows batch Stage 2 launcher."""
 
-    # Convert POSIX-style relative path (../../..) to batch-style (..\..\..)
-    bat_rel = layout.repo_relative_from_bin.replace("/", "\\")
-    return f"""@echo off
-set "SCRIPT_DIR=%~dp0"
-set "SCRIPT_DIR=%SCRIPT_DIR:~0,-1%"
-for %%I in ("%SCRIPT_DIR%\\{bat_rel}") do set "REPO_ROOT=%%~fI"
-set "L0_HOME=%REPO_ROOT%\\compiler"
-"%SCRIPT_DIR%\\{native_name}" %*
-"""
+    return shared_render_repo_native_cmd_wrapper(
+        repo_relative_from_bin=layout.repo_relative_from_bin,
+        home_var_name="L0_HOME",
+        native_name=native_name,
+    )
 
 
 def render_prefix_stage2_cmd_wrapper(
@@ -684,208 +655,61 @@ def render_prefix_stage2_cmd_wrapper(
 ) -> str:
     """Return the prefix-install Windows batch Stage 2 launcher."""
 
-    return f"""@echo off
-set "SCRIPT_DIR=%~dp0"
-set "SCRIPT_DIR=%SCRIPT_DIR:~0,-1%"
-for %%I in ("%SCRIPT_DIR%\\..") do set "PREFIX_ROOT=%%~fI"
-if "%L0_HOME%"=="" set "L0_HOME=%PREFIX_ROOT%"
-"%SCRIPT_DIR%\\{native_name}" %*
-"""
+    return shared_render_prefix_native_cmd_wrapper(
+        home_var_name="L0_HOME",
+        native_name=native_name,
+    )
 
 
 def render_env_script(layout: DeaBuildLayout) -> str:
     """Return the repo-relative sourceable environment script."""
 
-    return f"""#!/usr/bin/env bash
-#
-# SPDX-License-Identifier: MIT OR Apache-2.0
-# Copyright (c) 2026 gwz
-#
-
-script_src="${{BASH_SOURCE[0]-}}"
-if [[ -z "${{script_src}}" && -n "${{ZSH_VERSION-}}" ]]; then
-    script_src="${{(%):-%x}}"
-    if [[ -z "${{script_src}}" ]]; then
-        script_src="${{(%):-%N}}"
-    fi
-fi
-
-sourced=0
-if [[ -n "${{BASH_VERSION-}}" && "${{BASH_SOURCE[0]-}}" != "${{0}}" ]]; then
-    sourced=1
-fi
-if [[ "${{sourced}}" -eq 0 && -n "${{ZSH_VERSION-}}" && "${{ZSH_EVAL_CONTEXT-}}" == *:file ]]; then
-    sourced=1
-fi
-
-if [[ -z "${{script_src}}" || "${{sourced}}" -eq 0 ]]; then
-    echo "This script must be sourced: source {layout.dea_build_relative_from_repo}/bin/l0-env.sh" >&2
-    return 1 2>/dev/null || exit 1
-fi
-
-SCRIPT_DIR="$(cd -- "$(dirname -- "${{script_src}}")" && pwd -P)"
-REPO_ROOT="$(cd -- "${{SCRIPT_DIR}}/{layout.repo_relative_from_bin}" && pwd -P)"
-MONOREPO_ROOT="$(cd -- "${{REPO_ROOT}}/.." && pwd -P)"
-export L0_HOME="${{REPO_ROOT}}/compiler"
-
-if [[ -f "${{MONOREPO_ROOT}}/.venv/bin/activate" ]]; then
-    # shellcheck source=/dev/null
-    . "${{MONOREPO_ROOT}}/.venv/bin/activate"
-fi
-
-case ":${{PATH}}:" in
-    *":${{SCRIPT_DIR}}:"*) ;;
-    *) export PATH="${{SCRIPT_DIR}}${{PATH:+:${{PATH}}}}" ;;
-esac
-
-hash -r 2>/dev/null || true
-
-# To pin down a specific C compiler, set the L0_CC environment variable here. For example:
-#export L0_CC="clang"
-"""
-
-# Batch block appended to l0-env.cmd on Windows to put the MSYS2 mingw64\bin
-# directory on PATH.  This makes GCC/Clang and their support DLLs visible to
-# l0c from a plain cmd.exe session.  Probe order: MSYS2_ROOT env var, Windows
-# registry (HKCU then HKLM), default C:\msys64 path.
-_MINGW_PROBE_CMD = r"""
-rem -- Put MSYS2 mingw64\bin on PATH (compiler + DLLs) for --build and --run.
-set "_MINGW_BIN="
-if defined MSYS2_ROOT if exist "%MSYS2_ROOT%\mingw64\bin\" set "_MINGW_BIN=%MSYS2_ROOT%\mingw64\bin"
-if defined _MINGW_BIN goto :_mingw_set
-for /f "tokens=2*" %%A in ('reg query "HKCU\Software\MSYS2" /v "InstallDir" 2^>nul') do (
-    if exist "%%B\mingw64\bin\" set "_MINGW_BIN=%%B\mingw64\bin"
-)
-if defined _MINGW_BIN goto :_mingw_set
-for /f "tokens=2*" %%A in ('reg query "HKLM\Software\MSYS2" /v "InstallDir" 2^>nul') do (
-    if exist "%%B\mingw64\bin\" set "_MINGW_BIN=%%B\mingw64\bin"
-)
-if defined _MINGW_BIN goto :_mingw_set
-if exist "C:\msys64\mingw64\bin\" set "_MINGW_BIN=C:\msys64\mingw64\bin"
-if defined _MINGW_BIN goto :_mingw_set
-echo [l0-env] warning: MSYS2 mingw64 not found. Set MSYS2_ROOT or add mingw64\bin to PATH. 1>&2
-goto :_mingw_done
-:_mingw_set
-set "PATH_PADDED=;%PATH%;"
-if /I not "%PATH_PADDED%"=="%PATH_PADDED:;%_MINGW_BIN%;=%" goto :_mingw_done
-set "PATH=%_MINGW_BIN%;%PATH%"
-:_mingw_done
-set "_MINGW_BIN="
-set "PATH_PADDED="
-"""
+    return shared_render_repo_env_script(
+        repo_relative_from_bin=layout.repo_relative_from_bin,
+        build_relative_from_repo=layout.dea_build_relative_from_repo,
+        env_script_name="l0-env.sh",
+        env_script_label="l0-env",
+        home_var_name="L0_HOME",
+        compiler_env_var="L0_CC",
+    )
 
 
 def render_env_cmd_script(layout: DeaBuildLayout) -> str:
     """Return the repo-local Windows activation script."""
 
-    bat_rel = layout.repo_relative_from_bin.replace("/", "\\")
-    return f"""@echo off
-set "SCRIPT_DIR=%~dp0"
-set "SCRIPT_DIR=%SCRIPT_DIR:~0,-1%"
-for %%I in ("%SCRIPT_DIR%\\{bat_rel}") do set "REPO_ROOT=%%~fI"
-set "L0_HOME=%REPO_ROOT%\\compiler"
-set "PATH_PADDED=;%PATH%;"
-if /I "%PATH_PADDED%"=="%PATH_PADDED:;%SCRIPT_DIR%;=%" (
-    if defined PATH (
-        set "PATH=%SCRIPT_DIR%;%PATH%"
-    ) else (
-        set "PATH=%SCRIPT_DIR%"
+    return shared_render_repo_env_cmd_script(
+        repo_relative_from_bin=layout.repo_relative_from_bin,
+        env_script_label="l0-env",
+        home_var_name="L0_HOME",
     )
-)
-set "PATH_PADDED="
-{_MINGW_PROBE_CMD}"""
 
 
 def render_prefix_stage2_wrapper() -> str:
     """Return the prefix-relative Stage 2 launcher."""
 
-    return """#!/bin/sh
-set -eu
-
-script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)
-prefix_root=$(CDPATH= cd -- "${script_dir}/.." && pwd -P)
-
-if [ -z "${L0_HOME:-}" ]; then
-    export L0_HOME="${prefix_root}"
-fi
-
-exec "${script_dir}/l0c-stage2.native" "$@"
-"""
+    return shared_render_prefix_native_wrapper(
+        home_var_name="L0_HOME",
+        native_name="l0c-stage2.native",
+    )
 
 
 def render_prefix_env_script() -> str:
     """Return the prefix-relative sourceable environment script."""
 
-    return """#!/usr/bin/env bash
-#
-# SPDX-License-Identifier: MIT OR Apache-2.0
-# Copyright (c) 2026 gwz
-#
-
-script_src="${BASH_SOURCE[0]-}"
-if [[ -z "${script_src}" && -n "${ZSH_VERSION-}" ]]; then
-    script_src="${(%):-%x}"
-    if [[ -z "${script_src}" ]]; then
-        script_src="${(%):-%N}"
-    fi
-fi
-
-SCRIPT_DIR=""
-PREFIX_DIR=""
-if [[ -n "${script_src}" ]]; then
-    SCRIPT_DIR="$(cd -- "$(dirname -- "${script_src}")" && pwd -P)"
-    PREFIX_DIR="$(cd -- "${SCRIPT_DIR}/.." && pwd -P)"
-fi
-
-sourced=0
-if [[ -n "${BASH_VERSION-}" && "${BASH_SOURCE[0]-}" != "${0}" ]]; then
-    sourced=1
-fi
-if [[ "${sourced}" -eq 0 && -n "${ZSH_VERSION-}" && "${ZSH_EVAL_CONTEXT-}" == *:file ]]; then
-    sourced=1
-fi
-
-if [[ -z "${script_src}" || "${sourced}" -eq 0 ]]; then
-    if [[ -n "${SCRIPT_DIR}" ]]; then
-        echo "This script must be sourced: source ${SCRIPT_DIR}/l0-env.sh" >&2
-    else
-        echo "This script must be sourced: source <install-prefix>/bin/l0-env.sh" >&2
-    fi
-    return 1 2>/dev/null || exit 1
-fi
-
-export L0_HOME="${PREFIX_DIR}"
-
-case ":${PATH}:" in
-    *":${SCRIPT_DIR}:"*) ;;
-    *) export PATH="${SCRIPT_DIR}${PATH:+:${PATH}}" ;;
-esac
-
-hash -r 2>/dev/null || true
-
-# To pin down a specific C compiler, set the L0_CC environment variable here. For example:
-#export L0_CC="clang"
-"""
+    return shared_render_prefix_env_script(
+        env_script_name="l0-env.sh",
+        home_var_name="L0_HOME",
+        compiler_env_var="L0_CC",
+    )
 
 
 def render_prefix_env_cmd_script() -> str:
     """Return the prefix-relative Windows activation script."""
 
-    return f"""@echo off
-set "SCRIPT_DIR=%~dp0"
-set "SCRIPT_DIR=%SCRIPT_DIR:~0,-1%"
-for %%I in ("%SCRIPT_DIR%\\..") do set "PREFIX_ROOT=%%~fI"
-set "L0_HOME=%PREFIX_ROOT%"
-set "PATH_PADDED=;%PATH%;"
-if /I "%PATH_PADDED%"=="%PATH_PADDED:;%SCRIPT_DIR%;=%" (
-    if defined PATH (
-        set "PATH=%SCRIPT_DIR%;%PATH%"
-    ) else (
-        set "PATH=%SCRIPT_DIR%"
+    return shared_render_prefix_env_cmd_script(
+        env_script_label="l0-env",
+        home_var_name="L0_HOME",
     )
-)
-set "PATH_PADDED="
-{_MINGW_PROBE_CMD}"""
 
 
 def write_stage1_wrapper(layout: DeaBuildLayout) -> Path:

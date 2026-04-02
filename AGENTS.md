@@ -8,3 +8,5 @@ The root `Makefile` is monorepo-only orchestration (`help`, `venv`, `clean`). Le
 the level directory.
 
 For Dea/L0 work, use `l0/AGENTS.md`.
+
+For Dea/L1 work, use `l1/AGENTS.md`.

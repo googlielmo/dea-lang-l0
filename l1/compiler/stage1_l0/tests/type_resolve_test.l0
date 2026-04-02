@@ -1,0 +1,160 @@
+/*
+ * SPDX-License-Identifier: MIT OR Apache-2.0
+ * Copyright (c) 2026 gwz
+ */
+
+module type_resolve_test;
+
+import std.io;
+import std.string;
+import std.assert;
+import std.vector;
+import std.hashset;
+
+import analysis;
+import sem_context;
+import source_paths;
+import ast;
+import type_resolve;
+import types;
+import symbols;
+import util.log;
+import name_resolver;
+
+/**
+ * Returns the root directory for test fixtures.
+ *
+ * @return The semantics fixture directory used by these tests.
+ */
+func fixture_root() -> string {
+    return "compiler/stage1_l0/tests/fixtures/semantics";
+}
+
+/**
+ * Creates and configures source search paths for testing.
+ *
+ * @return Source search paths rooted at the semantics fixtures directory.
+ */
+func make_paths() -> SourceSearchPaths* {
+    let sp = sp_create();
+    sp_add_project_root(sp, fixture_root());
+    return sp;
+}
+
+/**
+ * Tests test_tr_symbol_lookup.
+ */
+func test_tr_symbol_lookup() {
+    let sp = make_paths();
+    with (let cfg = log_config_create(LL_SILENT, false) => drop cfg) {
+        let result = analysis_analyze_entry(sp, "ok_main", cfg);
+        let nr = result.names as NameResolution*;
+        let env = nr_env_find(nr, "ok_main") as ModuleEnv*;
+        
+        // Lookup local func
+        let sym = tr_symbol_lookup(nr, env, "main", null, null);
+        assert(sym != null, "main should be found");
+        assert(ord((sym as Symbol*).kind) == ord(SYM_FUNC), "main should be a function");
+        
+        // Lookup imported func
+        let sym2 = tr_symbol_lookup(nr, env, "make_point", null, null);
+        assert(sym2 != null, "make_point should be found via import");
+        assert(eq_s((sym2 as Symbol*).module_name, "shared_types"), "make_point should be in shared_types");
+        
+        // Lookup qualified variant (Status::Active)
+        let env_ok = nr_env_find(nr, "shared_types") as ModuleEnv*;
+        with (let qual = vs_create(1) => vs_free(qual)) {
+            vs_push(qual, "OptionInt");
+            let sym3 = tr_symbol_lookup(nr, env_ok, "Some", null, qual);
+            assert(sym3 != null, "OptionInt::Some should be found");
+            assert(ord((sym3 as Symbol*).kind) == ord(SYM_ENUM_VARIANT), "Some should be a variant");
+        }
+        
+        analysis_result_free(result);
+    }
+    sp_free(sp);
+}
+
+/**
+ * Tests test_tr_resolve_type_ref.
+ */
+func test_tr_resolve_type_ref() {
+    let sp = make_paths();
+    with (let cfg = log_config_create(LL_SILENT, false) => drop cfg) {
+        let result = analysis_analyze_entry(sp, "ok_main", cfg);
+        let nr = result.names as NameResolution*;
+        let tables = result.signatures as SignatureTables*;
+        let env = nr_env_find(nr, "ok_main") as ModuleEnv*;
+        
+        with (let seen = ss_create() => ss_free(seen)) {
+            // builtin int
+            let tref = new TypeRef("int", 0, false, null, null, Span(0,0,0,0));
+            let ty = tr_resolve_type_ref(tables, nr, env, tref, result.diags, seen);
+            assert(ty != null, "int should resolve");
+            assert(type_is_builtin(ty as Type*, "int"), "should be int");
+            type_free(ty as Type*);
+            drop tref;
+            
+            // struct Point (from shared_types)
+            let tref2 = new TypeRef("Point", 0, false, null, null, Span(0,0,0,0));
+            let ty2 = tr_resolve_type_ref(tables, nr, env, tref2, result.diags, seen);
+            assert(ty2 != null, "Point should resolve");
+            assert(ord((ty2 as Type*).kind) == ord(TY_STRUCT), "should be struct");
+            assert(eq_s((ty2 as Type*).name, "Point"), "name should be Point");
+            type_free(ty2 as Type*);
+            drop tref2;
+            
+            // pointer Point*
+            let tref3 = new TypeRef("Point", 1, false, null, null, Span(0,0,0,0));
+            let ty3 = tr_resolve_type_ref(tables, nr, env, tref3, result.diags, seen);
+            assert(ty3 != null, "Point* should resolve");
+            assert(ord((ty3 as Type*).kind) == ord(TY_POINTER), "should be pointer");
+            type_free(ty3 as Type*);
+            drop tref3;
+        }
+        
+        analysis_result_free(result);
+    }
+    sp_free(sp);
+}
+
+/**
+ * Tests module-qualified enum variant lookup when a local variant shadows imported names.
+ */
+func test_tr_module_qualified_variant_lookup_survives_shadow_warning() {
+    let sp = make_paths();
+    with (let cfg = log_config_create(LL_SILENT, false) => drop cfg) {
+        let result = analysis_analyze_entry(sp, "shadow_warn_main", cfg);
+        let nr = result.names as NameResolution*;
+        let env = nr_env_find(nr, "shadow_warn_main") as ModuleEnv*;
+
+        assert(!analysis_has_errors(result), "expected shadow_warn_main analysis to succeed");
+        assert(env != null, "shadow_warn_main env should be available");
+
+        let local = tr_symbol_lookup(nr, env, "Red", null, null);
+        assert(local != null, "local Red should resolve without qualification");
+        assert(eq_s((local as Symbol*).module_name, "shadow_warn_main"), "unqualified Red should resolve locally");
+
+        with (let module_path = vs_create(1) => vs_free(module_path)) {
+            vs_push(module_path, "shadow_warn_uno");
+            let qualified = tr_symbol_lookup(nr, env, "Red", module_path, null);
+            assert(qualified != null, "shadow_warn_uno::Red should resolve");
+            assert(ord((qualified as Symbol*).kind) == ord(SYM_ENUM_VARIANT), "qualified Red should be a variant");
+            assert(eq_s((qualified as Symbol*).module_name, "shadow_warn_uno"),
+                "qualified Red should resolve from shadow_warn_uno");
+        }
+
+        analysis_result_free(result);
+    }
+    sp_free(sp);
+}
+
+/**
+ * Main entry point for the module.
+ */
+func main() {
+    test_tr_symbol_lookup();
+    test_tr_resolve_type_ref();
+    test_tr_module_qualified_variant_lookup_survives_shadow_warning();
+    printl_s("type_resolve_test: all tests passed");
+}

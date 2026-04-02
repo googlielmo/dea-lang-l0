@@ -1,0 +1,185 @@
+/*
+ * SPDX-License-Identifier: MIT OR Apache-2.0
+ * Copyright (c) 2026 gwz
+ */
+
+module build_driver_test;
+
+import std.assert;
+import std.io;
+import std.string;
+import std.vector;
+
+import build_driver;
+
+/**
+ * Tests test_with_c_suffix_rewrites_existing_extension.
+ */
+func test_with_c_suffix_rewrites_existing_extension() {
+    assert(eq_s(bd_with_c_suffix("build/out.exe"), "build/out.c"), "existing extension should be replaced");
+    assert(eq_s(bd_with_c_suffix("plain-output"), "plain-output.c"), "missing extension should add .c");
+}
+
+/**
+ * Tests test_shell_quote_posix_handles_spaces_and_quotes.
+ */
+func test_shell_quote_posix_handles_spaces_and_quotes() {
+    assert(eq_s(bd_shell_quote_posix("two words"), "'two words'"), "space quoting mismatch");
+    assert(eq_s(bd_shell_quote_posix("rock'n'roll"), "'rock'\\''n'\\''roll'"), "single-quote escaping mismatch");
+    assert(eq_s(bd_shell_quote_posix(""), "''"), "empty string should still be quoted");
+}
+
+/**
+ * Tests test_shell_quote_windows_handles_spaces_and_quotes.
+ */
+func test_shell_quote_windows_handles_spaces_and_quotes() {
+    assert(eq_s(bd_shell_quote_windows("two words"), "\"two words\""), "space quoting mismatch");
+    assert(eq_s(bd_shell_quote_windows("say \"hi\""), "\"say \\\"hi\\\"\""), "double-quote escaping mismatch");
+    assert(eq_s(bd_shell_quote_windows(""), "\"\""), "empty string should still be quoted");
+}
+
+/**
+ * Tests test_join_shell_words_quotes_every_token.
+ */
+func test_join_shell_words_quotes_every_token() {
+    with (let words = vs_create(3) => vs_free(words)) {
+        vs_push(words, "alpha");
+        vs_push(words, "two words");
+        vs_push(words, "rock'n'roll");
+
+        let joined = bd_join_shell_words(words);
+        if (bd_is_windows()) {
+            assert(eq_s(joined, "alpha \"two words\" \"rock'n'roll\""), "joined shell command mismatch");
+        } else {
+            assert(eq_s(joined, "'alpha' 'two words' 'rock'\\''n'\\''roll'"), "joined shell command mismatch");
+        }
+    }
+}
+
+/**
+ * Tests test_windows_exec_token_rewrites_relative_slashes.
+ */
+func test_windows_exec_token_rewrites_relative_slashes() {
+    assert(eq_s(bd_windows_exec_token("./temp.exe"), ".\\temp.exe"), "dot-relative executable path mismatch");
+    assert(eq_s(bd_windows_exec_token("../bin/temp.exe"), "..\\bin\\temp.exe"), "parent-relative executable path mismatch");
+    assert(eq_s(bd_windows_exec_token("clang"), "clang"), "plain command should remain unchanged");
+}
+
+/**
+ * Tests test_join_display_words_matches_stage1_logging.
+ */
+func test_join_display_words_matches_stage1_logging() {
+    with (let words = vs_create(3) => vs_free(words)) {
+        vs_push(words, "clang");
+        vs_push(words, "file.c");
+        vs_push(words, "-O1");
+
+        let joined = bd_join_display_words(words);
+        assert(eq_s(joined, "clang file.c -O1"), "display command mismatch");
+    }
+}
+
+/**
+ * Tests test_format_word_list_matches_stage1_logging.
+ */
+func test_format_word_list_matches_stage1_logging() {
+    with (let words = vs_create(2) => vs_free(words)) {
+        assert(eq_s(bd_format_word_list(words), "[]"), "empty option list mismatch");
+        vs_push(words, "-g");
+        vs_push(words, "-O0");
+        assert(eq_s(bd_format_word_list(words), "['-g', '-O0']"), "formatted option list mismatch");
+    }
+}
+
+/**
+ * Tests test_compiler_flag_family_detection.
+ */
+func test_compiler_flag_family_detection() {
+    assert(eq_s(bd_compiler_flag_family("gcc"), "gcc"), "gcc family mismatch");
+    assert(eq_s(bd_compiler_flag_family("/usr/bin/clang-18"), "gcc"), "clang family mismatch");
+    assert(eq_s(bd_compiler_flag_family("cc"), "cc"), "cc family mismatch");
+    assert(eq_s(bd_compiler_flag_family("cl.exe"), "msvc"), "msvc family mismatch");
+    assert(eq_s(bd_compiler_flag_family("custom-cc"), "unknown"), "unknown family mismatch");
+}
+
+/**
+ * Tests test_get_optimize_flag_defaults_and_overrides.
+ */
+func test_get_optimize_flag_defaults_and_overrides() {
+    with (let empty = vs_create(1) => vs_free(empty)) {
+        let gcc_opt = bd_get_optimize_flag("gcc", empty);
+        let expected = "-O1";
+        if (bd_is_windows()) {
+            expected = "-O0";
+        }
+        assert(gcc_opt != null && eq_s(gcc_opt as string, expected), "gcc default optimize flag mismatch");
+    }
+
+    with (let debug_words = vs_create(1) => vs_free(debug_words)) {
+        vs_push(debug_words, "-g");
+        let gcc_debug = bd_get_optimize_flag("gcc", debug_words);
+        assert(gcc_debug != null && eq_s(gcc_debug as string, "-Og"), "gcc debug optimize flag mismatch");
+    }
+
+    with (let msvc_debug_words = vs_create(1) => vs_free(msvc_debug_words)) {
+        vs_push(msvc_debug_words, "/Zi");
+        let msvc_debug = bd_get_optimize_flag("msvc", msvc_debug_words);
+        assert(msvc_debug != null && eq_s(msvc_debug as string, "/Od"), "msvc debug optimize flag mismatch");
+    }
+
+    with (let explicit_opt = vs_create(1) => vs_free(explicit_opt)) {
+        vs_push(explicit_opt, "-O2");
+        assert(bd_get_optimize_flag("gcc", explicit_opt) == null, "explicit optimize flag should suppress defaults");
+    }
+}
+
+/**
+ * Tests test_output_flag_selection_matches_compiler_family.
+ */
+func test_output_flag_selection_matches_compiler_family() {
+    with (let gcc_words = vs_create(4) => vs_free(gcc_words)) {
+        bd_push_output_flags(gcc_words, "gcc", "out.exe");
+        assert(vs_size(gcc_words) == 2, "gcc output flags should use two argv words");
+        assert(eq_s(vs_get(gcc_words, 0), "-o"), "gcc output flag mismatch");
+        assert(eq_s(vs_get(gcc_words, 1), "out.exe"), "gcc output path mismatch");
+    }
+
+    with (let msvc_words = vs_create(2) => vs_free(msvc_words)) {
+        bd_push_output_flags(msvc_words, "msvc", "out.exe");
+        assert(vs_size(msvc_words) == 1, "msvc output flags should use one argv word");
+        assert(eq_s(vs_get(msvc_words, 0), "/Fe:out.exe"), "msvc output flag mismatch");
+    }
+}
+
+/**
+ * Tests test_exe_name_helpers_are_consistent.
+ */
+func test_exe_name_helpers_are_consistent() {
+    if (bd_is_windows()) {
+        assert(eq_s(bd_default_exe_name(), "a.exe"), "windows build name mismatch");
+        assert(eq_s(bd_exe_suffix(), ".exe"), "windows suffix mismatch");
+        assert(eq_s(bd_null_device(), "NUL"), "windows null device mismatch");
+    } else {
+        assert(eq_s(bd_default_exe_name(), "a.out"), "posix build name mismatch");
+        assert(eq_s(bd_exe_suffix(), ".out"), "posix suffix mismatch");
+        assert(eq_s(bd_null_device(), "/dev/null"), "posix null device mismatch");
+    }
+}
+
+/**
+ * Main entry point for the module.
+ */
+func main() {
+    test_with_c_suffix_rewrites_existing_extension();
+    test_shell_quote_posix_handles_spaces_and_quotes();
+    test_shell_quote_windows_handles_spaces_and_quotes();
+    test_join_shell_words_quotes_every_token();
+    test_windows_exec_token_rewrites_relative_slashes();
+    test_join_display_words_matches_stage1_logging();
+    test_format_word_list_matches_stage1_logging();
+    test_compiler_flag_family_detection();
+    test_get_optimize_flag_defaults_and_overrides();
+    test_output_flag_selection_matches_compiler_family();
+    test_exe_name_helpers_are_consistent();
+    printl_s("build_driver_test: all tests passed");
+}

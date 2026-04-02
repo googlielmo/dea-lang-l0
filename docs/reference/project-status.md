@@ -1,0 +1,94 @@
+# Dea Project Status
+
+Version: 2026-04-02
+
+This document summarizes the current status of the Dea project at the monorepo level.
+
+Today the repository contains one active release line, Dea/L0, plus an early bootstrap scaffold for Dea/L1. L0 remains
+the canonical user-facing toolchain and documentation set for current releases. L1 exists so post-L0 language evolution
+can begin inside the monorepo without changing the current L0 release target.
+
+## Scope and Canonical References
+
+Use this file as the Dea-wide status snapshot. For more specific details, use:
+
+- [../../MONOREPO.md](../../MONOREPO.md) for monorepo layout and root workflow.
+- [../plans/](../plans/) for active and closed Dea-wide plans.
+- [../../l0/docs/reference/project-status.md](../../l0/docs/reference/project-status.md) for the current L0
+  implementation and release status.
+- [../../l1/README.md](../../l1/README.md) for the current L1 bootstrap subtree entry point.
+
+## Current Repository Shape
+
+The monorepo currently contains:
+
+- `l0/` as the active language, compiler, runtime, docs, examples, and release subtree.
+- `l1/` as the next-level bootstrap subtree.
+- `scripts/` for monorepo-owned automation and shared helper modules.
+- `docs/` for Dea-wide and monorepo-wide plans/reference material.
+- `tools/` for vendored third-party dependencies.
+
+Inside `l1/`, the initial compiler layout is:
+
+- `compiler/stage1_l0/` for the first L1 compiler implemented in L0,
+- `compiler/stage2_l1/` as a placeholder for the future self-hosted L1 stage,
+- `compiler/shared/runtime/` and `compiler/shared/l1/stdlib/` for copied shared bootstrap assets.
+
+## Language-Level Status
+
+### Dea/L0
+
+L0 is the current release-bearing level.
+
+Its repository status today is:
+
+- self-hosted through Stage 2,
+- the canonical public CLI and user documentation surface,
+- validated through the existing L0 test, bootstrap, packaging, and docs workflows,
+- versioned under the `l0-v*` / `l0-snapshot-*` release namespace.
+
+### Dea/L1
+
+L1 is in bootstrap setup.
+
+Its repository status today is:
+
+- scaffolded as a separate subtree under `l1/`,
+- seeded from the runnable L0 Stage 2 compiler,
+- buildable as a repo-local `l1c-stage1` compiler,
+- validated through copied Stage 1 implementation tests written in `.l0` and run through the upstream L0 compiler,
+- using `.l1` as the current L1 source surface for the copied L1 stdlib, example programs, and bootstrap test fixtures,
+- not yet an install/dist/release-bearing product.
+
+## Release Model
+
+The Dea monorepo uses separate release lines for each language level:
+
+- L0 releases use `l0-v*` and `l0-snapshot-*`.
+- Future L1 releases will use `l1-v*` and `l1-snapshot-*`.
+
+L1 bootstrap development currently consumes L0 as an upstream compiler toolchain. Local development defaults to the
+repo-local L0 Stage 2 build, while reproducible CI/release-oriented bootstrap flows should use an explicit upstream L0
+compiler path.
+
+## Shared Monorepo State
+
+The monorepo now has a small but real shared top-level layer:
+
+- root `docs/plans/` for Dea-wide planning,
+- root `docs/reference/` for Dea-wide status/reference documents,
+- root `CLAUDE.md` for monorepo-wide workflow policy,
+- root `Makefile` for shared `help`, `venv`, and `clean`,
+- root `scripts/dea_tooling/` for shared launcher/bootstrap helpers.
+
+This shared layer is intentionally narrow. Most compiler, language, runtime, and user-facing documentation remains owned
+by the relevant level subtree.
+
+## Near-Term Direction
+
+Near-term project direction is split cleanly by level:
+
+1. Keep Dea/L0 focused on release-readiness, documentation completion, and residual bug fixes toward `1.0.0`.
+2. Keep Dea/L1 focused on bootstrap stabilization and subtree layout, not on release/distribution parity yet.
+3. Only move or duplicate level-local reference documents into root `docs/reference/` when they clearly become Dea-wide
+   rather than L0-specific.
