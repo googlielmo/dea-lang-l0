@@ -3,7 +3,7 @@
 ## Dea/L1 bootstrap scaffold and shared tooling core
 
 - Date: 2026-04-02
-- Status: In Progress
+- Status: Implemented
 - Title: Create the Dea/L1 bootstrap scaffold, root Dea-wide plans tree, and a small shared tooling core
 - Kind: Refactor
 - Severity: Medium
@@ -12,7 +12,7 @@
 - Modules:
   - `docs/README.md`
   - `docs/reference/project-status.md`
-  - `docs/plans/refactors/2026-04-02-l1-bootstrap-scaffold-noref.md`
+  - `docs/plans/refactors/closed/2026-04-02-l1-bootstrap-scaffold-noref.md`
   - `scripts/dea_tooling/`
   - `l1/`
   - root monorepo guidance files
@@ -74,9 +74,10 @@ The implemented scaffold has been exercised with:
 8. `./l1/build/l1/bin/l1c-stage1 --check -P l1/compiler/stage1_l0/src l1c`
 9. `make -C l1 test-stage1`
 
-## Remaining Work
+## Follow-on Work
 
-This plan remains open because the larger follow-up items are still deferred:
+The scaffold work covered by this plan is implemented. The remaining items are separate follow-on efforts and are not
+blockers for closing this plan:
 
 1. Any additional Dea-wide reference documents that should move from level-local ownership into root `docs/reference/`.
 2. L1 install/dist/release/docs/CI parity beyond the current bootstrap-only scaffold.
