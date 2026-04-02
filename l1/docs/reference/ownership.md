@@ -1,0 +1,153 @@
+# L1 Ownership and Memory Management Reference
+
+Version: 2026-04-02
+
+This document describes how ownership works in current Dea/L1 bootstrap builds, covering:
+
+- `new` / `drop` heap object lifetime
+- ARC-managed `string`
+- ownership rules for the copied L1 stdlib containers
+- optional-string unwrap behavior
+
+## Scope and Status
+
+- The ground truth is the current bootstrap implementation in `compiler/stage1_l0/` plus the shared L1 stdlib/runtime.
+- `compiler/stage2_l1/` is not implemented yet, so this document describes only current bootstrap behavior.
+- If runtime or codegen behavior differs from this document, treat that as a bug.
+
+## 1. Ownership Model at a Glance
+
+L1 currently uses three cooperating lifetime systems:
+
+1. `new` / `drop` for heap-allocated objects
+2. ARC for `string`
+3. container-level ownership rules inside stdlib collections
+
+These systems are separate:
+
+- `_rt_drop` frees memory allocated by `new`
+- `rt_string_release` frees a string payload when its refcount reaches zero
+- dropping an object does not recursively free unrelated child pointers for you
+
+## 2. Normative Rules Matrix
+
+| Operation                                                                   | Ownership result                      | What you need to do                                                                                            |
+| --------------------------------------------------------------------------- | ------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `let p = new T(...)`                                                        | Caller owns the heap object           | Call `drop p` exactly once unless you transfer ownership deliberately.                                         |
+| Normal L1 assignment of a `string` (`dst = s`, `*dest = val`, field assign) | Destination takes a managed reference | The compiler emits retain/release automatically. Do not add manual retain/release around ordinary assignments. |
+| Removing or clearing string entries from raw storage                        | Container owns stored strings         | Release owned strings before zeroing or removing the storage.                                                  |
+| Byte-copy move (`rt_memcpy`) of string-bearing data                         | Ownership moves with the bytes        | Do not release the moved-from slot again.                                                                      |
+| `string` returned by value from a container helper                          | Caller receives a managed value       | Follow normal ARC lifetime unless crossing a raw-memory boundary.                                              |
+| `return local_var` where `local_var` is owned                               | Ownership moves to caller             | Backend may skip final cleanup for that binding.                                                               |
+| `return expr` for a non-local/non-owned value                               | Caller receives a managed reference   | Backend retains the result before scope cleanup.                                                               |
+
+## 3. `new` / `drop` Semantics
+
+Current lowering policy:
+
+- `new` lowers to runtime allocation helpers
+- `drop` lowers to runtime deallocation helpers
+- `new Struct` and `new Struct()` allocate one zero-initialized object
+- `new Struct(args...)` allocates and initializes fields positionally
+- `new Variant(args...)` allocates the owning enum object for that active variant
+- `drop` accepts both `T*` and `T*?`
+- dropping `null` is a safe no-op
+
+Before calling the final drop helper, compiler-generated cleanup may release owned fields such as `string` members.
+Pointer children with independent ownership are still your responsibility.
+
+## 4. ARC `string` Semantics
+
+Every runtime `string` value is reference-counted.
+
+In normal code:
+
+- ordinary assignments are ARC-balanced by the compiler
+- local scope cleanup releases initialized owned values
+- explicit retain/release calls are reserved for raw-memory boundaries and low-level container internals
+
+## 5. Optional Unwrap
+
+When you unwrap `string?` with `opt as string`, the resulting `string` is ownership-stabilized by the backend.
+
+In ordinary L1 code, you should not need to add a compensating manual retain after `opt as string`.
+
+## 6. Container Ownership Contracts
+
+### `std.vector` / `VectorString`
+
+- `vs_push` uses assignment semantics
+- `vs_clear` and `vs_free` release stored strings before clearing/freeing storage
+- the generic `vec_*` layer is not ARC-aware by itself
+
+### `std.hashmap`
+
+- map keys are ARC strings owned by the map
+- insert/update retains new keys and releases replaced keys
+- remove/clear/free release all occupied keys
+- `spm_keys` and `sim_keys` return caller-owned `VectorString*`
+
+### `std.hashset`
+
+- set keys are ARC strings owned by the set
+- add/remove/clear/free follow the same retain/release discipline as map keys
+- `ss_to_vector` returns caller-owned `VectorString*`
+
+### `std.linear_map`
+
+- `LinearMapBase` is byte-oriented and does not provide deep ownership on its own
+- ARC-aware specializations release owned strings on remove/free paths
+
+## 7. Manual `rt_string_retain` / `rt_string_release`
+
+Manual retain/release is required when you:
+
+1. manipulate string-bearing storage through raw memory operations
+2. implement remove/clear/free loops for owned string slots
+3. cross an ownership boundary outside ordinary assignment semantics
+
+It is usually wrong when you:
+
+1. perform ordinary assignment on ARC-managed fields or locals
+2. use stdlib helpers that already own the ARC transitions for you
+
+## 8. Control Flow and Cleanup
+
+Current compiler behavior:
+
+- scope cleanup runs in reverse declaration order
+- `continue` cleans only the current iteration body scope before control returns to the loop update/condition path
+- `return`, `break`, and `expr?` early exits run pending `with` cleanup before ordinary owned-value cleanup
+- direct return of an owned local may be treated as a move
+
+## 9. Validation and Bug Reporting
+
+For ownership issues, provide:
+
+1. a minimal `.l1` reproducer
+2. the generated C excerpt showing retain/release/drop order
+3. trace logs when applicable
+
+Useful local checks:
+
+```bash
+make build-stage1
+source build/l1/bin/l1-env.sh
+l1c --gen examples/hello.l1
+python compiler/stage1_l0/run_trace_tests.py
+```
+
+## 10. Ground-Truth References
+
+Primary implementation references:
+
+- `compiler/stage1_l0/src/backend.l0`
+- `compiler/stage1_l0/src/c_emitter.l0`
+- `compiler/stage1_l0/src/expr_types.l0`
+- `compiler/stage1_l0/src/lexer.l0`
+- `compiler/stage1_l0/src/parser.l0`
+- `compiler/shared/l1/stdlib/std/vector.l1`
+- `compiler/shared/l1/stdlib/std/hashmap.l1`
+- `compiler/shared/l1/stdlib/std/hashset.l1`
+- `compiler/shared/l1/stdlib/std/linear_map.l1`
+- `compiler/shared/runtime/l1_runtime.h`

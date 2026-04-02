@@ -2,7 +2,7 @@
 
 This `l1/docs/` tree holds documentation for the Dea/L1 subtree.
 
-At the current bootstrap stage, this tree is intentionally narrow:
+At the current bootstrap stage, this tree is still intentionally narrow:
 
 - L1-local plans and notes
 - L1 bootstrap/reference documents
@@ -17,5 +17,5 @@ continues to live under `l0/docs/`.
 - `reference/` for L1-local status/bootstrap references
 - `specs/` for future L1-local specifications
 
-At the moment this scaffold is mostly empty apart from this index, giving the subtree a stable documentation home before
-the first L1-specific documents land.
+The `reference/` directory now carries the current L1 bootstrap reference set, while `plans/` and `specs/` remain
+available for future L1-local planning and specification work.
