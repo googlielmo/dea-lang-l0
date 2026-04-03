@@ -92,14 +92,50 @@ func test_typing_err() {
         let result = analysis_analyze_entry(sp, "typing_err", cfg);
         assert(analysis_has_errors(result), "expected typing errors for typing_err");
         
-        assert(has_diag_code(result, "TYP-0310"), "expected binary mismatch error");
-        assert(has_diag_code(result, "TYP-0311"), "expected assign mismatch error");
+        assert(count_diag_code(result, "TYP-0310") == 2, "expected binary and initializer mismatch errors");
+        assert(has_diag_code(result, "TYP-0311"), "expected assignment-statement mismatch error");
         assert(has_diag_code(result, "TYP-0189"), "expected unknown identifier error");
-        assert(has_diag_code(result, "TYP-0340"), "expected struct field error");
-        assert(has_diag_code(result, "TYP-0330"), "expected call args count error");
+        assert(has_diag_code(result, "TYP-0221"), "expected missing struct field error");
+        assert(!has_diag_code(result, "TYP-0340"), "did not expect legacy struct field code");
+        assert(has_diag_code(result, "TYP-0191"), "expected struct constructor arity error");
+        assert(!has_diag_code(result, "TYP-0330"), "did not expect legacy struct constructor arity code");
         assert(has_diag_code(result, "TYP-0315"), "expected return type mismatch error");
-        assert(has_diag_code(result, "TYP-0313"), "expected if condition error");
+        assert(has_diag_code(result, "TYP-0070"), "expected if condition error");
         
+        analysis_result_free(result);
+    }
+    sp_free(sp);
+}
+
+/**
+ * Tests field-access diagnostic parity cases.
+ */
+func test_typing_field_diag_err() {
+    let sp = make_paths();
+    with (let cfg = log_config_create(LL_SILENT, false) => drop cfg) {
+        let result = analysis_analyze_entry(sp, "typing_field_diag_err", cfg);
+        assert(analysis_has_errors(result), "expected typing errors for typing_field_diag_err");
+        assert(has_diag_code(result, "TYP-0220"), "expected nullable struct field-access error");
+        assert(has_diag_code(result, "TYP-0221"), "expected missing struct field error");
+        assert(has_diag_code(result, "TYP-0222"), "expected non-struct field-access error");
+        assert(!has_diag_code(result, "TYP-0340"), "did not expect legacy shared field-access code");
+        analysis_result_free(result);
+    }
+    sp_free(sp);
+}
+
+/**
+ * Tests index diagnostic parity cases.
+ */
+func test_typing_index_diag_err() {
+    let sp = make_paths();
+    with (let cfg = log_config_create(LL_SILENT, false) => drop cfg) {
+        let result = analysis_analyze_entry(sp, "typing_index_diag_err", cfg);
+        assert(analysis_has_errors(result), "expected typing errors for typing_index_diag_err");
+        assert(has_diag_code(result, "TYP-0210"), "expected non-int index expression error");
+        assert(has_diag_code(result, "TYP-0211"), "expected nullable index base error");
+        assert(has_diag_code(result, "TYP-0212"), "expected invalid index base error");
+        assert(!has_diag_code(result, "TYP-0350"), "did not expect legacy index-base diagnostic code");
         analysis_result_free(result);
     }
     sp_free(sp);
@@ -181,6 +217,97 @@ func test_typing_equality_unsupported() {
 }
 
 /**
+ * Tests successful typing for explicit cast parity cases.
+ */
+func test_typing_cast_ok() {
+    let sp = make_paths();
+    with (let cfg = log_config_create(LL_SILENT, false) => drop cfg) {
+        let result = analysis_analyze_entry(sp, "typing_cast_ok", cfg);
+        assert(!analysis_has_errors(result), "expected no typing errors for typing_cast_ok");
+        analysis_result_free(result);
+    }
+    sp_free(sp);
+}
+
+/**
+ * Tests invalid explicit cast diagnostics.
+ */
+func test_typing_cast_err() {
+    let sp = make_paths();
+    with (let cfg = log_config_create(LL_SILENT, false) => drop cfg) {
+        let result = analysis_analyze_entry(sp, "typing_cast_err", cfg);
+        assert(analysis_has_errors(result), "expected typing errors for typing_cast_err");
+        assert(count_diag_code(result, "TYP-0230") == 4, "expected four invalid explicit-cast errors");
+        assert(!has_diag_code(result, "TYP-0315"), "did not expect secondary return type mismatch on cast errors");
+        analysis_result_free(result);
+    }
+    sp_free(sp);
+}
+
+/**
+ * Tests explicit int-to-byte overflow diagnostics.
+ */
+func test_typing_cast_int_to_byte_overflow() {
+    let sp = make_paths();
+    with (let cfg = log_config_create(LL_SILENT, false) => drop cfg) {
+        let result = analysis_analyze_entry(sp, "typing_cast_int_to_byte_overflow", cfg);
+        assert(analysis_has_errors(result), "expected typing errors for typing_cast_int_to_byte_overflow");
+        assert(count_diag_code(result, "TYP-0700") == 2, "expected both overflowing int-to-byte casts to report TYP-0700");
+        assert(!has_diag_code(result, "TYP-0315"), "did not expect secondary return type mismatch on overflow casts");
+        analysis_result_free(result);
+    }
+    sp_free(sp);
+}
+
+/**
+ * Tests explicit null unwrap diagnostics for nullable pointers.
+ */
+func test_typing_cast_null_unwrap_err() {
+    let sp = make_paths();
+    with (let cfg = log_config_create(LL_SILENT, false) => drop cfg) {
+        let result = analysis_analyze_entry(sp, "typing_cast_null_unwrap_err", cfg);
+        assert(analysis_has_errors(result), "expected typing errors for typing_cast_null_unwrap_err");
+        assert(has_diag_code(result, "TYP-0701"), "expected compile-time-null unwrap error");
+        assert(!has_diag_code(result, "TYP-0315"), "did not expect secondary return type mismatch on null unwrap");
+        analysis_result_free(result);
+    }
+    sp_free(sp);
+}
+
+/**
+ * Tests assignment-vs-cast nullability behavior.
+ */
+func test_typing_nullable_assignment() {
+    let sp = make_paths();
+    with (let cfg = log_config_create(LL_SILENT, false) => drop cfg) {
+        let result = analysis_analyze_entry(sp, "typing_nullable_assignment", cfg);
+        assert(analysis_has_errors(result), "expected typing errors for typing_nullable_assignment");
+        assert(count_diag_code(result, "TYP-0310") == 1, "expected nullable-to-non-nullable initializer mismatch");
+        assert(!has_diag_code(result, "TYP-0315"), "did not expect secondary return type mismatch on nullable assignment");
+        analysis_result_free(result);
+    }
+    sp_free(sp);
+}
+
+/**
+ * Tests function-call mismatch diagnostics.
+ */
+func test_typing_call_err() {
+    let sp = make_paths();
+    with (let cfg = log_config_create(LL_SILENT, false) => drop cfg) {
+        let result = analysis_analyze_entry(sp, "typing_call_err", cfg);
+        assert(analysis_has_errors(result), "expected typing errors for typing_call_err");
+        assert(count_diag_code(result, "TYP-0183") == 2, "expected both arity mismatches to report TYP-0183");
+        assert(count_diag_code(result, "TYP-0312") == 1, "expected one argument type mismatch to report TYP-0312");
+        assert(!has_diag_code(result, "TYP-0320"), "did not expect legacy function-call arity code");
+        assert(!has_diag_code(result, "TYP-0321"), "did not expect legacy function-call argument type code");
+        assert(!has_diag_code(result, "TYP-0315"), "did not expect secondary return type mismatch on call errors");
+        analysis_result_free(result);
+    }
+    sp_free(sp);
+}
+
+/**
  * Tests successful typing for `new` parity cases.
  */
 func test_typing_new_ok() {
@@ -203,7 +330,8 @@ func test_typing_new_err() {
         assert(analysis_has_errors(result), "expected typing errors for typing_new_err");
         assert(has_diag_code(result, "TYP-0281"), "expected enum-allocation-without-variant error");
         assert(has_diag_code(result, "TYP-0283"), "expected struct new arity error");
-        assert(has_diag_code(result, "TYP-0333"), "expected enum variant payload type mismatch error");
+        assert(has_diag_code(result, "TYP-0314"), "expected enum variant payload type mismatch error");
+        assert(!has_diag_code(result, "TYP-0333"), "did not expect legacy enum variant payload mismatch code");
         assert(!has_diag_code(result, "SIG-0010"), "new variant should not be treated as a type name");
         analysis_result_free(result);
     }
@@ -297,11 +425,19 @@ func test_typing_dea_intrinsic_ref_err() {
 func main() {
     test_typing_ok();
     test_typing_err();
+    test_typing_field_diag_err();
+    test_typing_index_diag_err();
     test_return_void_in_non_void();
     test_return_invalid_expr();
     test_typing_try_ok();
     test_typing_try_err();
     test_typing_equality_unsupported();
+    test_typing_cast_ok();
+    test_typing_cast_err();
+    test_typing_cast_int_to_byte_overflow();
+    test_typing_cast_null_unwrap_err();
+    test_typing_nullable_assignment();
+    test_typing_call_err();
     test_typing_new_ok();
     test_typing_new_err();
     test_typing_drop_err();

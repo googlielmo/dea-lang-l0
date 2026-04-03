@@ -25,7 +25,7 @@ func err_new_struct_partial() {
 }
 
 func err_new_variant_bad_payload() {
-    let r = new Ok(true); // TYP-0333
+    let r = new Ok(true); // TYP-0314
     drop r;
 }
 

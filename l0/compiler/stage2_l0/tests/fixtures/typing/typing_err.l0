@@ -13,10 +13,18 @@ func err_binary_mismatch() {
 }
 
 /**
- * Triggers an assignment type mismatch.
+ * Triggers a let-initializer type mismatch.
  */
 func err_assign_mismatch() {
-    let x: int = "hello"; // TYP-0311
+    let x: int = "hello"; // TYP-0310
+}
+
+/**
+ * Triggers an assignment-statement type mismatch.
+ */
+func err_reassign_mismatch() {
+    let x: int = 0;
+    x = "hello"; // TYP-0311
 }
 
 /**
@@ -36,7 +44,7 @@ struct Point { x: int; y: int; }
  */
 func err_struct_field() {
     let p = Point(1, 2);
-    let z = p.z; // TYP-0340
+    let z = p.z; // TYP-0221
 }
 
 /**

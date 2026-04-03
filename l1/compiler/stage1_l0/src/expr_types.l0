@@ -643,7 +643,7 @@ func etc_check_stmt(self: ExpressionTypeChecker*, stmt_id: StmtId) {
                         stmt.type_ref as TypeRef*, self.result.diags, seen);
                     if (ann_ty != null && val_ty != null) {
                         if (!etc_can_assign(self, ann_ty as Type*, val_ty as Type*)) {
-                            etc_diag_error(self, "TYP-0311", concat4_s("initializer for '", stmt.name, "' type mismatch: ",
+                            etc_diag_error(self, "TYP-0310", concat4_s("initializer for '", stmt.name, "' type mismatch: ",
                                 concat3_s(type_format(ann_ty as Type*), " and ", type_format(val_ty as Type*))),
                                 unit.path, stmt.span);
                         }
@@ -662,7 +662,7 @@ func etc_check_stmt(self: ExpressionTypeChecker*, stmt_id: StmtId) {
             let right_ty = etc_infer_expr(self, stmt.expr_b);
             if (left_ty != null && right_ty != null) {
                 if (!etc_can_assign(self, left_ty as Type*, right_ty as Type*)) {
-                    etc_diag_error(self, "TYP-0312", concat_s("assignment type mismatch", ""), unit.path, stmt.span);
+                    etc_diag_error(self, "TYP-0311", concat_s("assignment type mismatch", ""), unit.path, stmt.span);
                 }
             }
             if (left_ty != null) type_free(left_ty as Type*);
@@ -672,7 +672,7 @@ func etc_check_stmt(self: ExpressionTypeChecker*, stmt_id: StmtId) {
             let cond_ty = etc_infer_expr(self, stmt.expr_a);
             if (cond_ty != null) {
                 if (!etc_is_bool(cond_ty as Type*)) {
-                    etc_diag_error(self, "TYP-0313", "if condition must be bool", unit.path, stmt.span);
+                    etc_diag_error(self, "TYP-0070", "if condition must be bool", unit.path, stmt.span);
                 }
                 type_free(cond_ty as Type*);
             }
@@ -718,7 +718,7 @@ func etc_check_stmt(self: ExpressionTypeChecker*, stmt_id: StmtId) {
             let cond_ty2 = etc_infer_expr(self, stmt.expr_a);
             if (cond_ty2 != null) {
                 if (!etc_is_bool(cond_ty2 as Type*)) {
-                    etc_diag_error(self, "TYP-0314", "while condition must be bool", unit.path, stmt.span);
+                    etc_diag_error(self, "TYP-0080", "while condition must be bool", unit.path, stmt.span);
                 }
                 type_free(cond_ty2 as Type*);
             }
@@ -729,7 +729,7 @@ func etc_check_stmt(self: ExpressionTypeChecker*, stmt_id: StmtId) {
             let cond_ty3 = etc_infer_expr(self, stmt.expr_a);
             if (cond_ty3 != null) {
                 if (!etc_is_bool(cond_ty3 as Type*)) {
-                    etc_diag_error(self, "TYP-0314", "for condition must be bool", unit.path, stmt.span);
+                    etc_diag_error(self, "TYP-0090", "for condition must be bool", unit.path, stmt.span);
                 }
                 type_free(cond_ty3 as Type*);
             }
@@ -928,6 +928,78 @@ func etc_can_assign(self: ExpressionTypeChecker*, dst: Type*, src: Type*) -> boo
 }
 
 /**
+ * Check whether a value can be cast explicitly using Stage 1 parity rules.
+ *
+ * @param self Expression checker state.
+ * @param dst Destination type.
+ * @param src Source type.
+ * @return `true` if the explicit cast is allowed.
+ */
+func etc_can_cast(self: ExpressionTypeChecker*, dst: Type*, src: Type*) -> bool {
+    if (etc_can_assign(self, dst, src)) {
+        return true;
+    }
+
+    if (type_is_builtin(dst, "byte") && type_is_builtin(src, "int")) {
+        return true;
+    }
+
+    if (ord(src.kind) == ord(TY_NULLABLE) && ord(dst.kind) != ord(TY_NULLABLE)) {
+        return etc_can_assign(self, dst, src.inner as Type*);
+    }
+
+    return false;
+}
+
+/**
+ * Extract a compile-time integer value from a cast operand when available.
+ *
+ * @param self Expression checker state.
+ * @param expr_id Operand expression id.
+ * @return Integer value, or `null` when not a supported constant form.
+ */
+func etc_cast_const_int(self: ExpressionTypeChecker*, expr_id: ExprId) -> int? {
+    if (expr_id < 0 || self.current_unit == null) {
+        return null;
+    }
+    let expr = expr_arena_get((self.current_unit as DriverUnit*).parse_result.expr_arena, expr_id);
+    if (ord(expr.kind) == ord(EX_INT)) {
+        return expr.int_value;
+    }
+    if (ord(expr.kind) == ord(EX_PAREN)) {
+        return etc_cast_const_int(self, expr.expr_a);
+    }
+    if (ord(expr.kind) == ord(EX_UNARY) && eq_s(expr.text_value, "-")) {
+        let inner = etc_cast_const_int(self, expr.expr_a);
+        if (inner != null) {
+            return -(inner as int);
+        }
+    }
+    return null;
+}
+
+/**
+ * Check whether a cast operand is provably null at compile time.
+ *
+ * @param self Expression checker state.
+ * @param expr_id Operand expression id.
+ * @return `true` if the operand is known-null.
+ */
+func etc_cast_is_const_null(self: ExpressionTypeChecker*, expr_id: ExprId) -> bool {
+    if (expr_id < 0 || self.current_unit == null) {
+        return false;
+    }
+    let expr = expr_arena_get((self.current_unit as DriverUnit*).parse_result.expr_arena, expr_id);
+    if (ord(expr.kind) == ord(EX_NULL)) {
+        return true;
+    }
+    if (ord(expr.kind) == ord(EX_PAREN) || ord(expr.kind) == ord(EX_CAST)) {
+        return etc_cast_is_const_null(self, expr.expr_a);
+    }
+    return false;
+}
+
+/**
  * Infers the type for a unary.
  *
  * @param self Expression checker state.
@@ -1076,7 +1148,7 @@ func etc_infer_call(self: ExpressionTypeChecker*, expr_id: ExprId, expr: ExprNod
         if (args != null) arg_count = vec_size(args);
         
         if (arg_count != vec_size(params)) {
-            etc_diag_error(self, "TYP-0320", concat_s("function call argument count mismatch", ""),
+            etc_diag_error(self, "TYP-0183", concat_s("function call argument count mismatch", ""),
                 (self.current_unit as DriverUnit*).path, expr.span);
         } else {
             for (let i = 0; i < arg_count; i = i + 1) {
@@ -1085,7 +1157,7 @@ func etc_infer_call(self: ExpressionTypeChecker*, expr_id: ExprId, expr: ExprNod
                 if (arg_ty != null) {
                     let p_ty = *(vec_get(params, i) as Type**);
                     if (!etc_can_assign(self, p_ty, arg_ty as Type*)) {
-                        etc_diag_error(self, "TYP-0321", concat_s("function call argument type mismatch", ""),
+                        etc_diag_error(self, "TYP-0312", concat_s("function call argument type mismatch", ""),
                             (self.current_unit as DriverUnit*).path, expr.span);
                     }
                     type_free(arg_ty as Type*);
@@ -1106,7 +1178,7 @@ func etc_infer_call(self: ExpressionTypeChecker*, expr_id: ExprId, expr: ExprNod
             if (args2 != null) arg_count2 = vec_size(args2);
             
             if (arg_count2 != vec_size(fields)) {
-                etc_diag_error(self, "TYP-0330", concat_s("struct constructor field count mismatch", ""),
+                etc_diag_error(self, "TYP-0191", concat_s("struct constructor field count mismatch", ""),
                     (self.current_unit as DriverUnit*).path, expr.span);
             } else {
                 for (let i = 0; i < arg_count2; i = i + 1) {
@@ -1115,7 +1187,7 @@ func etc_infer_call(self: ExpressionTypeChecker*, expr_id: ExprId, expr: ExprNod
                     if (arg_ty2 != null) {
                         let f_info = ptr_vec_get(fields, i) as StructFieldInfo*;
                         if (!etc_can_assign(self, f_info.field_type, arg_ty2 as Type*)) {
-                            etc_diag_error(self, "TYP-0331", concat_s("struct constructor field type mismatch", ""),
+                            etc_diag_error(self, "TYP-0313", concat_s("struct constructor field type mismatch", ""),
                                 (self.current_unit as DriverUnit*).path, expr.span);
                         }
                         type_free(arg_ty2 as Type*);
@@ -1144,7 +1216,7 @@ func etc_infer_call(self: ExpressionTypeChecker*, expr_id: ExprId, expr: ExprNod
                             if (args3 != null) arg_count3 = vec_size(args3);
                             
                             if (arg_count3 != vec_size(fields2)) {
-                                etc_diag_error(self, "TYP-0332", concat_s("enum variant constructor field count mismatch", ""),
+                                etc_diag_error(self, "TYP-0201", concat_s("enum variant constructor field count mismatch", ""),
                                     (self.current_unit as DriverUnit*).path, expr.span);
                             } else {
                                 for (let j = 0; j < arg_count3; j = j + 1) {
@@ -1153,7 +1225,7 @@ func etc_infer_call(self: ExpressionTypeChecker*, expr_id: ExprId, expr: ExprNod
                                     if (arg_ty3 != null) {
                                         let f_ty = ptr_vec_get(fields2, j) as Type*;
                                         if (!etc_can_assign(self, f_ty, arg_ty3 as Type*)) {
-                                            etc_diag_error(self, "TYP-0333", concat_s("enum variant constructor field type mismatch", ""),
+                                            etc_diag_error(self, "TYP-0314", concat_s("enum variant constructor field type mismatch", ""),
                                                 (self.current_unit as DriverUnit*).path, expr.span);
                                         }
                                         type_free(arg_ty3 as Type*);
@@ -1186,6 +1258,14 @@ func etc_infer_field(self: ExpressionTypeChecker*, expr_id: ExprId, expr: ExprNo
     if (left_ty == null) return null;
     let l_ty = left_ty as Type*;
 
+    if (ord(l_ty.kind) == ord(TY_NULLABLE) && ord((l_ty.inner as Type*).kind) == ord(TY_STRUCT)) {
+        etc_diag_error(self, "TYP-0220",
+            concat4_s("cannot access field '", expr.text_value, "' on nullable struct ", type_format(l_ty)),
+            (self.current_unit as DriverUnit*).path, expr.span);
+        type_free(l_ty);
+        return null;
+    }
+
     let base_ty = l_ty;
     if (ord(l_ty.kind) == ord(TY_POINTER)) {
         base_ty = l_ty.inner as Type*;
@@ -1202,10 +1282,17 @@ func etc_infer_field(self: ExpressionTypeChecker*, expr_id: ExprId, expr: ExprNo
                     return type_clone(f_info.field_type);
                 }
             }
+
+            etc_diag_error(self, "TYP-0221",
+                concat4_s("struct ", type_format(base_ty), " has no field '", expr.text_value),
+                (self.current_unit as DriverUnit*).path, expr.span);
+            type_free(l_ty);
+            return null;
         }
     }
 
-    etc_diag_error(self, "TYP-0340", concat4_s("type ", type_format(l_ty), " has no field '", expr.text_value),
+    etc_diag_error(self, "TYP-0222",
+        concat4_s("cannot access field '", expr.text_value, "' on non-struct type ", type_format(l_ty)),
         (self.current_unit as DriverUnit*).path, expr.span);
     type_free(l_ty);
     return null;
@@ -1227,18 +1314,27 @@ func etc_infer_index(self: ExpressionTypeChecker*, expr_id: ExprId, expr: ExprNo
         return null;
     }
     let l_ty = left_ty as Type*;
-
-    if (ord(l_ty.kind) != ord(TY_POINTER)) {
-        etc_diag_error(self, "TYP-0350", concat_s("indexing expects pointer, got ", type_format(l_ty)),
-            (self.current_unit as DriverUnit*).path, expr.span);
-    }
     
     if (index_ty != null) {
         if (!etc_is_int(index_ty as Type*)) {
-            etc_diag_error(self, "TYP-0351", concat_s("index expects int, got ", type_format(index_ty as Type*)),
+            etc_diag_error(self, "TYP-0210", concat_s("index expects int, got ", type_format(index_ty as Type*)),
                 (self.current_unit as DriverUnit*).path, expr.span);
         }
         type_free(index_ty as Type*);
+    }
+
+    if (ord(l_ty.kind) == ord(TY_NULLABLE)) {
+        etc_diag_error(self, "TYP-0211", concat_s("cannot index nullable type ", type_format(l_ty)),
+            (self.current_unit as DriverUnit*).path, expr.span);
+        type_free(l_ty);
+        return null;
+    }
+
+    if (ord(l_ty.kind) != ord(TY_POINTER)) {
+        etc_diag_error(self, "TYP-0212", concat_s("cannot index into expression of type ", type_format(l_ty)),
+            (self.current_unit as DriverUnit*).path, expr.span);
+        type_free(l_ty);
+        return null;
     }
 
     if (ord(l_ty.kind) == ord(TY_POINTER)) {
@@ -1317,15 +1413,61 @@ func etc_infer_expr(self: ExpressionTypeChecker*, expr_id: ExprId) -> Type*? {
         EX_FIELD => { ty = etc_infer_field(self, expr_id, expr); }
         EX_INDEX => { ty = etc_infer_index(self, expr_id, expr); }
         EX_CAST => {
-            if (expr.type_ref != null) {
+            let src_ty = etc_infer_expr(self, expr.expr_a);
+            if (src_ty != null && expr.type_ref != null) {
                 with (let seen = ss_create() => ss_free(seen)) {
-                    ty = tr_resolve_type_ref(self.result.signatures as SignatureTables*,
+                    let target_ty = tr_resolve_type_ref(self.result.signatures as SignatureTables*,
                         self.result.names as NameResolution*, self.current_env as ModuleEnv*,
                         expr.type_ref as TypeRef*, self.result.diags, seen);
+                    if (target_ty != null) {
+                        if (type_is_builtin(src_ty as Type*, "int") && type_is_builtin(target_ty as Type*, "byte")) {
+                            let const_int = etc_cast_const_int(self, expr.expr_a);
+                            if (const_int != null && ((const_int as int) < 0 || (const_int as int) > 255)) {
+                                etc_diag_error(self, "TYP-0700",
+                                    concat4_s("explicit cast from 'int' to 'byte' overflows: ",
+                                        int_to_string(const_int as int), " is outside 0..255", ""),
+                                    unit.path, expr.span);
+                            } else if (ord((src_ty as Type*).kind) == ord(TY_NULLABLE) &&
+                                ord(((src_ty as Type*).inner as Type*).kind) == ord(TY_POINTER) &&
+                                ord((target_ty as Type*).kind) == ord(TY_POINTER) &&
+                                etc_types_equal((target_ty as Type*), ((src_ty as Type*).inner as Type*)) &&
+                                etc_cast_is_const_null(self, expr.expr_a)) {
+                                etc_diag_error(self, "TYP-0701",
+                                    concat4_s("explicit cast from '", type_format(src_ty as Type*),
+                                        concat_s("' to '", type_format(target_ty as Type*)), "' is null at compile time"),
+                                    unit.path, expr.span);
+                            } else if (etc_can_cast(self, target_ty as Type*, src_ty as Type*)) {
+                                ty = target_ty;
+                                target_ty = null;
+                            } else {
+                                etc_diag_error(self, "TYP-0230",
+                                    concat4_s("cannot cast from '", type_format(src_ty as Type*),
+                                        concat_s("' to '", type_format(target_ty as Type*)), "'"),
+                                    unit.path, expr.span);
+                            }
+                        } else if (ord((src_ty as Type*).kind) == ord(TY_NULLABLE) &&
+                            ord(((src_ty as Type*).inner as Type*).kind) == ord(TY_POINTER) &&
+                            ord((target_ty as Type*).kind) == ord(TY_POINTER) &&
+                            etc_types_equal((target_ty as Type*), ((src_ty as Type*).inner as Type*)) &&
+                            etc_cast_is_const_null(self, expr.expr_a)) {
+                            etc_diag_error(self, "TYP-0701",
+                                concat4_s("explicit cast from '", type_format(src_ty as Type*),
+                                    concat_s("' to '", type_format(target_ty as Type*)), "' is null at compile time"),
+                                unit.path, expr.span);
+                        } else if (etc_can_cast(self, target_ty as Type*, src_ty as Type*)) {
+                            ty = target_ty;
+                            target_ty = null;
+                        } else {
+                            etc_diag_error(self, "TYP-0230",
+                                concat4_s("cannot cast from '", type_format(src_ty as Type*),
+                                    concat_s("' to '", type_format(target_ty as Type*)), "'"),
+                                unit.path, expr.span);
+                        }
+                        if (target_ty != null) type_free(target_ty as Type*);
+                    }
                 }
             }
-            let sub_ty2 = etc_infer_expr(self, expr.expr_a);
-            if (sub_ty2 != null) type_free(sub_ty2 as Type*);
+            if (src_ty != null) type_free(src_ty as Type*);
         }
         EX_NEW => {
             if (expr.type_ref != null) {
@@ -1352,7 +1494,7 @@ func etc_infer_expr(self: ExpressionTypeChecker*, expr_id: ExprId) -> Type*? {
 
                             let field_count = vec_size(variant.field_types);
                             if (arg_count != field_count) {
-                                etc_diag_error(self, "TYP-0332",
+                                etc_diag_error(self, "TYP-0201",
                                     concat_s("enum variant constructor field count mismatch", ""),
                                     unit.path, expr.span);
                             }
@@ -1362,7 +1504,7 @@ func etc_infer_expr(self: ExpressionTypeChecker*, expr_id: ExprId) -> Type*? {
                                     if (j < field_count) {
                                         let field_ty = ptr_vec_get(variant.field_types, j) as Type*;
                                         if (!etc_can_assign(self, field_ty, arg_ty as Type*)) {
-                                            etc_diag_error(self, "TYP-0333",
+                                            etc_diag_error(self, "TYP-0314",
                                                 concat_s("enum variant constructor field type mismatch", ""),
                                                 unit.path, expr.span);
                                         }

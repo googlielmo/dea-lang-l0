@@ -1,0 +1,33 @@
+/*
+ * SPDX-License-Identifier: MIT OR Apache-2.0
+ * Copyright (c) 2026 gwz
+ */
+
+module typing_index_diag_err;
+
+extern func maybe_buf() -> int*?;
+extern func buf() -> int*;
+
+/**
+ * Triggers a non-int index expression error.
+ */
+func err_non_int_index() {
+    let p = buf();
+    let value = p[true]; // TYP-0210
+}
+
+/**
+ * Triggers indexing on a nullable base.
+ */
+func err_nullable_index_base() {
+    let p: int*? = maybe_buf();
+    let value = p[0]; // TYP-0211
+}
+
+/**
+ * Triggers indexing on a non-pointer base.
+ */
+func err_invalid_index_base() {
+    let value: int = 1;
+    let item = value[0]; // TYP-0212
+}
