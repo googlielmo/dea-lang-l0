@@ -241,6 +241,57 @@ func test_typing_drop_flow_err() {
 }
 
 /**
+ * Tests successful typing when local functions shadow `dea` intrinsics.
+ */
+func test_typing_dea_local_shadow_ok() {
+    let sp = make_paths();
+    with (let cfg = log_config_create(LL_SILENT, false) => drop cfg) {
+        let result = analysis_analyze_entry(sp, "typing_dea_local_shadow", cfg);
+        assert(!analysis_has_errors(result), "expected no typing errors for typing_dea_local_shadow");
+        assert(count_diag_code(result, "RES-0021") == 2, "expected local shadow warnings for sizeof and ord");
+        analysis_result_free(result);
+    }
+    sp_free(sp);
+}
+
+/**
+ * Tests successful typing when an explicit import shadows one `dea` intrinsic.
+ */
+func test_typing_dea_import_shadow_ok() {
+    let sp = make_paths();
+    with (let cfg = log_config_create(LL_SILENT, false) => drop cfg) {
+        let result = analysis_analyze_entry(sp, "typing_dea_import_shadow_main", cfg);
+        let saw_import_shadow = false;
+        assert(!analysis_has_errors(result), "expected no typing errors for typing_dea_import_shadow_main");
+        assert(count_diag_code(result, "RES-0021") == 2,
+            "expected RES-0021 warnings for helper-local and main imported shadowing");
+        for (let i = 0; i < analysis_diag_count(result); i = i + 1) {
+            let d = analysis_diag_get(result, i);
+            if (eq_s(d.code, "RES-0021") && contains_s(d.message, "typing_dea_import_shadow_helper::sizeof")) {
+                saw_import_shadow = true;
+            }
+        }
+        assert(saw_import_shadow, "expected imported-shadow warning mentioning typing_dea_import_shadow_helper::sizeof");
+        analysis_result_free(result);
+    }
+    sp_free(sp);
+}
+
+/**
+ * Tests that `dea` intrinsics cannot be used as plain values.
+ */
+func test_typing_dea_intrinsic_ref_err() {
+    let sp = make_paths();
+    with (let cfg = log_config_create(LL_SILENT, false) => drop cfg) {
+        let result = analysis_analyze_entry(sp, "typing_dea_intrinsic_ref_err", cfg);
+        assert(analysis_has_errors(result), "expected typing errors for typing_dea_intrinsic_ref_err");
+        assert(count_diag_code(result, "TYP-0244") == 2, "expected both intrinsic references to report TYP-0244");
+        analysis_result_free(result);
+    }
+    sp_free(sp);
+}
+
+/**
  * Main entry point for the module.
  */
 func main() {
@@ -255,5 +306,8 @@ func main() {
     test_typing_new_err();
     test_typing_drop_err();
     test_typing_drop_flow_err();
+    test_typing_dea_local_shadow_ok();
+    test_typing_dea_import_shadow_ok();
+    test_typing_dea_intrinsic_ref_err();
     printl_s("expr_types_test: all tests passed");
 }

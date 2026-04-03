@@ -374,7 +374,7 @@ func l0c_cmd_sym(opts: CliOptions*, cfg: LogConfig*) -> int {
             return 1;
         }
 
-        with (let module_names = driver_module_names_sorted(result.driver_state) => vs_free(module_names)) {
+        with (let module_names = nr_env_names_sorted(result.names as NameResolution*) => vs_free(module_names)) {
             for (let i = 0; i < vs_size(module_names); i = i + 1) {
                 let mod_name = vs_get(module_names, i);
                 let entry_unit = driver_find_unit(result.driver_state, result.driver_state.entry_module) as DriverUnit*;

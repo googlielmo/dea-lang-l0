@@ -1,6 +1,6 @@
 # L1 Language and Runtime Design Decisions
 
-Version: 2026-04-02
+Version: 2026-04-03
 
 This document records current design rationale and policy decisions for Dea/L1 as implemented by the bootstrap compiler.
 
@@ -75,12 +75,38 @@ Current policy:
 - `null` is the only empty value of a nullable type
 - casts with `as` are explicit and checked by the type system/runtime helpers where required
 - `expr?` is the null-propagation operator
-- `sizeof` and `ord` are compiler-recognized intrinsics
 
 For non-pointer nullable values, generated C uses wrapper representations rather than exposing host-specific niche
 assumptions.
 
-## 6. Integer and Failure Semantics
+## 6. The `dea` Prelude Module
+
+The compiler synthesizes one implicit module, `dea`, for language-level primitives.
+
+Current contents:
+
+- `dea::sizeof`
+- `dea::ord`
+
+Current policy:
+
+- `dea` is a virtual module owned by the compiler, not a source file loaded from disk
+- `dea` is opened into every module automatically
+- `dea` has the lowest import precedence, so user locals and explicit imports shadow it normally
+- `dea::sizeof` and `dea::ord` remain the stable qualified escape hatch when user code intentionally reuses those names
+- this behavior does not change the surface grammar: `dea` is a semantic prelude mechanism, not a special import syntax
+- qualified `dea::sizeof` and `dea::ord` are always available even when unqualified `sizeof` or `ord` are shadowed
+- shadowing uses the normal name-resolution rules and warning behavior rather than bespoke intrinsic-specific fallback
+
+Rationale:
+
+- keep intrinsics in the normal symbol/module system instead of hard-coding bare names
+- avoid hijacking user-defined functions named `sizeof` or `ord`
+- preserve ergonomic unqualified use for bootstrap-stage code while keeping an explicit disambiguation path
+- leave room for future compiler-owned type aliases and other prelude-level symbols without introducing a synthetic
+  source file
+
+## 7. Integer and Failure Semantics
 
 The bootstrap compiler keeps integer behavior defined rather than inheriting host-C vagueness:
 
@@ -90,15 +116,20 @@ The bootstrap compiler keeps integer behavior defined rather than inheriting hos
 
 That policy is part of the language contract even though the current implementation is lowered through C.
 
-## 7. I/O and Runtime API Shape
+## 8. I/O and Runtime API Shape
 
 Bootstrap-stage tooling intentionally favors simple whole-file and console APIs over richer streaming abstractions. That
 is sufficient for compiler bootstrapping, diagnostics, and current examples while keeping the language/library surface
 narrow.
 
-## 8. Name Disambiguation
+## 9. Name Disambiguation
 
 Qualified references (`module.path::Name`) are the current cross-module disambiguation mechanism.
+
+The compiler also synthesizes one implicit module, `dea`, for language-level primitives. Its exports are opened into
+every module at the lowest precedence, so user locals and explicit imports shadow `dea` with the normal `RES-0021`
+warning. `dea::sizeof` and `dea::ord` remain the stable qualified escape hatch when user code intentionally reuses those
+names.
 
 Rationale:
 
@@ -106,12 +137,12 @@ Rationale:
 - provide an explicit escape hatch for ambiguity
 - avoid introducing more namespace surface before it is needed
 
-## 9. Portability Policy
+## 10. Portability Policy
 
 Generated code should stay within conservative C99 usage. Platform/compiler quirks belong in the runtime boundary, not
 in the language definition.
 
-## 10. Future Evolution
+## 11. Future Evolution
 
 Near-term L1 evolution should preserve the current bootstrap implementation and semantics unless a targeted bug fix or a
 decision-complete feature addition requires a deliberate change.

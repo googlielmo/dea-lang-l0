@@ -602,6 +602,54 @@ func test_backend_generate_intrinsics_use_analyzed_target_types() {
 }
 
 /**
+ * Tests that user functions named like intrinsics are not lowered as `dea` intrinsics.
+ */
+func test_backend_generate_dea_intrinsics_respect_symbol_origin() {
+    with (let filenames = vs_create(1) => vs_free(filenames),
+          let sources = vs_create(1) => vs_free(sources),
+          let lines = vs_create(24) => vs_free(lines),
+          let cfg = log_config_create(LL_ERROR, false) => drop cfg,
+          let opts = cg_options_create() => cg_options_free(opts)) {
+        opts.emit_line_directives = false;
+        vs_push(filenames, "demo/main.l1");
+        vs_push(lines, "module demo.main;");
+        vs_push(lines, "enum Flag {");
+        vs_push(lines, "    Off;");
+        vs_push(lines, "    On;");
+        vs_push(lines, "}");
+        vs_push(lines, "func sizeof(x: int) -> int {");
+        vs_push(lines, "    return x + 7;");
+        vs_push(lines, "}");
+        vs_push(lines, "func ord(x: int) -> int {");
+        vs_push(lines, "    return x + 9;");
+        vs_push(lines, "}");
+        vs_push(lines, "func main() -> int {");
+        vs_push(lines, "    let a = sizeof(4);");
+        vs_push(lines, "    let b = ord(5);");
+        vs_push(lines, "    let c = dea::sizeof(Flag);");
+        vs_push(lines, "    let d = dea::ord(On);");
+        vs_push(lines, "    return a + b + c + d;");
+        vs_push(lines, "}");
+        vs_push(sources, bt_source(lines));
+
+        let result = bt_analyze_sources("demo.main", filenames, sources);
+        assert(!analysis_has_errors(result), "analysis should succeed for dea shadowing fixture");
+
+        let generated = backend_generate(result, opts, cfg);
+        assert(contains_s(generated, "l0_demo_main_sizeof(4)"),
+            "local sizeof should lower as a normal function call");
+        assert(contains_s(generated, "l0_demo_main_ord(5)"),
+            "local ord should lower as a normal function call");
+        assert(contains_s(generated, "((l0_int)sizeof(struct l0_demo_main_Flag))"),
+            "dea::sizeof should lower through intrinsic emission");
+        assert(contains_s(generated, "((l0_int)(((struct l0_demo_main_Flag){ .tag = l0_demo_main_Flag_On }).tag))"),
+            "dea::ord should lower through intrinsic emission");
+
+        analysis_result_free(result);
+    }
+}
+
+/**
  * Tests test_backend_generate_string_copy_retains.
  */
 func test_backend_generate_string_copy_retains() {
@@ -650,6 +698,7 @@ func main() {
     test_backend_generate_drop_statement();
     test_backend_generate_new_and_try_lowering();
     test_backend_generate_intrinsics_use_analyzed_target_types();
+    test_backend_generate_dea_intrinsics_respect_symbol_origin();
     test_backend_generate_string_copy_retains();
     printl_s("backend_test: all tests passed");
 }

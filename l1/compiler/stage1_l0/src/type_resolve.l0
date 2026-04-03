@@ -159,6 +159,23 @@ func tr_resolve_alias(tables: SignatureTables*, nr: NameResolution*, env: Module
     }
 
     ss_add(seen, key);
+    if (sym.decl_ptr == null) {
+        ss_remove(seen, key);
+        tr_diag_error(
+            diags,
+            "SIG-0021",
+            concat4_s(
+                "compiler-synthesized type alias '",
+                sym.name,
+                "' in module '",
+                concat_s(sym.module_name, "' has no declaration")
+            ),
+            env.module_ptr.filename,
+            sym.span
+        );
+        return null;
+    }
+
     let decl = sym.decl_ptr as TypeAliasDecl*;
     let resolved = tr_resolve_type_ref(tables, nr, nr_env_find(nr, sym.module_name) as ModuleEnv*, decl.target, diags, seen);
     ss_remove(seen, key);

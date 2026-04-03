@@ -1,0 +1,5 @@
+module typing_dea_import_shadow_helper;
+
+func sizeof(x: int) -> int {
+    return x + 10;
+}

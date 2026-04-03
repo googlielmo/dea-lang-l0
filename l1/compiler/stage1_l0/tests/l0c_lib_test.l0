@@ -401,6 +401,22 @@ func test_sym_ok() {
 }
 
 /**
+ * Tests test_sym_all_modules_ok.
+ */
+func test_sym_all_modules_ok() {
+    with (let argv = vs_create(8) => vs_free(argv)) {
+        vs_push(argv, "--sym");
+        vs_push(argv, "--all-modules");
+        vs_push(argv, "-P");
+        vs_push(argv, semantics_fixture_root());
+        vs_push(argv, "ok_main");
+
+        let rc = run_with_argv(argv);
+        assert(rc == 0, "--sym --all-modules should succeed for ok_main");
+    }
+}
+
+/**
  * Main entry point for the module.
  */
 func main() {
@@ -422,5 +438,6 @@ func main() {
     test_merge_c_option_words_ignores_empty_inputs();
     test_type_ok();
     test_sym_ok();
+    test_sym_all_modules_ok();
     printl_s("l0c_lib_test: all tests passed");
 }

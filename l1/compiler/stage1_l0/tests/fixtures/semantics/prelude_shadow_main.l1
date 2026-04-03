@@ -1,0 +1,8 @@
+module prelude_shadow_main;
+
+import dea;
+import prelude_shadow_helper;
+
+func main() -> int {
+    return sizeof(1) + dea::sizeof(int);
+}

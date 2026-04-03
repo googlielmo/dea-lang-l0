@@ -1,6 +1,6 @@
 # Dea/L<sub>1</sub> Grammar
 
-Version: 2026-04-02
+Version: 2026-04-03
 
 The following is the formal grammar for the Dea/L<sub>1</sub> programming language in EBNF-style. This describes the
 concrete syntax that lexers and parsers should accept.
@@ -99,6 +99,9 @@ ModulePath          ::=     Ident ("." Ident)*
 
 `Ident` here is the module name component (no hierarchical packages in L<sub>1</sub> beyond dot-separated modules). This
 implies each module path component must be a valid identifier; hyphens and leading digits are not valid.
+
+Semantic note: intrinsic availability and the implicit `dea` prelude are semantic behavior, not grammar extensions. See
+`design-decisions.md` for the current prelude/import rules.
 
 ## 3. Top-level declarations
 
@@ -393,10 +396,10 @@ Notes:
 - `as` casts support `T?` \<-> `T` conversion.
 - The `?` type suffix denotes nullable types in the `Type` grammar.
 - `?` as a postfix operator is the **null propagation operator** (also known as the **try operator**).
-- `TypeExpr` allows types in argument position for intrinsics like `sizeof(int*)`.
+- `TypeExpr` allows types in argument position for intrinsics such as `sizeof(int*)` a.k.a. `dea::sizeof(int*)`.
 - A `TypeExpr` is syntactically unambiguous: either a builtin type name, or an identifier (including a qualified name)
   followed by `*` or `?` suffixes that end at an argument boundary (`,` or `)`).
 - Plain identifiers like `sizeof(Point)` parse as `Expr`; the type checker resolves whether `Point` refers to a type or
   variable.
-- Intrinsics such as `sizeof` and `ord` are parsed as ordinary identifiers and given special meaning during semantic
-  analysis and lowering.
+- Calls to `sizeof` and `ord` are parsed as ordinary function calls. Semantic analysis then resolves whether the callee
+  is one of the implicit `dea` prelude symbols or an ordinary user-defined function.

@@ -15,6 +15,7 @@ import std.vector;
 import ast;
 import c_emitter;
 import codegen_options;
+import dea_prelude;
 import driver;
 import name_resolver;
 import sem_context;
@@ -1583,9 +1584,12 @@ func be_emit_constructor_call(self: Backend*, expr_id: ExprId, sym: Symbol*, res
 func be_emit_call(self: Backend*, expr_id: ExprId) -> string {
     let expr = expr_arena_get(be_current_expr_arena(self), expr_id);
     let callee = expr_arena_get(be_current_expr_arena(self), expr.expr_a);
+    let callee_sym: Symbol*? = null;
 
     if (ord(callee.kind) == ord(EX_VAR_REF)) {
-        if (eq_s(callee.text_value, "sizeof") && expr.ids != null && vec_size(expr.ids as VectorBase*) == 1) {
+        callee_sym = be_lookup_symbol(self, callee.text_value, callee.module_path, callee.name_qualifier);
+
+        if (dea_is_intrinsic_symbol(callee_sym, "sizeof") && expr.ids != null && vec_size(expr.ids as VectorBase*) == 1) {
             let arg = expr_arena_get(be_current_expr_arena(self), id_vec_get(expr.ids as VectorBase*, 0));
             if (ord(arg.kind) == ord(EX_TYPE) && arg.type_ref != null) {
                 with (let target_ty = be_resolve_type_ref(self, arg.type_ref as TypeRef*) => type_free_opt(target_ty)) {
@@ -1604,30 +1608,36 @@ func be_emit_call(self: Backend*, expr_id: ExprId) -> string {
             }
         }
 
-        if (eq_s(callee.text_value, "ord") && expr.ids != null && vec_size(expr.ids as VectorBase*) == 1) {
+        if (dea_is_intrinsic_symbol(callee_sym, "ord") && expr.ids != null && vec_size(expr.ids as VectorBase*) == 1) {
             return cem_emit_ord(be_emit_expr(self, id_vec_get(expr.ids as VectorBase*, 0)));
         }
 
-        let sym = be_lookup_symbol(self, callee.text_value, callee.module_path, callee.name_qualifier);
-        if (sym != null) {
+        if (dea_is_symbol(callee_sym)) {
+            return be_ice_string("[ICE-2269] intrinsic call escaped regular lowering");
+        }
+
+        if (callee_sym != null) {
             with (let result_ty = be_expr_type(self, expr_id) => type_free_opt(result_ty)) {
-                if (result_ty != null && (ord((sym as Symbol*).kind) == ord(SYM_STRUCT) ||
-                    ord((sym as Symbol*).kind) == ord(SYM_ENUM_VARIANT))) {
-                    return be_emit_constructor_call(self, expr_id, sym as Symbol*, result_ty as Type*);
+                if (result_ty != null && (ord((callee_sym as Symbol*).kind) == ord(SYM_STRUCT) ||
+                    ord((callee_sym as Symbol*).kind) == ord(SYM_ENUM_VARIANT))) {
+                    return be_emit_constructor_call(self, expr_id, callee_sym as Symbol*, result_ty as Type*);
                 }
             }
 
-            if (ord((sym as Symbol*).kind) == ord(SYM_FUNC)) {
+            if (ord((callee_sym as Symbol*).kind) == ord(SYM_FUNC)) {
                 let c_func_name = "";
-                let decl = (sym as Symbol*).decl_ptr as FuncDecl*;
+                if ((callee_sym as Symbol*).decl_ptr == null) {
+                    return be_ice_string("[ICE-2270] regular function call is missing declaration pointer");
+                }
+                let decl = (callee_sym as Symbol*).decl_ptr as FuncDecl*;
                 if (decl.is_extern) {
-                    c_func_name = (sym as Symbol*).name;
+                    c_func_name = (callee_sym as Symbol*).name;
                 } else {
-                    c_func_name = cem_mangle_function_name((sym as Symbol*).module_name, (sym as Symbol*).name);
+                    c_func_name = cem_mangle_function_name((callee_sym as Symbol*).module_name, (callee_sym as Symbol*).name);
                 }
 
-                let func_ty = sig_lookup_func_type(self.result.signatures as SignatureTables*, (sym as Symbol*).module_name,
-                    (sym as Symbol*).name);
+                let func_ty = sig_lookup_func_type(self.result.signatures as SignatureTables*,
+                    (callee_sym as Symbol*).module_name, (callee_sym as Symbol*).name);
                 with (let sb = sb_create() => sb_free(sb)) {
                     let arg_count = 0;
                     if (expr.ids != null) {
@@ -1803,6 +1813,9 @@ func be_emit_expr(self: Backend*, expr_id: ExprId) -> string {
             }
 
             if (ord((sym as Symbol*).kind) == ord(SYM_FUNC)) {
+                if ((sym as Symbol*).decl_ptr == null) {
+                    return be_ice_string("[ICE-2271] function reference is missing declaration pointer");
+                }
                 let decl = (sym as Symbol*).decl_ptr as FuncDecl*;
                 if (decl.is_extern) {
                     return cem_emit_var_ref((sym as Symbol*).name);

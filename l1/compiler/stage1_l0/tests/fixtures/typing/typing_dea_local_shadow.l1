@@ -1,0 +1,18 @@
+module typing_dea_local_shadow;
+
+enum Flag {
+    Off;
+    On;
+}
+
+func sizeof(x: int) -> int {
+    return x + 1;
+}
+
+func ord(x: int) -> int {
+    return x + 2;
+}
+
+func main() -> int {
+    return sizeof(4) + ord(5) + dea::sizeof(Flag) + dea::ord(On);
+}

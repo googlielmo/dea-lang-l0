@@ -83,17 +83,26 @@ func test_name_resolution_ok() {
 
         assert(!driver_has_errors(state), "expected no driver errors");
         assert(diag_count(diags) == 0, "expected no name-resolution diagnostics");
-        assert(nr_env_count(names) == 3, "expected 3 semantic module envs");
+        assert(nr_env_count(names) == 4, "expected 4 semantic module envs including dea");
 
         let ok_env = nr_env_find(names, "ok_main");
         assert(ok_env != null, "expected ok_main env");
         let env = ok_env as ModuleEnv*;
 
+        assert(nr_module_env_imports_module(env, "dea"), "expected implicit dea import");
         assert(nr_module_env_imports_module(env, "shared_types"), "expected shared_types import");
         assert(nr_module_env_imports_module(env, "shared_more"), "expected shared_more import");
+        let sizeof_sym = nr_module_env_imported(env, "sizeof");
+        assert(sizeof_sym != null, "expected imported sizeof intrinsic");
+        assert(eq_s((sizeof_sym as Symbol*).module_name, "dea"), "sizeof should come from dea by default");
         assert(nr_module_env_imported(env, "Point") != null, "expected imported struct symbol");
         assert(nr_module_env_imported(env, "helper_value") != null, "expected imported helper function");
         assert(nr_module_env_imported(env, "Some") != null, "expected imported enum variant");
+
+        let dea_env = nr_env_find(names, "dea");
+        assert(dea_env != null, "expected synthesized dea env");
+        assert(nr_module_env_local(dea_env as ModuleEnv*, "sizeof") != null, "dea should define sizeof");
+        assert(nr_module_env_local(dea_env as ModuleEnv*, "ord") != null, "dea should define ord");
 
         let shared_env = nr_env_find(names, "shared_types");
         assert(shared_env != null, "expected shared_types env");
@@ -102,6 +111,49 @@ func test_name_resolution_ok() {
         let sym = some_sym as Symbol*;
         assert(ord(sym.kind) == ord(SYM_ENUM_VARIANT), "expected enum variant symbol kind");
         assert(eq_s(sym.owner_name, "OptionInt"), "expected parent enum owner name");
+
+        nr_free(names);
+        driver_state_free(state);
+    }
+    sp_free(sp);
+}
+
+/**
+ * Tests imported shadowing over the implicit `dea` prelude.
+ */
+func test_import_shadow_warning_replaces_dea_binding() {
+    let sp = make_paths();
+    with (let cfg = log_config_create(LL_SILENT, false) => drop cfg,
+          let diags = diag_create() => diag_free(diags)) {
+        let state = driver_analyze_entry(sp, "prelude_shadow_main", cfg);
+        let names = nr_resolve(state, diags);
+        let saw_main_import_shadow = false;
+
+        assert(!driver_has_errors(state), "expected no driver errors");
+        assert(count_diag_code(diags, "RES-0021") == 2,
+            "expected RES-0021 warnings for helper-local and main imported shadowing");
+        for (let i = 0; i < diag_count(diags); i = i + 1) {
+            let d = diag_get(diags, i);
+            if (eq_s(d.code, "RES-0021") && contains_s(d.message, "prelude_shadow_helper::sizeof")) {
+                saw_main_import_shadow = true;
+            }
+        }
+        assert(saw_main_import_shadow, "expected imported-shadow warning mentioning prelude_shadow_helper::sizeof");
+
+        let env = nr_env_find(names, "prelude_shadow_main");
+        assert(env != null, "expected prelude_shadow_main env");
+        assert(nr_module_env_imports_module(env as ModuleEnv*, "dea"), "expected dea import to remain visible");
+        assert(nr_module_env_imports_module(env as ModuleEnv*, "prelude_shadow_helper"),
+            "expected helper import to remain visible");
+
+        let sizeof_sym = nr_module_env_imported(env as ModuleEnv*, "sizeof");
+        assert(sizeof_sym != null, "expected imported sizeof symbol");
+        assert(eq_s((sizeof_sym as Symbol*).module_name, "prelude_shadow_helper"),
+            "unqualified sizeof should resolve to imported helper");
+
+        let dea_env = nr_env_find(names, "dea");
+        assert(dea_env != null, "expected synthesized dea env");
+        assert(nr_module_env_local(dea_env as ModuleEnv*, "sizeof") != null, "qualified dea::sizeof should remain available");
 
         nr_free(names);
         driver_state_free(state);
@@ -202,5 +254,6 @@ func main() {
     test_ambiguous_import_reports_warning();
     test_duplicate_top_level_reports_error();
     test_import_shadow_warning_keeps_qualified_variant_lookup_available();
+    test_import_shadow_warning_replaces_dea_binding();
     printl_s("name_resolver_test: all tests passed");
 }

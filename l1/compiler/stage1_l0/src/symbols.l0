@@ -30,7 +30,7 @@ struct Symbol {
     kind: SymbolKind;
     module_name: string;
     owner_name: string;
-    decl_ptr: void*;
+    decl_ptr: void*?;
     span: Span;
     resolved_type: Type*?;
 }
@@ -42,11 +42,11 @@ struct Symbol {
  * @param kind Kind of the symbol.
  * @param module_name Name of the module where the symbol is defined.
  * @param owner_name Name of the owner (e.g., function or struct) of the symbol.
- * @param decl_ptr Pointer to the AST node where the symbol is declared.
+ * @param decl_ptr Pointer to the AST node where the symbol is declared, or `null` for synthesized symbols.
  * @param span Source code span for error reporting.
  * @return A new Symbol instance with cloned string fields and null resolved type.
  */
-func symbol_create(name: string, kind: SymbolKind, module_name: string, owner_name: string, decl_ptr: void*,
+func symbol_create(name: string, kind: SymbolKind, module_name: string, owner_name: string, decl_ptr: void*?,
                    span: Span) -> Symbol* {
     return new Symbol(us_clone_s(name), kind, us_clone_s(module_name), us_clone_s(owner_name), decl_ptr, span, null);
 }

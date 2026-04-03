@@ -60,6 +60,13 @@ func test_tr_symbol_lookup() {
         let sym2 = tr_symbol_lookup(nr, env, "make_point", null, null);
         assert(sym2 != null, "make_point should be found via import");
         assert(eq_s((sym2 as Symbol*).module_name, "shared_types"), "make_point should be in shared_types");
+
+        with (let dea_path = vs_create(1) => vs_free(dea_path)) {
+            vs_push(dea_path, "dea");
+            let dea_sym = tr_symbol_lookup(nr, env, "sizeof", dea_path, null);
+            assert(dea_sym != null, "dea::sizeof should be found");
+            assert(eq_s((dea_sym as Symbol*).module_name, "dea"), "dea::sizeof should resolve from dea");
+        }
         
         // Lookup qualified variant (Status::Active)
         let env_ok = nr_env_find(nr, "shared_types") as ModuleEnv*;

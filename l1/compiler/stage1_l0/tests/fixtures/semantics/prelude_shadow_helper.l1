@@ -1,0 +1,5 @@
+module prelude_shadow_helper;
+
+func sizeof(x: int) -> int {
+    return x + 100;
+}

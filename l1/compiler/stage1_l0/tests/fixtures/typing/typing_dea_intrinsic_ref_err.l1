@@ -1,0 +1,7 @@
+module typing_dea_intrinsic_ref_err;
+
+func main() -> int {
+    let a = sizeof;
+    let b = dea::ord;
+    return 0;
+}

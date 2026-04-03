@@ -15,6 +15,7 @@ import util.diag;
 import util.strings;
 
 import ast;
+import dea_prelude;
 import driver;
 import locals;
 import name_resolver;
@@ -1055,10 +1056,11 @@ func etc_infer_binary(self: ExpressionTypeChecker*, expr_id: ExprId, expr: ExprN
 func etc_infer_call(self: ExpressionTypeChecker*, expr_id: ExprId, expr: ExprNode*) -> Type*? {
     let callee = expr_arena_get((self.current_unit as DriverUnit*).parse_result.expr_arena, expr.expr_a);
     if (ord(callee.kind) == ord(EX_VAR_REF)) {
-        if (eq_s(callee.text_value, "sizeof")) {
+        let callee_sym = etc_lookup_symbol(self, callee.text_value, callee.module_path, callee.name_qualifier);
+        if (dea_is_intrinsic_symbol(callee_sym, "sizeof")) {
             return etc_infer_sizeof_intrinsic(self, expr_id, expr);
         }
-        if (eq_s(callee.text_value, "ord")) {
+        if (dea_is_intrinsic_symbol(callee_sym, "ord")) {
             return etc_infer_ord_intrinsic(self, expr);
         }
     }
@@ -1284,17 +1286,24 @@ func etc_infer_expr(self: ExpressionTypeChecker*, expr_id: ExprId) -> Type*? {
                 let sym = etc_lookup_symbol(self, expr.text_value, expr.module_path, expr.name_qualifier);
                 if (sym != null) {
                     let s = sym as Symbol*;
-                    etc_set_var_res(self, expr_id, VAR_RES_MODULE);
-                    if (s.resolved_type != null) {
-                        ty = type_clone(s.resolved_type as Type*);
-                    } else if (ord(s.kind) == ord(SYM_FUNC)) {
-                        let ft = sig_lookup_func_type(self.result.signatures as SignatureTables*, s.module_name, s.name);
-                        if (ft != null) ty = type_clone(ft as Type*);
-                    } else if (ord(s.kind) == ord(SYM_LET)) {
-                        let lt = sig_lookup_let_type(self.result.signatures as SignatureTables*, s.module_name, s.name);
-                        if (lt != null) ty = type_clone(lt as Type*);
-                    } else if (ord(s.kind) == ord(SYM_ENUM_VARIANT)) {
-                        ty = type_new_enum(s.module_name, s.owner_name);
+                    if (ord(s.kind) == ord(SYM_FUNC) && dea_is_symbol(s)) {
+                        etc_diag_error(self, "TYP-0244",
+                            concat4_s("intrinsic '", concat3_s(s.module_name, "::", s.name),
+                                "' may only be used in call position", ""),
+                            unit.path, expr.span);
+                    } else {
+                        etc_set_var_res(self, expr_id, VAR_RES_MODULE);
+                        if (s.resolved_type != null) {
+                            ty = type_clone(s.resolved_type as Type*);
+                        } else if (ord(s.kind) == ord(SYM_FUNC)) {
+                            let ft = sig_lookup_func_type(self.result.signatures as SignatureTables*, s.module_name, s.name);
+                            if (ft != null) ty = type_clone(ft as Type*);
+                        } else if (ord(s.kind) == ord(SYM_LET)) {
+                            let lt = sig_lookup_let_type(self.result.signatures as SignatureTables*, s.module_name, s.name);
+                            if (lt != null) ty = type_clone(lt as Type*);
+                        } else if (ord(s.kind) == ord(SYM_ENUM_VARIANT)) {
+                            ty = type_new_enum(s.module_name, s.owner_name);
+                        }
                     }
                 } else {
                     etc_diag_error(self, "TYP-0189", concat3_s("unknown identifier '", expr.text_value, "'"),
