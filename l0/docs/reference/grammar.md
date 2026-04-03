@@ -47,7 +47,7 @@ Reserved keywords (not valid as identifiers):
 ```text
 module import func struct enum type extern let const
 return match case if else while for break continue in with cleanup
-true false sizeof null as new drop void bool string
+true false null as new drop void bool string
 byte short int long ubyte ushort uint ulong float double
 ```
 
@@ -386,7 +386,8 @@ Notes:
   followed by `*` or `?` suffixes that end at an argument boundary (`,` or `)`).
 - Plain identifiers like `sizeof(Point)` parse as `Expr`; the type checker resolves whether `Point` refers to a type or
   variable.
-- `sizeof` is not a keyword; it's a compiler-recognized intrinsic function.
+- Intrinsics such as `sizeof` and `ord` are parsed as ordinary identifiers and given special meaning during semantic
+  analysis and lowering.
 
 This grammar is intended to be just expressive enough to:
 
