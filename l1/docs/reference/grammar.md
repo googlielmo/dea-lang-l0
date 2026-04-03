@@ -14,6 +14,7 @@ Ident           ::=     Letter (Letter | Digit | "_")*
 
 Letter          ::=     "A".."Z" | "a".."z" | "_"
 Digit           ::=     "0".."9"
+BinDigit        ::=     "0" | "1"
 OctDigit        ::=     "0".."7"
 HexDigit        ::=     "0".."9" | "A".."F" | "a".."f"
 ```
@@ -21,9 +22,17 @@ HexDigit        ::=     "0".."9" | "A".."F" | "a".."f"
 ### 1.2 Literals
 
 ```ebnf
-IntLiteral          ::=     ( "-" )? Digit+ (* ambiguity with unary minus operator resolved in context by the lexer *)
+IntLiteral          ::=     ( "-" )? Digit+
+                      |     ( "-" )? "0b" BinDigit+
+                      |     ( "-" )? "0o" OctDigit+
+                      |     ( "-" )? "0x" HexDigit+
 
 BoolLiteral         ::=     "true" | "false"
+
+FloatLiteral        ::=     ( "-" )? Digit+ "." Digit+ ( ExponentPart )? ( TypeSuffix )?
+                      |     ( "-" )? Digit+ ExponentPart ( FTypeSuffix )?
+ExponentPart        ::=     ( "e" | "E" ) ( "+" | "-" )? Digit+
+FTypeSuffix         ::=     "f" | "F"
 
 ByteLiteral         ::=     "'" SingleByteChar "'"
 SingleByteChar      ::=     '\' EscapedChar
@@ -40,6 +49,8 @@ EscapedChar         ::=     '"' | '\' | 'n' | 't' | 'r' | "'" | Oct1to3
                       |     'u' Hex4 | 'U' Hex8 | 'x' HexDigit HexDigit*
 ```
 
+Note: ambiguity between `-` as a unary operator and as part of a negative literal is resolved in context by the lexer.
+
 ### 1.3 Keywords
 
 Reserved keywords (not valid as identifiers):
@@ -47,7 +58,7 @@ Reserved keywords (not valid as identifiers):
 ```text
 module import func struct enum type extern let const
 return match case if else while for break continue in with cleanup
-true false sizeof null as new drop void bool string
+true false null as new drop void bool string
 byte short int long ubyte ushort uint ulong float double
 ```
 
@@ -362,9 +373,10 @@ Arg                 ::=     TypeExpr
 TypeExpr            ::=     BuiltinTypeName ( "*" )* ( "?" )?
                       |     QualifiedIdent ( "*" )+ ( "?" )?
 
-BuiltinTypeName     ::=     "int" | "byte" | "bool" | "string" | "void"
+BuiltinTypeName     ::=     "int" | "float" | "double" | "byte" | "bool" | "string" | "void"
 
 PrimaryExpr         ::=     IntLiteral
+                      |     FloatLiteral
                       |     ByteLiteral
                       |     StringLiteral
                       |     BoolLiteral
@@ -386,10 +398,5 @@ Notes:
   followed by `*` or `?` suffixes that end at an argument boundary (`,` or `)`).
 - Plain identifiers like `sizeof(Point)` parse as `Expr`; the type checker resolves whether `Point` refers to a type or
   variable.
-- `sizeof` is not a keyword; it's a compiler-recognized intrinsic function.
-
-This grammar is intended to be just expressive enough to:
-
-- Write the bootstrap compiler and standard library in L<sub>1</sub>.
-- Avoid undefined behavior at the language level.
-- Keep the lexer/parser implementation straightforward.
+- Intrinsics such as `sizeof` and `ord` are parsed as ordinary identifiers and given special meaning during semantic
+  analysis and lowering.
