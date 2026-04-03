@@ -161,6 +161,7 @@ PAR_TRIGGERS = {
     "PAR-0320": "module main; import ;",
     "PAR-0321": "module main; import std.io",
     "PAR-0400": "module main; type Alias = ;",
+    "PAR-0401": "module main; func foo(x: main::) -> int { return 0; }",
     "PAR-9401": "module main; func main() -> int { let x: int[] = 0; return x; }",
     "PAR-0501": "module main; func main() -> int { with let x: int = 1 => x = 0 { return 0; } return 0; }",
     "PAR-0502": "module main; func main() -> int { with (let x: int = 1 => x = 0 { return 0; } return 0; }",

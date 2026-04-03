@@ -12,18 +12,18 @@ can begin inside the monorepo without changing the current L0 release target.
 
 Use this file as the Dea-wide status snapshot. For more specific details, use:
 
-- [../../MONOREPO.md](../../MONOREPO.md) for monorepo layout and root workflow.
-- [../plans/](../plans/) for active and closed Dea-wide plans.
-- [../../l0/docs/reference/project-status.md](../../l0/docs/reference/project-status.md) for the current L0
-  implementation and release status.
-- [../../l1/README.md](../../l1/README.md) for the current L1 bootstrap subtree entry point.
+- [MONOREPO.md](../../MONOREPO.md) for monorepo layout and root workflow.
+- [docs/plans/](../plans/) for active and closed Dea-wide plans.
+- [l0/docs/reference/project-status.md](../../l0/docs/reference/project-status.md) for the current L0 implementation and
+  release status.
+- [l1/README.md](../../l1/README.md) for the current L1 bootstrap subtree entry point.
 
 ## Current Repository Shape
 
 The monorepo currently contains:
 
-- `l0/` as the active language, compiler, runtime, docs, examples, and release subtree.
-- `l1/` as the next-level bootstrap subtree.
+- `l0/` as the implemented language, compiler, runtime, docs, examples, and release subtree.
+- `l1/` as the in-progress next-level subtree.
 - `scripts/` for monorepo-owned automation and shared helper modules.
 - `docs/` for Dea-wide and monorepo-wide plans/reference material.
 - `tools/` for vendored third-party dependencies.

@@ -45,6 +45,9 @@ level directory first.
 
 - Level-owned docs stay inside that level subtree (for example `l0/docs/**`).
 - Root `docs/**` is for Dea-wide and monorepo-wide material only.
+- Shared compiler diagnostic-code inventory and meanings live in `docs/specs/compiler/diagnostic-code-catalog.md`.
+- For shared diagnostic-code documentation, treat L0 Python Stage 1 as the current oracle for registered code
+  inventory/meaning unless a broader Dea-wide policy supersedes it.
 - Non-trivial shared work should be planned under `docs/plans/`.
 - Active plans stay at the category root. Closed plans move into `<category>/closed/`.
 

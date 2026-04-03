@@ -129,6 +129,7 @@ DIAGNOSTIC_CODE_FAMILIES = {
         "PAR-0320",
         "PAR-0321",
         "PAR-0400",
+        "PAR-0401",
         "PAR-9401",
         "PAR-0500",
         "PAR-0501",
