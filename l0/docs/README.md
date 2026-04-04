@@ -8,9 +8,12 @@ This directory is organized by document intent first, then subsystem.
 - `user/`: standalone end-user guides used as the source for shipped distribution docs.
 - `specs/`: normative contracts and behavioral specifications.
 - `implementation/`: implementation-oriented specs and design notes.
-- `proposals/`: planned or in-discussion changes and new features.
-- `plans/`: execution plans, especially bug-fix plans.
 - `attic/`: superseded or obsolete documents when archival storage is needed.
+
+Lifecycle artifacts do not live in `docs/`. Use the sibling `../work/` tree for:
+
+- `../work/proposals/`: planned or in-discussion changes and new features.
+- `../work/plans/`: execution plans and operational work tracking.
 
 Create subdirectories only when they are needed for real documents. Do not keep empty placeholders or `.gitkeep` entries
 in `docs/`; recreate directories on demand.
@@ -28,17 +31,7 @@ also produces a Chirpy-compatible export under `build/docs/blog-export/`, packag
 - Use `user/` for standalone end-user docs meant to ship in release archives.
 - Use `specs/` when defining canonical behavior/contracts.
 - Use `implementation/` for build strategy details (for example Stage 2 parser internals).
-- Use `proposals/` for future changes not yet accepted as canonical.
-- Use `plans/` for execution plans and operational work tracking.
 - Move a document to `attic/` only when it is superseded or obsolete.
-
-Plan category guidance:
-
-- `plans/features/`: user-facing language, compiler, or standard-library features.
-- `plans/tools/`: repository tooling and operational workflows, including CI, build/install packaging, release
-  automation, docs pipelines, Docker workflows, launchers, and validation tooling.
-- `plans/refactors/`: internal restructures that preserve the current external behavior.
-- `plans/bug-fixes/`: defect fixes in any subsystem.
 
 ## Naming Conventions
 
@@ -68,45 +61,9 @@ Version: YYYY-MM-DD
 - [Link to related architecture/spec/reference doc]
 ```
 
-### Plans (`plans/`)
+### Work Items (`../work/`)
 
-Plans for bug fixes, features, refactors, or tooling follow a more detailed metadata block.
-
-**Layout:** Each category (`features/`, `bug-fixes/`, `refactors/`, `tools/`) has a `closed/` subdirectory. Active plans
-(`Draft`, `In Progress`) remain at the category root. Plans with status `Closed` or `Implemented` are moved into
-`<category>/closed/`.
-
-**Attachments:** Non-Markdown reference files associated with plans (workflows, configs, scripts, etc.) go in
-`<category>/attachments/`. Attachments stay at the category level even after the referencing plan is closed, unless the
-attachment itself is obsolete.
-
-**Closing workflow:** When closing a plan, `git mv` it into the corresponding `closed/` subdirectory, then grep for its
-filename across `docs/` and update any cross-references to reflect the new path.
-
-**Template:**
-
-```markdown
-# [Bug Fix | Feature | Refactor | Tool] Plan
-
-## [Short Title]
-
-- Date: YYYY-MM-DD
-- Status: [Draft | In Progress | Closed (fixed/implemented)]
-- Title: [Full descriptive title]
-- Kind: [Bug Fix | Feature | Refactor | Tooling]
-- Severity: [Low | Medium | High | Critical]
-- Stage: [1 | 2 | Shared]
-- Subsystem: [Subsystem name]
-- Modules:
-    - `path/to/module.l0`
-- Test modules:
-    - `path/to/test_module.l0`
-- Repro: [Reproduction command or path] (optional)
-
-## Summary
-
-...
-```
+Plans and proposals follow the metadata and lifecycle rules in [`../work/README.md`](../work/README.md).
 
 ## Core References
 
@@ -139,7 +96,7 @@ Use `docs/attic/` only for superseded or obsolete documents.
 - Do not use `docs/attic/` as per-change version history; git already provides history.
 - Archive only retired docs; routine edits stay in the live tree.
 - When `docs/attic/` exists, keep any subdirectories aligned with the live docs tree (`reference/`, `specs/`,
-  `implementation/`, `proposals/`, `plans/`).
+  `implementation/`, `user/`).
 
 Archived file naming pattern:
 

@@ -3,7 +3,8 @@
 This subtree contains the bootstrap scaffold for Dea/L1 inside the Dea monorepo.
 
 The root [README.md](../README.md) remains the canonical public landing page for now and stays L0-centered in this
-phase. Run L1 bootstrap commands from this directory. L1-local documentation lives under [docs/](docs/).
+phase. Run L1 bootstrap commands from this directory. L1-local stable documentation lives under [docs/](docs/), while
+L1-local plans and other lifecycle artifacts live under [work/](work/).
 
 The subtree also includes minimal example programs at [examples/](examples/).
 

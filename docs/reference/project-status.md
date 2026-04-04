@@ -1,6 +1,6 @@
 # Dea Project Status
 
-Version: 2026-04-02
+Version: 2026-04-04
 
 This document summarizes the current status of the Dea project at the monorepo level.
 
@@ -13,7 +13,7 @@ can begin inside the monorepo without changing the current L0 release target.
 Use this file as the Dea-wide status snapshot. For more specific details, use:
 
 - [MONOREPO.md](../../MONOREPO.md) for monorepo layout and root workflow.
-- [docs/plans/](../plans/) for active and closed Dea-wide plans.
+- [work/plans/](../../work/plans/) for active and closed Dea-wide plans.
 - [l0/docs/reference/project-status.md](../../l0/docs/reference/project-status.md) for the current L0 implementation and
   release status.
 - [l1/README.md](../../l1/README.md) for the current L1 bootstrap subtree entry point.
@@ -25,7 +25,8 @@ The monorepo currently contains:
 - `l0/` as the implemented language, compiler, runtime, docs, examples, and release subtree.
 - `l1/` as the in-progress next-level subtree.
 - `scripts/` for monorepo-owned automation and shared helper modules.
-- `docs/` for Dea-wide and monorepo-wide plans/reference material.
+- `docs/` for Dea-wide and monorepo-wide stable documentation.
+- `work/` for Dea-wide and monorepo-wide plans/proposals.
 - `tools/` for vendored third-party dependencies.
 
 Inside `l1/`, the initial compiler layout is:
@@ -75,7 +76,7 @@ compiler path.
 
 The monorepo now has a small but real shared top-level layer:
 
-- root `docs/plans/` for Dea-wide planning,
+- root `work/plans/` for Dea-wide planning,
 - root `docs/reference/` for Dea-wide status/reference documents,
 - root `CLAUDE.md` for monorepo-wide workflow policy,
 - root `Makefile` for shared `help`, `venv`, and `clean`,

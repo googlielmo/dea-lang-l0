@@ -35,7 +35,8 @@ implementation status, read the relevant doc file(s).**
 
 Documentation policy:
 
-- `docs/README.md` for docs placement, naming, metadata standards, and attic rules.
+- `docs/README.md` for stable-doc placement, naming, metadata standards, and attic rules.
+- `work/README.md` for plan/proposal placement, lifecycle rules, and templates.
 - **Metadata:** Reference/Specs must have `Version: YYYY-MM-DD`. Plans (Bug Fix/Feature/Refactor/Tool) must use the
   standard metadata block (Date, Status, Kind, etc.).
 - Archived/obsolete document policy details live in `docs/README.md`.
@@ -243,7 +244,7 @@ rules here unless this file defines a narrower L0-specific requirement.
 5. **Documentation Updated:** If behavior changes, corresponding `.md` in `docs/`
 6. **Diagnostic Codes:** Equivalent Stage 2 conditions reuse Stage 1 codes exactly, including `ICE-xxxx`; new codes are
    globally unique and verified by search.
-7. **Plans Documented:** For non-trivial changes or bug fixes a plan must be documented in `docs/plans/` with a clear
-   execution path and expected outcomes. Active plans live at the category root (for example `docs/plans/features/` or
-   `docs/plans/tools/`); closed plans are `git mv`-ed into `<category>/closed/` with cross-references updated. See
-   `docs/README.md` for naming, placement, and closing workflow rules.
+7. **Plans Documented:** For non-trivial changes or bug fixes a plan must be documented in `work/plans/` with a clear
+   execution path and expected outcomes. Active plans live at the category root (for example `work/plans/features/` or
+   `work/plans/tools/`); closed plans are `git mv`-ed into `<category>/closed/` with cross-references updated. See
+   `work/README.md` for naming, placement, and closing workflow rules.

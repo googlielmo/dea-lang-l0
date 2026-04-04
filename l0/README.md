@@ -14,4 +14,5 @@ Useful local documents:
 - [compiler/stage2_l0/README.md](compiler/stage2_l0/README.md) for Stage 2 workflow details
 - [CLAUDE.md](CLAUDE.md) for repo-local AI guidance
 
-When L1 development begins, the full L0 project documentation will move here from the root README.
+L1 development has begun as a bootstrap subtree under [`../l1/`](../l1/), but the canonical public overview remains the
+root [README.md](../README.md) during the current L0-centered monorepo phase.

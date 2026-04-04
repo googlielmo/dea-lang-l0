@@ -1,26 +1,21 @@
 # Root Documentation Layout
 
-This root `docs/` tree is for Dea-wide and monorepo-wide documentation.
+This root `docs/` tree is for Dea-wide and monorepo-wide stable documentation.
 
 Today it contains:
 
-- Dea-wide plans that are not owned by one language level
-- monorepo layout and shared automation work
+- Dea-wide current-state reference material
+- Dea-wide normative specifications
+- monorepo layout and shared automation documentation once stabilized
 - Dea-wide reference/status documents that describe the project as a whole
 - future cross-level design and release-process documents
 
-Existing level-local documentation remains in the owning subtree such as `l0/docs/`.
+Existing level-local stable documentation remains in the owning subtree such as `l0/docs/`.
 
-## Plans
+Lifecycle artifacts do not live in `docs/`. Use the sibling `work/` tree instead:
 
-Root plans live under `docs/plans/` and follow the same category split used by level-local docs:
-
-- `features/`
-- `bug-fixes/`
-- `refactors/`
-- `tools/`
-
-Active plans live at the category root. Closed plans live under `<category>/closed/`.
+- root `work/` for Dea-wide plans and proposals
+- level-local `work/` trees such as `l0/work/` and `l1/work/` for level-owned plans and proposals
 
 ## Reference
 
@@ -33,3 +28,14 @@ Examples:
 - cross-level architecture notes once they exist
 
 Language-specific references live in the owning subtree such as `l0/docs/reference/`.
+
+## Specs
+
+Root specs live under `docs/specs/` and define Dea-wide contracts that are not owned by one level.
+
+Examples:
+
+- shared compiler contracts and catalogs
+- future cross-level release or compatibility policy
+
+Language-specific specs live in the owning subtree such as `l0/docs/specs/`.

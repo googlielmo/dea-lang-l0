@@ -22,12 +22,14 @@ run inside the relevant level directory.
 | `l0/`      | Dea/L0 language, compiler, runtime, docs, examples, and tests |
 | `l1/`      | Dea/L1 bootstrap scaffold and compiler seed                   |
 | `scripts/` | Monorepo-owned automation and shared helper modules           |
-| `docs/`    | Dea-wide and monorepo-wide plans and shared documentation     |
+| `docs/`    | Dea-wide and monorepo-wide stable documentation               |
+| `work/`    | Dea-wide and monorepo-wide plans and proposals                |
 | `tools/`   | Vendored third-party dependencies                             |
 
-Root-level documentation under [`docs/`](docs/) is reserved for Dea-wide and monorepo-wide material such as shared
-plans. Existing user-facing L0 documentation remains under [`l0/`](l0/). Root-owned automation helpers live under
-[`scripts/`](scripts/), while vendored third-party assets remain under [`tools/`](tools/).
+Root-level stable documentation under [`docs/`](docs/) is reserved for Dea-wide and monorepo-wide reference/spec
+material. Root-level lifecycle artifacts such as shared plans live under [`work/`](work/). Existing user-facing L0
+documentation remains under [`l0/`](l0/). Root-owned automation helpers live under [`scripts/`](scripts/), while
+vendored third-party assets remain under [`tools/`](tools/).
 
 ## Release Tags
 

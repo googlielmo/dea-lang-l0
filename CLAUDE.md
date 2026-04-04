@@ -12,7 +12,8 @@ This is a monorepo for the Dea language family. Each language level is a self-co
 | `l1/`      | L1 bootstrap scaffold, compiler seed, and local tests |
 | `scripts/` | Shared monorepo automation and helper modules         |
 | `tools/`   | Vendored third-party dependencies                     |
-| `docs/`    | Dea-wide and monorepo-wide plans/docs                 |
+| `docs/`    | Dea-wide and monorepo-wide stable docs                |
+| `work/`    | Dea-wide and monorepo-wide plans/proposals            |
 
 ## Per-Level Guidance
 
@@ -22,7 +23,7 @@ For L1-specific guidance, read `l1/CLAUDE.md`.
 
 For human-facing monorepo structure and root workflow guidance, read `MONOREPO.md`.
 
-For Dea-wide plans and shared refactors, use `docs/plans/` at the repository root.
+For Dea-wide plans, proposals, and shared refactors, use `work/` at the repository root.
 
 ## Root Makefile
 
@@ -41,15 +42,20 @@ level directory first.
 - Level-local `make venv` targets populate or reuse that shared environment.
 - Root `make venv` delegates to each registered level.
 
-## Documentation And Plans
+## Documentation And Work Tracking
 
 - Level-owned docs stay inside that level subtree (for example `l0/docs/**`).
-- Root `docs/**` is for Dea-wide and monorepo-wide material only.
+- Level-owned lifecycle artifacts stay inside that level subtree under `work/` (for example `l0/work/**`).
+- Root `docs/**` is for Dea-wide and monorepo-wide stable material only.
+- Root `work/**` is for Dea-wide and monorepo-wide lifecycle artifacts only.
 - Shared compiler diagnostic-code inventory and meanings live in `docs/specs/compiler/diagnostic-code-catalog.md`.
 - For shared diagnostic-code documentation, treat L0 Python Stage 1 as the current oracle for registered code
   inventory/meaning unless a broader Dea-wide policy supersedes it.
-- Non-trivial shared work should be planned under `docs/plans/`.
-- Active plans stay at the category root. Closed plans move into `<category>/closed/`.
+- Non-trivial shared work should be tracked under `work/plans/`.
+- Active plans stay at `work/plans/<kind>/`. Closed plans move into `work/plans/<kind>/closed/`.
+- Shared parity or seeded-port work defaults to one root-owned shared plan with explicit target implementations and
+  per-target status. Do not open a follow-up level-local plan for a mechanical downstream port unless the downstream
+  scope materially diverges.
 
 ## Git Conventions
 
