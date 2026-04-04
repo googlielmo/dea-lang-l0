@@ -1,6 +1,6 @@
 # Dea/L<sub>0</sub> Grammar
 
-Version: 2026-03-26
+Version: 2026-04-04
 
 The following is the formal grammar for the Dea/L<sub>0</sub> programming language in EBNF-style. This describes the
 concrete syntax that lexers and parsers should accept.
@@ -42,16 +42,17 @@ EscapedChar         ::=     '"' | '\' | 'n' | 't' | 'r' | "'" | Oct1to3
 
 ### 1.3 Keywords
 
-Reserved keywords (not valid as identifiers):
+Reserved words (not valid as identifiers):
 
 ```text
 module import func struct enum type extern let const
 return match case if else while for break continue in with cleanup
-true false null as new drop void bool string
-byte short int long ubyte ushort uint ulong float double
+true false null as new drop void bool string int byte
+tiny short long ushort uint ulong float double
 ```
 
-Note: not all keywords are used in L<sub>0</sub>; some are reserved for future extensions.
+Builtin type names such as `void`, `bool`, `string`, `int`, and `byte` are reserved. In addition, `tiny`, `short`,
+`long`, `ushort`, `uint`, `ulong`, `float`, and `double` are reserved for future extensions.
 
 ### 1.4 Symbols / operators
 

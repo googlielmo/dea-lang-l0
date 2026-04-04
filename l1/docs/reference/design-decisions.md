@@ -134,11 +134,14 @@ Rationale:
 
 The bootstrap compiler keeps integer behavior defined rather than inheriting host-C vagueness:
 
+- planned builtin integer names are `tiny`, `short`, `int`, `long`, `byte`, `ushort`, `uint`, and `ulong`
+- `tiny` is 8-bit signed semantics
+- `byte` is 8-bit unsigned semantics
 - `int` is 32-bit signed semantics
-- `byte` is 8-bit semantics
 - overflow-sensitive arithmetic and narrowing go through checked runtime helpers
 
-That policy is part of the language contract even though the current implementation is lowered through C.
+That policy is part of the language contract even though the current implementation is lowered through C. Some planned
+integer builtin names are documented in the grammar before the current bootstrap compiler implements them.
 
 ## 10. I/O and Runtime API Shape
 

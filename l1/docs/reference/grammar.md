@@ -1,6 +1,6 @@
 # Dea/L<sub>1</sub> Grammar
 
-Version: 2026-04-03
+Version: 2026-04-04
 
 The following is the formal grammar for the Dea/L<sub>1</sub> programming language in EBNF-style. This describes the
 concrete syntax that lexers and parsers should accept.
@@ -53,16 +53,18 @@ Note: ambiguity between `-` as a unary operator and as part of a negative litera
 
 ### 1.3 Keywords
 
-Reserved keywords (not valid as identifiers):
+Reserved words (not valid as identifiers):
 
 ```text
 module import func struct enum type extern let const
 return match case if else while for break continue in with cleanup
 true false null as new drop void bool string
-byte short int long ubyte ushort uint ulong float double
+byte tiny short int long ushort uint ulong float double
 ```
 
-Note: not all keywords are used in L<sub>1</sub>; some are reserved for future extensions.
+Builtin type names such as `void`, `bool`, `string`, `byte`, `tiny`, `short`, `int`, `long`, `ushort`, `uint`, `ulong`,
+`float`, and `double` are reserved. The grammar is prescriptive here and may intentionally lead the current bootstrap
+implementation. In addition, `in` and `const` are reserved for future extensions.
 
 ### 1.4 Symbols / operators
 
@@ -380,7 +382,9 @@ Arg                 ::=     TypeExpr
 TypeExpr            ::=     BuiltinTypeName ( "*" )* ( "?" )?
                       |     QualifiedIdent ( "*" )+ ( "?" )?
 
-BuiltinTypeName     ::=     "int" | "float" | "double" | "byte" | "bool" | "string" | "void"
+BuiltinTypeName     ::=     "tiny" | "short" | "int" | "long"
+                      |     "byte" | "ushort" | "uint" | "ulong"
+                      |     "float" | "double" | "bool" | "string" | "void"
 
 PrimaryExpr         ::=     IntLiteral
                       |     FloatLiteral
