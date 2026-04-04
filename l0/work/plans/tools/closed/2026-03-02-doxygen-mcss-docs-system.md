@@ -67,7 +67,7 @@ generation. It covers:
 - The docs source set is explicit and stable:
   - `compiler/stage1_py/**/*.py`, excluding tests and `__pycache__`
   - `compiler/stage2_l0/src/**/*.l0`
-  - `compiler/stage2_l0/check_trace_log.py`
+  - `compiler/stage2_l0/scripts/check_trace_log.py`
   - `compiler/shared/l0/stdlib/**/*.l0`
   - `compiler/shared/runtime/*.h`
   - `compiler/docgen/**/*.py` is intentionally excluded from generated API reference output

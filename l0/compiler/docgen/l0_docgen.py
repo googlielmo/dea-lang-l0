@@ -116,7 +116,7 @@ def build_source_manifest(root: Path) -> SourceManifest:
     for path in sorted((root / "compiler/stage2_l0/src").rglob("*.l0")):
         files.append(path.relative_to(root))
 
-    files.append(Path("compiler/stage2_l0/check_trace_log.py"))
+    files.append(Path("compiler/stage2_l0/scripts/check_trace_log.py"))
 
     for path in sorted((root / "compiler/shared/l0/stdlib").rglob("*.l0")):
         files.append(path.relative_to(root))
@@ -404,7 +404,7 @@ def main(argv: list[str] | None = None) -> int:
         mainpage=html_mainpage_path.as_posix(),
         stage1_dir=(shadow_root / "compiler/stage1_py").as_posix(),
         stage2_src_dir=(shadow_root / "compiler/stage2_l0/src").as_posix(),
-        stage2_cli_file=(shadow_root / "compiler/stage2_l0/check_trace_log.py").as_posix(),
+        stage2_cli_file=(shadow_root / "compiler/stage2_l0/scripts/check_trace_log.py").as_posix(),
         shared_stdlib_dir=(shadow_root / "compiler/shared/l0/stdlib").as_posix(),
         shared_runtime_dir=(shadow_root / "compiler/shared/runtime").as_posix(),
         strip_from_path=shadow_root.as_posix(),
@@ -431,7 +431,7 @@ def main(argv: list[str] | None = None) -> int:
             mainpage=latex_mainpage_path.as_posix(),
             stage1_dir=(shadow_root / "compiler/stage1_py").as_posix(),
             stage2_src_dir=(shadow_root / "compiler/stage2_l0/src").as_posix(),
-            stage2_cli_file=(shadow_root / "compiler/stage2_l0/check_trace_log.py").as_posix(),
+            stage2_cli_file=(shadow_root / "compiler/stage2_l0/scripts/check_trace_log.py").as_posix(),
             shared_stdlib_dir=(shadow_root / "compiler/shared/l0/stdlib").as_posix(),
             shared_runtime_dir=(shadow_root / "compiler/shared/runtime").as_posix(),
             strip_from_path=shadow_root.as_posix(),

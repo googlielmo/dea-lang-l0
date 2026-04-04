@@ -16,7 +16,7 @@
   - `l1/docs/`
   - `scripts/dea_tooling/`
 - Test modules:
-  - `l1/compiler/stage1_l0/run_tests.py`
+  - `l1/compiler/stage1_l0/scripts/run_tests.py`
   - install-prefix smoke checks
   - dist archive smoke checks
 - Related:

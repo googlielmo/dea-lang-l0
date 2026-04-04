@@ -17,7 +17,7 @@
   - `l1/`
   - root monorepo guidance files
 - Test modules:
-  - `l1/compiler/stage1_l0/run_tests.py`
+  - `l1/compiler/stage1_l0/scripts/run_tests.py`
   - root and level-local make/help/bootstrap smoke checks
 
 ## Summary

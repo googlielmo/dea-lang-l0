@@ -12,7 +12,7 @@
 - Modules:
   - `compiler/stage2_l0/src/expr_types.l0`
   - `compiler/stage2_l0/src/l0c.l0`
-  - `compiler/stage2_l0/run_tests.py`
+  - `compiler/stage2_l0/scripts/run_tests.py`
   - `compiler/stage2_l0/tests/l0c_stage2_bootstrap_test.sh`
   - `compiler/stage2_l0/tests/l0c_triple_bootstrap_test.py`
   - `work/plans/tools/closed/2026-03-09-stage2-bootstrap-compiler-artifact-noref.md`
@@ -142,8 +142,8 @@ The third self-built compiler must also pass a direct smoke check after the iden
       toolchains, and is skipped for `tcc`
    3. the third self-built compiler passes a direct smoke check
    4. all artifacts stay under `build/tests/...`
-6. Run `./compiler/stage2_l0/run_tests.py` to confirm the new triple-bootstrap regression integrates cleanly with the
-   Stage 2 suite.
+6. Run `./compiler/stage2_l0/scripts/run_tests.py` to confirm the new triple-bootstrap regression integrates cleanly
+   with the Stage 2 suite.
 
 ## Assumptions and Defaults
 

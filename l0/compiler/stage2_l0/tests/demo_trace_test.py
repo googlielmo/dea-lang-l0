@@ -17,7 +17,7 @@ import tempfile
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parent.parent.parent
-TRACE_CHECKER = REPO_ROOT / "compiler/stage2_l0/check_trace_log.py"
+TRACE_CHECKER = REPO_ROOT / "compiler/stage2_l0/scripts/check_trace_log.py"
 TARGET = REPO_ROOT / "examples/demo.l0"
 
 

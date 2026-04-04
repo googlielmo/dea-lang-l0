@@ -134,7 +134,7 @@ Useful local checks:
 make build-stage1
 source build/l1/bin/l1-env.sh
 l1c --gen examples/hello.l1
-python compiler/stage1_l0/run_trace_tests.py
+python compiler/stage1_l0/scripts/run_trace_tests.py
 ```
 
 ## 10. Ground-Truth References

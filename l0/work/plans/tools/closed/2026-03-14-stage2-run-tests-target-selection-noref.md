@@ -11,11 +11,11 @@
 - Subsystem: Test runner
 - Modules:
   - `Makefile`
-  - `compiler/stage2_l0/run_tests.py`
+  - `compiler/stage2_l0/scripts/run_tests.py`
   - `compiler/stage2_l0/README.md`
 - Test modules:
   - `compiler/stage2_l0/tests/l0c_stage2_run_tests_selection_test.py`
-- Repro: `./.venv/bin/python ./compiler/stage2_l0/run_tests.py driver_test`
+- Repro: `./.venv/bin/python ./compiler/stage2_l0/scripts/run_tests.py driver_test`
 
 ## Summary
 
@@ -35,6 +35,6 @@ only bare `PASS` / `FAIL` status lines, so short targeted runs give no per-test 
 
 ```bash
 ./.venv/bin/python ./compiler/stage2_l0/tests/l0c_stage2_run_tests_selection_test.py
-./.venv/bin/python ./compiler/stage2_l0/run_tests.py driver_test l0c_stage2_run_tests_selection_test
+./.venv/bin/python ./compiler/stage2_l0/scripts/run_tests.py driver_test l0c_stage2_run_tests_selection_test
 make DEA_BUILD_DIR=build/dea test-stage2 TESTS="driver_test l0c_stage2_run_tests_selection_test"
 ```

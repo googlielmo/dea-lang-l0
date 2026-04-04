@@ -11,7 +11,7 @@ from textwrap import dedent
 
 def _checker_path() -> Path:
     workspace_root = Path(__file__).resolve().parents[4]
-    return workspace_root / "compiler" / "stage2_l0" / "check_trace_log.py"
+    return workspace_root / "compiler" / "stage2_l0" / "scripts" / "check_trace_log.py"
 
 
 def _run_checker(tmp_path, log_text: str, extra_args: list[str] | None = None):

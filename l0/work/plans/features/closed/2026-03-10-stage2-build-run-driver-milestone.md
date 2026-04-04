@@ -194,8 +194,8 @@ parity.
 6. Final milestone verification commands are:
 
 ```bash
-python3 compiler/stage2_l0/run_tests.py
-python3 compiler/stage2_l0/run_trace_tests.py
+python3 compiler/stage2_l0/scripts/run_tests.py
+python3 compiler/stage2_l0/scripts/run_trace_tests.py
 ```
 
 ## Documentation Updates

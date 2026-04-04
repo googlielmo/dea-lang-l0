@@ -18,9 +18,10 @@ from typing import Iterable
 
 DEFAULT_MAX_JOBS = 12
 SCRIPT_DIR = Path(__file__).resolve().parent
-REPO_ROOT = SCRIPT_DIR.parent.parent
+STAGE_DIR = SCRIPT_DIR.parent
+REPO_ROOT = STAGE_DIR.parent.parent
 MONOREPO_ROOT = REPO_ROOT.parent
-TESTS_DIR = SCRIPT_DIR / "tests"
+TESTS_DIR = STAGE_DIR / "tests"
 DEA_BUILD_DIR_ENV = "DEA_BUILD_DIR"
 TRACE_EXCLUDED_L0_TESTS: set[str] = set()
 

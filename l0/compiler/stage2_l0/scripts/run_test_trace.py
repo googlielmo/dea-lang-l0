@@ -17,13 +17,12 @@ import sys
 from test_runner_common import (
     REPO_ROOT,
     SCRIPT_DIR,
+    TESTS_DIR,
     discover_l0_tests,
     require_repo_stage2_test_env,
     run_captured_binary_output,
     source_tree_l0c_command,
 )
-
-TESTS_DIR = SCRIPT_DIR / "tests"
 
 
 def parse_args() -> argparse.Namespace:

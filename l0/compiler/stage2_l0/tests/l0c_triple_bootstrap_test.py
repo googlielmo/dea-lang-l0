@@ -21,9 +21,9 @@ import time
 from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-PARENT_DIR = SCRIPT_DIR.parent
-if str(PARENT_DIR) not in sys.path:
-    sys.path.insert(0, str(PARENT_DIR))
+RUNNER_DIR = SCRIPT_DIR.parent / "scripts"
+if str(RUNNER_DIR) not in sys.path:
+    sys.path.insert(0, str(RUNNER_DIR))
 
 from test_runner_common import require_repo_stage2_test_env
 

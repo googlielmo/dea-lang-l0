@@ -108,7 +108,7 @@ Internal impl-only API types:
 1. Existing Stage 2 tests: `./compiler/stage2_l0/run_tests.sh`
 2. Focused parser regression: `./l0c -P compiler/stage2_l0/src run compiler/stage2_l0/tests/parser_test.l0`
 3. Trace plus triage: `./compiler/stage2_l0/run_parser_trace.sh`
-4. `./compiler/stage2_l0/check_trace_log.py <stderr-log> --triage --max-details 8`
+4. `./compiler/stage2_l0/scripts/check_trace_log.py <stderr-log> --triage --max-details 8`
 
 ## Implementation Verification
 
@@ -118,7 +118,7 @@ Executed on 2026-02-18:
    (`parser_test: all tests passed`).
 2. `./compiler/stage2_l0/run_tests.sh` Result: pass (`8/8` tests passed).
 3. `./compiler/stage2_l0/run_parser_trace.sh` Result: pass (`exit_code=0`).
-4. `./compiler/stage2_l0/check_trace_log.py /tmp/l0_stage2_parser_trace_20260218_165506.stderr.log --triage --max-details 8`
+4. `./compiler/stage2_l0/scripts/check_trace_log.py /tmp/l0_stage2_parser_trace_20260218_165506.stderr.log --triage --max-details 8`
    Result: pass (`errors=0`, `warnings=0`, `leaked_object_ptrs=0`, `leaked_string_ptrs=0`).
 
 ## Assumptions and Defaults

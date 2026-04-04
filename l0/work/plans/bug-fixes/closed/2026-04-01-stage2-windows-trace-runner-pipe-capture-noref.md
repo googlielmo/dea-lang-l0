@@ -10,9 +10,9 @@
 - Stage: Shared
 - Subsystem: Stage 2 test infrastructure / Windows trace capture
 - Modules:
-  - `compiler/stage2_l0/test_runner_common.py`
-  - `compiler/stage2_l0/run_trace_tests.py`
-  - `compiler/stage2_l0/run_test_trace.py`
+  - `compiler/stage2_l0/scripts/test_runner_common.py`
+  - `compiler/stage2_l0/scripts/run_trace_tests.py`
+  - `compiler/stage2_l0/scripts/run_test_trace.py`
   - `compiler/stage2_l0/tests/demo_trace_test.py`
 - Test modules:
   - `compiler/stage2_l0/tests/l0c_stage2_trace_runner_common_test.py`

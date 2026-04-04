@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
 
-SCRIPTS_ROOT = Path(__file__).resolve().parents[3] / "scripts"
+SCRIPTS_ROOT = Path(__file__).resolve().parents[4] / "scripts"
 if str(SCRIPTS_ROOT) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_ROOT))
 
@@ -24,9 +24,10 @@ from dea_tooling.bootstrap import resolve_bootstrap_compiler, wrapper_command
 
 DEFAULT_MAX_JOBS = 12
 SCRIPT_DIR = Path(__file__).resolve().parent
-REPO_ROOT = SCRIPT_DIR.parent.parent
+STAGE_DIR = SCRIPT_DIR.parent
+REPO_ROOT = STAGE_DIR.parent.parent
 MONOREPO_ROOT = REPO_ROOT.parent
-TESTS_DIR = SCRIPT_DIR / "tests"
+TESTS_DIR = STAGE_DIR / "tests"
 L1_BUILD_DIR_ENV = "L1_BUILD_DIR"
 DEFAULT_L1_BUILD_DIR = "build/l1"
 L1_BOOTSTRAP_L0C_ENV = "L1_BOOTSTRAP_L0C"

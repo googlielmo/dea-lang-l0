@@ -63,7 +63,7 @@ make venv DEA_BUILD_DIR="$DIST_DIR_REL" install-dev-stage2 >/dev/null
 make PREFIX="$PREFIX_DIR" install >/dev/null
 
 REPO_PYTHON="$(resolve_repo_python)"
-if ! bash -lc 'source "$1/bin/l0-env.sh" && DEA_BUILD_DIR="$2" "$3" ./compiler/stage2_l0/run_test_trace.py parser_test' bash "$PREFIX_DIR" "$DIST_DIR_REL" "$REPO_PYTHON" >"$TRACE_LOG" 2>&1; then
+if ! bash -lc 'source "$1/bin/l0-env.sh" && DEA_BUILD_DIR="$2" "$3" ./compiler/stage2_l0/scripts/run_test_trace.py parser_test' bash "$PREFIX_DIR" "$DIST_DIR_REL" "$REPO_PYTHON" >"$TRACE_LOG" 2>&1; then
     cat "$TRACE_LOG" >&2
     fail "run_test_trace.py failed after sourcing the installed prefix env"
 fi

@@ -202,10 +202,10 @@ test-stage1: venv
 	"$(VENV_PYTHON)" -m pytest -n auto
 
 test-stage2: venv install-dev-stage2
-	DEA_BUILD_DIR="$(DEA_BUILD_DIR)" "$(VENV_PYTHON)" ./compiler/stage2_l0/run_tests.py $(TESTS)
+	DEA_BUILD_DIR="$(DEA_BUILD_DIR)" "$(VENV_PYTHON)" ./compiler/stage2_l0/scripts/run_tests.py $(TESTS)
 
 test-stage2-trace: venv install-dev-stage2
-	DEA_BUILD_DIR="$(DEA_BUILD_DIR)" "$(VENV_PYTHON)" ./compiler/stage2_l0/run_trace_tests.py $(TESTS)
+	DEA_BUILD_DIR="$(DEA_BUILD_DIR)" "$(VENV_PYTHON)" ./compiler/stage2_l0/scripts/run_trace_tests.py $(TESTS)
 
 test-dist: venv
 	"$(VENV_PYTHON)" ./tests/test_make_dist_workflow.py

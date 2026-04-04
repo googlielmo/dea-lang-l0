@@ -194,16 +194,16 @@ Recommended commands:
 
 ```bash
 ./scripts/l0c ... --gen ...
-./compiler/stage2_l0/run_test_trace.py <test-or-reproducer>
-./compiler/stage2_l0/check_trace_log.py <stderr.log> --triage
+./compiler/stage2_l0/scripts/run_test_trace.py <test-or-reproducer>
+./compiler/stage2_l0/scripts/check_trace_log.py <stderr.log> --triage
 ```
 
 For ownership-related Stage 2 changes, run the full finalization checks:
 
 ```bash
-./compiler/stage2_l0/run_trace_tests.py
-./compiler/stage2_l0/run_test_trace.py <test_name>
-./compiler/stage2_l0/check_trace_log.py <stderr.log> --triage
+./compiler/stage2_l0/scripts/run_trace_tests.py
+./compiler/stage2_l0/scripts/run_test_trace.py <test_name>
+./compiler/stage2_l0/scripts/check_trace_log.py <stderr.log> --triage
 ```
 
 Pass criteria:

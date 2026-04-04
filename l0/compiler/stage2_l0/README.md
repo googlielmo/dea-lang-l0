@@ -113,11 +113,11 @@ If you invoke the Python helpers directly instead, prepare the repo-local env fi
 ```bash
 make venv
 make DEA_BUILD_DIR=build/dev-dea install-dev-stage2
-../.venv/bin/python ./compiler/stage2_l0/run_tests.py
-../.venv/bin/python ./compiler/stage2_l0/run_trace_tests.py
-../.venv/bin/python ./compiler/stage2_l0/run_trace_tests.py l0c_lib_test type_resolve_test
-../.venv/bin/python ./compiler/stage2_l0/run_test_trace.py parser_test
-../.venv/bin/python ./compiler/stage2_l0/run_tests.py driver_test l0c_build_run_test
+../.venv/bin/python ./compiler/stage2_l0/scripts/run_tests.py
+../.venv/bin/python ./compiler/stage2_l0/scripts/run_trace_tests.py
+../.venv/bin/python ./compiler/stage2_l0/scripts/run_trace_tests.py l0c_lib_test type_resolve_test
+../.venv/bin/python ./compiler/stage2_l0/scripts/run_test_trace.py parser_test
+../.venv/bin/python ./compiler/stage2_l0/scripts/run_tests.py driver_test l0c_build_run_test
 ```
 
 `run_tests.py` executes `*.l0` test modules plus `*_test.sh` and `*_test.py` regression scripts under
@@ -236,7 +236,7 @@ inspection. On failure, the test keeps artifacts automatically.
 Run Stage 2 L0 trace checks (runtime + leak triage on every trace-eligible top-level `.l0` test):
 
 ```bash
-./compiler/stage2_l0/run_trace_tests.py
+./compiler/stage2_l0/scripts/run_trace_tests.py
 ```
 
 This runner also uses a bounded auto-detected worker count by default; override with `L0_TEST_JOBS=<n>`.
@@ -259,7 +259,7 @@ Output:
 Capture Stage 2 trace logs (both ARC and memory) for a Stage 2 test:
 
 ```bash
-./compiler/stage2_l0/run_test_trace.py parser_test
+./compiler/stage2_l0/scripts/run_test_trace.py parser_test
 ```
 
 The test argument accepts either `parser_test` or `parser_test.l0`.
@@ -279,7 +279,7 @@ By default, output files are written under `/tmp` and printed at the end:
 Custom output paths:
 
 ```bash
-./compiler/stage2_l0/run_test_trace.py \
+./compiler/stage2_l0/scripts/run_test_trace.py \
   parser_test \
   --out /tmp/parser.stderr.log \
   --stdout /tmp/parser.stdout.log
@@ -290,13 +290,13 @@ Custom output paths:
 Analyze a captured trace log and detect definite issues (leaks, malformed critical events, panic traces):
 
 ```bash
-./compiler/stage2_l0/check_trace_log.py /tmp/parser.stderr.log
+./compiler/stage2_l0/scripts/check_trace_log.py /tmp/parser.stderr.log
 ```
 
 Triage and detail controls:
 
 ```bash
-./compiler/stage2_l0/check_trace_log.py /tmp/parser.stderr.log --triage --max-details 100
+./compiler/stage2_l0/scripts/check_trace_log.py /tmp/parser.stderr.log --triage --max-details 100
 ```
 
 Exit codes:

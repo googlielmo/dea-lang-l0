@@ -187,7 +187,7 @@ def test_trace_log_analyzer_surfaces_loc(analyze_single, compile_and_run, tmp_pa
 
     # Find check_trace_log.py relative to this test
     repo_root = Path(__file__).parent.parent.parent.parent.parent
-    analyzer = repo_root / "compiler" / "stage2_l0" / "check_trace_log.py"
+    analyzer = repo_root / "compiler" / "stage2_l0" / "scripts" / "check_trace_log.py"
     
     cmd = [sys.executable, str(analyzer), str(trace_file), "--triage"]
     cp = subprocess.run(cmd, capture_output=True, text=True)

@@ -168,8 +168,8 @@ Target behavior:
 05. `use-dev-stage1` and `use-dev-stage2` are the only targets that switch `<DIST_DIR>/bin/l0c`.
 06. `use-dev-stage1` and `use-dev-stage2` print the exact `source <DIST_DIR>/bin/l0-env.sh` command to run next.
 07. `test-stage1` ensures the local virtual environment exists, then runs `python -m pytest -n auto` from `./.venv`.
-08. `test-stage2` runs `./compiler/stage2_l0/run_tests.py`.
-09. `test-stage2-trace` runs `./compiler/stage2_l0/run_trace_tests.py`.
+08. `test-stage2` runs `./compiler/stage2_l0/scripts/run_tests.py`.
+09. `test-stage2-trace` runs `./compiler/stage2_l0/scripts/run_trace_tests.py`.
 10. `test-all` runs the three test targets above.
 11. `triple-test` runs `./compiler/stage2_l0/tests/l0c_triple_bootstrap_test.py` only as a convenience entrypoint for
     the separately tracked strict bootstrap fixed-point regression.

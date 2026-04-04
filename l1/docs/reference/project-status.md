@@ -1,6 +1,6 @@
 # L1 Project Status
 
-Version: 2026-04-02
+Version: 2026-04-04
 
 This document summarizes what is implemented in the Dea/L1 subtree today.
 
@@ -33,6 +33,10 @@ C generation, and host build/run integration for `.l1` inputs.
 
 The implementation sources remain `.l0`, while user-facing L1 source inputs, examples, and copied stdlib modules use
 `.l1`.
+
+The current compiler also synthesizes the implicit `dea` prelude module for language intrinsics. Unqualified
+`sizeof(...)` and `ord(...)` remain ergonomic bootstrap-stage spellings, while `dea::sizeof(...)` and `dea::ord(...)`
+are always available as the stable qualified forms.
 
 ### Runtime and Standard Library
 
@@ -71,8 +75,8 @@ make test-stage1
 
 Validation is currently centered on:
 
-- the `compiler/stage1_l0/tests/` suite
-- bootstrap trace tests and helper scripts under `compiler/stage1_l0/`
+- `make test-stage1` and the `compiler/stage1_l0/tests/` suite
+- `compiler/stage1_l0/scripts/run_trace_tests.py` for ARC/memory trace validation
 - keeping the copied stdlib/runtime tree usable by the bootstrap compiler
 
 ## Platform Support
@@ -82,7 +86,8 @@ bootstrap path:
 
 - Linux and macOS are the primary local-development hosts
 - builds require a C99-compatible host compiler
-- the bootstrap compiler itself depends on an upstream `l0c-stage2` unless `L1_BOOTSTRAP_L0C` is set explicitly
+- the default local upstream compiler is `../l0/build/dea/bin/l0c-stage2`
+- reproducible bootstrap flows can override that default with `L1_BOOTSTRAP_L0C`
 
 ## Known Constraints
 

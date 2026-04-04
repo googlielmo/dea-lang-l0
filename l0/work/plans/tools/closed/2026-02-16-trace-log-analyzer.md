@@ -9,7 +9,8 @@
 - Severity: Medium (improves debugging efficiency and regression detection)
 - Stage: 2
 - Subsystem: Tools
-- Modules: `compiler/stage2_l0/check_trace_log.py`, `compiler/stage1_py/tests/cli/test_stage2_trace_log_checker.py`
+- Modules: `compiler/stage2_l0/scripts/check_trace_log.py`,
+  `compiler/stage1_py/tests/cli/test_stage2_trace_log_checker.py`
 
 ## Summary
 
@@ -19,9 +20,9 @@ capture so it works on archived logs too.
 
 ## Public Interfaces / Types / CLI Additions
 
-1. New script: compiler/stage2_l0/check_trace_log.py
+1. New script: compiler/stage2_l0/scripts/check_trace_log.py
 2. CLI contract:
-   1. ./compiler/stage2_l0/check_trace_log.py \<trace_stderr.log>
+   1. ./compiler/stage2_l0/scripts/check_trace_log.py \<trace_stderr.log>
    2. Optional flags:
       1. --triage (print leak clustering/examples for faster debugging)
       2. --max-details N (override default detail cap for errors/warnings/triage examples)

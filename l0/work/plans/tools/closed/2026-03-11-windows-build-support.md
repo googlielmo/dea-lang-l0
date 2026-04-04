@@ -14,7 +14,7 @@
   - `compiler/stage1_py/l0c.py`
   - `compiler/stage1_py/tests/conftest.py`
   - `compiler/stage2_l0/src/build_driver.l0`
-  - `compiler/stage2_l0/test_runner_common.py`
+  - `compiler/stage2_l0/scripts/test_runner_common.py`
   - `scripts/build-stage2-l0c.sh`
   - `.github/workflows/ci.yml`
   - `docs/reference/project-status.md`
@@ -162,7 +162,7 @@ When `build-stage2-l0c.sh` runs on Windows (via MSYS2 bash), generate a `.cmd` c
 
 Make test runners detect bash availability and conditionally run `.sh` tests.
 
-**Changes in `compiler/stage2_l0/test_runner_common.py`:**
+**Changes in `compiler/stage2_l0/scripts/test_runner_common.py`:**
 
 1. At discovery time, check `shutil.which("bash")`.
 2. If bash is available: run `.sh` tests via `["bash", script_path]`.

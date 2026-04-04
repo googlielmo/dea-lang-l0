@@ -12,7 +12,7 @@
 - Modules:
   - `compiler/shared/runtime/l0_runtime.h`
   - `compiler/stage1_py/l0_c_emitter.py`
-  - `compiler/stage2_l0/check_trace_log.py`
+  - `compiler/stage2_l0/scripts/check_trace_log.py`
   - `docs/specs/runtime/trace.md`
 - Test modules:
   - `compiler/stage1_py/tests/backend/test_trace_location.py`
