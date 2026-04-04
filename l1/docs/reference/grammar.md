@@ -76,6 +76,10 @@ Note: not all keywords are used in L<sub>1</sub>; some are reserved for future e
 ?   (* used in types and as postfix try operator *)
 ```
 
+Note: the current bootstrap implementation reserves `&`, but no forward-looking design decision has been made yet on
+whether address-of will become part of the L<sub>1</sub> language surface. Likewise, the presence of postfix indexing
+syntax in this grammar should not be read as freezing the final semantic contract of pointer indexing.
+
 ### 1.5 Special identifier `_`
 
 The single identifier `_` is tokenized as a dedicated `UNDERSCORE` token and used only as the wildcard pattern. It is
