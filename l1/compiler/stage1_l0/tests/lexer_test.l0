@@ -7,65 +7,135 @@ module lexer_test;
 
 import std.io;
 import std.string;
+import std.assert;
 
-import tokens;
 import lexer;
+import tokens;
+import util.diag;
 
 /**
- * Helper function to print a labeled boolean value.
+ * Lexes source and asserts that the first token is one integer literal.
  *
- * @param label The label to print.
- * @param val The value to process.
+ * @param source Source text to lex.
+ * @param expected_text Expected literal spelling preserved in the token.
+ * @param expected_value Expected parsed integer value.
  */
-func print_bool(label: string, val: bool) {
-    if (val) {
-        printl_ss(label, "true");
-    } else {
-        printl_ss(label, "false");
-    }
-}
+func expect_single_int(source: string, expected_text: string, expected_value: int) {
+    let ls = ls_create(source, "<test>");
+    let toks = tokenize(ls);
+    assert(toks != null, "Expected lexing to succeed");
+    assert(!ls_has_errors(ls), "Expected no lexer diagnostics");
 
-/**
- * Tests test_token_vector.
- */
-func test_token_vector() {
-    printl_s("=== TokenVector Test ===");
+    let tv = toks as TokenVector;
+    assert(tv_len(tv) == 2, "Expected one token plus EOF");
 
-    // Create TokenVector
-    printl_s("Creating TokenVector...");
-    let tv = tv_create();
-    printl_si("Initial length:", tv_len(tv));
-
-    // Create some test tokens
-    printl_s("\nPushing tokens...");
-    let tok1 = Token(TT_MODULE, 0, 1, 1);
-    let tok2 = Token(TT_IDENT("foo"), 7, 1, 8);
-    let tok3 = Token(TT_SEMI, 10, 1, 11);
-    let tok4 = Token(TT_EOF, 11, 1, 12);
-
-    tv_push(tv, tok1);
-    tv_push(tv, tok2);
-    tv_push(tv, tok3);
-    tv_push(tv, tok4);
-    printl_si("Length after pushing 4 tokens:", tv_len(tv));
-
-    // Test get
-    printl_s("\nTesting get...");
-    for (let i = 0; i < tv_len(tv); i = i + 1) {
-        let tok = tv_get(tv, i);
-        printl_si("  Token at index:", i);
-        printl_ss("    type:", token_to_string(tok));
-        printl_si("    line:", tok.line);
-        printl_si("    column:", tok.column);
+    let tok = tv_get(tv, 0);
+    match (tok.token_type) {
+        TT_INT(text, value) => {
+            assert(eq_s(text, expected_text), "Unexpected integer literal text");
+            assert(value == expected_value, "Unexpected integer literal value");
+        }
+        _ => {
+            printl_ss("actual token:", token_to_string(tok));
+            assert(false, "Expected integer literal token");
+        }
     }
 
     tv_free(tv);
-    printl_s("\nDone!");
+    ls_free(ls);
+}
+
+/**
+ * Lexes source and asserts the first diagnostic code.
+ *
+ * @param source Source text to lex.
+ * @param expected Expected first diagnostic code.
+ */
+func expect_lex_error(source: string, expected: string) {
+    let ls = ls_create(source, "<test>");
+    let toks = tokenize(ls);
+    assert(toks == null, "Expected lexing to fail");
+    assert(ls_has_errors(ls), "Expected lexer diagnostics");
+    assert(diag_count(ls.diags) > 0, "Expected at least one diagnostic");
+
+    let diag = diag_get(ls.diags, 0);
+    if (!eq_s(diag.code, expected)) {
+        printl_ss("actual error code:", diag.code);
+        printl_ss("actual error message:", diag.message);
+        assert(false, "Unexpected lexer diagnostic code");
+    }
+
+    ls_free(ls);
+}
+
+/**
+ * Tests accepted prefixed integer literals.
+ */
+func test_prefixed_int_literals_ok() {
+    expect_single_int("0x2a", "0x2a", 42);
+    expect_single_int("0b101010", "0b101010", 42);
+    expect_single_int("0o52", "0o52", 42);
+    expect_single_int("-0x2a", "-0x2a", -42);
+    expect_single_int("-0b101010", "-0b101010", -42);
+    expect_single_int("-0o52", "-0o52", -42);
+}
+
+/**
+ * Tests malformed prefixed integer literals.
+ */
+func test_prefixed_int_literals_err() {
+    expect_lex_error("0x", "LEX-0062");
+    expect_lex_error("0b", "LEX-0063");
+    expect_lex_error("0o", "LEX-0064");
+    expect_lex_error("0xg", "LEX-0062");
+    expect_lex_error("0b2", "LEX-0063");
+    expect_lex_error("0o8", "LEX-0064");
+    expect_lex_error("0X2A", "LEX-0061");
+    expect_lex_error("0B101010", "LEX-0061");
+    expect_lex_error("0O52", "LEX-0061");
+    expect_lex_error("0x1g", "LEX-0061");
+    expect_lex_error("0b12", "LEX-0061");
+    expect_lex_error("0o78", "LEX-0061");
+    expect_lex_error("0xff_name", "LEX-0061");
+}
+
+/**
+ * Tests that signed 32-bit integer boundaries parse in every supported base.
+ */
+func test_int_literal_limits_all_bases() {
+    expect_single_int("2147483647", "2147483647", 2147483647);
+    expect_single_int("-2147483648", "-2147483648", -2147483648);
+    expect_single_int("0x7fffffff", "0x7fffffff", 2147483647);
+    expect_single_int("-0x80000000", "-0x80000000", -2147483648);
+    expect_single_int("0b1111111111111111111111111111111",
+        "0b1111111111111111111111111111111", 2147483647);
+    expect_single_int("-0b10000000000000000000000000000000",
+        "-0b10000000000000000000000000000000", -2147483648);
+    expect_single_int("0o17777777777", "0o17777777777", 2147483647);
+    expect_single_int("-0o20000000000", "-0o20000000000", -2147483648);
+}
+
+/**
+ * Tests prefixed integer overflow handling.
+ */
+func test_prefixed_int_literals_overflow() {
+    expect_lex_error("2147483648", "LEX-0060");
+    expect_lex_error("-2147483649", "LEX-0060");
+    expect_lex_error("0x80000000", "LEX-0060");
+    expect_lex_error("-0x80000001", "LEX-0060");
+    expect_lex_error("0b10000000000000000000000000000000", "LEX-0060");
+    expect_lex_error("-0b10000000000000000000000000000001", "LEX-0060");
+    expect_lex_error("0o20000000000", "LEX-0060");
+    expect_lex_error("-0o20000000001", "LEX-0060");
 }
 
 /**
  * Main entry point for the module.
  */
 func main() {
-    test_token_vector();
+    test_prefixed_int_literals_ok();
+    test_prefixed_int_literals_err();
+    test_int_literal_limits_all_bases();
+    test_prefixed_int_literals_overflow();
+    printl_s("lexer_test: all tests passed");
 }

@@ -131,6 +131,23 @@ func test_expr_precedence_postfix_and_qualified_type_ok() {
 }
 
 /**
+ * Tests prefixed integer literals in expressions.
+ */
+func test_prefixed_int_literals_ok() {
+    let src = "module main; func main() -> int { let x: int = 0x2a + 0b10 + 0o4; let y: int = -0x2a; return x + y; }";
+    expect_ok(src);
+}
+
+/**
+ * Tests malformed prefixed integer literals surfacing lexer diagnostics through parsing.
+ */
+func test_prefixed_int_literals_err() {
+    expect_error_code("module main; func main() -> int { return 0x; }", "LEX-0062");
+    expect_error_code("module main; func main() -> int { return 0b12; }", "LEX-0061");
+    expect_error_code("module main; func main() -> int { return 0o8; }", "LEX-0064");
+}
+
+/**
  * Tests test_postfix_chain_ok.
  */
 func test_postfix_chain_ok() {
@@ -237,6 +254,8 @@ func main() {
     test_with_mixed_forms_error();
     test_case_empty_error();
     test_expr_precedence_postfix_and_qualified_type_ok();
+    test_prefixed_int_literals_ok();
+    test_prefixed_int_literals_err();
     test_postfix_chain_ok();
     test_type_expr_call_arg_ok();
     test_reserved_binary_and_error();

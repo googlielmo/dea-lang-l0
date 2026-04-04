@@ -55,6 +55,9 @@ This document is an inventory reference. The normative rule for parity and reuse
 | `LEX-0059` | Unknown escape sequence                                |
 | `LEX-0060` | Integer literal exceeds 32-bit signed range            |
 | `LEX-0061` | Invalid character after integer literal                |
+| `LEX-0062` | Invalid hexadecimal integer literal (L1+)              |
+| `LEX-0063` | Invalid binary integer literal (L1+)                   |
+| `LEX-0064` | Invalid octal integer literal (L1+)                    |
 | `LEX-0070` | Unterminated block comment                             |
 
 ## `PAR`

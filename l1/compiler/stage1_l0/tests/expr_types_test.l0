@@ -260,6 +260,19 @@ func test_typing_cast_int_to_byte_overflow() {
 }
 
 /**
+ * Tests that prefixed integer literals keep ordinary `int` typing behavior.
+ */
+func test_typing_prefixed_int_literals_ok() {
+    let sp = make_paths();
+    with (let cfg = log_config_create(LL_SILENT, false) => drop cfg) {
+        let result = analysis_analyze_entry(sp, "typing_prefixed_int_literals", cfg);
+        assert(!analysis_has_errors(result), "expected no typing errors for typing_prefixed_int_literals");
+        analysis_result_free(result);
+    }
+    sp_free(sp);
+}
+
+/**
  * Tests explicit null unwrap diagnostics for nullable pointers.
  */
 func test_typing_cast_null_unwrap_err() {
@@ -435,6 +448,7 @@ func main() {
     test_typing_cast_ok();
     test_typing_cast_err();
     test_typing_cast_int_to_byte_overflow();
+    test_typing_prefixed_int_literals_ok();
     test_typing_cast_null_unwrap_err();
     test_typing_nullable_assignment();
     test_typing_call_err();

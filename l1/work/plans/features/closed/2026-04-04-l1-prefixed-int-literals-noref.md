@@ -3,7 +3,7 @@
 ## Add L1-prefixed integer literals
 
 - Date: 2026-04-04
-- Status: Draft
+- Status: Completed
 - Title: Add L1-prefixed integer literals
 - Kind: Feature
 - Severity: Medium
@@ -27,9 +27,8 @@
 
 ## Summary
 
-L1 now wants a grammar delta against L0 for integer literals: decimal literals should keep their current behavior, and
-additional prefixed forms should be accepted for hexadecimal (`0x` / `0X`), binary (`0b` / `0B`), and octal (`0o` /
-`0O`) integers.
+L1 now accepts a grammar delta against L0 for integer literals: decimal literals keep their existing behavior, and
+additional lower-case prefixed forms are accepted for hexadecimal (`0x`), binary (`0b`), and octal (`0o`) integers.
 
 Today the Stage 1 lexer only recognizes decimal `TT_INT` tokens and parses them through `string_to_int`. The parser,
 AST, and type checker already treat integer literals as ordinary `int` expressions after lexing, so this feature should
@@ -66,9 +65,9 @@ stay mostly lexer-led as long as all prefixed forms continue to lower into the e
 
 Specify the accepted spellings and boundaries for:
 
-- hexadecimal literals with `0x` / `0X`
-- binary literals with `0b` / `0B`
-- octal literals with `0o` / `0O`
+- hexadecimal literals with `0x`
+- binary literals with `0b`
+- octal literals with `0o`
 - optional unary `-` as the existing separate parser-level operator
 
 This phase should also define which malformed forms are rejected, including missing digits after a prefix, invalid
@@ -122,6 +121,17 @@ Add tests for:
 4. Prefixed literals surface as ordinary `int` expressions in Stage 1 typing.
 5. Malformed prefixed literals fail during lexing/parsing with deterministic diagnostics.
 6. Signed 32-bit overflow is still rejected for prefixed literals.
+
+## Outcome
+
+1. `compiler/stage1_l0/src/lexer.l0` now lexes lower-case `0x`, `0b`, and `0o` integer literals on the existing `TT_INT`
+   path.
+2. Malformed prefixed literals report dedicated lexer diagnostics `LEX-0062`, `LEX-0063`, and `LEX-0064`; mixed-tail
+   cases such as `0b12` still fail with `LEX-0061`.
+3. `compiler/stage1_l0/tests/lexer_test.l0` now covers valid literals, malformed literals, and signed 32-bit min/max and
+   overflow boundaries across decimal, hexadecimal, binary, and octal spellings.
+4. `compiler/stage1_l0/tests/parser_test.l0` and `compiler/stage1_l0/tests/expr_types_test.l0` confirm the parser and
+   type checker continue to treat prefixed literals as ordinary `int` expressions.
 
 ## Open Design Constraints
 

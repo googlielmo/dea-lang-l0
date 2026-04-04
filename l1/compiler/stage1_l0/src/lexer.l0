@@ -72,6 +72,16 @@ func escape_char_value(c: byte) -> byte {
 }
 
 /**
+ * Check whether a byte is a binary digit.
+ *
+ * @param c Byte to inspect.
+ * @return `true` if `c` is `0` or `1`.
+ */
+func is_binary_digit(c: byte) -> bool {
+    return c == '0' || c == '1';
+}
+
+/**
  * Check whether a byte is an octal digit.
  *
  * @param c Byte to inspect.
@@ -631,6 +641,7 @@ func ls_read_valid_char_escape(self: LexerState*, single_byte: bool) -> EscapedC
 
 /**
  * Reads an integer literal from the input, starting with the first digit character.
+ * Supports decimal, hexadecimal (0x), binary (0b), and octal (0o) literals.
  * Validates that the literal is well-formed and does not contain invalid characters immediately following it.
  * Also checks for integer overflow and ensures the value fits within a 32-bit signed integer range.
  * Returns a Token of type TT_INT if successful, or `null` if a lexing error occurs, in which case the error field
@@ -638,24 +649,71 @@ func ls_read_valid_char_escape(self: LexerState*, single_byte: bool) -> EscapedC
  */
 func ls_read_number(self: LexerState*, first_char: byte, is_negative: bool,
                     start_index: int, start_line: int, start_column: int) -> Token? {
-    with (let cb = cb_create() => cb_free(cb)) {
+    with (let cb = cb_create() => cb_free(cb),
+          let vb = cb_create() => cb_free(vb)) {
+        let base = 10;
+
         if (is_negative) {
+            cb_append(vb, '-');
             cb_append(cb, '-');
         }
-        cb_append(cb, first_char);
-        while (is_digit(ls_peek(self))) {
-            cb_append(cb, ls_advance(self));
-        }
-        let number_str = cb_to_string(cb);
 
-        // Check for invalid characters immediately following the number (e.g., "123abc")
-        if (is_ident_start(ls_peek(self))) {
+        if (first_char == '0' && ls_peek(self) == 'x') {
+            base = 16;
+            cb_append(cb, first_char);
+            cb_append(cb, ls_advance(self));
+            if (!is_hex_digit(ls_peek(self))) {
+                ls_emit_error(self, "LEX-0062", "invalid hexadecimal literal, expected at least one hex digit after '0x'", start_line, start_column, self.line, self.column);
+                return null;
+            }
+            while (is_hex_digit(ls_peek(self))) {
+                cb_append(vb, ls_peek(self));
+                cb_append(cb, ls_advance(self));
+            }
+        } else if (first_char == '0' && ls_peek(self) == 'b') {
+            base = 2;
+            cb_append(cb, first_char);
+            cb_append(cb, ls_advance(self));
+            if (!is_binary_digit(ls_peek(self))) {
+                ls_emit_error(self, "LEX-0063", "invalid binary literal, expected at least one binary digit after '0b'", start_line, start_column, self.line, self.column);
+                return null;
+            }
+            while (is_binary_digit(ls_peek(self))) {
+                cb_append(vb, ls_peek(self));
+                cb_append(cb, ls_advance(self));
+            }
+        } else if (first_char == '0' && ls_peek(self) == 'o') {
+            base = 8;
+            cb_append(cb, first_char);
+            cb_append(cb, ls_advance(self));
+            if (!is_octal_digit(ls_peek(self))) {
+                ls_emit_error(self, "LEX-0064", "invalid octal literal, expected at least one octal digit after '0o'", start_line, start_column, self.line, self.column);
+                return null;
+            }
+            while (is_octal_digit(ls_peek(self))) {
+                cb_append(vb, ls_peek(self));
+                cb_append(cb, ls_advance(self));
+            }
+        } else {
+            cb_append(vb, first_char);
+            cb_append(cb, first_char);
+            while (is_digit(ls_peek(self))) {
+                cb_append(vb, ls_peek(self));
+                cb_append(cb, ls_advance(self));
+            }
+        }
+
+        let number_str = cb_to_string(cb);
+        let value_str = cb_to_string(vb);
+
+        // Reject identifier-like or mixed-base suffixes such as `123abc`, `0b12`, or `0xff_name`.
+        if (is_ident_part(ls_peek(self))) {
             ls_emit_error(self, "LEX-0061", concat3_s("invalid character '", byte_to_s(ls_peek(self)), "' after integer literal"), start_line, start_column, self.line, self.column);
             return null;
         }
 
         // Check for integer overflow
-        let number_value : int? = string_to_int(number_str);
+        let number_value : int? = string_to_int_base(value_str, base);
         if (number_value == null) {
             ls_emit_error(self, "LEX-0060", concat3_s("integer literal '", number_str, "' exceeds 32-bit signed range"), start_line, start_column, self.line, self.column);
             return null;
