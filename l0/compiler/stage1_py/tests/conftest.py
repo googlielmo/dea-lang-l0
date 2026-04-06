@@ -24,7 +24,35 @@ from l0_driver import L0Driver
 from l0_paths import SourceSearchPaths
 
 import shutil
+
 import pytest
+
+
+def pytest_addoption(parser):
+    parser.addoption(
+        "--quiet-progress",
+        action="store_true",
+        default=False,
+        help="Suppress per-test progress characters like ...F... while keeping failures and summary",
+    )
+
+
+@pytest.hookimpl(tryfirst=True)
+def pytest_report_teststatus(report, config):
+    if not config.getoption("--quiet-progress"):
+        return None
+
+    # Only change the short progress character.
+    # Keep the normal category and verbose word so summaries still work.
+    if report.when in {"setup", "call", "teardown"}:
+        if report.passed:
+            return "passed", "", "PASSED"
+        if report.failed:
+            return "failed", "F", "FAILED"
+        if report.skipped:
+            return "skipped", "", "SKIPPED"
+
+    return None
 
 
 def _compiler_flag_family(compiler: str) -> str:
@@ -140,6 +168,7 @@ def write_l0_file(temp_project: Path):
         code content, writes the file (automatically dedenting the content),
         and returns the Path to the written file.
     """
+
     def _write(module_name: str, content: str) -> Path:
         parts = module_name.split(".")
         file_path = temp_project.joinpath(*parts).with_suffix(".l0")
@@ -172,6 +201,7 @@ def write_l0_file_to():
         A callable that takes a root Path, a module name, and source content,
         writes the file, and returns its Path.
     """
+
     def _write(root: Path, module_name: str, content: str) -> Path:
         parts = module_name.split(".")
         file_path = root.joinpath(*parts).with_suffix(".l0")
@@ -242,6 +272,7 @@ def compile_and_run(runtime_dir: Path):
         resulting binary, and returns a tuple:
         (success_boolean, standard_output_string, standard_error_string).
     """
+
     def _compile_and_run(c_code: str, work_dir: Path) -> tuple[bool, str, str]:
         cc = _find_cc()
         flag_family = _compiler_flag_family(cc)
@@ -321,6 +352,7 @@ def analyze_single(temp_project: Path, stage1_root: Path):
         A callable that takes a module name and source code string,
         and returns an AnalysisResult.
     """
+
     def _analyze(module_name: str, src: str):
         parts = module_name.split(".")
         file_path = temp_project.joinpath(*parts).with_suffix(".l0")
@@ -357,6 +389,7 @@ def codegen_single(analyze_single):
         and returns a tuple `(c_code, diagnostics)`. If analysis fails,
         `c_code` is None and `diagnostics` contains the errors.
     """
+
     def _codegen(module_name: str, src: str):
         result = analyze_single(module_name, src)
 

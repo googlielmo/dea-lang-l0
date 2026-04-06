@@ -155,9 +155,15 @@ make test-stage1                                      # recommended Stage 1 test
 For Stage 2 (`compiler/stage2_l0`) changes, finalization checks should include:
 
 ```bash
-make DEA_BUILD_DIR=build/dev-dea test-stage2
-make DEA_BUILD_DIR=build/dev-dea test-stage2-trace
-make DEA_BUILD_DIR=build/dev-dea triple-test
+make test-stage2
+make test-stage2-trace
+make triple-test # this is included in test-stage2 but can be run separately if needed
+```
+
+Full Stage 1 + Stage 2 validation can be run in parallel (recommended finalization step before commit) with:
+
+```bash
+make -j test-all # runs all tests in parallel, including Stage 1, Stage 2, and trace tests
 ```
 
 For workflow and distribution tooling validation:
@@ -175,7 +181,7 @@ make refresh-goldens                                  # regenerate Stage 2 backe
 ```
 
 These Make targets are self-contained repo-local workflows: they ensure `../.venv`, prepare the Stage 2 artifact under
-`DEA_BUILD_DIR`, and scrub installed-prefix `L0_*` env leakage before running.
+`DEA_BUILD_DIR` (default=`build/dea`), and scrub installed-prefix `L0_*` env leakage before running.
 
 `run_trace_tests.py` is an important finalization gate because it validates ARC/memory traces and leak triage across all
 Stage 2 tests.

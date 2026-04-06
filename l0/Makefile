@@ -198,34 +198,34 @@ else
 endif
 	@printf '\n------------------------------------------------------------------------------\n'
 
-test-stage1: venv
-	"$(VENV_PYTHON)" -m pytest -n auto
+test-stage1: | venv
+	"$(VENV_PYTHON)" -m pytest -n auto -qq --quiet-progress
 
-test-stage2: venv install-dev-stage2
+test-stage2: install-dev-stage2 | venv
 	DEA_BUILD_DIR="$(DEA_BUILD_DIR)" "$(VENV_PYTHON)" ./compiler/stage2_l0/scripts/run_tests.py $(TESTS)
 
-test-stage2-trace: venv install-dev-stage2
+test-stage2-trace: install-dev-stage2 | venv
 	DEA_BUILD_DIR="$(DEA_BUILD_DIR)" "$(VENV_PYTHON)" ./compiler/stage2_l0/scripts/run_trace_tests.py $(TESTS)
 
-test-dist: venv
+test-dist: | venv
 	"$(VENV_PYTHON)" ./tests/test_make_dist_workflow.py
 
-test-all: test-stage1 test-stage2 test-stage2-trace test-workflows
-
-triple-test: venv install-dev-stage2
+triple-test: install-dev-stage2 | venv
 	DEA_BUILD_DIR="$(DEA_BUILD_DIR)" "$(VENV_PYTHON)" ./compiler/stage2_l0/tests/l0c_triple_bootstrap_test.py
 
-test-dea-build: venv
+test-dea-build: | venv
 	"$(VENV_PYTHON)" ./tests/test_make_dea_build_workflow.py
 
-test-dist-fallback: venv
+test-dist-fallback: | venv
 	"$(VENV_PYTHON)" ./tests/test_dist_tools_lib_fallback.py
 
-test-release-tags: venv
+test-release-tags: | venv
 	"$(VENV_PYTHON)" ./tests/test_release_tag_policy.py
 
 test-workflows: test-dist test-dea-build test-dist-fallback test-release-tags
 	@printf 'All workflow tests passed!\n'
+
+test-all: test-stage1 test-stage2 test-stage2-trace test-workflows
 
 refresh-goldens: venv
 	"$(VENV_PYTHON)" ./scripts/refresh_stage2_backend_goldens.py
