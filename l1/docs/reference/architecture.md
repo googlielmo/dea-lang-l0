@@ -57,11 +57,12 @@ Current CLI entry point: `compiler/stage1_l0/src/l1c.l0`.
 Normal developer workflow:
 
 ```bash
-make -C ../l0 use-dev-stage2
-make build-stage1
-source build/l1/bin/l1-env.sh
+make use-dev-stage1
+source build/dea/bin/l1-env.sh
 l1c --help
 ```
+
+`make use-dev-stage1` auto-prepares the default repo-local upstream `../l0/build/dea/bin/l0c-stage2` when needed.
 
 ## 2. Pass Responsibilities
 

@@ -12,11 +12,12 @@ programs and copied L1 stdlib modules that those tests compile as L1-language in
 Run the local bootstrap workflow from [`l1/`](../../README.md):
 
 ```bash
-make -C ../../l0 use-dev-stage2
-make build-stage1
-source build/l1/bin/l1-env.sh
+make use-dev-stage1
+source build/dea/bin/l1-env.sh
 l1c --version
 ```
+
+`make use-dev-stage1` auto-prepares the default repo-local upstream `../../l0/build/dea/bin/l0c-stage2` when needed.
 
 For a non-default upstream bootstrap compiler, set `L1_BOOTSTRAP_L0C=/path/to/l0c-stage2` when running
 `make build-stage1`.

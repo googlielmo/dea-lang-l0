@@ -16,11 +16,12 @@ bootstrap.
 Minimal local workflow:
 
 ```bash
-make -C ../l0 use-dev-stage2
-make build-stage1
-source build/l1/bin/l1-env.sh
+make use-dev-stage1
+source build/dea/bin/l1-env.sh
 l1c --version
 ```
+
+`make use-dev-stage1` auto-prepares the default repo-local upstream `../l0/build/dea/bin/l0c-stage2` when needed.
 
 To use an explicit upstream L0 compiler instead of the repo-local default, set `L1_BOOTSTRAP_L0C=/path/to/l0c` when
 running `make build-stage1`.

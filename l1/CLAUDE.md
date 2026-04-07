@@ -27,8 +27,8 @@ Dea/L1 is in bootstrap-scaffold status.
 
 ```bash
 make venv
-make build-stage1
-source build/l1/bin/l1-env.sh
+make use-dev-stage1
+source build/dea/bin/l1-env.sh
 l1c --help
 l1c --version
 make test-stage1

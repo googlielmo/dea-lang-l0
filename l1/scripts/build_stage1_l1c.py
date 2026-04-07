@@ -30,7 +30,7 @@ from dea_tooling.launchers import (
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 MONOREPO_ROOT = REPO_ROOT.parent
-DEFAULT_L1_BUILD_DIR = "build/l1"
+DEFAULT_L1_BUILD_DIR = "build/dea"
 L1_BUILD_DIR_ENV = "L1_BUILD_DIR"
 L1_BOOTSTRAP_L0C_ENV = "L1_BOOTSTRAP_L0C"
 
