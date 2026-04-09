@@ -31,7 +31,7 @@ help:
 		'  venv               Create or reuse the shared monorepo `../.venv`.' \
 		'  use-dev-stage1     Build and switch the repo-local `l1c` alias to Stage 1.' \
 		'  test-all           Run the full L1 validation suite (currently `test-stage1` only).' \
-		'  test-stage1        Run the L1 Stage 1 `.l0` implementation test suite with the built repo-local compiler.' \
+		'  test-stage1        Run the L1 Stage 1 `.l0` implementation tests with the built repo-local compiler.' \
 		'  clean              Remove repo-local build artifacts under `build/*`.' \
 		'' \
 		'Variables:' \

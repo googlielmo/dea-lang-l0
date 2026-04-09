@@ -1,5 +1,0 @@
-module dep2;
-
-func g() -> int {
-    return 2;
-}

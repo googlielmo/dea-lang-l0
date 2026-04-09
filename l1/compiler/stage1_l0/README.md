@@ -9,6 +9,9 @@ The implementation sources in this subtree remain `.l0`, and the copied implemen
 tests are exercised through the upstream `l0c-stage2` bootstrap compiler rather than through `l1c` itself. The fixture
 programs and copied L1 stdlib modules that those tests compile as L1-language inputs now use the `.l1` extension.
 
+Stage 1 validation here is limited to those `.l0` implementation tests and their focused backend/emitter assertions.
+Committed full-file generated-C golden checks are intentionally out of scope for the current Stage 1 bootstrap contract.
+
 Run the local bootstrap workflow from [`l1/`](../../README.md):
 
 ```bash

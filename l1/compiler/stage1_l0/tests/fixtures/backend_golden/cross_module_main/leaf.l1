@@ -1,5 +1,0 @@
-module leaf;
-
-func h() -> int {
-    return 3;
-}

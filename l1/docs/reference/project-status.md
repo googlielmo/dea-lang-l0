@@ -76,9 +76,11 @@ make test-stage1
 
 Validation is currently centered on:
 
-- `make test-stage1` and the `compiler/stage1_l0/tests/` suite
+- `make test-stage1` and the `.l0` implementation tests under `compiler/stage1_l0/tests/`
 - `compiler/stage1_l0/scripts/run_trace_tests.py` for ARC/memory trace validation
 - keeping the copied stdlib/runtime tree usable by the bootstrap compiler
+
+Current Stage 1 validation does not include an end-to-end exact generated-C golden-file diff suite.
 
 ## Platform Support
 

@@ -1,5 +1,0 @@
-module main;
-
-func main() -> int {
-    return 0;
-}
