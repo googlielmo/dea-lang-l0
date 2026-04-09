@@ -18,34 +18,34 @@
 /* Optional wrapper types (late) */
 /* Function declarations */
 /* Module: main */
-l0_int l0_main_main(void);
+dea_int dea_main_main(void);
 /* Module: dep1 */
-l0_int l0_dep1_f(void);
+dea_int dea_dep1_f(void);
 /* Module: leaf */
-l0_int l0_leaf_h(void);
+dea_int dea_leaf_h(void);
 /* Module: dep2 */
-l0_int l0_dep2_g(void);
+dea_int dea_dep2_g(void);
 /* Function definitions */
 /* -------------------------------- */
 /* Module: main */
 /* -------------------------------- */
-l0_int l0_main_main(void)
+dea_int dea_main_main(void)
 {
-    return (_rt_iadd(l0_dep1_f(), l0_dep2_g()));
+    return (_rt_iadd(dea_dep1_f(), dea_dep2_g()));
 }
 
 /* -------------------------------- */
 /* Module: dep1 */
 /* -------------------------------- */
-l0_int l0_dep1_f(void)
+dea_int dea_dep1_f(void)
 {
-    return l0_leaf_h();
+    return dea_leaf_h();
 }
 
 /* -------------------------------- */
 /* Module: leaf */
 /* -------------------------------- */
-l0_int l0_leaf_h(void)
+dea_int dea_leaf_h(void)
 {
     return 3;
 }
@@ -53,7 +53,7 @@ l0_int l0_leaf_h(void)
 /* -------------------------------- */
 /* Module: dep2 */
 /* -------------------------------- */
-l0_int l0_dep2_g(void)
+dea_int dea_dep2_g(void)
 {
     return 2;
 }
@@ -62,5 +62,5 @@ l0_int l0_dep2_g(void)
 int main(int argc, char **argv)
 {
     _rt_init_args(argc, argv);
-    return (int) l0_main_main();
+    return (int) dea_main_main();
 }

@@ -18,26 +18,26 @@
 /* Optional wrapper types (late) */
 /* Function declarations */
 /* Module: main */
-l0_int l0_main_add(l0_int a, l0_int b);
-l0_int l0_main_main(void);
+dea_int dea_main_add(dea_int a, dea_int b);
+dea_int dea_main_main(void);
 /* Function definitions */
 /* -------------------------------- */
 /* Module: main */
 /* -------------------------------- */
-l0_int l0_main_add(l0_int a, l0_int b)
+dea_int dea_main_add(dea_int a, dea_int b)
 {
     return (_rt_iadd(a, b));
 }
 
-l0_int l0_main_main(void)
+dea_int dea_main_main(void)
 {
-    l0_int sum = 0;
+    dea_int sum = 0;
     // for loop
     {
-        l0_int i = 0;
+        dea_int i = 0;
         while (1)
         {
-            l0_bool l0_cond_1 = 0;
+            dea_bool dea_cond_1 = 0;
             {
                 {
                     if ((i < 3))
@@ -47,17 +47,17 @@ l0_int l0_main_main(void)
                 }
                 goto __cond_false_4;
             __cond_true_3:;
-                l0_cond_1 = 1;
+                dea_cond_1 = 1;
                 goto __cond_end_5;
             __cond_false_4:;
             __cond_end_5:;
             }
-            if ((!(l0_cond_1)))
+            if ((!(dea_cond_1)))
             {
                 goto __lbrk_1;
             }
             {
-                l0_bool l0_cond_2 = 0;
+                dea_bool dea_cond_2 = 0;
                 {
                     {
                         if ((i < 2))
@@ -67,14 +67,14 @@ l0_int l0_main_main(void)
                     }
                     goto __cond_false_7;
                 __cond_true_6:;
-                    l0_cond_2 = 1;
+                    dea_cond_2 = 1;
                     goto __cond_end_8;
                 __cond_false_7:;
                 __cond_end_8:;
                 }
-                if (l0_cond_2)
+                if (dea_cond_2)
                 {
-                    sum = (_rt_iadd(sum, l0_main_add(i, 1)));
+                    sum = (_rt_iadd(sum, dea_main_add(i, 1)));
                 }
             }
         __lcont_2:;
@@ -84,7 +84,7 @@ l0_int l0_main_main(void)
 __lbrk_1:;
     while (1)
     {
-        l0_bool l0_cond_3 = 0;
+        dea_bool dea_cond_3 = 0;
         {
             {
                 if ((sum > 0))
@@ -94,12 +94,12 @@ __lbrk_1:;
             }
             goto __cond_false_12;
         __cond_true_11:;
-            l0_cond_3 = 1;
+            dea_cond_3 = 1;
             goto __cond_end_13;
         __cond_false_12:;
         __cond_end_13:;
         }
-        if ((!(l0_cond_3)))
+        if ((!(dea_cond_3)))
         {
             goto __lbrk_9;
         }
@@ -114,5 +114,5 @@ __lbrk_9:;
 int main(int argc, char **argv)
 {
     _rt_init_args(argc, argv);
-    return (int) l0_main_main();
+    return (int) dea_main_main();
 }

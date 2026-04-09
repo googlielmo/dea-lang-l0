@@ -12,31 +12,31 @@
 #include "l1_runtime.h"
 
 /* Forward declarations */
-struct l0_main_Point;
-struct l0_main_MaybePoint;
+struct dea_main_Point;
+struct dea_main_MaybePoint;
 
 /* Optional wrapper types (builtins / early) */
 /* Type definitions (dependency-ordered) */
-#ifndef L0_DEFINED_l0_main_Point
-#define L0_DEFINED_l0_main_Point
-struct l0_main_Point {
-    l0_int x;
-    l0_int y;
+#ifndef DEA_DEFINED_dea_main_Point
+#define DEA_DEFINED_dea_main_Point
+struct dea_main_Point {
+    dea_int x;
+    dea_int y;
 };
 #endif
 
-#ifndef L0_DEFINED_l0_main_MaybePoint
-#define L0_DEFINED_l0_main_MaybePoint
-enum l0_main_MaybePoint_tag {
-    l0_main_MaybePoint_None,
-    l0_main_MaybePoint_Some,
+#ifndef DEA_DEFINED_dea_main_MaybePoint
+#define DEA_DEFINED_dea_main_MaybePoint
+enum dea_main_MaybePoint_tag {
+    dea_main_MaybePoint_None,
+    dea_main_MaybePoint_Some,
 };
 
-struct l0_main_MaybePoint {
-    enum l0_main_MaybePoint_tag tag;
+struct dea_main_MaybePoint {
+    enum dea_main_MaybePoint_tag tag;
     union {
         struct { char __dummy__; } None;
-        struct { struct l0_main_Point value; } Some;
+        struct { struct dea_main_Point value; } Some;
     } data;
 };
 #endif
@@ -44,17 +44,17 @@ struct l0_main_MaybePoint {
 /* Optional wrapper types (late) */
 /* Top-level let declarations */
 /* Module: main */
-static struct l0_main_Point l0_main_origin = { .x = 0, .y = 0 };
+static struct dea_main_Point dea_main_origin = { .x = 0, .y = 0 };
 /* Function declarations */
 /* Module: main */
-l0_int l0_main_main(void);
+dea_int dea_main_main(void);
 /* Function definitions */
 /* -------------------------------- */
 /* Module: main */
 /* -------------------------------- */
-l0_int l0_main_main(void)
+dea_int dea_main_main(void)
 {
-    struct l0_main_Point p = l0_main_origin;
+    struct dea_main_Point p = dea_main_origin;
     return (p).x;
 }
 
@@ -62,5 +62,5 @@ l0_int l0_main_main(void)
 int main(int argc, char **argv)
 {
     _rt_init_args(argc, argv);
-    return (int) l0_main_main();
+    return (int) dea_main_main();
 }

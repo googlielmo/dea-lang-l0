@@ -85,6 +85,33 @@ func cem_upper_ascii(text: string) -> string {
 }
 
 /**
+ * Return whether a name starts with any reserved generated/runtime prefix.
+ *
+ * @param name Identifier text to inspect.
+ * @return `true` when the prefix is reserved by the backend/runtime.
+ */
+func cem_has_reserved_prefix(name: string) -> bool {
+    return starts_with_s(name, "l0_") || starts_with_s(name, "_l0_") ||
+           starts_with_s(name, "rt_") || starts_with_s(name, "_rt_") ||
+           starts_with_s(name, "L0_") || starts_with_s(name, "_L0_") ||
+           starts_with_s(name, "dea_") || starts_with_s(name, "_dea_") ||
+           starts_with_s(name, "DEA_") || starts_with_s(name, "_DEA_");
+}
+
+/**
+ * Mangle a declared source leaf name when it collides with reserved prefixes.
+ *
+ * @param name Declared source name.
+ * @return Original or suffixed leaf name.
+ */
+func cem_mangle_source_leaf_name(name: string) -> string {
+    if (cem_has_reserved_prefix(name) || starts_with_s(name, "_") || ends_with_s(name, "__v")) {
+        return concat_s(name, "__v");
+    }
+    return name;
+}
+
+/**
  * Free every collected optional-wrapper inner type.
  *
  * @param items Wrapper map to free.
@@ -312,7 +339,7 @@ func cem_mangle_module(module_name: string) -> string {
  * @return Mangled C struct name.
  */
 func cem_mangle_struct_name(module_name: string, struct_name: string) -> string {
-    return concat4_s("l0_", cem_mangle_module(module_name), "_", struct_name);
+    return concat4_s("dea_", cem_mangle_module(module_name), "_", cem_mangle_source_leaf_name(struct_name));
 }
 
 /**
@@ -323,7 +350,7 @@ func cem_mangle_struct_name(module_name: string, struct_name: string) -> string 
  * @return Mangled C enum name.
  */
 func cem_mangle_enum_name(module_name: string, enum_name: string) -> string {
-    return concat4_s("l0_", cem_mangle_module(module_name), "_", enum_name);
+    return concat4_s("dea_", cem_mangle_module(module_name), "_", cem_mangle_source_leaf_name(enum_name));
 }
 
 /**
@@ -334,7 +361,7 @@ func cem_mangle_enum_name(module_name: string, enum_name: string) -> string {
  * @return Mangled C function name.
  */
 func cem_mangle_function_name(module_name: string, func_name: string) -> string {
-    return concat4_s("l0_", cem_mangle_module(module_name), "_", func_name);
+    return concat4_s("dea_", cem_mangle_module(module_name), "_", cem_mangle_source_leaf_name(func_name));
 }
 
 /**
@@ -345,11 +372,11 @@ func cem_mangle_function_name(module_name: string, func_name: string) -> string 
  * @return Mangled C identifier.
  */
 func cem_mangle_let_name(module_name: string, let_name: string) -> string {
-    let safe = let_name;
+    let safe = cem_mangle_source_leaf_name(let_name);
     if (cem_is_c_keyword(let_name)) {
-        safe = concat_s("l0_kw_", let_name);
+        safe = concat_s("dea_kw_", let_name);
     }
-    return concat4_s("l0_", cem_mangle_module(module_name), "_", safe);
+    return concat4_s("dea_", cem_mangle_module(module_name), "_", safe);
 }
 
 /**
@@ -359,8 +386,7 @@ func cem_mangle_let_name(module_name: string, let_name: string) -> string {
  * @return Original or suffixed identifier.
  */
 func cem_mangle_identifier(name: string) -> string {
-    if (cem_is_c_keyword(name) || ends_with_s(name, "__v") || starts_with_s(name, "l0_") || starts_with_s(name, "L0_") ||
-        starts_with_s(name, "_")) {
+    if (cem_is_c_keyword(name) || ends_with_s(name, "__v") || cem_has_reserved_prefix(name) || starts_with_s(name, "_")) {
         return concat_s(name, "__v");
     }
     return name;
@@ -375,7 +401,7 @@ func cem_mangle_identifier(name: string) -> string {
  */
 func cem_fresh_tmp(self: CEmitter*, kind: string) -> string {
     self.tmp_counter = self.tmp_counter + 1;
-    return concat4_s("l0_", kind, "_", int_to_string(self.tmp_counter));
+    return concat4_s("dea_", kind, "_", int_to_string(self.tmp_counter));
 }
 
 /**
@@ -385,7 +411,7 @@ func cem_fresh_tmp(self: CEmitter*, kind: string) -> string {
  * @return Casted `sizeof` expression.
  */
 func cem_emit_sizeof_type(typ: Type*) -> string {
-    return concat3_s("((l0_int)sizeof(", cem_emit_type(typ), "))");
+    return concat3_s("((dea_int)sizeof(", cem_emit_type(typ), "))");
 }
 
 /**
@@ -395,7 +421,7 @@ func cem_emit_sizeof_type(typ: Type*) -> string {
  * @return Casted tag extraction expression.
  */
 func cem_emit_ord(c_enum_expr: string) -> string {
-    return concat3_s("((l0_int)((", c_enum_expr, ").tag))");
+    return concat3_s("((dea_int)((", c_enum_expr, ").tag))");
 }
 
 /**
@@ -465,7 +491,7 @@ func cem_opt_key_for_type(t: Type*) -> string {
  * @return Wrapper typedef name.
  */
 func cem_opt_wrapper_name_for_inner(inner: Type*) -> string {
-    return concat_s("l0_opt_", cem_opt_key_for_type(inner));
+    return concat_s("dea_opt_", cem_opt_key_for_type(inner));
 }
 
 /**
@@ -476,16 +502,16 @@ func cem_opt_wrapper_name_for_inner(inner: Type*) -> string {
  */
 func cem_emit_type(typ: Type*) -> string {
     if (type_is_builtin(typ, "int")) {
-        return "l0_int";
+        return "dea_int";
     }
     if (type_is_builtin(typ, "byte")) {
-        return "l0_byte";
+        return "dea_byte";
     }
     if (type_is_builtin(typ, "bool")) {
-        return "l0_bool";
+        return "dea_bool";
     }
     if (type_is_builtin(typ, "string")) {
-        return "l0_string";
+        return "dea_string";
     }
     if (type_is_builtin(typ, "void")) {
         return "void";
@@ -638,7 +664,7 @@ func cem_emit_unreachable_comment(self: CEmitter*) {
  */
 func cem_emit_unreachable_marker(self: CEmitter*, reason: string) {
     let c_reason = se_encode_c_string_bytes(reason);
-    ccb_emit(self.out, concat4_s("L0_UNREACHABLE(\"", c_reason, "\"", ");"));
+    ccb_emit(self.out, concat4_s("DEA_UNREACHABLE(\"", c_reason, "\"", ");"));
 }
 
 /**
@@ -660,10 +686,10 @@ func cem_emit_header(self: CEmitter*, opts: CodegenOptions*) {
     ccb_emit(self.out, "");
     ccb_emit(self.out, "/* L1 runtime header */");
     if (opts.trace_arc) {
-        ccb_emit(self.out, "#define L0_TRACE_ARC 1");
+        ccb_emit(self.out, "#define DEA_TRACE_ARC 1");
     }
     if (opts.trace_memory) {
-        ccb_emit(self.out, "#define L0_TRACE_MEMORY 1");
+        ccb_emit(self.out, "#define DEA_TRACE_MEMORY 1");
     }
     ccb_emit(self.out, "#include \"l1_runtime.h\"");
     ccb_emit(self.out, "");
@@ -768,7 +794,7 @@ func cem_find_enum_variant_info(enum_info: EnumInfo*, variant_name: string) -> E
  */
 func cem_emit_struct(self: CEmitter*, module_name: string, decl: StructDecl*, struct_info: StructInfo*) {
     let c_name = cem_mangle_struct_name(module_name, decl.name);
-    let guard = concat_s("L0_DEFINED_", c_name);
+    let guard = concat_s("DEA_DEFINED_", c_name);
     ccb_emit(self.out, concat_s("#ifndef ", guard));
     ccb_emit(self.out, concat_s("#define ", guard));
     ccb_emit(self.out, concat_s("struct ", concat_s(c_name, " {")));
@@ -799,7 +825,7 @@ func cem_emit_struct(self: CEmitter*, module_name: string, decl: StructDecl*, st
  */
 func cem_emit_enum(self: CEmitter*, module_name: string, decl: EnumDecl*, enum_info: EnumInfo*) {
     let c_name = cem_mangle_enum_name(module_name, decl.name);
-    let guard = concat_s("L0_DEFINED_", c_name);
+    let guard = concat_s("DEA_DEFINED_", c_name);
     let tag_enum_name = concat_s(c_name, "_tag");
 
     ccb_emit(self.out, concat_s("#ifndef ", guard));
@@ -970,7 +996,7 @@ func cem_emit_main_wrapper(self: CEmitter*, entry_module: string, func_type: Typ
     ccb_indent(self.out);
     ccb_emit(self.out, "_rt_init_args(argc, argv);");
 
-    if (eq_s(c_return_type, "l0_int")) {
+    if (eq_s(c_return_type, "dea_int")) {
         ccb_emit(self.out, concat3_s("return (int) ", mangled_name, "();"));
     } else if (eq_s(c_return_type, "bool")) {
         ccb_emit(self.out, concat4_s("bool result = ", mangled_name, "(", ");"));
@@ -1120,7 +1146,7 @@ func cem_emit_optional_wrappers(self: CEmitter*, early: bool) {
             let c_inner = cem_emit_type(inner);
             ccb_emit(self.out, concat_s("#ifndef ", guard));
             ccb_emit(self.out, concat_s("#define ", guard));
-            ccb_emit(self.out, concat4_s("typedef struct { l0_bool has_value; ", c_inner, " value; } ", concat_s(name, ";")));
+            ccb_emit(self.out, concat4_s("typedef struct { dea_bool has_value; ", c_inner, " value; } ", concat_s(name, ";")));
             ccb_emit(self.out, concat3_s("#endif /* ", guard, " */"));
             ccb_emit(self.out, "");
             ss_add(self.opt_emitted, us_clone_s(name));
@@ -1222,11 +1248,11 @@ func cem_encode_c_byte_literal(value: byte) -> string {
  * @return C spelling for the literal.
  */
 func cem_emit_byte_literal(value: byte) -> string {
-    return concat4_s("((l0_byte)'", cem_encode_c_byte_literal(value), "')", "");
+    return concat4_s("((dea_byte)'", cem_encode_c_byte_literal(value), "')", "");
 }
 
 /**
- * Emit a decoded string literal through `L0_STRING_CONST`.
+ * Emit a decoded string literal through `DEA_STRING_CONST`.
  *
  * @param value Decoded string bytes.
  * @return C spelling for the runtime string value.
@@ -1234,7 +1260,7 @@ func cem_emit_byte_literal(value: byte) -> string {
 func cem_emit_string_literal(value: string) -> string {
     let escaped = se_encode_c_string_bytes(value);
     return concat4_s(
-        "((l0_string)L0_STRING_CONST(\"",
+        "((dea_string)DEA_STRING_CONST(\"",
         escaped,
         "\", ",
         concat_s(int_to_string(len_s(value)), "))")
@@ -1250,7 +1276,7 @@ func cem_emit_string_literal(value: string) -> string {
 func cem_emit_const_string_literal(value: string) -> string {
     let escaped = se_encode_c_string_bytes(value);
     return concat4_s(
-        "L0_STRING_CONST(\"",
+        "DEA_STRING_CONST(\"",
         escaped,
         "\", ",
         concat_s(int_to_string(len_s(value)), ")")
@@ -2038,7 +2064,7 @@ func cem_emit_null_assignment(self: CEmitter*, c_var: string) {
  */
 func cem_emit_alloc_obj(self: CEmitter*, c_ptr_type: string, c_base_type: string, c_temp_name: string) {
     ccb_emit(self.out, concat4_s(c_ptr_type, " ", c_temp_name,
-        concat_s(" = (", concat4_s(c_ptr_type, ")_rt_alloc_obj((l0_int)sizeof(", c_base_type, "));"))));
+        concat_s(" = (", concat4_s(c_ptr_type, ")_rt_alloc_obj((dea_int)sizeof(", c_base_type, "));"))));
 }
 
 /**

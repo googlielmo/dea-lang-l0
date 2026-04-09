@@ -3,7 +3,7 @@
 ## Migrate L1 public C ABI names from `l0_*` to `dea_*`
 
 - Date: 2026-04-04
-- Status: Draft
+- Status: Completed
 - Title: Migrate L1 public C ABI names from `l0_*` to `dea_*`
 - Kind: Feature
 - Severity: High
@@ -51,8 +51,8 @@ new integer builtins, does not freeze a mixed ABI such as `l0_int` plus `l1_shor
 3. The migration covers all public names emitted into generated C, not just builtin typedefs.
 4. `_rt_*` remains the internal runtime-helper namespace unless a helper name embeds a public type spelling that would
    otherwise leak `l0_*` into emitted C.
-5. Temporary compatibility aliases for legacy `l0_*` names are provided only where they are centrally owned by
-   `l1_runtime.h`; generated nominal names do not keep compatibility aliases.
+5. No compatibility aliases are kept for legacy `l0_*` names in the L1 runtime header or generated output.
+6. `l0_siphash.h` remains unchanged in this tranche and is tracked by a separate shared follow-up plan.
 
 ## Goal
 
@@ -73,8 +73,6 @@ Update `compiler/shared/runtime/l1_runtime.h` so the public runtime-owned types/
 - runtime-owned optional wrapper typedefs such as `dea_opt_bool`, `dea_opt_byte`, `dea_opt_int`, `dea_opt_string`
 - public constants/macros such as `DEA_STRING_CONST`, `DEA_UNREACHABLE`, and `DEA_DEFINED_*`
 
-Add compatibility aliases in the same header for legacy runtime-owned `l0_*` spellings where feasible.
-
 ### Phase 2: Switch emitter output to `dea_*`
 
 Update `compiler/stage1_l0/src/c_emitter.l0` so generated C uses the new public names consistently:
@@ -91,8 +89,8 @@ checked narrow-cast helpers.
 
 Rewrite L1 emitter/backend tests and backend golden C fixtures to assert `dea_*` / `DEA_*` spellings.
 
-Update backend/reference docs so they describe `dea_*` as the stable ABI and `l0_*` aliases, where present, as temporary
-compatibility-only surface.
+Update backend/reference docs so they describe `dea_*` as the stable ABI, document the reserved-prefix taxonomy, and
+note the temporary `l0_siphash.h` include exception.
 
 ## Non-Goals
 
@@ -109,8 +107,22 @@ compatibility-only surface.
    the new prefixes.
 3. Generated C for existing Stage 1 programs contains no public `l0_*` or `L0_*` spellings except compatibility aliases
    defined inside `l1_runtime.h`.
-4. The runtime header still provides centralized compatibility aliases for runtime-owned legacy names during the
-   transition.
+4. The runtime header and generated output do not retain migrated public `l0_*` / `L0_*` aliases.
+
+## Outcome
+
+1. `compiler/shared/runtime/l1_runtime.h` now exposes the migrated public ABI under `dea_*` / `DEA_*`, including builtin
+   typedefs, optional wrappers, public macros, and runtime-owned `sys.rt` struct names.
+2. `compiler/stage1_l0/src/c_emitter.l0` now emits `dea_*` / `DEA_*` names for builtin lowering, nominal mangling,
+   optional wrappers, temps, guards, string macros, and trace toggles.
+3. The emitter now actively mangles user/source names that begin with reserved historical or current backend/runtime
+   prefixes, including `l0_*`, `_l0_*`, `rt_*`, `_rt_*`, `L0_*`, `_L0_*`, `dea_*`, `_dea_*`, `DEA_*`, and `_DEA_*`.
+4. `compiler/stage1_l0/tests/c_emitter_test.l0`, `compiler/stage1_l0/tests/backend_test.l0`,
+   `compiler/stage1_l0/tests/l0c_lib_test.l0`, and the backend golden fixtures now assert the migrated output directly.
+5. `docs/reference/c-backend-design.md` and `docs/reference/design-decisions.md` now document the `dea_*` ABI and the
+   explicit prefix taxonomy.
+6. The `l0_siphash.h` include remains unchanged for now, and the shared follow-up is tracked in
+   `work/plans/features/2026-04-09-shared-siphash-global-include-noref.md`.
 
 ## Open Design Constraints
 

@@ -18,44 +18,44 @@
 /* Optional wrapper types (late) */
 /* Function declarations */
 /* Module: main */
-l0_int l0_main_main(void);
+dea_int dea_main_main(void);
 /* Function definitions */
 /* -------------------------------- */
 /* Module: main */
 /* -------------------------------- */
-l0_int l0_main_main(void)
+dea_int dea_main_main(void)
 {
-    l0_string s = ((l0_string)L0_STRING_CONST("hi", 2));
-    l0_string l0_copy_1 = s;
-    rt_string_retain(l0_copy_1);
-    l0_string t = l0_copy_1;
+    dea_string s = ((dea_string)DEA_STRING_CONST("hi", 2));
+    dea_string dea_copy_1 = s;
+    rt_string_retain(dea_copy_1);
+    dea_string t = dea_copy_1;
     {
-        l0_string l0_copy_2 = t;
-        rt_string_retain(l0_copy_2);
-        l0_string x = l0_copy_2;
+        dea_string dea_copy_2 = t;
+        rt_string_retain(dea_copy_2);
+        dea_string x = dea_copy_2;
         {
-            l0_string l0_copy_3 = x;
-            rt_string_retain(l0_copy_3);
-            l0_string y = l0_copy_3;
+            dea_string dea_copy_3 = x;
+            rt_string_retain(dea_copy_3);
+            dea_string y = dea_copy_3;
             rt_string_release(y);
         }
         {
-            l0_string l0_copy_4 = x;
-            rt_string_retain(l0_copy_4);
-            l0_string z = l0_copy_4;
+            dea_string dea_copy_4 = x;
+            rt_string_retain(dea_copy_4);
+            dea_string z = dea_copy_4;
             rt_string_release(z);
         }
         rt_string_release(x);
     }
-    l0_int l0_ret_5 = 0;
+    dea_int dea_ret_5 = 0;
     rt_string_release(t);
     rt_string_release(s);
-    return l0_ret_5;
+    return dea_ret_5;
 }
 
 /* C entry point wrapper */
 int main(int argc, char **argv)
 {
     _rt_init_args(argc, argv);
-    return (int) l0_main_main();
+    return (int) dea_main_main();
 }

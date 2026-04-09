@@ -12,22 +12,22 @@
 #include "l1_runtime.h"
 
 /* Forward declarations */
-struct l0_main_MaybeInt;
+struct dea_main_MaybeInt;
 
 /* Optional wrapper types (builtins / early) */
 /* Type definitions (dependency-ordered) */
-#ifndef L0_DEFINED_l0_main_MaybeInt
-#define L0_DEFINED_l0_main_MaybeInt
-enum l0_main_MaybeInt_tag {
-    l0_main_MaybeInt_None,
-    l0_main_MaybeInt_Some,
+#ifndef DEA_DEFINED_dea_main_MaybeInt
+#define DEA_DEFINED_dea_main_MaybeInt
+enum dea_main_MaybeInt_tag {
+    dea_main_MaybeInt_None,
+    dea_main_MaybeInt_Some,
 };
 
-struct l0_main_MaybeInt {
-    enum l0_main_MaybeInt_tag tag;
+struct dea_main_MaybeInt {
+    enum dea_main_MaybeInt_tag tag;
     union {
         struct { char __dummy__; } None;
-        struct { l0_int value; } Some;
+        struct { dea_int value; } Some;
     } data;
 };
 #endif
@@ -35,15 +35,15 @@ struct l0_main_MaybeInt {
 /* Optional wrapper types (late) */
 /* Function declarations */
 /* Module: main */
-struct l0_main_MaybeInt l0_main_make(l0_bool flag);
-l0_int l0_main_main(void);
+struct dea_main_MaybeInt dea_main_make(dea_bool flag);
+dea_int dea_main_main(void);
 /* Function definitions */
 /* -------------------------------- */
 /* Module: main */
 /* -------------------------------- */
-struct l0_main_MaybeInt l0_main_make(l0_bool flag)
+struct dea_main_MaybeInt dea_main_make(dea_bool flag)
 {
-    l0_bool l0_cond_1 = 0;
+    dea_bool dea_cond_1 = 0;
     {
         {
             if (flag)
@@ -53,23 +53,23 @@ struct l0_main_MaybeInt l0_main_make(l0_bool flag)
         }
         goto __cond_false_2;
     __cond_true_1:;
-        l0_cond_1 = 1;
+        dea_cond_1 = 1;
         goto __cond_end_3;
     __cond_false_2:;
     __cond_end_3:;
     }
-    if (l0_cond_1)
+    if (dea_cond_1)
     {
-        return (struct l0_main_MaybeInt){ .tag = l0_main_MaybeInt_Some, .data = { .Some = { .value = 7 } } };
+        return (struct dea_main_MaybeInt){ .tag = dea_main_MaybeInt_Some, .data = { .Some = { .value = 7 } } };
     }
-    return (struct l0_main_MaybeInt){ .tag = l0_main_MaybeInt_None };
+    return (struct dea_main_MaybeInt){ .tag = dea_main_MaybeInt_None };
 }
 
-l0_int l0_main_main(void)
+dea_int dea_main_main(void)
 {
-    l0_int total = 0;
+    dea_int total = 0;
     {
-        l0_int _scrutinee = 1;
+        dea_int _scrutinee = 1;
         switch (_scrutinee) {
         case 0:
         {
@@ -88,15 +88,15 @@ l0_int l0_main_main(void)
         }
     }
     {
-        struct l0_main_MaybeInt _scrutinee = l0_main_make(1);
+        struct dea_main_MaybeInt _scrutinee = dea_main_make(1);
         switch ((_scrutinee).tag) {
-        case l0_main_MaybeInt_Some:
+        case dea_main_MaybeInt_Some:
         {
-            l0_int v = (_scrutinee).data.Some.value;
+            dea_int v = (_scrutinee).data.Some.value;
             total = (_rt_iadd(total, v));
             break;
         }
-        case l0_main_MaybeInt_None:
+        case dea_main_MaybeInt_None:
         {
             total = 0;
             break;
@@ -110,5 +110,5 @@ l0_int l0_main_main(void)
 int main(int argc, char **argv)
 {
     _rt_init_args(argc, argv);
-    return (int) l0_main_main();
+    return (int) dea_main_main();
 }

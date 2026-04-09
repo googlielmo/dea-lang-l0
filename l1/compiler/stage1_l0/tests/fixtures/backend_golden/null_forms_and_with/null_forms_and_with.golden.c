@@ -14,68 +14,68 @@
 /* Forward declarations */
 
 /* Optional wrapper types (builtins / early) */
-#ifndef L0_OPT_INT_DEFINED
-#define L0_OPT_INT_DEFINED
-typedef struct { l0_bool has_value; l0_int value; } l0_opt_int;
-#endif /* L0_OPT_INT_DEFINED */
+#ifndef DEA_OPT_INT_DEFINED
+#define DEA_OPT_INT_DEFINED
+typedef struct { dea_bool has_value; dea_int value; } dea_opt_int;
+#endif /* DEA_OPT_INT_DEFINED */
 
 /* Type definitions (dependency-ordered) */
 /* Optional wrapper types (late) */
 /* Function declarations */
 /* Module: main */
-l0_opt_int l0_main_value_none(void);
-l0_int* l0_main_ptr_none(void);
-l0_bool l0_main_is_none_value(l0_opt_int x);
-l0_bool l0_main_is_none_ptr(l0_int* x);
-l0_int l0_main_helper(void);
-l0_int l0_main_main(void);
+dea_opt_int dea_main_value_none(void);
+dea_int* dea_main_ptr_none(void);
+dea_bool dea_main_is_none_value(dea_opt_int x);
+dea_bool dea_main_is_none_ptr(dea_int* x);
+dea_int dea_main_helper(void);
+dea_int dea_main_main(void);
 /* Function definitions */
 /* -------------------------------- */
 /* Module: main */
 /* -------------------------------- */
-l0_opt_int l0_main_value_none(void)
+dea_opt_int dea_main_value_none(void)
 {
-    return ((l0_opt_int){.has_value = 0});
+    return ((dea_opt_int){.has_value = 0});
 }
 
-l0_int* l0_main_ptr_none(void)
+dea_int* dea_main_ptr_none(void)
 {
     return NULL;
 }
 
-l0_bool l0_main_is_none_value(l0_opt_int x)
+dea_bool dea_main_is_none_value(dea_opt_int x)
 {
     return (!((x).has_value));
 }
 
-l0_bool l0_main_is_none_ptr(l0_int* x)
+dea_bool dea_main_is_none_ptr(dea_int* x)
 {
     return (x == NULL);
 }
 
-l0_int l0_main_helper(void)
+dea_int dea_main_helper(void)
 {
     {
         /* null literal */
         {
             /* null literal */
-            l0_int l0_ret_1 = 1;
+            dea_int dea_ret_1 = 1;
             {
                 return 2;
             }
-            return l0_ret_1;
+            return dea_ret_1;
         }
     }
 }
 
-l0_int l0_main_main(void)
+dea_int dea_main_main(void)
 {
-    l0_opt_int x = ((l0_opt_int){.has_value = 0});
-    l0_int* p = NULL;
-    l0_bool l0_cond_2 = 0;
+    dea_opt_int x = ((dea_opt_int){.has_value = 0});
+    dea_int* p = NULL;
+    dea_bool dea_cond_2 = 0;
     {
         {
-            if (l0_main_is_none_value(x))
+            if (dea_main_is_none_value(x))
             {
                 goto __cond_rhs_7;
             }
@@ -83,7 +83,7 @@ l0_int l0_main_main(void)
         goto __cond_false_2;
     __cond_rhs_7:;
         {
-            if (l0_main_is_none_ptr(p))
+            if (dea_main_is_none_ptr(p))
             {
                 goto __cond_rhs_6;
             }
@@ -91,7 +91,7 @@ l0_int l0_main_main(void)
         goto __cond_false_2;
     __cond_rhs_6:;
         {
-            if ((!((l0_main_value_none()).has_value)))
+            if ((!((dea_main_value_none()).has_value)))
             {
                 goto __cond_rhs_5;
             }
@@ -99,7 +99,7 @@ l0_int l0_main_main(void)
         goto __cond_false_2;
     __cond_rhs_5:;
         {
-            if ((l0_main_ptr_none() == NULL))
+            if ((dea_main_ptr_none() == NULL))
             {
                 goto __cond_rhs_4;
             }
@@ -107,19 +107,19 @@ l0_int l0_main_main(void)
         goto __cond_false_2;
     __cond_rhs_4:;
         {
-            if ((l0_main_helper() == 2))
+            if ((dea_main_helper() == 2))
             {
                 goto __cond_true_1;
             }
         }
         goto __cond_false_2;
     __cond_true_1:;
-        l0_cond_2 = 1;
+        dea_cond_2 = 1;
         goto __cond_end_3;
     __cond_false_2:;
     __cond_end_3:;
     }
-    if (l0_cond_2)
+    if (dea_cond_2)
     {
         return 0;
     }
@@ -130,5 +130,5 @@ l0_int l0_main_main(void)
 int main(int argc, char **argv)
 {
     _rt_init_args(argc, argv);
-    return (int) l0_main_main();
+    return (int) dea_main_main();
 }

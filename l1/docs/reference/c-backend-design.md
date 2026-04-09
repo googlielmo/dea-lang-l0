@@ -63,8 +63,19 @@ Current backend target is a single C translation unit.
 - `byte`, `bool`, and `string` likewise lower through runtime-defined C-facing types
 - `void` lowers to C `void`
 
-The bootstrap implementation still uses runtime/helper names with the historical `l0_` prefix in generated C and in the
-runtime header. Those names are implementation details, not separate language-level semantics.
+Current L1 prefix policy is:
+
+- `dea_*` for public generated/runtime C identifiers
+- `DEA_*` for public generated/runtime preprocessor names
+- `rt_*` for stable runtime API entry points used by generated C and stdlib declarations
+- `_rt_*` for private runtime helpers
+- `_dea_*` / `_DEA_*` for touched non-`_rt_` private runtime names that previously carried historical `l0` spellings
+
+The emitter actively mangles user/source names that start with reserved generated/runtime prefixes, including both the
+legacy `l0` families and the current `dea` families, to avoid collisions in generated C.
+
+The only intentional legacy-prefixed include that remains in generated output for now is `l0_siphash.h`, which is
+treated as a temporary internal implementation header rather than part of the public L1 ABI.
 
 ### Structs, enums, pointers, and nullable values
 

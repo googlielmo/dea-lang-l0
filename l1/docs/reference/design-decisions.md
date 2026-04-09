@@ -40,6 +40,22 @@ semantics.
 Generated code should stay within conservative C99 usage. Platform/compiler quirks belong in the runtime boundary, not
 in the language definition.
 
+## 3a. C ABI Naming Policy
+
+Current L1 C ABI policy uses:
+
+- `dea_*` for public generated/runtime C identifiers
+- `DEA_*` for public generated/runtime preprocessor names
+- `rt_*` for stable runtime API functions
+- `_rt_*` for private runtime helpers
+
+Historical `l0_*`, `L0_*`, `_l0_*`, and `_L0_*` names are not part of the current L1 ABI and should not be introduced in
+new L1-emitted names. The emitter reserves both the historical prefixes and the current `dea` prefixes when mangling
+user/source identifiers so generated C cannot collide with backend/runtime-owned namespaces.
+
+One temporary exception remains: `l0_siphash.h` is still used as an internal include name until the shared cross-level
+SipHash include migration lands.
+
 ## 4. Future Evolution
 
 Near-term L1 evolution should preserve the current bootstrap implementation and semantics unless a targeted bug fix or a

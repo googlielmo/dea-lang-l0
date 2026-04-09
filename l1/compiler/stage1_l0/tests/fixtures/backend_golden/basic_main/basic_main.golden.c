@@ -18,12 +18,12 @@
 /* Optional wrapper types (late) */
 /* Function declarations */
 /* Module: main */
-l0_int l0_main_main(void);
+dea_int dea_main_main(void);
 /* Function definitions */
 /* -------------------------------- */
 /* Module: main */
 /* -------------------------------- */
-l0_int l0_main_main(void)
+dea_int dea_main_main(void)
 {
     return 0;
 }
@@ -32,5 +32,5 @@ l0_int l0_main_main(void)
 int main(int argc, char **argv)
 {
     _rt_init_args(argc, argv);
-    return (int) l0_main_main();
+    return (int) dea_main_main();
 }

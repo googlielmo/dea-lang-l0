@@ -167,8 +167,8 @@ func test_backend_scope_helpers_manage_cleanup_state() {
         assert(be_lookup_local_var_type(self, "borrowed") != null, "declared local lookup should succeed");
         assert(be_scope_chain_has_cleanup(self), "owned ARC local should trigger cleanup detection");
 
-        let temp = be_materialize_arc_temp(self, "((l0_string)L0_STRING_CONST(\"x\", 1))", temp_ty);
-        assert(eq_s(temp, "l0_arc_1"), "ARC temp naming mismatch");
+        let temp = be_materialize_arc_temp(self, "((dea_string)DEA_STRING_CONST(\"x\", 1))", temp_ty);
+        assert(eq_s(temp, "dea_arc_1"), "ARC temp naming mismatch");
         assert(vec_size(root.owned_vars) == 2, "materialized ARC temp should become owned");
 
         let child = be_push_scope(self);
@@ -275,9 +275,9 @@ func test_backend_generate_types_and_top_level_lets() {
         assert(contains_s(generated, "/* Type definitions (dependency-ordered) */"),
             "type-definition section comment missing");
         assert(contains_s(generated,
-            "struct l0_demo_main_Point {\n    l0_int x;\n    l0_int y;\n};\n#endif\n\n#ifndef L0_DEFINED_l0_demo_main_MaybePoint"),
+            "struct dea_demo_main_Point {\n    dea_int x;\n    dea_int y;\n};\n#endif\n\n#ifndef DEA_DEFINED_dea_demo_main_MaybePoint"),
             "struct should be emitted before dependent enum");
-        assert(contains_s(generated, "static struct l0_demo_main_Point l0_demo_main_origin = { .x = 0, .y = 0 };"),
+        assert(contains_s(generated, "static struct dea_demo_main_Point dea_demo_main_origin = { .x = 0, .y = 0 };"),
             "top-level struct constructor let mismatch");
         assert(contains_s(generated, "return (p).x;"), "field access lowering mismatch");
 
@@ -318,14 +318,14 @@ func test_backend_generate_basic_control_flow() {
         assert(!analysis_has_errors(result), "analysis should succeed for control-flow fixture");
 
         let generated = backend_generate(result, opts, cfg);
-        assert(contains_s(generated, "l0_int l0_demo_main_add(l0_int a, l0_int b);"),
+        assert(contains_s(generated, "dea_int dea_demo_main_add(dea_int a, dea_int b);"),
             "function declaration mismatch");
         assert(contains_s(generated, "return (_rt_iadd(a, b));"), "checked integer add lowering mismatch");
         assert(contains_s(generated, "// for loop"), "for-loop wrapper comment mismatch");
-        assert(contains_s(generated, "l0_int i = 0;\n        while (1)"),
+        assert(contains_s(generated, "dea_int i = 0;\n        while (1)"),
             "for-loop lowering mismatch");
         assert(contains_s(generated, "if ((i < 2))"), "if lowering mismatch");
-        assert(contains_s(generated, "sum = (_rt_iadd(sum, l0_demo_main_add(i, 1)));"),
+        assert(contains_s(generated, "sum = (_rt_iadd(sum, dea_demo_main_add(i, 1)));"),
             "assignment and call lowering mismatch");
         assert(contains_s(generated, "while (1)"), "while lowering mismatch");
 
@@ -413,10 +413,10 @@ func test_backend_generate_match_and_with_cleanup_block() {
         assert(!analysis_has_errors(result), "analysis should succeed for match/with fixture");
 
         let generated = backend_generate(result, opts, cfg);
-        assert(contains_s(generated, "struct l0_demo_main_MaybeInt _scrutinee = l0_demo_main_make();"),
+        assert(contains_s(generated, "struct dea_demo_main_MaybeInt _scrutinee = dea_demo_main_make();"),
             "match scrutinee temp mismatch");
         assert(contains_s(generated, "switch ((_scrutinee).tag) {"), "match lowering should switch on enum tag");
-        assert(contains_s(generated, "l0_int v = (_scrutinee).data.Some.value;"), "pattern binding mismatch");
+        assert(contains_s(generated, "dea_int v = (_scrutinee).data.Some.value;"), "pattern binding mismatch");
         assert(contains_s(generated, "total = x;\n        }\n        {\n            total = x;"),
             "with cleanup block should run after body in header scope");
 
@@ -460,19 +460,19 @@ func test_backend_generate_with_cleanup_block_header_try_predeclares_nullable_le
         assert(!analysis_has_errors(result), "analysis should succeed for with-header try fixture");
 
         let generated = backend_generate(result, opts, cfg);
-        assert(contains_s(generated, "struct l0_demo_main_Expr* left = NULL;"),
+        assert(contains_s(generated, "struct dea_demo_main_Expr* left = NULL;"),
             "nullable cleanup-block header let should be predeclared to null");
-        assert(contains_s(generated, "struct l0_demo_main_Expr* right = NULL;"),
+        assert(contains_s(generated, "struct dea_demo_main_Expr* right = NULL;"),
             "second nullable cleanup-block header let should be predeclared to null");
-        assert(contains_s(generated, "left = l0_try_"), "predeclared left should be assigned after the try succeeds");
-        assert(contains_s(generated, "right = l0_try_"), "predeclared right should be assigned after the try succeeds");
-        assert(!contains_s(generated, "struct l0_demo_main_Expr* left = l0_try_"),
+        assert(contains_s(generated, "left = dea_try_"), "predeclared left should be assigned after the try succeeds");
+        assert(contains_s(generated, "right = dea_try_"), "predeclared right should be assigned after the try succeeds");
+        assert(!contains_s(generated, "struct dea_demo_main_Expr* left = dea_try_"),
             "left should not be redeclared after predeclaration");
-        assert(!contains_s(generated, "struct l0_demo_main_Expr* right = l0_try_"),
+        assert(!contains_s(generated, "struct dea_demo_main_Expr* right = dea_try_"),
             "right should not be redeclared after predeclaration");
-        assert(contains_s(generated, "l0_demo_main_free_expr(left);"),
+        assert(contains_s(generated, "dea_demo_main_free_expr(left);"),
             "cleanup block should still reference the predeclared left variable");
-        assert(contains_s(generated, "l0_demo_main_free_expr(right);"),
+        assert(contains_s(generated, "dea_demo_main_free_expr(right);"),
             "cleanup block should still reference the predeclared right variable");
 
         analysis_result_free(result);
@@ -548,15 +548,15 @@ func test_backend_generate_new_and_try_lowering() {
         assert(!analysis_has_errors(result), "analysis should succeed for new/try fixture");
 
         let generated = backend_generate(result, opts, cfg);
-        assert(contains_s(generated, "_rt_alloc_obj((l0_int)sizeof(struct l0_demo_main_Box));"),
+        assert(contains_s(generated, "_rt_alloc_obj((dea_int)sizeof(struct dea_demo_main_Box));"),
             "new expression should allocate heap storage");
-        assert(contains_s(generated, "(struct l0_demo_main_Box){ 0 }"),
+        assert(contains_s(generated, "(struct dea_demo_main_Box){ 0 }"),
             "zero-arg struct new should lower to zero initialization");
-        assert(contains_s(generated, "*l0_new_"), "new expression should initialize the allocated object");
-        assert(contains_s(generated, "l0_demo_main_Result_Ok"),
+        assert(contains_s(generated, "*dea_new_"), "new expression should initialize the allocated object");
+        assert(contains_s(generated, "dea_demo_main_Result_Ok"),
             "enum variant new should initialize the variant tag");
-        assert(contains_s(generated, "l0_opt_int l0_try_"), "try expression should materialize a temp");
-        assert(contains_s(generated, "if (!((l0_try_"), "try expression should check has_value");
+        assert(contains_s(generated, "dea_opt_int dea_try_"), "try expression should materialize a temp");
+        assert(contains_s(generated, "if (!((dea_try_"), "try expression should check has_value");
 
         analysis_result_free(result);
     }
@@ -593,9 +593,9 @@ func test_backend_generate_intrinsics_use_analyzed_target_types() {
         assert(!analysis_has_errors(result), "analysis should succeed for sizeof/ord fixture");
 
         let generated = backend_generate(result, opts, cfg);
-        assert(contains_s(generated, "((l0_int)sizeof(struct l0_demo_main_Pair))"),
+        assert(contains_s(generated, "((dea_int)sizeof(struct dea_demo_main_Pair))"),
             "sizeof should lower through the analyzed target type");
-        assert(contains_s(generated, "((l0_int)((f).tag))"), "ord should lower to the enum tag");
+        assert(contains_s(generated, "((dea_int)((f).tag))"), "ord should lower to the enum tag");
 
         analysis_result_free(result);
     }
@@ -636,13 +636,13 @@ func test_backend_generate_dea_intrinsics_respect_symbol_origin() {
         assert(!analysis_has_errors(result), "analysis should succeed for dea shadowing fixture");
 
         let generated = backend_generate(result, opts, cfg);
-        assert(contains_s(generated, "l0_demo_main_sizeof(4)"),
+        assert(contains_s(generated, "dea_demo_main_sizeof(4)"),
             "local sizeof should lower as a normal function call");
-        assert(contains_s(generated, "l0_demo_main_ord(5)"),
+        assert(contains_s(generated, "dea_demo_main_ord(5)"),
             "local ord should lower as a normal function call");
-        assert(contains_s(generated, "((l0_int)sizeof(struct l0_demo_main_Flag))"),
+        assert(contains_s(generated, "((dea_int)sizeof(struct dea_demo_main_Flag))"),
             "dea::sizeof should lower through intrinsic emission");
-        assert(contains_s(generated, "((l0_int)(((struct l0_demo_main_Flag){ .tag = l0_demo_main_Flag_On }).tag))"),
+        assert(contains_s(generated, "((dea_int)(((struct dea_demo_main_Flag){ .tag = dea_demo_main_Flag_On }).tag))"),
             "dea::ord should lower through intrinsic emission");
 
         analysis_result_free(result);
@@ -672,7 +672,7 @@ func test_backend_generate_string_copy_retains() {
         assert(!analysis_has_errors(result), "analysis should succeed for ARC copy fixture");
 
         let generated = backend_generate(result, opts, cfg);
-        assert(contains_s(generated, "rt_string_retain(l0_copy_"), "copying an owned string should retain");
+        assert(contains_s(generated, "rt_string_retain(dea_copy_"), "copying an owned string should retain");
         assert(contains_s(generated, "rt_string_release(t);"), "owned local cleanup should release copied string");
         assert(contains_s(generated, "rt_string_release(s);"), "owned local cleanup should release original string");
 

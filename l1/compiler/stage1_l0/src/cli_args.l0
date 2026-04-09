@@ -379,9 +379,9 @@ func cli_print_help() {
     cli_print_line(false, "                        Disable #line directives in generated C code (valid");
     cli_print_line(false, "                        in: '--build', '--run', '--gen')");
     cli_print_line(false, "  --trace-arc           Enable ARC runtime tracing in generated C code (emits");
-    cli_print_line(false, "                        L0_TRACE_ARC; valid in: '--build', '--run', '--gen')");
+    cli_print_line(false, "                        DEA_TRACE_ARC; valid in: '--build', '--run', '--gen')");
     cli_print_line(false, "  --trace-memory        Enable memory runtime tracing in generated C code");
-    cli_print_line(false, "                        (emits L0_TRACE_MEMORY; valid in: '--build', '--run',");
+    cli_print_line(false, "                        (emits DEA_TRACE_MEMORY; valid in: '--build', '--run',");
     cli_print_line(false, "                        '--gen')");
     cli_print_line(false, "  --keep-c              Keep generated C file (valid in: '--build', '--run';");
     cli_print_line(false, "                        use with '--output' to specify C file path");

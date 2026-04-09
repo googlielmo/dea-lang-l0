@@ -12,28 +12,28 @@
 #include "l1_runtime.h"
 
 /* Forward declarations */
-struct l0_main_Flag;
-struct l0_main_Pair;
+struct dea_main_Flag;
+struct dea_main_Pair;
 
 /* Optional wrapper types (builtins / early) */
 /* Type definitions (dependency-ordered) */
-#ifndef L0_DEFINED_l0_main_Pair
-#define L0_DEFINED_l0_main_Pair
-struct l0_main_Pair {
-    l0_int left;
-    l0_int right;
+#ifndef DEA_DEFINED_dea_main_Pair
+#define DEA_DEFINED_dea_main_Pair
+struct dea_main_Pair {
+    dea_int left;
+    dea_int right;
 };
 #endif
 
-#ifndef L0_DEFINED_l0_main_Flag
-#define L0_DEFINED_l0_main_Flag
-enum l0_main_Flag_tag {
-    l0_main_Flag_Off,
-    l0_main_Flag_On,
+#ifndef DEA_DEFINED_dea_main_Flag
+#define DEA_DEFINED_dea_main_Flag
+enum dea_main_Flag_tag {
+    dea_main_Flag_Off,
+    dea_main_Flag_On,
 };
 
-struct l0_main_Flag {
-    enum l0_main_Flag_tag tag;
+struct dea_main_Flag {
+    enum dea_main_Flag_tag tag;
     union {
         struct { char __dummy__; } Off;
         struct { char __dummy__; } On;
@@ -44,21 +44,21 @@ struct l0_main_Flag {
 /* Optional wrapper types (late) */
 /* Function declarations */
 /* Module: main */
-l0_int l0_main_main(void);
+dea_int dea_main_main(void);
 /* Function definitions */
 /* -------------------------------- */
 /* Module: main */
 /* -------------------------------- */
-l0_int l0_main_main(void)
+dea_int dea_main_main(void)
 {
-    struct l0_main_Pair p = (struct l0_main_Pair){ .left = 1, .right = ((l0_int)sizeof(struct l0_main_Pair)) };
-    struct l0_main_Flag f = (struct l0_main_Flag){ .tag = l0_main_Flag_On };
-    return (_rt_iadd((p).right, ((l0_int)((f).tag))));
+    struct dea_main_Pair p = (struct dea_main_Pair){ .left = 1, .right = ((dea_int)sizeof(struct dea_main_Pair)) };
+    struct dea_main_Flag f = (struct dea_main_Flag){ .tag = dea_main_Flag_On };
+    return (_rt_iadd((p).right, ((dea_int)((f).tag))));
 }
 
 /* C entry point wrapper */
 int main(int argc, char **argv)
 {
     _rt_init_args(argc, argv);
-    return (int) l0_main_main();
+    return (int) dea_main_main();
 }
