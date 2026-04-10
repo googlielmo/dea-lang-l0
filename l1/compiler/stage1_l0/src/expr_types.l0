@@ -37,6 +37,25 @@ struct ExpressionTypeChecker {
     current_ret_type: Type*?;
     current_scope: Scope*?;
     alive_scopes: VectorBase*?; // StringIntMap*
+    loop_depth: int;
+    next_stmt_unreachable: bool;
+    cleanup_header_guard_stack: CleanupHeaderGuard*?;
+}
+
+/**
+ * Describes whether a statement definitely returns.
+ */
+enum StmtFlowKind {
+    FLOW_FALLTHROUGH;
+    FLOW_RETURNS;
+}
+
+/**
+ * Linked stack entry for guarded `with` header locals during cleanup-block checking.
+ */
+struct CleanupHeaderGuard {
+    parent: CleanupHeaderGuard*?;
+    guarded: StringSet*;
 }
 
 /**
@@ -324,6 +343,116 @@ func etc_set_intrinsic_target(self: ExpressionTypeChecker*, expr_id: ExprId, ty:
 }
 
 /**
+ * Free a temporary cleanup-header guard stack.
+ *
+ * @param stack Linked guard stack to free.
+ */
+func etc_cleanup_header_guard_stack_free(stack: CleanupHeaderGuard*?) {
+    let cur = stack;
+    while (cur != null) {
+        let node = cur as CleanupHeaderGuard*;
+        let parent = node.parent;
+        ss_free(node.guarded);
+        drop node;
+        cur = parent;
+    }
+}
+
+/**
+ * Return whether the current cleanup-block guard stack marks a local name as maybe uninitialized.
+ *
+ * @param self Expression checker state.
+ * @param name Variable name to inspect.
+ * @return `true` when the visible local binding matches a guarded header declaration.
+ */
+func etc_is_guarded_cleanup_header_local(self: ExpressionTypeChecker*, name: string) -> bool {
+    if (self.cleanup_header_guard_stack == null || self.current_scope == null) {
+        return false;
+    }
+    let local = lc_scope_lookup(self.current_scope, name);
+    if (local == null) {
+        return false;
+    }
+    let symbol = local as LocalSymbol*;
+    if (ord(symbol.kind) != ord(LK_LOCAL)) {
+        return false;
+    }
+    let guards = self.cleanup_header_guard_stack;
+    while (guards != null) {
+        let guard_node = guards as CleanupHeaderGuard*;
+        if (ss_has(guard_node.guarded, name)) {
+            return true;
+        }
+        guards = guard_node.parent;
+    }
+    return false;
+}
+
+/**
+ * Return whether an expression contains postfix `?`.
+ *
+ * @param arena Expression arena to inspect.
+ * @param expr_id Expression id to walk.
+ * @return `true` when the expression tree contains `EX_TRY`.
+ */
+func etc_expr_contains_try(arena: ExprArena*, expr_id: ExprId) -> bool {
+    if (expr_id < 0) {
+        return false;
+    }
+    let expr = expr_arena_get(arena, expr_id);
+    if (ord(expr.kind) == ord(EX_TRY)) {
+        return true;
+    }
+    if (etc_expr_contains_try(arena, expr.expr_a)) return true;
+    if (etc_expr_contains_try(arena, expr.expr_b)) return true;
+    if (etc_expr_contains_try(arena, expr.expr_c)) return true;
+    if (expr.ids != null) {
+        let ids = expr.ids as VectorBase*;
+        for (let i = 0; i < vec_size(ids); i = i + 1) {
+            if (etc_expr_contains_try(arena, id_vec_get(ids, i))) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+/**
+ * Return whether a statement contains postfix `?`.
+ *
+ * @param unit Driver unit owning the statement.
+ * @param stmt_id Statement id to inspect.
+ * @return `true` when the statement contains `EX_TRY`.
+ */
+func etc_stmt_contains_try(unit: DriverUnit*, stmt_id: StmtId) -> bool {
+    if (stmt_id < 0) {
+        return false;
+    }
+    let stmt = stmt_arena_get(unit.parse_result.stmt_arena, stmt_id);
+    match (stmt.kind) {
+        ST_BLOCK => {
+            if (stmt.ids != null) {
+                let ids = stmt.ids as VectorBase*;
+                for (let i = 0; i < vec_size(ids); i = i + 1) {
+                    if (etc_stmt_contains_try(unit, id_vec_get(ids, i))) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+        ST_LET => { return etc_expr_contains_try(unit.parse_result.expr_arena, stmt.expr_a); }
+        ST_ASSIGN => {
+            return etc_expr_contains_try(unit.parse_result.expr_arena, stmt.expr_a) ||
+                etc_expr_contains_try(unit.parse_result.expr_arena, stmt.expr_b);
+        }
+        ST_EXPR => { return etc_expr_contains_try(unit.parse_result.expr_arena, stmt.expr_a); }
+        ST_RETURN => { return etc_expr_contains_try(unit.parse_result.expr_arena, stmt.expr_a); }
+        _ => { return false; }
+    }
+}
+
+/**
  * Resolve the type of a local binding visible in the current scope.
  *
  * @param self Expression checker state.
@@ -602,17 +731,287 @@ func etc_bind_pattern_types(self: ExpressionTypeChecker*, match_ty: Type*, patte
 }
 
 /**
+ * Find one enum-variant metadata entry by name.
+ *
+ * @param info Enum metadata to inspect.
+ * @param name Variant name to find.
+ * @return Matching variant metadata, or `null`.
+ */
+func etc_find_enum_variant_info(info: EnumInfo*, name: string) -> EnumVariantInfo*? {
+    for (let i = 0; i < vec_size(info.variants); i = i + 1) {
+        let variant = ptr_vec_get(info.variants, i) as EnumVariantInfo*;
+        if (eq_s(variant.name, name)) {
+            return variant;
+        }
+    }
+    return null;
+}
+
+/**
+ * Format one pattern symbol name for diagnostics.
+ *
+ * @param pattern Pattern node to describe.
+ * @return Unqualified or module-qualified pattern name.
+ */
+func etc_pattern_symbol_name(pattern: PatternNode*) -> string {
+    if (pattern.module_path != null) {
+        return concat3_s(tr_module_from_path(pattern.module_path as VectorString*), "::", pattern.name);
+    }
+    if (pattern.name_qualifier != null && vs_size(pattern.name_qualifier as VectorString*) > 0) {
+        return concat3_s(vs_get(pattern.name_qualifier as VectorString*, 0), "::", pattern.name);
+    }
+    return pattern.name;
+}
+
+/**
+ * Check whether one `match` arm pattern is valid for the matched enum type.
+ *
+ * @param self Expression checker state.
+ * @param match_ty Enum type of the scrutinee.
+ * @param pattern_id Pattern to validate.
+ * @return `true` when payload binding may proceed.
+ */
+func etc_check_match_pattern(self: ExpressionTypeChecker*, match_ty: Type*, pattern_id: PatternId) -> bool {
+    let unit = self.current_unit as DriverUnit*;
+    let pattern = pattern_arena_get(unit.parse_result.pattern_arena, pattern_id);
+    if (ord(pattern.kind) != ord(PT_VARIANT)) {
+        return true;
+    }
+
+    let info = sig_lookup_enum_info(self.result.signatures as SignatureTables*, match_ty.module_name, match_ty.name);
+    if (info == null) {
+        return false;
+    }
+
+    if (pattern.module_path != null) {
+        let target_module = tr_module_from_path(pattern.module_path as VectorString*);
+        let qualified = etc_pattern_symbol_name(pattern);
+        if (!eq_s(target_module, (self.current_env as ModuleEnv*).module_name) &&
+            !nr_module_env_imports_module(self.current_env as ModuleEnv*, target_module)) {
+            etc_diag_error(
+                self,
+                "TYP-0102",
+                concat4_s("unknown variant '", qualified, "' for enum '",
+                    concat3_s(type_format(match_ty), "' (module '", concat_s(target_module, "' not imported)"))),
+                unit.path,
+                pattern.span
+            );
+            return false;
+        }
+        if (nr_env_find(self.result.names as NameResolution*, target_module) == null) {
+            etc_diag_error(
+                self,
+                "TYP-0102",
+                concat4_s("unknown variant '", qualified, "' for enum '",
+                    concat3_s(type_format(match_ty), "' (unknown module '", concat_s(target_module, "')"))),
+                unit.path,
+                pattern.span
+            );
+            return false;
+        }
+        let sym = tr_symbol_lookup(self.result.names as NameResolution*, self.current_env as ModuleEnv*, pattern.name,
+            pattern.module_path, pattern.name_qualifier);
+        if (sym == null ||
+            ord((sym as Symbol*).kind) != ord(SYM_ENUM_VARIANT) ||
+            !eq_s((sym as Symbol*).module_name, match_ty.module_name) ||
+            !eq_s((sym as Symbol*).owner_name, match_ty.name)) {
+            etc_diag_error(
+                self,
+                "TYP-0102",
+                concat4_s("unknown variant '", qualified, "' for enum '", concat_s(type_format(match_ty), "'")),
+                unit.path,
+                pattern.span
+            );
+            return false;
+        }
+    }
+
+    let variant = etc_find_enum_variant_info(info as EnumInfo*, pattern.name);
+    if (variant == null) {
+        etc_diag_error(
+            self,
+            "TYP-0102",
+            concat4_s("unknown variant '", etc_pattern_symbol_name(pattern), "' for enum '",
+                concat_s(type_format(match_ty), "'")),
+            unit.path,
+            pattern.span
+        );
+        return false;
+    }
+
+    let pattern_arity = 0;
+    if (pattern.vars != null) {
+        pattern_arity = vs_size(pattern.vars as VectorString*);
+    }
+    let variant_info = variant as EnumVariantInfo*;
+    let expected_arity = vec_size(variant_info.field_types);
+    if (pattern_arity != expected_arity) {
+        etc_diag_error(
+            self,
+            "TYP-0101",
+            concat4_s(
+                "pattern variable count mismatch: variant '",
+                pattern.name,
+                "' has ",
+                concat3_s(int_to_string(expected_arity), " fields but pattern has ",
+                    concat_s(int_to_string(pattern_arity), " variables"))
+            ),
+            unit.path,
+            pattern.span
+        );
+        return false;
+    }
+
+    return true;
+}
+
+/**
+ * Format the missing enum variants for a non-exhaustive `match`.
+ *
+ * @param info Enum metadata for the matched type.
+ * @param covered Covered variant-name set.
+ * @return Comma-separated missing variant names in enum declaration order.
+ */
+func etc_format_missing_match_variants(info: EnumInfo*, covered: StringSet*) -> string {
+    with (let sb = sb_create() => sb_free(sb)) {
+        let first = true;
+        for (let i = 0; i < vec_size(info.variants); i = i + 1) {
+            let variant = ptr_vec_get(info.variants, i) as EnumVariantInfo*;
+            if (ss_has(covered, variant.name)) {
+                continue;
+            }
+            if (!first) {
+                sb_append(sb, ", ");
+            }
+            sb_append(sb, variant.name);
+            first = false;
+        }
+        return sb_to_string(sb);
+    }
+}
+
+/**
+ * Check whether an enum `match` covers all variants.
+ *
+ * @param self Expression checker state.
+ * @param match_ty Type of the matched expression.
+ * @param arms Match arms to inspect.
+ * @param span Source span for diagnostics.
+ * @return `true` if the match is exhaustive.
+ */
+func etc_check_match_exhaustiveness(self: ExpressionTypeChecker*, match_ty: Type*, arms: VectorBase*, span: Span) -> bool {
+    let unit = self.current_unit as DriverUnit*;
+    if (ord(match_ty.kind) != ord(TY_ENUM)) {
+        return false;
+    }
+
+    let info = sig_lookup_enum_info(self.result.signatures as SignatureTables*, match_ty.module_name, match_ty.name);
+    if (info == null) {
+        etc_diag_error(
+            self,
+            "TYP-0103",
+            concat3_s("no type information for enum '", type_format(match_ty), "'"),
+            unit.path,
+            span
+        );
+        return false;
+    }
+
+    with (let covered = ss_create() => ss_free(covered)) {
+        let wildcard_present = false;
+        for (let i = 0; i < vec_size(arms); i = i + 1) {
+            let arm = ptr_vec_get(arms, i) as MatchArm*;
+            let pattern = pattern_arena_get(unit.parse_result.pattern_arena, arm.pattern);
+            if (ord(pattern.kind) == ord(PT_WILDCARD)) {
+                wildcard_present = true;
+            } else if (ord(pattern.kind) == ord(PT_VARIANT)) {
+                ss_add(covered, us_clone_s(pattern.name));
+            }
+        }
+
+        if (wildcard_present && ss_size(covered) == vec_size((info as EnumInfo*).variants)) {
+            etc_diag_warn(
+                self,
+                "TYP-0105",
+                concat4_s(
+                    "unreachable wildcard pattern in match: all variants of enum '",
+                    type_format(match_ty),
+                    "' are already covered",
+                    ""
+                ),
+                unit.path,
+                span
+            );
+            return true;
+        }
+
+        if (wildcard_present) {
+            return true;
+        }
+
+        if (ss_size(covered) == vec_size((info as EnumInfo*).variants)) {
+            return true;
+        }
+
+        etc_diag_error(
+            self,
+            "TYP-0104",
+            concat4_s(
+                "non-exhaustive match: missing variants (",
+                etc_format_missing_match_variants(info as EnumInfo*, covered),
+                ") for enum '",
+                concat_s(type_format(match_ty), "'")
+            ),
+            unit.path,
+            span
+        );
+        return false;
+    }
+}
+
+/**
+ * Return whether a type is valid as a `case` scrutinee.
+ *
+ * @param ty Type to inspect.
+ * @return `true` for `int`, `byte`, `bool`, and `string`.
+ */
+func etc_is_case_type(ty: Type*?) -> bool {
+    return etc_is_int(ty) || etc_is_bool(ty) || etc_is_string(ty);
+}
+
+/**
+ * Build a stable duplicate-detection key for a `case` literal.
+ *
+ * @param expr Literal expression node.
+ * @return A type-prefixed key, or `null` if the expression is unsupported.
+ */
+func etc_case_literal_key(expr: ExprNode*) -> string? {
+    match (expr.kind) {
+        EX_INT => { return concat_s("int:", int_to_string(expr.int_value)); }
+        EX_BYTE => { return concat_s("byte:", int_to_string(expr.int_value)); }
+        EX_BOOL => {
+            if (expr.bool_value) return "bool:true";
+            return "bool:false";
+        }
+        EX_STRING => { return concat_s("string:", expr.text_value); }
+        _ => { return null; }
+    }
+}
+
+/**
  * Type-check a statement and its nested statements.
  *
  * @param self Expression checker state.
  * @param stmt_id Statement id to check.
+ * @return Whether the statement definitely returns.
  */
-func etc_check_stmt(self: ExpressionTypeChecker*, stmt_id: StmtId) {
+func etc_check_stmt(self: ExpressionTypeChecker*, stmt_id: StmtId) -> StmtFlowKind {
     if (stmt_id < 0) {
-        return;
+        return FLOW_FALLTHROUGH;
     }
     let unit = self.current_unit as DriverUnit*;
     let stmt = stmt_arena_get(unit.parse_result.stmt_arena, stmt_id);
+    let flow = FLOW_FALLTHROUGH;
     
     let old_scope = self.current_scope;
     let pushed_alive_scope = false;
@@ -627,34 +1026,80 @@ func etc_check_stmt(self: ExpressionTypeChecker*, stmt_id: StmtId) {
 
     match (stmt.kind) {
         ST_BLOCK => {
+            let unreachable_warning_issued = false;
             if (stmt.ids != null) {
                 let ids = stmt.ids as VectorBase*;
                 for (let i = 0; i < vec_size(ids); i = i + 1) {
-                    etc_check_stmt(self, id_vec_get(ids, i));
+                    let nested_stmt = stmt_arena_get(unit.parse_result.stmt_arena, id_vec_get(ids, i));
+                    if (ord(flow) == ord(FLOW_RETURNS) && !unreachable_warning_issued) {
+                        etc_diag_warn(self, "TYP-0031", "unreachable code after 'return'", unit.path, nested_stmt.span);
+                        unreachable_warning_issued = true;
+                    } else if (self.next_stmt_unreachable && !unreachable_warning_issued) {
+                        etc_diag_warn(self, "TYP-0030", "unreachable code", unit.path, nested_stmt.span);
+                        unreachable_warning_issued = true;
+                    }
+                    let stmt_flow = etc_check_stmt(self, id_vec_get(ids, i));
+                    if (ord(stmt_flow) == ord(FLOW_RETURNS)) {
+                        flow = FLOW_RETURNS;
+                    }
                 }
             }
+            self.next_stmt_unreachable = false;
         }
         ST_LET => {
-            let val_ty = etc_infer_expr(self, stmt.expr_a);
+            let declare_local = false;
             if (stmt.type_ref != null) {
                 with (let seen = ss_create() => ss_free(seen)) {
                     let ann_ty = tr_resolve_type_ref(self.result.signatures as SignatureTables*,
                         self.result.names as NameResolution*, self.current_env as ModuleEnv*,
                         stmt.type_ref as TypeRef*, self.result.diags, seen);
-                    if (ann_ty != null && val_ty != null) {
-                        if (!etc_can_assign(self, ann_ty as Type*, val_ty as Type*)) {
-                            etc_diag_error(self, "TYP-0310", concat4_s("initializer for '", stmt.name, "' type mismatch: ",
-                                concat3_s(type_format(ann_ty as Type*), " and ", type_format(val_ty as Type*))),
-                                unit.path, stmt.span);
+                    if (ann_ty != null) {
+                        if (type_is_builtin(ann_ty as Type*, "void")) {
+                            etc_diag_error(self, "TYP-0050", "variable cannot have type 'void'", unit.path, stmt.span);
+                        } else {
+                            let val_ty = etc_infer_expr(self, stmt.expr_a);
+                            if (val_ty != null) {
+                                if (!etc_can_assign(self, ann_ty as Type*, val_ty as Type*)) {
+                                    etc_diag_error(self, "TYP-0310", concat4_s("initializer for '", stmt.name,
+                                        "' type mismatch: ",
+                                        concat3_s(type_format(ann_ty as Type*), " and ", type_format(val_ty as Type*))),
+                                        unit.path, stmt.span);
+                                } else {
+                                    declare_local = true;
+                                }
+                                type_free(val_ty as Type*);
+                            }
                         }
+                        type_free(ann_ty as Type*);
+                    } else {
+                        etc_diag_error(self, "TYP-0040",
+                            concat3_s("cannot resolve type annotation for variable '", stmt.name, "'"),
+                            unit.path, (stmt.type_ref as TypeRef*).span);
                     }
-                    if (ann_ty != null) type_free(ann_ty as Type*);
+                }
+            } else {
+                let val_ty2 = etc_infer_expr(self, stmt.expr_a);
+                if (val_ty2 != null) {
+                    let expr_ty = val_ty2 as Type*;
+                    if (ord(expr_ty.kind) == ord(TY_NULL)) {
+                        etc_diag_error(self, "TYP-0052", "cannot infer type from 'null'; explicit type required",
+                            unit.path, stmt.span);
+                    } else if (type_is_builtin(expr_ty, "void")) {
+                        let init_expr = expr_arena_get(unit.parse_result.expr_arena, stmt.expr_a);
+                        etc_diag_error(self, "TYP-0053", "initializer is 'void', cannot assign to variable",
+                            unit.path, init_expr.span);
+                    } else {
+                        declare_local = true;
+                    }
+                    type_free(expr_ty);
+                } else {
+                    etc_diag_error(self, "TYP-0051", concat3_s("initializer for '", stmt.name, "' type mismatch"),
+                        unit.path, stmt.span);
                 }
             }
-            if (val_ty != null) {
-                type_free(val_ty as Type*);
+            if (declare_local) {
+                etc_alive_declare(self, stmt.name);
             }
-            etc_alive_declare(self, stmt.name);
         }
         ST_ASSIGN => {
             etc_alive_revive_assignment_target(self, stmt.expr_a);
@@ -678,14 +1123,19 @@ func etc_check_stmt(self: ExpressionTypeChecker*, stmt_id: StmtId) {
             }
             let pre_alive: VectorBase*? = null;
             let then_alive: VectorBase*? = null;
+            let pre_unreachable = self.next_stmt_unreachable;
             if (self.alive_scopes != null) {
                 pre_alive = etc_alive_scope_stack_clone(self.alive_scopes as VectorBase*);
             }
-            etc_check_stmt(self, stmt.stmt_a);
+            self.next_stmt_unreachable = false;
+            let then_flow = etc_check_stmt(self, stmt.stmt_a);
+            let then_unreachable = self.next_stmt_unreachable;
             if (self.alive_scopes != null) {
                 then_alive = etc_alive_scope_stack_clone(self.alive_scopes as VectorBase*);
             }
-            etc_check_stmt(self, stmt.stmt_b);
+            self.next_stmt_unreachable = false;
+            let else_flow = etc_check_stmt(self, stmt.stmt_b);
+            let else_unreachable = self.next_stmt_unreachable;
             if (stmt.stmt_b >= 0 && pre_alive != null && then_alive != null && self.alive_scopes != null) {
                 let else_alive = self.alive_scopes as VectorBase*;
                 let merged = etc_alive_scope_stack_clone(pre_alive as VectorBase*);
@@ -713,6 +1163,18 @@ func etc_check_stmt(self: ExpressionTypeChecker*, stmt_id: StmtId) {
             }
             etc_alive_scope_stack_free(pre_alive);
             etc_alive_scope_stack_free(then_alive);
+            if (stmt.stmt_b >= 0 &&
+                ord(then_flow) == ord(FLOW_RETURNS) &&
+                ord(else_flow) == ord(FLOW_RETURNS)) {
+                flow = FLOW_RETURNS;
+            }
+            if (pre_unreachable) {
+                self.next_stmt_unreachable = true;
+            } else if (stmt.stmt_b >= 0) {
+                self.next_stmt_unreachable = then_unreachable && else_unreachable;
+            } else {
+                self.next_stmt_unreachable = false;
+            }
         }
         ST_WHILE => {
             let cond_ty2 = etc_infer_expr(self, stmt.expr_a);
@@ -722,7 +1184,9 @@ func etc_check_stmt(self: ExpressionTypeChecker*, stmt_id: StmtId) {
                 }
                 type_free(cond_ty2 as Type*);
             }
+            self.loop_depth = self.loop_depth + 1;
             etc_check_stmt(self, stmt.stmt_a);
+            self.loop_depth = self.loop_depth - 1;
         }
         ST_FOR => {
             etc_check_stmt(self, stmt.stmt_a);
@@ -734,17 +1198,32 @@ func etc_check_stmt(self: ExpressionTypeChecker*, stmt_id: StmtId) {
                 type_free(cond_ty3 as Type*);
             }
             etc_check_stmt(self, stmt.stmt_b);
+            self.loop_depth = self.loop_depth + 1;
             etc_check_stmt(self, stmt.stmt_c);
+            self.loop_depth = self.loop_depth - 1;
         }
         ST_MATCH => {
             let val_ty2 = etc_infer_expr(self, stmt.expr_a);
             if (val_ty2 != null) {
-                if (stmt.match_arms != null) {
+                if (ord((val_ty2 as Type*).kind) != ord(TY_ENUM)) {
+                    etc_diag_error(self, "TYP-0100",
+                        concat3_s("match expression must have enum type, got '", type_format(val_ty2 as Type*), "'"),
+                        unit.path, stmt.span);
+                } else if (stmt.match_arms != null) {
                     let arms = stmt.match_arms as VectorBase*;
+                    let all_arms_return = true;
                     for (let i = 0; i < vec_size(arms); i = i + 1) {
                         let arm = ptr_vec_get(arms, i) as MatchArm*;
-                        etc_bind_pattern_types(self, val_ty2 as Type*, arm.pattern);
-                        etc_check_stmt(self, arm.body);
+                        if (etc_check_match_pattern(self, val_ty2 as Type*, arm.pattern)) {
+                            etc_bind_pattern_types(self, val_ty2 as Type*, arm.pattern);
+                        }
+                        let arm_flow = etc_check_stmt(self, arm.body);
+                        if (ord(arm_flow) != ord(FLOW_RETURNS)) {
+                            all_arms_return = false;
+                        }
+                    }
+                    if (etc_check_match_exhaustiveness(self, val_ty2 as Type*, arms, stmt.span) && all_arms_return) {
+                        flow = FLOW_RETURNS;
                     }
                 }
                 type_free(val_ty2 as Type*);
@@ -753,28 +1232,112 @@ func etc_check_stmt(self: ExpressionTypeChecker*, stmt_id: StmtId) {
         ST_CASE => {
             let val_ty3 = etc_infer_expr(self, stmt.expr_a);
             if (val_ty3 != null) {
-                if (stmt.case_arms != null) {
-                    let arms2 = stmt.case_arms as VectorBase*;
-                    for (let i = 0; i < vec_size(arms2); i = i + 1) {
-                        let arm2 = ptr_vec_get(arms2, i) as CaseArm*;
-                        etc_check_stmt(self, arm2.body);
-                    }
+                let case_ty_ok = etc_is_case_type(val_ty3 as Type*);
+                if (!case_ty_ok) {
+                    etc_diag_error(
+                        self,
+                        "TYP-0106",
+                        concat4_s(
+                            "'case' scrutinee must have type 'int', 'byte', 'bool', or 'string', got '",
+                            type_format(val_ty3 as Type*),
+                            "'",
+                            ""
+                        ),
+                        unit.path,
+                        stmt.span
+                    );
                 }
-                if (stmt.case_else != null) {
-                    etc_check_stmt(self, (stmt.case_else as CaseElse*).body);
+                if (stmt.case_arms != null) {
+                    with (let seen_literals = ss_create() => ss_free(seen_literals)) {
+                        let arms2 = stmt.case_arms as VectorBase*;
+                        let all_case_arms_return = true;
+                        for (let i = 0; i < vec_size(arms2); i = i + 1) {
+                            let arm2 = ptr_vec_get(arms2, i) as CaseArm*;
+                            let literal_ty = etc_infer_expr(self, arm2.literal);
+                            if (literal_ty != null) {
+                                let arm_literal = expr_arena_get(unit.parse_result.expr_arena, arm2.literal);
+                                if (case_ty_ok && !etc_types_equal(literal_ty as Type*, val_ty3 as Type*)) {
+                                    etc_diag_error(
+                                        self,
+                                        "TYP-0107",
+                                        concat4_s(
+                                            "'case' arm literal type '",
+                                            type_format(literal_ty as Type*),
+                                            "' does not match scrutinee type '",
+                                            concat_s(type_format(val_ty3 as Type*), "'")
+                                        ),
+                                        unit.path,
+                                        arm_literal.span
+                                    );
+                                } else {
+                                    let literal_key = etc_case_literal_key(arm_literal);
+                                    if (literal_key != null) {
+                                        let case_key = literal_key as string;
+                                        if (ss_has(seen_literals, case_key)) {
+                                            etc_diag_error(
+                                                self,
+                                                "TYP-0108",
+                                                "duplicate literal value in 'case' statement",
+                                                unit.path,
+                                                arm_literal.span
+                                            );
+                                        } else {
+                                            ss_add(seen_literals, us_clone_s(case_key));
+                                        }
+                                    }
+                                }
+                                type_free(literal_ty as Type*);
+                            }
+                            let arm_flow2 = etc_check_stmt(self, arm2.body);
+                            if (ord(arm_flow2) != ord(FLOW_RETURNS)) {
+                                all_case_arms_return = false;
+                            }
+                        }
+                        if (stmt.case_else != null) {
+                            let else_flow2 = etc_check_stmt(self, (stmt.case_else as CaseElse*).body);
+                            if (all_case_arms_return && ord(else_flow2) == ord(FLOW_RETURNS)) {
+                                flow = FLOW_RETURNS;
+                            }
+                        }
+                    }
                 }
                 type_free(val_ty3 as Type*);
             }
         }
         ST_WITH => {
+            let cleanup_guards: StringSet*? = null;
             if (stmt.with_items != null) {
                 let items = stmt.with_items as VectorBase*;
+                let seen_header_try = false;
                 for (let i = 0; i < vec_size(items); i = i + 1) {
                     let item = ptr_vec_get(items, i) as WithItem*;
+                    let init_has_try = etc_stmt_contains_try(unit, item.init);
                     etc_check_stmt(self, item.init);
+                    if (init_has_try) {
+                        seen_header_try = true;
+                    }
+                    if (seen_header_try) {
+                        let init_stmt = stmt_arena_get(unit.parse_result.stmt_arena, item.init);
+                        if (ord(init_stmt.kind) == ord(ST_LET) && init_stmt.type_ref != null) {
+                            let local = lc_scope_lookup(self.current_scope, init_stmt.name);
+                            if (local != null) {
+                                let local_ty = etc_lookup_local(self, init_stmt.name);
+                                if (local_ty != null) {
+                                    let ty = local_ty as Type*;
+                                    if (ord(ty.kind) != ord(TY_NULLABLE)) {
+                                        if (cleanup_guards == null) {
+                                            cleanup_guards = ss_create();
+                                        }
+                                        ss_add(cleanup_guards as StringSet*, us_clone_s(init_stmt.name));
+                                    }
+                                    type_free(ty);
+                                }
+                            }
+                        }
+                    }
                 }
             }
-            etc_check_stmt(self, stmt.stmt_a);
+            let body_flow = etc_check_stmt(self, stmt.stmt_a);
             if (stmt.with_items != null && stmt.stmt_b < 0) {
                 let items2 = stmt.with_items as VectorBase*;
                 for (let j = vec_size(items2) - 1; j >= 0; j = j - 1) {
@@ -784,7 +1347,25 @@ func etc_check_stmt(self: ExpressionTypeChecker*, stmt_id: StmtId) {
                     }
                 }
             }
-            etc_check_stmt(self, stmt.stmt_b);
+            let cleanup_guard_node: CleanupHeaderGuard*? = null;
+            if (stmt.stmt_b >= 0 && cleanup_guards != null) {
+                cleanup_guard_node = new CleanupHeaderGuard(self.cleanup_header_guard_stack, cleanup_guards as StringSet*);
+                self.cleanup_header_guard_stack = cleanup_guard_node;
+                cleanup_guards = null;
+            }
+            let cleanup_flow = etc_check_stmt(self, stmt.stmt_b);
+            if (cleanup_guards != null) {
+                ss_free(cleanup_guards as StringSet*);
+            }
+            if (cleanup_guard_node != null) {
+                let node = cleanup_guard_node as CleanupHeaderGuard*;
+                self.cleanup_header_guard_stack = node.parent;
+                ss_free(node.guarded);
+                drop node;
+            }
+            if (ord(body_flow) == ord(FLOW_RETURNS) || ord(cleanup_flow) == ord(FLOW_RETURNS)) {
+                flow = FLOW_RETURNS;
+            }
         }
         ST_RETURN => {
             if (self.current_ret_type != null) {
@@ -805,6 +1386,7 @@ func etc_check_stmt(self: ExpressionTypeChecker*, stmt_id: StmtId) {
                     }
                 }
             }
+            flow = FLOW_RETURNS;
         }
         ST_DROP => {
             let drop_ty = etc_lookup_local(self, stmt.name);
@@ -839,14 +1421,25 @@ func etc_check_stmt(self: ExpressionTypeChecker*, stmt_id: StmtId) {
                 type_free(ty as Type*);
             }
         }
-        ST_BREAK => {}
-        ST_CONTINUE => {}
+        ST_BREAK => {
+            if (self.loop_depth < 1) {
+                etc_diag_error(self, "TYP-0110", "'break' statement not within a loop", unit.path, stmt.span);
+            }
+            self.next_stmt_unreachable = true;
+        }
+        ST_CONTINUE => {
+            if (self.loop_depth < 1) {
+                etc_diag_error(self, "TYP-0120", "'continue' statement not within a loop", unit.path, stmt.span);
+            }
+            self.next_stmt_unreachable = true;
+        }
     }
     
     self.current_scope = old_scope;
     if (pushed_alive_scope) {
         etc_alive_scope_pop(self);
     }
+    return flow;
 }
 
 /**
@@ -1371,6 +1964,20 @@ func etc_infer_expr(self: ExpressionTypeChecker*, expr_id: ExprId) -> Type*? {
         EX_VAR_REF => {
             let local_ty = etc_lookup_local(self, expr.text_value);
             if (local_ty != null) {
+                if (etc_is_guarded_cleanup_header_local(self, expr.text_value)) {
+                    etc_diag_error(
+                        self,
+                        "TYP-0156",
+                        concat4_s(
+                            "'cleanup' block references 'with' header variable '",
+                            expr.text_value,
+                            "' that may be uninitialized on '?' header-failure path; use nullable type or inline '=>'",
+                            " cleanup"
+                        ),
+                        unit.path,
+                        expr.span
+                    );
+                }
                 let alive = etc_alive_lookup(self, expr.text_value);
                 if (alive != null && (alive as int) == 0) {
                     etc_diag_error(self, "TYP-0150", concat3_s("use of dropped variable '", expr.text_value, "'"),
@@ -1596,7 +2203,7 @@ func etc_infer_expr(self: ExpressionTypeChecker*, expr_id: ExprId) -> Type*? {
                 let nullable_ty = inner_ty as Type*;
                 if (ord(nullable_ty.kind) != ord(TY_NULLABLE)) {
                     etc_diag_error(self, "TYP-0250",
-                        concat4_s("cannot apply '?' to non-nullable type '", type_format(nullable_ty), "'", ""),
+                        concat3_s("cannot apply '?' to non-nullable type '", type_format(nullable_ty), "'"),
                         unit.path, expr.span);
                     type_free(nullable_ty);
                 } else if (self.current_ret_type == null || ord((self.current_ret_type as Type*).kind) != ord(TY_NULLABLE)) {
@@ -1643,7 +2250,24 @@ func etc_check_function(self: ExpressionTypeChecker*, env: FunctionEnv*) {
         return;
     }
     self.current_ret_type = (func_type as Type*).result;
-    etc_check_stmt(self, env.func_decl.body);
+    let body_flow = etc_check_stmt(self, env.func_decl.body);
+    if (!(env.func_decl as FuncDecl*).is_extern &&
+        !etc_is_void(self.current_ret_type) &&
+        ord(body_flow) != ord(FLOW_RETURNS)) {
+        let unit = self.current_unit as DriverUnit*;
+        etc_diag_error(
+            self,
+            "TYP-0010",
+            concat4_s(
+                "not all control paths return a value of type '",
+                type_format(self.current_ret_type as Type*),
+                "'",
+                ""
+            ),
+            unit.path,
+            env.func_decl.span
+        );
+    }
     self.current_func = null;
     self.current_ret_type = null;
     self.current_scope = null;
@@ -1656,7 +2280,7 @@ func etc_check_function(self: ExpressionTypeChecker*, env: FunctionEnv*) {
  * @param result Analysis result to populate with expression types and diagnostics.
  */
 func expr_types_check(result: AnalysisResult*) {
-    let checker = new ExpressionTypeChecker(result, "", null, null, null, null, null, ptr_vec_create(4));
+    let checker = new ExpressionTypeChecker(result, "", null, null, null, null, null, ptr_vec_create(4), 0, false, null);
     
     for (let i = 0; i < driver_unit_count(result.driver_state); i = i + 1) {
         let unit = driver_unit_get(result.driver_state, i);
@@ -1676,5 +2300,6 @@ func expr_types_check(result: AnalysisResult*) {
     }
     
     etc_alive_scope_stack_free(checker.alive_scopes);
+    etc_cleanup_header_guard_stack_free(checker.cleanup_header_guard_stack);
     drop checker;
 }

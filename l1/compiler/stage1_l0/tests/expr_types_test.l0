@@ -108,6 +108,117 @@ func test_typing_err() {
 }
 
 /**
+ * Tests `let` declaration diagnostic parity cases.
+ */
+func test_typing_let_diag_err() {
+    let sp = make_paths();
+    with (let cfg = log_config_create(LL_SILENT, false) => drop cfg) {
+        let result = analysis_analyze_entry(sp, "typing_let_diag_err", cfg);
+        assert(analysis_has_errors(result), "expected typing errors for typing_let_diag_err");
+        assert(has_diag_code(result, "TYP-0050"), "expected void local annotation error");
+        assert(has_diag_code(result, "TYP-0052"), "expected null-inference let error");
+        assert(has_diag_code(result, "TYP-0053"), "expected void-initializer let error");
+        analysis_result_free(result);
+    }
+    sp_free(sp);
+}
+
+/**
+ * Tests follow-on `let` diagnostic parity cases.
+ */
+func test_typing_let_diag_tail_err() {
+    let sp = make_paths();
+    with (let cfg = log_config_create(LL_SILENT, false) => drop cfg) {
+        let result = analysis_analyze_entry(sp, "typing_let_diag_tail_err", cfg);
+        assert(analysis_has_errors(result), "expected typing errors for typing_let_diag_tail_err");
+        assert(has_diag_code(result, "TYP-0040"), "expected unresolved let-annotation error");
+        assert(has_diag_code(result, "TYP-0051"), "expected failed inferred-let initializer error");
+        analysis_result_free(result);
+    }
+    sp_free(sp);
+}
+
+/**
+ * Tests loop-condition diagnostic code parity cases.
+ */
+func test_typing_loop_cond_err() {
+    let sp = make_paths();
+    with (let cfg = log_config_create(LL_SILENT, false) => drop cfg) {
+        let result = analysis_analyze_entry(sp, "typing_loop_cond_err", cfg);
+        assert(analysis_has_errors(result), "expected typing errors for typing_loop_cond_err");
+        assert(has_diag_code(result, "TYP-0080"), "expected while condition error");
+        assert(has_diag_code(result, "TYP-0090"), "expected for condition error");
+        analysis_result_free(result);
+    }
+    sp_free(sp);
+}
+
+/**
+ * Tests `match` scrutinee and arm diagnostic parity cases.
+ */
+func test_typing_match_diag_err() {
+    let sp = make_paths();
+    with (let cfg = log_config_create(LL_SILENT, false) => drop cfg) {
+        let result = analysis_analyze_entry(sp, "typing_match_diag_err", cfg);
+        assert(analysis_has_errors(result), "expected typing errors for typing_match_diag_err");
+        assert(has_diag_code(result, "TYP-0100"), "expected non-enum match scrutinee error");
+        assert(has_diag_code(result, "TYP-0101"), "expected match pattern arity error");
+        assert(has_diag_code(result, "TYP-0102"), "expected unknown match variant error");
+        analysis_result_free(result);
+    }
+    sp_free(sp);
+}
+
+/**
+ * Tests module-qualified `match` pattern parity cases.
+ */
+func test_typing_match_qualified_pattern_err() {
+    let sp = make_paths();
+    with (let cfg = log_config_create(LL_SILENT, false) => drop cfg) {
+        let result = analysis_analyze_entry(sp, "typing_match_qualified_pattern_err", cfg);
+        assert(analysis_has_errors(result), "expected typing errors for typing_match_qualified_pattern_err");
+        assert(has_diag_code(result, "TYP-0102"), "expected qualified-pattern unknown-variant error");
+        analysis_result_free(result);
+    }
+    sp_free(sp);
+}
+
+/**
+ * Tests `case` diagnostic parity cases.
+ */
+func test_typing_case_diag_err() {
+    let sp = make_paths();
+    with (let cfg = log_config_create(LL_SILENT, false) => drop cfg) {
+        let result = analysis_analyze_entry(sp, "typing_case_diag_err", cfg);
+        assert(analysis_has_errors(result), "expected typing errors for typing_case_diag_err");
+        assert(has_diag_code(result, "TYP-0106"), "expected invalid case scrutinee error");
+        assert(has_diag_code(result, "TYP-0107"), "expected case literal type mismatch error");
+        assert(has_diag_code(result, "TYP-0108"), "expected duplicate case literal error");
+        analysis_result_free(result);
+    }
+    sp_free(sp);
+}
+
+/**
+ * Tests cleanup-block header-failure guard diagnostics.
+ */
+func test_typing_with_cleanup_guard() {
+    let sp = make_paths();
+    with (let cfg = log_config_create(LL_SILENT, false) => drop cfg) {
+        let err_result = analysis_analyze_entry(sp, "typing_with_cleanup_guard_err", cfg);
+        assert(analysis_has_errors(err_result), "expected typing errors for typing_with_cleanup_guard_err");
+        assert(count_diag_code(err_result, "TYP-0156") == 2, "expected guarded cleanup diagnostics for both header vars");
+        analysis_result_free(err_result);
+
+        let ok_result = analysis_analyze_entry(sp, "typing_with_cleanup_guard_ok", cfg);
+        assert(!analysis_has_errors(ok_result), "expected no typing errors for typing_with_cleanup_guard_ok");
+        assert(!has_diag_code(ok_result, "TYP-0156"), "did not expect guarded cleanup diagnostics for nullable subset");
+        analysis_result_free(ok_result);
+    }
+    sp_free(sp);
+}
+
+/**
  * Tests field-access diagnostic parity cases.
  */
 func test_typing_field_diag_err() {
@@ -321,6 +432,65 @@ func test_typing_call_err() {
 }
 
 /**
+ * Tests `match` exhaustiveness and missing-return flow diagnostics.
+ */
+func test_typing_match_flow_err() {
+    let sp = make_paths();
+    with (let cfg = log_config_create(LL_SILENT, false) => drop cfg) {
+        let result = analysis_analyze_entry(sp, "typing_match_flow_err", cfg);
+        assert(analysis_has_errors(result), "expected typing errors for typing_match_flow_err");
+        assert(has_diag_code(result, "TYP-0104"), "expected non-exhaustive match error");
+        assert(count_diag_code(result, "TYP-0010") == 2, "expected missing-return errors for match and if fallthrough");
+        analysis_result_free(result);
+    }
+    sp_free(sp);
+}
+
+/**
+ * Tests warning-only enum `match` parity diagnostics.
+ */
+func test_typing_match_warn_ok() {
+    let sp = make_paths();
+    with (let cfg = log_config_create(LL_SILENT, false) => drop cfg) {
+        let result = analysis_analyze_entry(sp, "typing_match_warn_ok", cfg);
+        assert(!analysis_has_errors(result), "did not expect typing errors for typing_match_warn_ok");
+        assert(count_diag_code(result, "TYP-0105") == 1, "expected unreachable wildcard warning");
+        analysis_result_free(result);
+    }
+    sp_free(sp);
+}
+
+/**
+ * Tests loop-control diagnostics outside loops.
+ */
+func test_typing_loop_control_err() {
+    let sp = make_paths();
+    with (let cfg = log_config_create(LL_SILENT, false) => drop cfg) {
+        let result = analysis_analyze_entry(sp, "typing_loop_control_err", cfg);
+        assert(analysis_has_errors(result), "expected typing errors for typing_loop_control_err");
+        assert(has_diag_code(result, "TYP-0110"), "expected break-outside-loop error");
+        assert(has_diag_code(result, "TYP-0120"), "expected continue-outside-loop error");
+        analysis_result_free(result);
+    }
+    sp_free(sp);
+}
+
+/**
+ * Tests warning-only unreachable-code parity diagnostics.
+ */
+func test_typing_unreachable_warn_ok() {
+    let sp = make_paths();
+    with (let cfg = log_config_create(LL_SILENT, false) => drop cfg) {
+        let result = analysis_analyze_entry(sp, "typing_unreachable_warn_ok", cfg);
+        assert(!analysis_has_errors(result), "did not expect typing errors for typing_unreachable_warn_ok");
+        assert(count_diag_code(result, "TYP-0030") == 1, "expected one generic unreachable-code warning");
+        assert(count_diag_code(result, "TYP-0031") == 1, "expected one unreachable-after-return warning");
+        analysis_result_free(result);
+    }
+    sp_free(sp);
+}
+
+/**
  * Tests successful typing for `new` parity cases.
  */
 func test_typing_new_ok() {
@@ -438,6 +608,13 @@ func test_typing_dea_intrinsic_ref_err() {
 func main() {
     test_typing_ok();
     test_typing_err();
+    test_typing_let_diag_err();
+    test_typing_let_diag_tail_err();
+    test_typing_loop_cond_err();
+    test_typing_match_diag_err();
+    test_typing_match_qualified_pattern_err();
+    test_typing_case_diag_err();
+    test_typing_with_cleanup_guard();
     test_typing_field_diag_err();
     test_typing_index_diag_err();
     test_return_void_in_non_void();
@@ -452,6 +629,10 @@ func main() {
     test_typing_cast_null_unwrap_err();
     test_typing_nullable_assignment();
     test_typing_call_err();
+    test_typing_match_flow_err();
+    test_typing_match_warn_ok();
+    test_typing_loop_control_err();
+    test_typing_unreachable_warn_ok();
     test_typing_new_ok();
     test_typing_new_err();
     test_typing_drop_err();

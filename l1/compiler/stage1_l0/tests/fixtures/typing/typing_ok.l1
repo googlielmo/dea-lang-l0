@@ -68,6 +68,19 @@ func test_enum(s: Status) -> int {
 }
 
 /**
+ * Exercises enum pattern matching with a wildcard arm.
+ *
+ * @param s The enum value to inspect.
+ * @return The payload when active, otherwise zero.
+ */
+func test_enum_wildcard(s: Status) -> int {
+    match (s) {
+        Active(c) => { return c; }
+        _ => { return 0; }
+    }
+}
+
+/**
  * Exercises pointer dereference typing.
  *
  * @param p The pointer to dereference.

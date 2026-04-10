@@ -67,6 +67,6 @@ func err_return_type() -> int {
  * Triggers a non-boolean `if` condition error.
  */
 func err_if_cond() {
-    if (123) { // TYP-0313
+    if (123) { // TYP-0070
     }
 }
