@@ -46,6 +46,40 @@ func expect_single_int(source: string, expected_text: string, expected_value: in
 }
 
 /**
+ * Lexes source and asserts that the first token is one real literal.
+ *
+ * @param source Source text to lex.
+ * @param expected_sig Expected significand spelling preserved in the token.
+ * @param expected_exp_text Expected exponent text without the marker and including any explicit sign.
+ * @param expected_is_float Whether the token should report the float suffix.
+ */
+func expect_single_real(source: string, expected_sig: string, expected_exp_text: string, expected_is_float: bool) {
+    let ls = ls_create(source, "<test>");
+    let toks = tokenize(ls);
+    assert(toks != null, "Expected lexing to succeed");
+    assert(!ls_has_errors(ls), "Expected no lexer diagnostics");
+
+    let tv = toks as TokenVector;
+    assert(tv_len(tv) == 2, "Expected one token plus EOF");
+
+    let tok = tv_get(tv, 0);
+    match (tok.token_type) {
+        TT_REALNUM(sig, exp_text, is_float) => {
+            assert(eq_s(sig, expected_sig), "Unexpected real literal significand");
+            assert(eq_s(exp_text, expected_exp_text), "Unexpected real literal exponent text");
+            assert(is_float == expected_is_float, "Unexpected real literal float suffix flag");
+        }
+        _ => {
+            printl_ss("actual token:", token_to_string(tok));
+            assert(false, "Expected real literal token");
+        }
+    }
+
+    tv_free(tv);
+    ls_free(ls);
+}
+
+/**
  * Lexes source and asserts the first diagnostic code.
  *
  * @param source Source text to lex.
@@ -65,6 +99,39 @@ func expect_lex_error(source: string, expected: string) {
         assert(false, "Unexpected lexer diagnostic code");
     }
 
+    ls_free(ls);
+}
+
+/**
+ * Lexes source and asserts the first two tokens by rendered spelling.
+ *
+ * @param source Source text to lex.
+ * @param expected_first Expected rendering for token 0.
+ * @param expected_second Expected rendering for token 1.
+ */
+func expect_two_tokens(source: string, expected_first: string, expected_second: string) {
+    let ls = ls_create(source, "<test>");
+    let toks = tokenize(ls);
+    assert(toks != null, "Expected lexing to succeed");
+    assert(!ls_has_errors(ls), "Expected no lexer diagnostics");
+
+    let tv = toks as TokenVector;
+    assert(tv_len(tv) == 3, "Expected two tokens plus EOF");
+
+    let tok0 = tv_get(tv, 0);
+    let tok1 = tv_get(tv, 1);
+    let actual0 = token_to_string(tok0);
+    let actual1 = token_to_string(tok1);
+    if (!eq_s(actual0, expected_first)) {
+        printl_ss("actual token 0:", actual0);
+        assert(false, "Unexpected first token");
+    }
+    if (!eq_s(actual1, expected_second)) {
+        printl_ss("actual token 1:", actual1);
+        assert(false, "Unexpected second token");
+    }
+
+    tv_free(tv);
     ls_free(ls);
 }
 
@@ -130,6 +197,60 @@ func test_prefixed_int_literals_overflow() {
 }
 
 /**
+ * Tests accepted real literals.
+ */
+func test_real_literals_ok() {
+    expect_single_real("1.0", "1.0", "", false);
+    expect_single_real("0.0", "0.0", "", false);
+    expect_single_real("123.456", "123.456", "", false);
+    expect_single_real("1.0f", "1.0", "", true);
+    expect_single_real("1.0F", "1.0", "", true);
+    expect_single_real("-1.0", "-1.0", "", false);
+    expect_single_real("-1.0f", "-1.0", "", true);
+
+    expect_single_real("1e3", "1", "3", false);
+    expect_single_real("1E3", "1", "3", false);
+    expect_single_real("1e+3", "1", "+3", false);
+    expect_single_real("1e-3", "1", "-3", false);
+    expect_single_real("1e3f", "1", "3", true);
+    expect_single_real("1E-3F", "1", "-3", true);
+    expect_single_real("-1e3", "-1", "3", false);
+    expect_single_real("-1e-3f", "-1", "-3", true);
+}
+
+/**
+ * Tests malformed real literals.
+ */
+func test_real_literals_err() {
+    expect_lex_error("1e", "LEX-0065");
+    expect_lex_error("1e+", "LEX-0065");
+    expect_lex_error("1e-", "LEX-0065");
+    expect_lex_error("1.0e", "LEX-0065");
+    expect_lex_error("1.0e+", "LEX-0065");
+
+    expect_lex_error("1.0x", "LEX-0066");
+    expect_lex_error("1e3x", "LEX-0066");
+    expect_lex_error("1.0ff", "LEX-0066");
+    expect_lex_error("1e3foo", "LEX-0066");
+
+    expect_lex_error("1.0d", "LEX-0067");
+    expect_lex_error("1.0D", "LEX-0067");
+    expect_lex_error("1e3d", "LEX-0067");
+
+    expect_lex_error("123f", "LEX-0068");
+    expect_lex_error("123F", "LEX-0068");
+    expect_lex_error("-123f", "LEX-0068");
+}
+
+/**
+ * Tests boundary forms that are not currently recognized as real literals.
+ */
+func test_real_literal_boundaries() {
+    expect_two_tokens("1.", "int(1)", ".");
+    expect_two_tokens(".5", ".", "int(5)");
+}
+
+/**
  * Main entry point for the module.
  */
 func main() {
@@ -137,5 +258,8 @@ func main() {
     test_prefixed_int_literals_err();
     test_int_literal_limits_all_bases();
     test_prefixed_int_literals_overflow();
+    test_real_literals_ok();
+    test_real_literals_err();
+    test_real_literal_boundaries();
     printl_s("lexer_test: all tests passed");
 }

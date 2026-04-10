@@ -141,8 +141,8 @@ struct LexerState {
 /**
  * Create a lexer state for source text and filename metadata.
  *
- * @param source Source text to tokenize.
- * @param filename Source filename used in diagnostics.
+ * @param source    Source text to tokenize.
+ * @param filename  Source filename used in diagnostics.
  * @return New lexer state.
  */
 func ls_create(source: string, filename: string) -> LexerState* {
@@ -172,13 +172,13 @@ func ls_has_errors(self: LexerState*) -> bool {
 /**
  * Emit a lexer diagnostic at an explicit source span.
  *
- * @param self Lexer state collecting diagnostics.
- * @param code Diagnostic code.
- * @param message Diagnostic message.
- * @param line One-based starting line.
- * @param column One-based starting column.
- * @param line_end One-based ending line.
- * @param column_end One-based ending column.
+ * @param self          Lexer state collecting diagnostics.
+ * @param code          Diagnostic code.
+ * @param message       Diagnostic message.
+ * @param line          One-based starting line.
+ * @param column        One-based starting column.
+ * @param line_end      One-based ending line.
+ * @param column_end    One-based ending column.
  */
 func ls_emit_error(self: LexerState*, code: string, message: string, line: int, column: int, line_end: int, column_end: int) {
     diag_error(self.diags, "Lexer", code, message, self.filename, line, column, line_end, column_end);
@@ -254,13 +254,12 @@ func ls_advance(self: LexerState*) -> byte {
    Auxiliary data structures
    --------------------------------- */
 
-// Struct to represent a valid byte or Unicode code point escape sequence and its corresponding value
 /**
- * Represents the EscapedChar structure.
+ * Structure to represent a valid byte or Unicode code point escape sequence and its corresponding value.
  */
 struct EscapedChar {
-    escape_str: string; // The full escape sequence as it appears in the source (e.g., "\\n", "\\x1B", etc.)
-    char_value: int;    // The actual character value represented by the escape sequence (e.g., 10 for "\\n", 27 for "\\x1B")
+    escape_str: string; //< The full escape sequence as it appears in the source (e.g., "\\n", "\\x1B", etc.)
+    char_value: int;    //< The actual character value represented by the escape sequence (e.g., 10 for "\\n", 27 for "\\x1B")
 }
 
 /* ---------------------------------
@@ -270,6 +269,10 @@ struct EscapedChar {
 /**
  * Tokenizes the input source code and returns a vector of tokens.
  * If a lexing error occurs, the error field in the LexerState will be set and null will be returned.
+ * The returned tokens will include a final TT_EOF token at the end of the input.
+ *
+ * @param self Lexer state to tokenize.
+ * @return Vector of tokens if successful, or `null` if a lexing error occurs.
  */
 func tokenize(self: LexerState*) -> TokenVector? {
     let tokens = tv_create();
@@ -289,6 +292,9 @@ func tokenize(self: LexerState*) -> TokenVector? {
  * Reads the next token from the input source code.
  * Returns a Token if successful, or `null` if a lexing error occurs,
  * in which case the error field in the LexerState will be set.
+ *
+ * @param self Lexer state to read from.
+ * @return Next token if successful, or `null` if a lexing error occurs.
  */
 func ls_next_token(self: LexerState*) -> Token? {
     ls_skip_whitespace_and_comments(self)?;
@@ -461,6 +467,12 @@ func ls_next_token(self: LexerState*) -> Token? {
  * Handles escape sequences and validates that the literal represents a single byte.
  * Returns a Token of type TT_BYTE if successful, or `null` if a lexing error occurs,
  * in which case the error field in the LexerState will be set.
+ *
+ * @param self          Lexer state to read from.
+ * @param start_index   Starting index of the byte literal (position of the opening single quote).
+ * @param start_line    Starting line number of the byte literal.
+ * @param start_column  Starting column number of the byte literal.
+ * @return Token of type TT_BYTE if successful, or `null` if a lexing error occurs.
  */
 func ls_read_byte_literal(self: LexerState*, start_index: int, start_line: int, start_column: int) -> Token? {
     with (let cb = cb_create() => cb_free(cb)) {
@@ -496,6 +508,12 @@ func ls_read_byte_literal(self: LexerState*, start_index: int, start_line: int, 
  * Handles escape sequences and validates that the string is properly terminated.
  * Returns a Token of type TT_STRING if successful, or `null` if a lexing error occurs,
  * in which case the error field in the LexerState will be set.
+ *
+ * @param self Lexer    state to read from.
+ * @param start_index   Starting index of the string literal (position of the opening double quote).
+ * @param start_line    Starting line number of the string literal.
+ * @param start_column  Starting column number of the string literal.
+ * @return Token of type TT_STRING if successful, or `null` if a lexing error occurs.
  */
 func ls_read_string_literal(self: LexerState*, start_index: int, start_line: int, start_column: int) -> Token? {
     with (let cb = cb_create() => cb_free(cb),
@@ -541,6 +559,12 @@ func ls_read_string_literal(self: LexerState*, start_index: int, start_line: int
  * If `single_byte` is true, also validates that the resulting character value can fit in a single byte (0-255).
  * Returns an EscapedChar struct if successful, or `null` if an invalid escape sequence is encountered,
  * in which case the error field in the LexerState will be set.
+ *
+ * @param self Lexer    state to read from.
+ * @param single_byte   Whether to enforce that the resulting character value fits in a single byte (0-255), which is
+ *                      required for byte literals. If false, allows Unicode code points up to 0x10FFFF.
+ * @return EscapedChar  struct containing the original escape string and its character value if successful, or `null` if
+ *                      an invalid escape sequence is encountered.
  */
 func ls_read_valid_char_escape(self: LexerState*, single_byte: bool) -> EscapedChar? {
     let char_value: int = 0;
@@ -640,17 +664,31 @@ func ls_read_valid_char_escape(self: LexerState*, single_byte: bool) -> EscapedC
 }
 
 /**
- * Reads an integer literal from the input, starting with the first digit character.
- * Supports decimal, hexadecimal (0x), binary (0b), and octal (0o) literals.
+ * Reads a number literal from the input, starting with the given first character (which has already been consumed).
+ * Supports decimal, hexadecimal (0x), binary (0b), and octal (0o) literals, as well as real literals with optional
+ * decimal points and exponent parts.
  * Validates that the literal is well-formed and does not contain invalid characters immediately following it.
  * Also checks for integer overflow and ensures the value fits within a 32-bit signed integer range.
- * Returns a Token of type TT_INT if successful, or `null` if a lexing error occurs, in which case the error field
- * in the LexerState will be set.
+ * Returns a Token of type TT_INT if an integer literal is successfully read, or TT_REAL if a real literal is
+ * successfully read. Returns `null` if a lexing error occurs, in which case the error field in the LexerState will be
+ * set.
+ *
+ * @param self          Lexer state to read from.
+ * @param first_char    The first character of the number literal (already consumed).
+ * @param is_negative   Whether the number literal is negative (determined by a preceding '-', already consumed).
+ * @param start_index   Starting index of the number literal (position of the first character).
+ * @param start_line    Starting line number of the number literal.
+ * @param start_column  Starting column number of the number literal.
+ * @return Token of type TT_INT or TT_REAL if successful, or `null` if a lexing error occurs.
  */
 func ls_read_number(self: LexerState*, first_char: byte, is_negative: bool,
                     start_index: int, start_line: int, start_column: int) -> Token? {
+    let is_real = false;    // Whether this is a real literal, i.e. contains a decimal point or exponent part
+    let is_exp = false;     // Whether an exponent part has been encountered in a real literal
+    let is_float = false;   // Whether this real literal has an 'f' suffix
     with (let cb = cb_create() => cb_free(cb),
-          let vb = cb_create() => cb_free(vb)) {
+          let vb = cb_create() => cb_free(vb),
+          let eb = cb_create() => cb_free(eb)) {
         let base = 10;
 
         if (is_negative) {
@@ -695,31 +733,86 @@ func ls_read_number(self: LexerState*, first_char: byte, is_negative: bool,
                 cb_append(cb, ls_advance(self));
             }
         } else {
+            // Decimal or real literal
             cb_append(vb, first_char);
             cb_append(cb, first_char);
-            while (is_digit(ls_peek(self))) {
-                cb_append(vb, ls_peek(self));
-                cb_append(cb, ls_advance(self));
+            while (true) {
+                let next_c = ls_peek(self);
+                if (is_digit(next_c)) {
+                    cb_append(vb, next_c);
+                    cb_append(cb, ls_advance(self));
+                } else if (next_c == '.' && !is_real && is_digit(ls_peek_next(self))) {
+                    is_real = true;
+                    cb_append(cb, ls_advance(self)); // consume '.'
+                } else if ((next_c == 'e' || next_c == 'E') && !is_exp) {
+                    is_real = true;
+                    is_exp = true;
+                    ls_advance(self); // consume 'e' or 'E'
+                    next_c = ls_peek(self);
+                    if (next_c == '+' || next_c == '-') {
+                        cb_append(eb, ls_advance(self)); // consume optional '+' or '-'
+                    }
+                    if (!is_digit(ls_peek(self))) {
+                        ls_emit_error(self, "LEX-0065", "invalid real literal, expected digits after exponent marker", start_line, start_column, self.line, self.column);
+                        return null;
+                    }
+                    while (is_digit(ls_peek(self))) {
+                        cb_append(eb, ls_advance(self));
+                    }
+                    break;
+                } else {
+                    break;
+                }
             }
         }
 
-        let number_str = cb_to_string(cb);
-        let value_str = cb_to_string(vb);
+        if (is_real) {
+            // Real literal
+            if (ls_peek(self) == 'f' || ls_peek(self) == 'F') {
+                is_float = true;
+                ls_advance(self); // consume 'f' or 'F'
+            }
+            let next_c = ls_peek(self);
+            if (is_ident_part(next_c)) {
+                if (!is_float && (next_c == 'd' || next_c == 'D')) {
+                    // special-case error message for 'd'/'D' suffix
+                    ls_emit_error(self, "LEX-0067", concat3_s("invalid suffix '", byte_to_s(next_c), "' after real literal; only 'f' is supported"), self.line, self.column, self.line, self.column + 1);
+                    return null;
+                }
+                ls_emit_error(self, "LEX-0066", concat3_s("invalid character '", byte_to_s(next_c), "' after real literal"), self.line, self.column, self.line, self.column + 1);
+                return null;
+            }
 
-        // Reject identifier-like or mixed-base suffixes such as `123abc`, `0b12`, or `0xff_name`.
-        if (is_ident_part(ls_peek(self))) {
-            ls_emit_error(self, "LEX-0061", concat3_s("invalid character '", byte_to_s(ls_peek(self)), "' after integer literal"), start_line, start_column, self.line, self.column);
-            return null;
+            let significand = cb_to_string(cb); // significand part includes the optional leading '-' and the optional decimal point
+            let exponent = cb_to_string(eb);    // exponent part includes the optional '+'/'-' sign but not the 'e' or 'E'
+
+            return Token(TT_REALNUM(significand, exponent, is_float), start_index, start_line, start_column);
+        } else {
+            // Integer literal
+            let number_str = cb_to_string(cb);
+            let value_str = cb_to_string(vb);
+
+            // Reject identifier-like or mixed-base suffixes such as `123abc`, `0b12`, or `0xff_name`.
+            let next_c = ls_peek(self);
+            if (is_ident_part(next_c)) {
+                if ((next_c == 'f' || next_c == 'F') && base == 10) {
+                    // special-case error message for 'd'/'D' suffix
+                    ls_emit_error(self, "LEX-0068", concat3_s("invalid suffix '", byte_to_s(next_c), concat3_s("' after integer literal; use ", number_str, ".0f for a float")), self.line, self.column, self.line, self.column + 1);
+                    return null;
+                }
+                ls_emit_error(self, "LEX-0061", concat3_s("invalid character '", byte_to_s(ls_peek(self)), "' after integer literal"), self.line, self.column, self.line, self.column + 1);
+                return null;
+            }
+
+            // Check for integer overflow
+            let number_value : int? = string_to_int_base(value_str, base);
+            if (number_value == null) {
+                ls_emit_error(self, "LEX-0060", concat3_s("integer literal '", number_str, "' exceeds 32-bit signed range"), start_line, start_column, self.line, self.column);
+                return null;
+            }
+
+            return Token(TT_INT(number_str, number_value as int), start_index, start_line, start_column);
         }
-
-        // Check for integer overflow
-        let number_value : int? = string_to_int_base(value_str, base);
-        if (number_value == null) {
-            ls_emit_error(self, "LEX-0060", concat3_s("integer literal '", number_str, "' exceeds 32-bit signed range"), start_line, start_column, self.line, self.column);
-            return null;
-        }
-
-        return Token(TT_INT(number_str, number_value as int), start_index, start_line, start_column);
     }
 }
 
@@ -729,6 +822,9 @@ func ls_read_number(self: LexerState*, first_char: byte, is_negative: bool,
  * Handles both line comments and block comments.
  * Returns std.unit::present() if successful, or `null` if an unterminated block comment is encountered,
  * in which case the error field in the LexerState will be set.
+ *
+ * @param self Lexer state to advance.
+ * @return `std.unit::present()` if successful, or `null` if an unterminated block comment is encountered.
  */
 func ls_skip_whitespace_and_comments(self: LexerState*) -> Unit? {
     while (true) {

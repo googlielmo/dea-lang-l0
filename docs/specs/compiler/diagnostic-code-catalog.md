@@ -58,6 +58,10 @@ This document is an inventory reference. The normative rule for parity and reuse
 | `LEX-0062` | Invalid hexadecimal integer literal (L1+)              |
 | `LEX-0063` | Invalid binary integer literal (L1+)                   |
 | `LEX-0064` | Invalid octal integer literal (L1+)                    |
+| `LEX-0065` | Invalid real literal: missing exponent digits (L1+)    |
+| `LEX-0066` | Invalid character after real literal (L1+)             |
+| `LEX-0067` | Invalid suffix after real literal (L1+)                |
+| `LEX-0068` | Invalid float suffix after integer literal (L1+)       |
 | `LEX-0070` | Unterminated block comment                             |
 
 ## `PAR`
