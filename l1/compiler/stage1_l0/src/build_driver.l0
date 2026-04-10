@@ -280,7 +280,7 @@ func bd_temp_stem(tag: string) -> string {
         }
     }
 
-    return join(root, concat4_s("l1c-stage1-", tag, "-fallback", ""));
+    return join(root, concat3_s("l1c-stage1-", tag, "-fallback"));
 }
 
 /**
@@ -621,9 +621,9 @@ func bd_find_c_compiler() -> string? {
             let candidate = vs_get(candidates, i);
             let probe = "";
             if (bd_is_windows()) {
-                probe = concat4_s("where.exe ", bd_shell_quote(candidate), concat4_s(" >", bd_null_device(), " 2>&1", ""), "");
+                probe = concat3_s("where.exe ", bd_shell_quote(candidate), concat3_s(" >", bd_null_device(), " 2>&1"));
             } else {
-                probe = concat4_s("command -v ", bd_shell_quote(candidate), concat4_s(" >", bd_null_device(), " 2>&1", ""), "");
+                probe = concat3_s("command -v ", bd_shell_quote(candidate), concat3_s(" >", bd_null_device(), " 2>&1"));
             }
             if (system(probe) == 0) {
                 return candidate;
@@ -738,7 +738,7 @@ func bd_validate_entry_main(result: AnalysisResult*, entry_module: string, diags
             diags,
             "l1c",
             "L1C-0012",
-            concat4_s("entry module '", entry_module, "' must define a 'main' function for build/run", ""),
+            concat3_s("entry module '", entry_module, "' must define a 'main' function for build/run"),
             "",
             0,
             0,
@@ -750,7 +750,7 @@ func bd_validate_entry_main(result: AnalysisResult*, entry_module: string, diags
 
     let entry_env = nr_env_find(result.names as NameResolution*, entry_module);
     if (entry_env == null) {
-        diag_error(diags, "l1c", "L1C-0012", concat4_s("entry module '", entry_module, "' not found in analysis result", ""),
+        diag_error(diags, "l1c", "L1C-0012", concat3_s("entry module '", entry_module, "' not found in analysis result"),
             "", 0, 0, 0, 0);
         return false;
     }
@@ -761,7 +761,7 @@ func bd_validate_entry_main(result: AnalysisResult*, entry_module: string, diags
             diags,
             "l1c",
             "L1C-0012",
-            concat4_s("entry module '", entry_module, "' must define a 'main' function for build/run", ""),
+            concat3_s("entry module '", entry_module, "' must define a 'main' function for build/run"),
             "",
             0,
             0,
@@ -776,7 +776,7 @@ func bd_validate_entry_main(result: AnalysisResult*, entry_module: string, diags
             diags,
             "l1c",
             "L1C-0016",
-            concat4_s("missing type information for entry function '", concat3_s(entry_module, "::", "main"), "'", ""),
+            concat3_s("missing type information for entry function '", concat3_s(entry_module, "::", "main"), "'"),
             "",
             0,
             0,
@@ -792,7 +792,7 @@ func bd_validate_entry_main(result: AnalysisResult*, entry_module: string, diags
             diags,
             "l1c",
             "L1C-0016",
-            concat4_s("missing type information for entry function '", concat3_s(entry_module, "::", "main"), "'", ""),
+            concat3_s("missing type information for entry function '", concat3_s(entry_module, "::", "main"), "'"),
             "",
             0,
             0,
@@ -1075,7 +1075,7 @@ func bd_build_to_exe(opts: CliOptions*, cfg: LogConfig*, exe_path: string, keep_
                 bd_join_shell_words(command_words),
                 " > ",
                 bd_shell_quote(stdout_path),
-                concat4_s(" 2> ", bd_shell_quote(stderr_path), "", "")
+                concat3_s(" 2> ", bd_shell_quote(stderr_path), "")
             );
             let compile_rc = system(compile_cmd);
             let compile_failed = compile_rc != 0;
