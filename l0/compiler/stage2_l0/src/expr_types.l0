@@ -36,6 +36,7 @@ struct ExpressionTypeChecker {
     current_ret_type: Type*?;
     current_scope: Scope*?;
     alive_scopes: VectorBase*?; // StringIntMap*
+    decl_scopes: VectorBase*?; // StringIntMap*
     loop_depth: int;
     next_stmt_unreachable: bool;
     cleanup_header_guard_stack: CleanupHeaderGuard*?;
@@ -199,6 +200,98 @@ func etc_alive_scope_pop(self: ExpressionTypeChecker*) {
     scopes.length = scopes.length - 1;
 }
 
+func etc_decl_scope_current(self: ExpressionTypeChecker*) -> StringIntMap*? {
+    if (self.decl_scopes == null || vec_size(self.decl_scopes as VectorBase*) == 0) {
+        return null;
+    }
+    let scopes = self.decl_scopes as VectorBase*;
+    return ptr_vec_get(scopes, vec_size(scopes) - 1) as StringIntMap*;
+}
+
+func etc_decl_scope_push(self: ExpressionTypeChecker*, scope: Scope*?) {
+    if (self.decl_scopes == null) {
+        self.decl_scopes = ptr_vec_create(4);
+    }
+    let map = sim_create();
+    if (scope != null) {
+        let scope2 = scope as Scope*;
+        for (let i = 0; i < spm_capacity(scope2.symbols); i = i + 1) {
+            if (spm_slot_occupied(scope2.symbols, i)) {
+                let local = spm_slot_value(scope2.symbols, i) as LocalSymbol*;
+                if (ord(local.kind) != ord(LK_LOCAL)) {
+                    sim_put(map, local.name, 1);
+                }
+            }
+        }
+    }
+    ptr_vec_push(self.decl_scopes as VectorBase*, map as void*);
+}
+
+func etc_decl_scope_pop(self: ExpressionTypeChecker*) {
+    if (self.decl_scopes == null || vec_size(self.decl_scopes as VectorBase*) == 0) {
+        return;
+    }
+    let scopes = self.decl_scopes as VectorBase*;
+    let last = vec_size(scopes) - 1;
+    sim_free(ptr_vec_get(scopes, last) as StringIntMap*);
+    scopes.length = scopes.length - 1;
+}
+
+func etc_decl_outer_has(self: ExpressionTypeChecker*, name: string) -> bool {
+    if (self.decl_scopes == null) {
+        return false;
+    }
+    let scopes = self.decl_scopes as VectorBase*;
+    for (let i = vec_size(scopes) - 2; i >= 0; i = i - 1) {
+        if (sim_has(ptr_vec_get(scopes, i) as StringIntMap*, name)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+func etc_check_local_declaration(self: ExpressionTypeChecker*, name: string, span: Span) {
+    let current = etc_decl_scope_current(self);
+    if (current == null) {
+        return;
+    }
+    let unit = self.current_unit as DriverUnit*;
+    if (sim_has(current as StringIntMap*, name)) {
+        etc_diag_warn(self, "TYP-0020", concat3_s("local variable '", name, "' already declared in this scope"),
+            unit.path, span);
+        return;
+    }
+    if (etc_decl_outer_has(self, name)) {
+        etc_diag_warn(self, "TYP-0021", concat3_s("local variable '", name, "' shadows an outer local"),
+            unit.path, span);
+    }
+    if (self.current_env != null) {
+        let env = self.current_env as ModuleEnv*;
+        if (nr_module_env_is_ambiguous(env, name)) {
+            etc_diag_warn(self, "TYP-0024", concat3_s("local variable '", name, "' shadows an ambiguous import"),
+                unit.path, span);
+        } else {
+            let sym = nr_module_env_all(env, name);
+            if (sym != null) {
+                let s = sym as Symbol*;
+                if (ord(s.kind) == ord(SYM_ENUM_VARIANT)) {
+                    if (eq_s(s.module_name, self.current_module)) {
+                        etc_diag_warn(self, "TYP-0022", concat3_s("local variable '", name,
+                            "' shadows an enum variant"), unit.path, span);
+                    } else {
+                        etc_diag_warn(self, "TYP-0023", concat3_s("local variable '", name,
+                            "' shadows an imported enum variant"), unit.path, span);
+                    }
+                } else {
+                    etc_diag_warn(self, "TYP-0025", concat3_s("local variable '", name,
+                        "' shadows a top-level symbol"), unit.path, span);
+                }
+            }
+        }
+    }
+    sim_put(current as StringIntMap*, name, 1);
+}
+
 /**
  * Look up definite liveness for a visible local.
  *
@@ -288,6 +381,10 @@ func etc_alive_revive_assignment_target(self: ExpressionTypeChecker*, expr_id: E
  */
 func etc_set_expr_type(self: ExpressionTypeChecker*, expr_id: ExprId, ty: Type*) {
     let key = etc_key(self.current_module, expr_id);
+    let old = spm_get(self.result.expr_types, key);
+    if (old != null) {
+        type_free(old as Type*);
+    }
     spm_put(self.result.expr_types, key, type_clone(ty) as void*);
 }
 
@@ -300,6 +397,10 @@ func etc_set_expr_type(self: ExpressionTypeChecker*, expr_id: ExprId, ty: Type*)
  */
 func etc_set_var_type(self: ExpressionTypeChecker*, name: string, ty: Type*) {
     let key = concat3_s(self.current_module, "::var::", name);
+    let old = spm_get(self.result.expr_types, key);
+    if (old != null) {
+        type_free(old as Type*);
+    }
     spm_put(self.result.expr_types, key, type_clone(ty) as void*);
 }
 
@@ -543,6 +644,32 @@ func etc_symbol_as_type(self: ExpressionTypeChecker*, sym: Symbol*) -> Type*? {
             }
         }
         _ => { return null; }
+    }
+}
+
+func etc_diag_type_ref_failure(self: ExpressionTypeChecker*, tref: TypeRef*, fallback_code: string, span: Span) {
+    let unit = self.current_unit as DriverUnit*;
+    if (tref.is_nullable && tref.pointer_depth == 0 && tref.module_path == null && eq_s(tref.name, "void")) {
+        etc_diag_error(self, "TYP-0278", "type 'void' cannot be nullable", unit.path, span);
+        return;
+    }
+    if (tref.module_path == null && nr_module_env_is_ambiguous(self.current_env as ModuleEnv*, tref.name)) {
+        etc_diag_error(self, "TYP-0279", concat3_s("ambiguous type name '", tref.name, "'"), unit.path, span);
+        return;
+    }
+    let sym = etc_lookup_symbol(self, tref.name, tref.module_path, null);
+    if (sym != null) {
+        let s = sym as Symbol*;
+        if (ord(s.kind) == ord(SYM_TYPE_ALIAS)) {
+            etc_diag_error(self, "TYP-0270", concat3_s("type alias '", tref.name, "' does not have a resolved type"),
+                unit.path, span);
+        } else if (ord(s.kind) != ord(SYM_STRUCT) && ord(s.kind) != ord(SYM_ENUM)) {
+            etc_diag_error(self, "TYP-0271", concat3_s("symbol '", tref.name, "' is not a type"), unit.path, span);
+        } else {
+            etc_diag_error(self, fallback_code, concat3_s("unknown type '", tref.name, "'"), unit.path, span);
+        }
+    } else {
+        etc_diag_error(self, fallback_code, concat3_s("unknown type '", tref.name, "'"), unit.path, span);
     }
 }
 
@@ -1014,11 +1141,14 @@ func etc_check_stmt(self: ExpressionTypeChecker*, stmt_id: StmtId) -> StmtFlowKi
     
     let old_scope = self.current_scope;
     let pushed_alive_scope = false;
+    let pushed_decl_scope = false;
     if (self.current_func != null) {
         let scope = lc_func_env_get_block_scope(self.current_func as FunctionEnv*, stmt_id);
         if (scope != null) {
             etc_alive_scope_push(self, scope);
+            etc_decl_scope_push(self, scope);
             pushed_alive_scope = true;
+            pushed_decl_scope = true;
             self.current_scope = scope;
         }
     }
@@ -1071,6 +1201,8 @@ func etc_check_stmt(self: ExpressionTypeChecker*, stmt_id: StmtId) -> StmtFlowKi
                         }
                         type_free(ann_ty as Type*);
                     } else {
+                        etc_diag_type_ref_failure(self, stmt.type_ref as TypeRef*, "TYP-0279",
+                            (stmt.type_ref as TypeRef*).span);
                         etc_diag_error(self, "TYP-0040",
                             concat3_s("cannot resolve type annotation for variable '", stmt.name, "'"),
                             unit.path, (stmt.type_ref as TypeRef*).span);
@@ -1096,6 +1228,7 @@ func etc_check_stmt(self: ExpressionTypeChecker*, stmt_id: StmtId) -> StmtFlowKi
                         unit.path, stmt.span);
                 }
             }
+            etc_check_local_declaration(self, stmt.name, stmt.span);
             if (declare_local) {
                 etc_alive_declare(self, stmt.name);
             }
@@ -1435,6 +1568,9 @@ func etc_check_stmt(self: ExpressionTypeChecker*, stmt_id: StmtId) -> StmtFlowKi
     }
     
     self.current_scope = old_scope;
+    if (pushed_decl_scope) {
+        etc_decl_scope_pop(self);
+    }
     if (pushed_alive_scope) {
         etc_alive_scope_pop(self);
     }
@@ -1606,19 +1742,19 @@ func etc_infer_unary(self: ExpressionTypeChecker*, expr_id: ExprId, expr: ExprNo
 
     if (eq_s(expr.text_value, "-")) {
         if (!etc_is_int(s_ty)) {
-            etc_diag_error(self, "TYP-0310", concat_s("unary '-' expects int, got ", type_format(s_ty)),
+            etc_diag_error(self, "TYP-0160", concat_s("unary '-' expects int, got ", type_format(s_ty)),
                 (self.current_unit as DriverUnit*).path, expr.span);
         }
         return s_ty;
     } else if (eq_s(expr.text_value, "!")) {
         if (!etc_is_bool(s_ty)) {
-            etc_diag_error(self, "TYP-0310", concat_s("unary '!' expects bool, got ", type_format(s_ty)),
+            etc_diag_error(self, "TYP-0161", concat_s("unary '!' expects bool, got ", type_format(s_ty)),
                 (self.current_unit as DriverUnit*).path, expr.span);
         }
         return s_ty;
     } else if (eq_s(expr.text_value, "*")) {
         if (ord(s_ty.kind) != ord(TY_POINTER)) {
-            etc_diag_error(self, "TYP-0310", concat_s("dereference '*' expects pointer, got ", type_format(s_ty)),
+            etc_diag_error(self, "TYP-0162", concat_s("dereference '*' expects pointer, got ", type_format(s_ty)),
                 (self.current_unit as DriverUnit*).path, expr.span);
             return s_ty;
         }
@@ -1658,7 +1794,7 @@ func etc_infer_binary(self: ExpressionTypeChecker*, expr_id: ExprId, expr: ExprN
     if (eq_s(op, "+") || eq_s(op, "-") || eq_s(op, "*") || eq_s(op, "/") || eq_s(op, "%") ||
         eq_s(op, "&") || eq_s(op, "|") || eq_s(op, "^") || eq_s(op, "<<") || eq_s(op, ">>")) {
         if (!etc_is_int(l_ty) || !etc_is_int(r_ty)) {
-            etc_diag_error(self, "TYP-0310", concat4_s("binary '", op, "' expects int, got ", type_format(l_ty)),
+            etc_diag_error(self, "TYP-0170", concat4_s("binary '", op, "' expects int, got ", type_format(l_ty)),
                 (self.current_unit as DriverUnit*).path, expr.span);
         }
         type_free(l_ty);
@@ -1675,7 +1811,7 @@ func etc_infer_binary(self: ExpressionTypeChecker*, expr_id: ExprId, expr: ExprN
             }
 
             if (!is_null_check) {
-                etc_diag_error(self, "TYP-0310", concat_s(concat4_s("binary '", op, "' type mismatch: ", type_format(l_ty)),
+                etc_diag_error(self, "TYP-0172", concat_s(concat4_s("binary '", op, "' type mismatch: ", type_format(l_ty)),
                     concat_s(" and ", type_format(r_ty))), (self.current_unit as DriverUnit*).path, expr.span);
             }
         }
@@ -1689,7 +1825,7 @@ func etc_infer_binary(self: ExpressionTypeChecker*, expr_id: ExprId, expr: ExprN
         return type_builtin_bool();
     } else if (eq_s(op, "<") || eq_s(op, "<=") || eq_s(op, ">") || eq_s(op, ">=")) {
         if (!etc_is_int(l_ty) || !etc_is_int(r_ty)) {
-            etc_diag_error(self, "TYP-0310", concat4_s("binary '", op, "' expects int, got ", type_format(l_ty)),
+            etc_diag_error(self, "TYP-0170", concat4_s("binary '", op, "' expects int, got ", type_format(l_ty)),
                 (self.current_unit as DriverUnit*).path, expr.span);
         }
         type_free(l_ty);
@@ -1697,7 +1833,7 @@ func etc_infer_binary(self: ExpressionTypeChecker*, expr_id: ExprId, expr: ExprN
         return type_builtin_bool();
     } else if (eq_s(op, "&&") || eq_s(op, "||")) {
         if (!etc_is_bool(l_ty) || !etc_is_bool(r_ty)) {
-            etc_diag_error(self, "TYP-0310", concat4_s("binary '", op, "' expects bool, got ", type_format(l_ty)),
+            etc_diag_error(self, "TYP-0171", concat4_s("binary '", op, "' expects bool, got ", type_format(l_ty)),
                 (self.current_unit as DriverUnit*).path, expr.span);
         }
         type_free(r_ty);
@@ -1726,9 +1862,33 @@ func etc_infer_call(self: ExpressionTypeChecker*, expr_id: ExprId, expr: ExprNod
         if (eq_s(callee.text_value, "ord")) {
             return etc_infer_ord_intrinsic(self, expr);
         }
+        if (etc_lookup_local(self, callee.text_value) == null &&
+            etc_lookup_symbol(self, callee.text_value, callee.module_path, callee.name_qualifier) == null &&
+            callee.module_path == null && callee.name_qualifier == null &&
+            !nr_module_env_is_ambiguous(self.current_env as ModuleEnv*, callee.text_value)) {
+            etc_diag_error(self, "TYP-0189", concat3_s("unknown function '", callee.text_value, "'"),
+                (self.current_unit as DriverUnit*).path, callee.span);
+            return null;
+        }
     }
 
-    let callee_ty = etc_infer_expr(self, expr.expr_a);
+    let callee_ty: Type*? = null;
+    if (ord(callee.kind) == ord(EX_VAR_REF)) {
+        let callee_sym2 = etc_lookup_symbol(self, callee.text_value, callee.module_path, callee.name_qualifier);
+        if (callee_sym2 != null) {
+            let cs = callee_sym2 as Symbol*;
+            if (ord(cs.kind) == ord(SYM_STRUCT)) {
+                callee_ty = type_new_struct(cs.module_name, cs.name);
+            } else if (ord(cs.kind) == ord(SYM_ENUM)) {
+                callee_ty = type_new_enum(cs.module_name, cs.name);
+            } else if (ord(cs.kind) == ord(SYM_ENUM_VARIANT)) {
+                callee_ty = type_new_enum(cs.module_name, cs.owner_name);
+            }
+        }
+    }
+    if (callee_ty == null) {
+        callee_ty = etc_infer_expr(self, expr.expr_a);
+    }
     if (callee_ty == null) return null;
     let c_ty = callee_ty as Type*;
 
@@ -1769,7 +1929,7 @@ func etc_infer_call(self: ExpressionTypeChecker*, expr_id: ExprId, expr: ExprNod
             if (args2 != null) arg_count2 = vec_size(args2);
             
             if (arg_count2 != vec_size(fields)) {
-                etc_diag_error(self, "TYP-0330", concat_s("struct constructor field count mismatch", ""),
+                etc_diag_error(self, "TYP-0191", concat_s("struct constructor field count mismatch", ""),
                     (self.current_unit as DriverUnit*).path, expr.span);
             } else {
                 for (let i = 0; i < arg_count2; i = i + 1) {
@@ -1778,7 +1938,7 @@ func etc_infer_call(self: ExpressionTypeChecker*, expr_id: ExprId, expr: ExprNod
                     if (arg_ty2 != null) {
                         let f_info = ptr_vec_get(fields, i) as StructFieldInfo*;
                         if (!etc_can_assign(self, f_info.field_type, arg_ty2 as Type*)) {
-                            etc_diag_error(self, "TYP-0331", concat_s("struct constructor field type mismatch", ""),
+                            etc_diag_error(self, "TYP-0313", concat_s("struct constructor field type mismatch", ""),
                                 (self.current_unit as DriverUnit*).path, expr.span);
                         }
                         type_free(arg_ty2 as Type*);
@@ -1791,9 +1951,11 @@ func etc_infer_call(self: ExpressionTypeChecker*, expr_id: ExprId, expr: ExprNod
 
     if (ord(c_ty.kind) == ord(TY_ENUM)) {
         let callee_expr = expr_arena_get((self.current_unit as DriverUnit*).parse_result.expr_arena, expr.expr_a);
+        let constructed_variant = false;
         if (ord(callee_expr.kind) == ord(EX_VAR_REF)) {
             let sym = etc_lookup_symbol(self, callee_expr.text_value, callee_expr.module_path, callee_expr.name_qualifier);
             if (sym != null && ord((sym as Symbol*).kind) == ord(SYM_ENUM_VARIANT)) {
+                constructed_variant = true;
                 let s = sym as Symbol*;
                 let info2 = sig_lookup_enum_info(self.result.signatures as SignatureTables*, s.module_name, s.owner_name);
                 if (info2 != null) {
@@ -1807,7 +1969,7 @@ func etc_infer_call(self: ExpressionTypeChecker*, expr_id: ExprId, expr: ExprNod
                             if (args3 != null) arg_count3 = vec_size(args3);
                             
                             if (arg_count3 != vec_size(fields2)) {
-                                etc_diag_error(self, "TYP-0332", concat_s("enum variant constructor field count mismatch", ""),
+                                etc_diag_error(self, "TYP-0201", concat_s("enum variant constructor field count mismatch", ""),
                                     (self.current_unit as DriverUnit*).path, expr.span);
                             } else {
                                 for (let j = 0; j < arg_count3; j = j + 1) {
@@ -1816,7 +1978,7 @@ func etc_infer_call(self: ExpressionTypeChecker*, expr_id: ExprId, expr: ExprNod
                                     if (arg_ty3 != null) {
                                         let f_ty = ptr_vec_get(fields2, j) as Type*;
                                         if (!etc_can_assign(self, f_ty, arg_ty3 as Type*)) {
-                                            etc_diag_error(self, "TYP-0333", concat_s("enum variant constructor field type mismatch", ""),
+                                            etc_diag_error(self, "TYP-0314", concat_s("enum variant constructor field type mismatch", ""),
                                                 (self.current_unit as DriverUnit*).path, expr.span);
                                         }
                                         type_free(arg_ty3 as Type*);
@@ -1829,9 +1991,20 @@ func etc_infer_call(self: ExpressionTypeChecker*, expr_id: ExprId, expr: ExprNod
                 }
             }
         }
+        if (!constructed_variant) {
+            etc_diag_error(self, "TYP-0181", concat_s("enum type is not callable; call a variant instead", ""),
+                (self.current_unit as DriverUnit*).path, expr.span);
+        }
         return c_ty;
     }
 
+    if (ord(c_ty.kind) == ord(TY_ENUM)) {
+        etc_diag_error(self, "TYP-0181", concat_s("enum type is not callable; call a variant instead", ""),
+            (self.current_unit as DriverUnit*).path, expr.span);
+    } else {
+        etc_diag_error(self, "TYP-0180", concat_s("expression is not callable", ""),
+            (self.current_unit as DriverUnit*).path, expr.span);
+    }
     type_free(c_ty);
     return null;
 }
@@ -1960,6 +2133,11 @@ func etc_infer_expr(self: ExpressionTypeChecker*, expr_id: ExprId) -> Type*? {
         EX_STRING => { ty = type_builtin_string(); }
         EX_NULL => { ty = type_new_null(); }
         EX_VAR_REF => {
+            if (contains_s(expr.text_value, "::")) {
+                etc_diag_error(self, "TYP-0158", concat3_s("unsupported qualified expression '", expr.text_value, "'"),
+                    unit.path, expr.span);
+                return null;
+            }
             let local_ty = etc_lookup_local(self, expr.text_value);
             if (local_ty != null) {
                 if (etc_is_guarded_cleanup_header_local(self, expr.text_value)) {
@@ -1984,24 +2162,61 @@ func etc_infer_expr(self: ExpressionTypeChecker*, expr_id: ExprId) -> Type*? {
                 etc_set_var_res(self, expr_id, VAR_RES_LOCAL);
                 ty = local_ty;
             } else {
-                let sym = etc_lookup_symbol(self, expr.text_value, expr.module_path, expr.name_qualifier);
-                if (sym != null) {
-                    let s = sym as Symbol*;
-                    etc_set_var_res(self, expr_id, VAR_RES_MODULE);
-                    if (s.resolved_type != null) {
-                        ty = type_clone(s.resolved_type as Type*);
-                    } else if (ord(s.kind) == ord(SYM_FUNC)) {
-                        let ft = sig_lookup_func_type(self.result.signatures as SignatureTables*, s.module_name, s.name);
-                        if (ft != null) ty = type_clone(ft as Type*);
-                    } else if (ord(s.kind) == ord(SYM_LET)) {
-                        let lt = sig_lookup_let_type(self.result.signatures as SignatureTables*, s.module_name, s.name);
-                        if (lt != null) ty = type_clone(lt as Type*);
-                    } else if (ord(s.kind) == ord(SYM_ENUM_VARIANT)) {
-                        ty = type_new_enum(s.module_name, s.owner_name);
-                    }
-                } else {
-                    etc_diag_error(self, "TYP-0189", concat3_s("unknown identifier '", expr.text_value, "'"),
+                if (expr.name_qualifier != null && vs_size(expr.name_qualifier as VectorString*) != 1) {
+                    etc_diag_error(self, "TYP-0158", concat3_s("unsupported qualified expression '", expr.text_value, "'"),
                         unit.path, expr.span);
+                } else {
+                    let sym = etc_lookup_symbol(self, expr.text_value, expr.module_path, expr.name_qualifier);
+                    if (sym != null) {
+                    let s = sym as Symbol*;
+                    if (ord(s.kind) == ord(SYM_STRUCT) || ord(s.kind) == ord(SYM_ENUM) ||
+                        ord(s.kind) == ord(SYM_TYPE_ALIAS)) {
+                        etc_diag_error(self, "TYP-0151", concat3_s("type name '", expr.text_value,
+                            "' cannot be used as a value"), unit.path, expr.span);
+                    } else if (ord(s.kind) == ord(SYM_ENUM_VARIANT)) {
+                        let variant_has_fields = false;
+                        let enum_info = sig_lookup_enum_info(self.result.signatures as SignatureTables*, s.module_name, s.owner_name);
+                        if (enum_info != null) {
+                            let variants = (enum_info as EnumInfo*).variants;
+                            for (let i = 0; i < vec_size(variants); i = i + 1) {
+                                let variant = ptr_vec_get(variants, i) as EnumVariantInfo*;
+                                if (eq_s(variant.name, s.name) && vec_size(variant.field_types) > 0) {
+                                    variant_has_fields = true;
+                                }
+                            }
+                        }
+                        if (variant_has_fields) {
+                            etc_diag_error(self, "TYP-0152", concat3_s("enum variant '", expr.text_value,
+                                "' requires constructor arguments"), unit.path, expr.span);
+                        } else {
+                            etc_set_var_res(self, expr_id, VAR_RES_MODULE);
+                            ty = type_new_enum(s.module_name, s.owner_name);
+                        }
+                    } else {
+                        etc_set_var_res(self, expr_id, VAR_RES_MODULE);
+                        if (s.resolved_type != null) {
+                            ty = type_clone(s.resolved_type as Type*);
+                        } else if (ord(s.kind) == ord(SYM_FUNC)) {
+                            let ft = sig_lookup_func_type(self.result.signatures as SignatureTables*, s.module_name, s.name);
+                            if (ft != null) ty = type_clone(ft as Type*);
+                        } else if (ord(s.kind) == ord(SYM_LET)) {
+                            let lt = sig_lookup_let_type(self.result.signatures as SignatureTables*, s.module_name, s.name);
+                            if (lt != null) ty = type_clone(lt as Type*);
+                        }
+                    }
+                    } else {
+                        if (expr.module_path != null) {
+                            etc_diag_error(self, "TYP-0154", concat3_s("module path for '", expr.text_value,
+                                "' is not imported"), unit.path, expr.span);
+                        } else if (expr.name_qualifier == null &&
+                            nr_module_env_is_ambiguous(self.current_env as ModuleEnv*, expr.text_value)) {
+                            etc_diag_error(self, "TYP-0155", concat3_s("ambiguous identifier '", expr.text_value, "'"),
+                                unit.path, expr.span);
+                        } else {
+                            etc_diag_error(self, "TYP-0159", concat3_s("unknown identifier '", expr.text_value, "'"),
+                                unit.path, expr.span);
+                        }
+                    }
                 }
             }
         }
@@ -2062,6 +2277,9 @@ func etc_infer_expr(self: ExpressionTypeChecker*, expr_id: ExprId) -> Type*? {
                                 unit.path, expr.span);
                         }
                         if (target_ty != null) type_free(target_ty as Type*);
+                    } else {
+                        etc_diag_type_ref_failure(self, expr.type_ref as TypeRef*, "TYP-0279",
+                            (expr.type_ref as TypeRef*).span);
                     }
                 }
             }
@@ -2092,7 +2310,7 @@ func etc_infer_expr(self: ExpressionTypeChecker*, expr_id: ExprId) -> Type*? {
 
                             let field_count = vec_size(variant.field_types);
                             if (arg_count != field_count) {
-                                etc_diag_error(self, "TYP-0332",
+                                etc_diag_error(self, "TYP-0201",
                                     concat_s("enum variant constructor field count mismatch", ""),
                                     unit.path, expr.span);
                             }
@@ -2102,7 +2320,7 @@ func etc_infer_expr(self: ExpressionTypeChecker*, expr_id: ExprId) -> Type*? {
                                     if (j < field_count) {
                                         let field_ty = ptr_vec_get(variant.field_types, j) as Type*;
                                         if (!etc_can_assign(self, field_ty, arg_ty as Type*)) {
-                                            etc_diag_error(self, "TYP-0333",
+                                            etc_diag_error(self, "TYP-0314",
                                                 concat_s("enum variant constructor field type mismatch", ""),
                                                 unit.path, expr.span);
                                         }
@@ -2180,6 +2398,8 @@ func etc_infer_expr(self: ExpressionTypeChecker*, expr_id: ExprId) -> Type*? {
                         } else {
                             type_free(base);
                         }
+                    } else {
+                        etc_diag_type_ref_failure(self, target_ref, "TYP-0280", target_ref.span);
                     }
                 }
                 }
@@ -2209,6 +2429,9 @@ func etc_infer_expr(self: ExpressionTypeChecker*, expr_id: ExprId) -> Type*? {
             }
         }
         EX_TYPE => {
+            etc_diag_error(self, "TYP-0290",
+                "type expression is only valid as an argument to type-accepting intrinsics",
+                unit.path, expr.span);
             if (expr.type_ref != null) {
                 with (let seen3 = ss_create() => ss_free(seen3)) {
                     ty = tr_resolve_type_ref(self.result.signatures as SignatureTables*,
@@ -2271,7 +2494,7 @@ func etc_check_function(self: ExpressionTypeChecker*, env: FunctionEnv*) {
  * @param result Analysis result to populate with expression types and diagnostics.
  */
 func expr_types_check(result: AnalysisResult*) {
-    let checker = new ExpressionTypeChecker(result, "", null, null, null, null, null, ptr_vec_create(4), 0, false, null);
+    let checker = new ExpressionTypeChecker(result, "", null, null, null, null, null, ptr_vec_create(4), ptr_vec_create(4), 0, false, null);
     
     for (let i = 0; i < driver_unit_count(result.driver_state); i = i + 1) {
         let unit = driver_unit_get(result.driver_state, i);
@@ -2291,6 +2514,7 @@ func expr_types_check(result: AnalysisResult*) {
     }
     
     etc_alive_scope_stack_free(checker.alive_scopes);
+    etc_alive_scope_stack_free(checker.decl_scopes);
     etc_cleanup_header_guard_stack_free(checker.cleanup_header_guard_stack);
     drop checker;
 }

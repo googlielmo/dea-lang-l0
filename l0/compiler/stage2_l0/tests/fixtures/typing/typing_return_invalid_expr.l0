@@ -12,5 +12,5 @@ module typing_return_invalid_expr;
  * a secondary return-type mismatch.
  */
 func err_return_invalid_expr() -> int {
-    return missing_name; // TYP-0189
+    return missing_name; // TYP-0159
 }

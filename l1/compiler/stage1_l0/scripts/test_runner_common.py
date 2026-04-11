@@ -182,12 +182,17 @@ def require_repo_stage1_test_env(entrypoint_name: str) -> tuple[Path, str, Path,
 
 
 def discover_stage1_l0_tests() -> list[TestCase]:
-    """Return discovered `.l0` L1 Stage 1 implementation tests in deterministic order."""
+    """Return discovered L1 Stage 1 implementation tests in deterministic order."""
 
-    return [
-        TestCase(index=index, name=path.stem, path=path, kind="l0")
-        for index, path in enumerate(sorted(TESTS_DIR.glob("*.l0")))
-    ]
+    cases: list[TestCase] = []
+    index = 0
+    for path in sorted(TESTS_DIR.glob("*.l0")):
+        cases.append(TestCase(index=index, name=path.stem, path=path, kind="l0"))
+        index += 1
+    for path in sorted(TESTS_DIR.glob("*_test.py")):
+        cases.append(TestCase(index=index, name=path.name, path=path, kind="python"))
+        index += 1
+    return cases
 
 
 def discover_trace_l0_tests() -> list[TestCase]:
@@ -226,9 +231,11 @@ def resolve_trace_job_count() -> int:
 def build_normal_test_command(case: TestCase, build_dir: Path) -> list[str]:
     """Return the subprocess command for one normal L1 Stage 1 implementation test."""
 
-    if case.kind != "l0":
-        raise ValueError(f"Unsupported test kind: {case.kind}")
-    return [*repo_stage1_command(), "-P", "compiler/stage1_l0/src", "--run", str(case.path)]
+    if case.kind == "l0":
+        return [*repo_stage1_command(), "-P", "compiler/stage1_l0/src", "--run", str(case.path)]
+    if case.kind == "python":
+        return [str(REPO_VENV_PYTHON), str(case.path)]
+    raise ValueError(f"Unsupported test kind: {case.kind}")
 
 
 def run_combined_output(command: list[str], *, env: dict[str, str] | None = None) -> CommandResult:

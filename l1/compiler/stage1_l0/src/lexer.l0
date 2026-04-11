@@ -585,7 +585,11 @@ func ls_read_valid_char_escape(self: LexerState*, single_byte: bool) -> EscapedC
                 let digit = ls_peek(self);
                 cb_append(cb, ls_advance(self));
                 hex_digits = hex_digits + 1;
-                char_value = char_value * 16 + hex_char_to_int(digit);
+                if (char_value > 69631) {
+                    char_value = 1114112;
+                } else {
+                    char_value = char_value * 16 + hex_char_to_int(digit);
+                }
             }
             if (hex_digits < 1) {
                 ls_emit_error(self, "LEX-0050", "invalid hexadecimal escape sequence", self.line, self.column, self.line, self.column);
@@ -607,7 +611,11 @@ func ls_read_valid_char_escape(self: LexerState*, single_byte: bool) -> EscapedC
                 let digit = ls_peek(self);
                 cb_append(cb, ls_advance(self));
                 hex_digits = hex_digits + 1;
-                char_value = char_value * 16 + hex_char_to_int(digit);
+                if (char_value > 69631) {
+                    char_value = 1114112;
+                } else {
+                    char_value = char_value * 16 + hex_char_to_int(digit);
+                }
             }
             if (hex_digits != required_digits) {
                 let error_code = "LEX-0051"; // u

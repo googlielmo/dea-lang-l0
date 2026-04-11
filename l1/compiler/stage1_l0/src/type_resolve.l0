@@ -155,6 +155,13 @@ func tr_resolve_alias(tables: SignatureTables*, nr: NameResolution*, env: Module
             env.module_ptr.filename,
             sym.span
         );
+        tr_diag_error(
+            diags,
+            "TYP-0270",
+            concat4_s("type alias '", sym.name, "' does not have a resolved type", ""),
+            env.module_ptr.filename,
+            sym.span
+        );
         return null;
     }
 

@@ -9,7 +9,7 @@ module typing_err;
  * Triggers a binary-operator type mismatch.
  */
 func err_binary_mismatch() {
-    let x: int = 1 + true; // TYP-0310
+    let x: int = 1 + true; // TYP-0170
 }
 
 /**
@@ -31,7 +31,7 @@ func err_reassign_mismatch() {
  * Triggers an unknown-identifier error.
  */
 func err_unknown_id() {
-    let x = unknown_var; // TYP-0189
+    let x = unknown_var; // TYP-0159
 }
 
 /**
@@ -51,7 +51,7 @@ func err_struct_field() {
  * Triggers a constructor arity mismatch.
  */
 func err_call_args() {
-    let p = Point(1); // TYP-0330
+    let p = Point(1); // TYP-0191
 }
 
 /**

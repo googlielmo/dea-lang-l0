@@ -92,9 +92,10 @@ func test_typing_err() {
         let result = analysis_analyze_entry(sp, "typing_err", cfg);
         assert(analysis_has_errors(result), "expected typing errors for typing_err");
         
-        assert(count_diag_code(result, "TYP-0310") == 2, "expected binary and initializer mismatch errors");
+        assert(has_diag_code(result, "TYP-0170"), "expected binary int operand mismatch error");
+        assert(count_diag_code(result, "TYP-0310") == 1, "expected initializer mismatch error");
         assert(has_diag_code(result, "TYP-0311"), "expected assignment-statement mismatch error");
-        assert(has_diag_code(result, "TYP-0189"), "expected unknown identifier error");
+        assert(has_diag_code(result, "TYP-0159"), "expected unknown identifier error");
         assert(has_diag_code(result, "TYP-0221"), "expected missing struct field error");
         assert(!has_diag_code(result, "TYP-0340"), "did not expect legacy struct field code");
         assert(has_diag_code(result, "TYP-0191"), "expected struct constructor arity error");
@@ -274,7 +275,7 @@ func test_return_invalid_expr() {
     with (let cfg = log_config_create(LL_SILENT, false) => drop cfg) {
         let result = analysis_analyze_entry(sp, "typing_return_invalid_expr", cfg);
         assert(analysis_has_errors(result), "expected typing errors for typing_return_invalid_expr");
-        assert(has_diag_code(result, "TYP-0189"), "expected missing identifier error");
+        assert(has_diag_code(result, "TYP-0159"), "expected missing identifier error");
         assert(!has_diag_code(result, "TYP-0315"), "did not expect return type mismatch on invalid return expr");
         analysis_result_free(result);
     }
