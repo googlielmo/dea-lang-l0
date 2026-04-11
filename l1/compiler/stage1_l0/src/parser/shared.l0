@@ -7,10 +7,11 @@ module parser.shared;
 
 import std.string;
 import std.unit;
-
 import std.text;
 import std.vector;
+
 import util.diag;
+import util.numbers;
 
 import tokens;
 import ast;
@@ -587,7 +588,8 @@ func token_text_for_width(tok: Token) -> string {
     match (tok.token_type) {
         TT_IDENT(t) => { return t; }
         TT_INT(t, v) => { return t; }
-        TT_REALNUM(s, e, ff) => { return tt_real_to_string(s, e, ff); }
+        TT_BIGINT(t, b) => { return bigint_to_string(t, b); }
+        TT_REALNUM(s, e, ff) => { return realnum_to_string(s, e, ff); }
         TT_BYTE(t, v) => { return t; }
         TT_STRING(t, v) => { return t; }
         TT_EOF => { return ""; }

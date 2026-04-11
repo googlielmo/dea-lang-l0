@@ -9,10 +9,11 @@ import std.io;
 import std.string;
 import std.unit;
 import sys.rt;
-
 import std.text;
 import std.vector;
 import std.linear_map;
+
+import util.numbers;
 
 /**
  * Defines the TokenType enumeration.
@@ -22,7 +23,8 @@ enum TokenType {
 
     TT_IDENT(text: string);                 // identifier, e.g. i, name, etc.
     TT_UNDERSCORE;                          // "_"
-    TT_INT(text: string, value: int);       // integer literal, e.g. 42, -7, etc.
+    TT_INT(text: string, value: int);       // a signed 32-bit `int` literal, e.g. 42, 0xFF, -0b1010, etc.
+    TT_BIGINT(text: string, base: int);     // any integer literal that doesn't fit in `int`, e.g. -0x1234567890, etc.
     TT_REALNUM(sig: string, exp_text: string, is_float: bool); // real number literal, e.g. 3.14, 2e-10, etc.
     TT_BYTE(text: string, value: byte);     // octet/byte literal, e.g. 'a', '\n', etc.
     TT_STRING(text: string, value: string); // string literal, e.g. "hello world", etc.
@@ -119,10 +121,8 @@ func token_to_string(token: Token) -> string {
         TT_IDENT(t) => { return concat3_s("ident(", t, ")"); }
         TT_UNDERSCORE => { return "_"; }
         TT_INT(t, v) => { return concat3_s("int(", t, ")"); }
-        TT_REALNUM(sig, exp_text, is_float) => {
-            let s = tt_real_to_string(sig, exp_text, is_float);
-            return concat3_s("real(", s, ")");
-        }
+        TT_BIGINT(t, b) => { return concat3_s("bigint(", bigint_to_string(t, b), ")"); }
+        TT_REALNUM(s, e, ff) => { return concat3_s("real(", realnum_to_string(s, e, ff), ")"); }
         TT_BYTE(t, v) => { return concat3_s("byte(", t, ")"); }
         TT_STRING(t, v) => { return concat3_s("string(", t, ")"); }
 
@@ -302,6 +302,7 @@ func is_expr_ending_token_type(token_type: TokenType) -> bool {
     match (token_type) {
         TT_IDENT(t) => { return true; }
         TT_INT(t, v) => { return true; }
+        TT_BIGINT(t, b) => { return true; }
         TT_REALNUM(sig, exp_text, is_float) => { return true; }
         TT_BYTE(t, v) => { return true; }
         TT_STRING(t, v) => { return true; }
@@ -383,6 +384,9 @@ func token_release_payload(token: Token) {
         TT_INT(text, value) => {
             rt_string_release(text);
         }
+        TT_BIGINT(text, base) => {
+            rt_string_release(text);
+        }
         TT_REALNUM(sig, exp_text, is_float) => {
             rt_string_release(sig);
             rt_string_release(exp_text);
@@ -409,16 +413,4 @@ func tv_free(self: TokenVector) {
         token_release_payload(*(vec_get(self.vec, i) as Token*));
     }
     vec_free(self.vec);
-}
-
-func tt_real_to_string(sig: string, exp_text: string, is_float: bool) -> string {
-    let exp_part = "";
-    if (!eq_s(exp_text, "")) {
-        exp_part = concat_s("e", exp_text);
-    }
-    let suffix = "";
-    if (is_float) {
-        suffix = "f";
-    }
-    return concat3_s(sig, exp_part, suffix);
 }

@@ -46,6 +46,38 @@ func expect_single_int(source: string, expected_text: string, expected_value: in
 }
 
 /**
+ * Lexes source and asserts that the first token is one bigint literal.
+ *
+ * @param source Source text to lex.
+ * @param expected_text Expected literal spelling preserved in the token.
+ * @param expected_base Expected numeric base.
+ */
+func expect_single_bigint(source: string, expected_text: string, expected_base: int) {
+    let ls = ls_create(source, "<test>");
+    let toks = tokenize(ls);
+    assert(toks != null, "Expected lexing to succeed");
+    assert(!ls_has_errors(ls), "Expected no lexer diagnostics");
+
+    let tv = toks as TokenVector;
+    assert(tv_len(tv) == 2, "Expected one token plus EOF");
+
+    let tok = tv_get(tv, 0);
+    match (tok.token_type) {
+        TT_BIGINT(text, base) => {
+            assert(eq_s(text, expected_text), "Unexpected bigint literal text");
+            assert(base == expected_base, "Unexpected bigint base");
+        }
+        _ => {
+            printl_ss("actual token:", token_to_string(tok));
+            assert(false, "Expected bigint literal token");
+        }
+    }
+
+    tv_free(tv);
+    ls_free(ls);
+}
+
+/**
  * Lexes source and asserts that the first token is one real literal.
  *
  * @param source Source text to lex.
@@ -183,17 +215,19 @@ func test_int_literal_limits_all_bases() {
 }
 
 /**
- * Tests prefixed integer overflow handling.
+ * Tests that integer literals exceeding 32-bit signed range produce bigint tokens.
  */
 func test_prefixed_int_literals_overflow() {
-    expect_lex_error("2147483648", "LEX-0060");
-    expect_lex_error("-2147483649", "LEX-0060");
-    expect_lex_error("0x80000000", "LEX-0060");
-    expect_lex_error("-0x80000001", "LEX-0060");
-    expect_lex_error("0b10000000000000000000000000000000", "LEX-0060");
-    expect_lex_error("-0b10000000000000000000000000000001", "LEX-0060");
-    expect_lex_error("0o20000000000", "LEX-0060");
-    expect_lex_error("-0o20000000001", "LEX-0060");
+    expect_single_bigint("2147483648", "2147483648", 10);
+    expect_single_bigint("-2147483649", "-2147483649", 10);
+    expect_single_bigint("0x80000000", "80000000", 16);
+    expect_single_bigint("-0x80000001", "-80000001", 16);
+    expect_single_bigint("0b10000000000000000000000000000000",
+        "10000000000000000000000000000000", 2);
+    expect_single_bigint("-0b10000000000000000000000000000001",
+        "-10000000000000000000000000000001", 2);
+    expect_single_bigint("0o20000000000", "20000000000", 8);
+    expect_single_bigint("-0o20000000001", "-20000000001", 8);
 }
 
 /**

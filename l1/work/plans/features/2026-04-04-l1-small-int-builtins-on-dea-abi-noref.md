@@ -49,6 +49,12 @@ surface required for declarations, calls, returns, assignments, casts, and code 
 This plan depends on `2026-04-04-l1-dea-c-abi-prefix-migration-noref.md` landing first. It assumes the public runtime
 header and emitted C surface already use `dea_*` / `DEA_*` names.
 
+## Available Infrastructure
+
+`compiler/stage1_l0/src/util/numbers.l0` already provides range-checking helpers for Phase 2 constant-range diagnostics:
+`fits_in_tiny` (`-128..127`), `fits_in_byte` (`0..255`), `fits_in_short` (`-32768..32767`), and `fits_in_ushort`
+(`0..65535`). The same module provides `realnum_to_string` and `bigint_to_string` for number-literal display.
+
 ## Current State
 
 1. The grammar now documents `tiny`, `short`, and `ushort` as builtin type names, but `compiler/stage1_l0/src/tokens.l0`

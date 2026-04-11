@@ -1,0 +1,96 @@
+/*
+ * SPDX-License-Identifier: MIT OR Apache-2.0
+ * Copyright (c) 2026 gwz
+ */
+
+module util.numbers;
+
+import std.string;
+import std.text;
+
+/**
+ * Convert a real number's components into a string representation.
+ *
+ * @param sig       The significand part of the real number as a string (e.g., "1.23").
+ * @param exp_text  The exponent part of the real number as a string (e.g., "4" for "1.23e4").
+ * @param is_float  Whether the number should be suffixed with 'f' to indicate a float literal.
+ * @return A string representing the full real number literal (e.g., "1.23e-4" or "-1.23f").
+ */
+func realnum_to_string(sig: string, exp_text: string, is_float: bool) -> string {
+    let exp_part = "";
+    if (!eq_s(exp_text, "")) {
+        exp_part = concat_s("e", exp_text);
+    }
+    let suffix = "";
+    if (is_float) {
+        suffix = "f";
+    }
+    return concat3_s(sig, exp_part, suffix);
+}
+
+/**
+ * Reconstruct a bigint literal's display string from its canonical value digits and base.
+ *
+ * The value text is the prefix-stripped, lowercase, sign-inclusive form stored in `TT_BIGINT`
+ * (e.g., "-80000001" for base 16). This function prepends the appropriate base prefix after
+ * any leading '-' to produce the source-level spelling (e.g., "-0x80000001").
+ *
+ * @param text  Canonical value digits with optional leading '-'.
+ * @param base  Numeric base (2, 8, 10, or 16).
+ * @return Display string with the base prefix restored.
+ */
+func bigint_to_string(text: string, base: int) -> string {
+    if (base == 10) {
+        return text;
+    }
+    let prefix = "";
+    case (base) {
+        16 => { prefix = "0x"; }
+         8 => { prefix = "0o"; }
+         2 => { prefix = "0b"; }
+    }
+    if (len_s(text) > 0 && char_at_s(text, 0) == '-') {
+        return concat3_s("-", prefix, slice_s(text, 1, len_s(text)));
+    }
+    return concat_s(prefix, text);
+}
+
+/**
+ * Check if a given integer value can fit within a 16-bit signed integer range.
+ *
+ * @param value The integer value to check.
+ * @return `true` if the value is between -32768 and 32767 inclusive, `false` otherwise.
+ */
+func fits_in_short(value: int) -> bool {
+    return value >= -32768 && value <= 32767;
+}
+
+/**
+ * Check if a given integer value can fit within a 16-bit unsigned integer range.
+ *
+ * @param value The integer value to check.
+ * @return `true` if the value is between 0 and 65535 inclusive, `false` otherwise.
+ */
+func fits_in_ushort(value: int) -> bool {
+    return value >= 0 && value <= 65535;
+}
+
+/**
+ * Check if a given integer value can fit within an 8-bit signed integer range.
+ *
+ * @param value The integer value to check.
+ * @return `true` if the value is between -128 and 127 inclusive, `false` otherwise.
+ */
+func fits_in_tiny(value: int) -> bool {
+    return value >= -128 && value <= 127;
+}
+
+/**
+ * Check if a given integer value can fit within an 8-bit unsigned integer range.
+ *
+ * @param value The integer value to check.
+ * @return `true` if the value is between 0 and 255 inclusive, `false` otherwise.
+ */
+func fits_in_byte(value: int) -> bool {
+    return value >= 0 && value <= 255;
+}

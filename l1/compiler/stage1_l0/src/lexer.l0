@@ -8,10 +8,10 @@ module lexer;
 import std.io;
 import std.string;
 import std.unit;
-
 import std.text;
 import std.vector;
 import std.linear_map;
+
 import util.diag;
 
 import tokens;
@@ -705,7 +705,7 @@ func ls_read_number(self: LexerState*, first_char: byte, is_negative: bool,
                 return null;
             }
             while (is_hex_digit(ls_peek(self))) {
-                cb_append(vb, ls_peek(self));
+                cb_append(vb, to_lower(ls_peek(self)));
                 cb_append(cb, ls_advance(self));
             }
         } else if (first_char == '0' && ls_peek(self) == 'b') {
@@ -804,11 +804,10 @@ func ls_read_number(self: LexerState*, first_char: byte, is_negative: bool,
                 return null;
             }
 
-            // Check for integer overflow
+            // Parse as 32-bit signed integer; overflow yields a bigint token.
             let number_value : int? = string_to_int_base(value_str, base);
             if (number_value == null) {
-                ls_emit_error(self, "LEX-0060", concat3_s("integer literal '", number_str, "' exceeds 32-bit signed range"), start_line, start_column, self.line, self.column);
-                return null;
+                return Token(TT_BIGINT(value_str, base), start_index, start_line, start_column);
             }
 
             return Token(TT_INT(number_str, number_value as int), start_index, start_line, start_column);
