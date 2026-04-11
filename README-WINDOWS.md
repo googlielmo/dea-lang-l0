@@ -17,7 +17,7 @@ The recommended Windows path today is:
 - MinGW-w64 GCC or Clang
 - GNU Make on `PATH`
 
-This is the validated Dea/L0 `1.0.0` Windows path. MSVC-family builds remain outside the validated release matrix.
+This is the current validated Dea/L0 Windows path. MSVC-family builds remain outside the validated release matrix.
 Native `cmd.exe` entrypoints are supported; the MSYS2 requirement comes from the supported backend C toolchain, not from
 the `.cmd` launchers themselves.
 

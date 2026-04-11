@@ -104,7 +104,7 @@ These remain true on the current `1.0.0.dev0` development branch:
 
 ## Post-0.9.2 Development Notes
 
-The current `1.0.0.dev0` branch starts from the `0.9.2` release baseline:
+The current `1.0.0.dev0` branch starts from the `l0-v0.9.2` release baseline:
 
 1. Keep the current Stage 1/Stage 2 CLI, semantics, stdlib surface, and monorepo release wiring stable unless a bug fix
    requires a targeted correction.

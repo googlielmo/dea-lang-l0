@@ -44,7 +44,7 @@ the semantics are enforced by L0 itself.
 
 ## Project status and directions
 
-L0 `1.0.0.dev0` is the current development line following the `0.9.2` monorepo release.
+L0 `1.0.0.dev0` is the current development line following the `l0-v0.9.2` monorepo release.
 
 - Stage 1: complete and usable.
 
