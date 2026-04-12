@@ -17,6 +17,12 @@ import tempfile
 from pathlib import Path
 from textwrap import dedent
 
+SCRIPTS_ROOT = Path(__file__).resolve().parent
+if str(SCRIPTS_ROOT) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS_ROOT))
+
+from dea_tooling.bootstrap import wrapper_command
+
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 ORACLE_TESTS = REPO_ROOT / "l0" / "compiler" / "stage1_py" / "tests"
@@ -143,7 +149,7 @@ def run_compiler(stage: str, compiler: Path, root: Path, target: str) -> tuple[i
         env["L0_HOME"] = str(REPO_ROOT / "l0" / "compiler")
         env["L1_HOME"] = str(cwd / "compiler")
     completed = subprocess.run(
-        [str(compiler), "-P", str(root), "--check", target],
+        [*wrapper_command(compiler), "-P", str(root), "--check", target],
         cwd=cwd,
         env=env,
         stdin=subprocess.DEVNULL,

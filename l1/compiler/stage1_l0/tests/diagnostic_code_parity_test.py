@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import os
 import subprocess
+import sys
 from pathlib import Path
 
 
@@ -23,7 +24,7 @@ def main() -> int:
         build_dir = L1_ROOT / build_dir
     compiler = build_dir / "bin" / "l1c-stage1"
     return subprocess.run(
-        [str(REPO_ROOT / ".venv" / "bin" / "python"), str(REPO_ROOT / "scripts" / "diagnostic_parity.py"),
+        [sys.executable, str(REPO_ROOT / "scripts" / "diagnostic_parity.py"),
          "--stage", "l1", "--compiler", str(compiler)],
         cwd=REPO_ROOT,
         check=False,
