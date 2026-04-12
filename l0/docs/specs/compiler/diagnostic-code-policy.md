@@ -1,13 +1,18 @@
 # Diagnostic Code Policy
 
-Version: 2026-03-09
+Version: 2026-04-12
 
-Normative specification for compiler diagnostic-code assignment and reuse across Stage 1 and Stage 2.
+Normative L0 Stage 1/Stage 2 supplement for compiler diagnostic-code assignment and reuse.
 
 ## Related Docs
 
+- [docs/specs/compiler/diagnostic-code-catalog.md](../../../../docs/specs/compiler/diagnostic-code-catalog.md):
+  normative shared registry of diagnostic code identifiers, levels, and meanings.
 - [diagnostic-format.md](diagnostic-format.md): output rendering format for diagnostics.
 - [stage1-contract.md](stage1-contract.md): Stage 1 compiler contract and stable external behavior.
+
+This document supplements the shared diagnostic code catalog by defining how L0 Stage 2 reuses or allocates codes
+relative to the L0 Stage 1 oracle.
 
 ## Core Rule
 

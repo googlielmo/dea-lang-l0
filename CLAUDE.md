@@ -48,7 +48,10 @@ level directory first.
 - Level-owned lifecycle artifacts stay inside that level subtree under `work/` (for example `l0/work/**`).
 - Root `docs/**` is for Dea-wide and monorepo-wide stable material only.
 - Root `work/**` is for Dea-wide and monorepo-wide lifecycle artifacts only.
-- Shared compiler diagnostic-code inventory and meanings live in `docs/specs/compiler/diagnostic-code-catalog.md`.
+- In Markdown links to repository files, use repository-root paths as the visible link text (for example
+  `docs/specs/compiler/diagnostic-code-catalog.md`), not relative-path text such as `../../..`.
+- Shared compiler diagnostic-code registry, levels, and meanings live in
+  `docs/specs/compiler/diagnostic-code-catalog.md`.
 - For shared diagnostic-code documentation, treat L0 Python Stage 1 as the current oracle for registered code
   inventory/meaning unless a broader Dea-wide policy supersedes it.
 - Non-trivial shared work should be tracked under `work/plans/`.
@@ -61,6 +64,7 @@ level directory first.
 
 - Multiline commits: sentence-case summary with period, then factual body as bullets with `- ` prefix, sentence-case,
   ending with a period.
+- Always leave one blank line between the summary line and the first body bullet.
 - Each bullet is a single line; do not wrap bullets across multiple lines.
 - Before committing, run pre-commit from the relevant level directory against the root config:
   `uv run --group dev pre-commit run --hook-stage pre-commit -c ../.pre-commit-config.yaml --files $(git diff --cached --name-only --diff-filter=ACMR --relative)`.
