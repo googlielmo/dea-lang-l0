@@ -650,8 +650,11 @@ def test_overqualified_name_in_expression(write_l0_file, temp_project):
     assert result.has_errors()
     assert has_error_code(result.diagnostics, "TYP-0158")
     diags_0158 = [d for d in result.diagnostics if "TYP-0158" in d.message]
-    assert any("not supported" in d.message for d in diags_0158)
-    assert any("color::Red" in d.message for d in diags_0158)
+    assert any(
+        "nested symbol path 'color::Color::Red': paths must have the form 'module::symbol' "
+        "(did you mean 'color::Red'?)" in d.message
+        for d in diags_0158
+    )
 
 
 def test_overqualified_name_in_type(write_l0_file, temp_project):
@@ -686,8 +689,11 @@ def test_overqualified_name_in_type(write_l0_file, temp_project):
     assert result.has_errors()
     assert has_error_code(result.diagnostics, "SIG-0018")
     diags_0018 = [d for d in result.diagnostics if "SIG-0018" in d.message]
-    assert any("not supported" in d.message for d in diags_0018)
-    assert any("color::Red" in d.message for d in diags_0018)
+    assert any(
+        "nested symbol path 'color::Color::Red': paths must have the form 'module::symbol' "
+        "(did you mean 'color::Red'?)" in d.message
+        for d in diags_0018
+    )
 
 
 def test_overqualified_name_in_pattern(write_l0_file, temp_project):
@@ -731,8 +737,11 @@ def test_overqualified_name_in_pattern(write_l0_file, temp_project):
     assert result.has_errors()
     assert has_error_code(result.diagnostics, "TYP-0158")
     diags_0158 = [d for d in result.diagnostics if "TYP-0158" in d.message]
-    assert any("not supported" in d.message for d in diags_0158)
-    assert any("color::Red" in d.message for d in diags_0158)
+    assert any(
+        "nested symbol path 'color::Color::Red': paths must have the form 'module::symbol' "
+        "(did you mean 'color::Red'?)" in d.message
+        for d in diags_0158
+    )
 
 
 def test_triple_qualified_name(write_l0_file, temp_project):
@@ -769,8 +778,11 @@ def test_triple_qualified_name(write_l0_file, temp_project):
     assert result.has_errors()
     assert has_error_code(result.diagnostics, "TYP-0158")
     diags_0158 = [d for d in result.diagnostics if "TYP-0158" in d.message]
-    # The full path a::B::C::D should appear in the error
-    assert any("a::B::C::D" in d.message for d in diags_0158)
+    assert any(
+        "nested symbol path 'a::B::C::D': paths must have the form 'module::symbol' "
+        "(did you mean 'a::D'?)" in d.message
+        for d in diags_0158
+    )
 
 
 def test_single_qualified_still_works(write_l0_file, temp_project):

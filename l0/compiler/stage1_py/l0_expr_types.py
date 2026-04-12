@@ -1837,8 +1837,8 @@ class ExpressionTypeChecker:
             simple = f"{'.'.join(module_path)}::{name}"
         self._error(
             node,
-            f"[TYP-0158] qualified symbol paths ('{full}') are not supported; "
-            f"use '{simple}' to refer to the symbol directly",
+            f"[TYP-0158] nested symbol path '{full}': "
+            f"paths must have the form 'module::symbol' (did you mean '{simple}'?)",
         )
         return True
 

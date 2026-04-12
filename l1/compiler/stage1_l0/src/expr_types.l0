@@ -88,6 +88,64 @@ func etc_diag_warn(self: ExpressionTypeChecker*, code: string, message: string, 
 }
 
 /**
+ * Format the full display form for one nested symbol path expression.
+ *
+ * @param expr Variable-reference expression carrying module and qualifier segments.
+ * @return Full nested path such as `color::Color::Red`.
+ */
+func etc_nested_symbol_path_full(expr: ExprNode*) -> string {
+    with (let sb = sb_create() => sb_free(sb)) {
+        if (expr.module_path != null) {
+            let mp = expr.module_path as VectorString*;
+            for (let i = 0; i < vs_size(mp); i = i + 1) {
+                if (i > 0) {
+                    sb_append(sb, ".");
+                }
+                sb_append(sb, vs_get(mp, i));
+            }
+            if (vs_size(mp) > 0) {
+                sb_append(sb, "::");
+            }
+        }
+        if (expr.name_qualifier != null) {
+            let nq = expr.name_qualifier as VectorString*;
+            for (let i = 0; i < vs_size(nq); i = i + 1) {
+                sb_append(sb, vs_get(nq, i));
+                sb_append(sb, "::");
+            }
+        }
+        sb_append(sb, expr.text_value);
+        return sb_to_string(sb);
+    }
+}
+
+/**
+ * Format the direct symbol suggestion for one nested symbol path expression.
+ *
+ * @param expr Variable-reference expression carrying module and qualifier segments.
+ * @return Simplified path such as `color::Red`.
+ */
+func etc_nested_symbol_path_simple(expr: ExprNode*) -> string {
+    if (expr.module_path == null) {
+        return expr.text_value;
+    }
+    return concat3_s(tr_module_from_path(expr.module_path as VectorString*), "::", expr.text_value);
+}
+
+/**
+ * Build the `TYP-0158` message for one nested symbol path expression.
+ *
+ * @param expr Variable-reference expression carrying module and qualifier segments.
+ * @return Diagnostic text matching the shared nested-path wording.
+ */
+func etc_nested_symbol_path_message(expr: ExprNode*) -> string {
+    let full = etc_nested_symbol_path_full(expr);
+    let simple = etc_nested_symbol_path_simple(expr);
+    return concat4_s("nested symbol path '", full, "': paths must have the form 'module::symbol' (did you mean '",
+        concat_s(simple, "'?)"));
+}
+
+/**
  * Build the storage key used for per-expression analysis tables.
  *
  * @param module_name Owning module name.
@@ -2135,7 +2193,7 @@ func etc_infer_expr(self: ExpressionTypeChecker*, expr_id: ExprId) -> Type*? {
         EX_NULL => { ty = type_new_null(); }
         EX_VAR_REF => {
             if (contains_s(expr.text_value, "::")) {
-                etc_diag_error(self, "TYP-0158", concat3_s("unsupported qualified expression '", expr.text_value, "'"),
+                etc_diag_error(self, "TYP-0158", etc_nested_symbol_path_message(expr),
                     unit.path, expr.span);
                 return null;
             }
@@ -2163,8 +2221,8 @@ func etc_infer_expr(self: ExpressionTypeChecker*, expr_id: ExprId) -> Type*? {
                 etc_set_var_res(self, expr_id, VAR_RES_LOCAL);
                 ty = local_ty;
             } else {
-                if (expr.name_qualifier != null && vs_size(expr.name_qualifier as VectorString*) != 1) {
-                    etc_diag_error(self, "TYP-0158", concat3_s("unsupported qualified expression '", expr.text_value, "'"),
+                if (expr.name_qualifier != null) {
+                    etc_diag_error(self, "TYP-0158", etc_nested_symbol_path_message(expr),
                         unit.path, expr.span);
                 } else {
                     let sym = etc_lookup_symbol(self, expr.text_value, expr.module_path, expr.name_qualifier);

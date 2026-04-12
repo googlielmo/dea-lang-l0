@@ -47,6 +47,116 @@ func tr_module_from_path(path: VectorString*) -> string {
 }
 
 /**
+ * Format the fully qualified display name for one parsed type reference.
+ *
+ * @param tref Parsed type reference to render.
+ * @return Display string including module path and name qualifier segments.
+ */
+func tr_type_ref_full_name(tref: TypeRef*) -> string {
+    with (let sb = sb_create() => sb_free(sb)) {
+        if (tref.module_path != null) {
+            let mp = tref.module_path as VectorString*;
+            for (let i = 0; i < vs_size(mp); i = i + 1) {
+                if (i > 0) {
+                    sb_append(sb, ".");
+                }
+                sb_append(sb, vs_get(mp, i));
+            }
+            if (vs_size(mp) > 0) {
+                sb_append(sb, "::");
+            }
+        }
+        if (tref.name_qualifier != null) {
+            let nq = tref.name_qualifier as VectorString*;
+            for (let i = 0; i < vs_size(nq); i = i + 1) {
+                sb_append(sb, vs_get(nq, i));
+                sb_append(sb, "::");
+            }
+        }
+        sb_append(sb, tref.name);
+        return sb_to_string(sb);
+    }
+}
+
+/**
+ * Format the direct type name suggestion for one parsed type reference.
+ *
+ * @param tref Parsed type reference to simplify.
+ * @return Display string omitting enum-style qualifier segments.
+ */
+func tr_type_ref_simple_name(tref: TypeRef*) -> string {
+    if (tref.module_path == null) {
+        return tref.name;
+    }
+    return concat3_s(tr_module_from_path(tref.module_path as VectorString*), "::", tref.name);
+}
+
+/**
+ * Collect imported module names contributing one ambiguous type name.
+ *
+ * @param nr Name-resolution result containing all module environments.
+ * @param env Current module environment.
+ * @param name Ambiguous imported type name.
+ * @return Sorted module names that provide the ambiguous type.
+ */
+func tr_ambiguous_type_modules(nr: NameResolution*, env: ModuleEnv*, name: string) -> VectorString* {
+    let modules = vs_create(4);
+    for (let i = 0; i < nr_env_count(nr); i = i + 1) {
+        let candidate = nr_env_get(nr, i);
+        if (!nr_module_env_imports_module(env, candidate.module_name)) {
+            continue;
+        }
+        if (nr_module_env_local(candidate, name) == null) {
+            continue;
+        }
+        vs_push(modules, candidate.module_name);
+    }
+    vs_sort(modules);
+    return modules;
+}
+
+/**
+ * Format one quoted module list for ambiguous-type diagnostics.
+ *
+ * @param modules Sorted module names contributing an ambiguity.
+ * @return String like `a', 'b`.
+ */
+func tr_format_ambiguous_modules(modules: VectorString*) -> string {
+    with (let sb = sb_create() => sb_free(sb)) {
+        for (let i = 0; i < vs_size(modules); i = i + 1) {
+            if (i > 0) {
+                sb_append(sb, "', '");
+            }
+            sb_append(sb, vs_get(modules, i));
+        }
+        return sb_to_string(sb);
+    }
+}
+
+/**
+ * Format the disambiguation hints for one ambiguous type name.
+ *
+ * @param modules Sorted module names contributing an ambiguity.
+ * @param name Ambiguous type name.
+ * @return String like `'a::T' or 'b::T'`.
+ */
+func tr_format_ambiguous_hints(modules: VectorString*, name: string) -> string {
+    with (let sb = sb_create() => sb_free(sb)) {
+        for (let i = 0; i < vs_size(modules); i = i + 1) {
+            if (i > 0) {
+                sb_append(sb, " or ");
+            }
+            sb_append(sb, "'");
+            sb_append(sb, vs_get(modules, i));
+            sb_append(sb, "::");
+            sb_append(sb, name);
+            sb_append(sb, "'");
+        }
+        return sb_to_string(sb);
+    }
+}
+
+/**
  * Emit a type-resolution diagnostic for a source span.
  *
  * @param diags Diagnostic collector.
@@ -151,7 +261,7 @@ func tr_resolve_alias(tables: SignatureTables*, nr: NameResolution*, env: Module
         tr_diag_error(
             diags,
             "SIG-0020",
-            concat4_s("cyclic type alias involving '", sym.name, "' in module '", sym.module_name),
+            concat4_s("cyclic type alias involving '", sym.name, "' in module '", concat_s(sym.module_name, "'")),
             env.module_ptr.filename,
             sym.span
         );
@@ -232,13 +342,15 @@ func tr_apply_suffix(base: Type*, tref: TypeRef*, diags: DiagCollector*, filenam
  * @return Resolved type, or `null` if resolution fails.
  */
 func tr_resolve_type_ref(tables: SignatureTables*, nr: NameResolution*, env: ModuleEnv*, tref: TypeRef*,
-                          diags: DiagCollector*, seen: StringSet*) -> Type*? {
+                         diags: DiagCollector*, seen: StringSet*) -> Type*? {
     if (tref.name_qualifier != null) {
-        let full = tref.name;
+        let full = tr_type_ref_full_name(tref);
+        let simple = tr_type_ref_simple_name(tref);
         tr_diag_error(
             diags,
             "SIG-0018",
-            concat3_s("qualified symbol paths are not supported in type position: ", full, ""),
+            concat4_s("nested symbol path '", full, "': paths must have the form 'module::symbol' (did you mean '",
+                concat_s(simple, "'?)")),
             env.module_ptr.filename,
             tref.span
         );
@@ -262,13 +374,18 @@ func tr_resolve_type_ref(tables: SignatureTables*, nr: NameResolution*, env: Mod
     }
 
     if (tref.module_path == null && nr_module_env_is_ambiguous(env, tref.name)) {
-        tr_diag_error(
-            diags,
-            "SIG-0019",
-            concat4_s("ambiguous type '", tref.name, "' in module '", env.module_name),
-            env.module_ptr.filename,
-            tref.span
-        );
+        with (let modules = tr_ambiguous_type_modules(nr, env, tref.name) => vs_free(modules)) {
+            let modules_str = tr_format_ambiguous_modules(modules);
+            let hints = tr_format_ambiguous_hints(modules, tref.name);
+            tr_diag_error(
+                diags,
+                "SIG-0019",
+                concat4_s("ambiguous type '", tref.name, "' (imported from modules '",
+                    concat_s(modules_str, concat_s("'); use ", concat_s(hints, " to disambiguate")))),
+                env.module_ptr.filename,
+                tref.span
+            );
+        }
         return null;
     }
 
@@ -277,7 +394,7 @@ func tr_resolve_type_ref(tables: SignatureTables*, nr: NameResolution*, env: Mod
         tr_diag_error(
             diags,
             "SIG-0019",
-            concat4_s("unknown type '", tref.name, "' in module '", env.module_name),
+            concat4_s("unknown type '", tref.name, "' in module '", concat_s(env.module_name, "'")),
             env.module_ptr.filename,
             tref.span
         );
@@ -295,7 +412,8 @@ func tr_resolve_type_ref(tables: SignatureTables*, nr: NameResolution*, env: Mod
         tr_diag_error(
             diags,
             "SIG-0010",
-            concat4_s("symbol '", s.name, "' in module '", env.module_name),
+            concat4_s("symbol '", s.name, "' in module '",
+                concat_s(env.module_name, concat_s("' is not a type (kind=", concat_s(symbol_kind_name(s.kind), ")")))),
             env.module_ptr.filename,
             tref.span
         );

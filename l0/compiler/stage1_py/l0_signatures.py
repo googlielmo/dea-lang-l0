@@ -177,8 +177,8 @@ class SignatureResolver:
                 simple = f"{'.'.join(tref.module_path)}::{tref.name}"
             self._emit(diag_from_node(
                 kind="error",
-                message=f"[SIG-0018] qualified symbol paths ('{full}') are not supported; "
-                        f"use '{simple}' to refer to the type directly",
+                message=f"[SIG-0018] nested symbol path '{full}': "
+                        f"paths must have the form 'module::symbol' (did you mean '{simple}'?)",
                 module_name=env.name, filename=env.module.filename, node=tref,
             ))
             return None

@@ -223,7 +223,7 @@ and reuse supplement for applying this registry within L0.
 | ---------- | ----- | --------------------------------------------------------------------------------- |
 | `SIG-0010` | All   | Symbol is not a type                                                              |
 | `SIG-0011` | All   | Type 'void' cannot be nullable                                                    |
-| `SIG-0018` | All   | Overqualified type path is not supported                                          |
+| `SIG-0018` | All   | Nested symbol paths are not supported                                             |
 | `SIG-0019` | All   | Unknown or ambiguous type reference                                               |
 | `SIG-0020` | All   | Cyclic type alias definition                                                      |
 | `SIG-0021` | All   | Internal error: compiler-inserted type alias has no backing declaration           |
@@ -278,7 +278,7 @@ and reuse supplement for applying this registry within L0.
 | `TYP-0154` | All   | Identifier refers to a non-imported module                                                             |
 | `TYP-0155` | All   | Ambiguous identifier                                                                                   |
 | `TYP-0156` | All   | 'cleanup' block references 'with' header variable that may be uninitialized on '?' header-failure path |
-| `TYP-0158` | All   | Overqualified symbol path is not supported                                                             |
+| `TYP-0158` | All   | Nested symbol paths are not supported                                                                  |
 | `TYP-0159` | All   | Unknown identifier                                                                                     |
 | `TYP-0160` | All   | Unary `-` requires an integer operand                                                                  |
 | `TYP-0161` | All   | Unary `!` requires a `bool` operand                                                                    |
