@@ -64,9 +64,9 @@ func analysis_result_free(self: AnalysisResult*) {
 
     sim_free(self.var_ref_resolution);
 
-    for (let i = 0; i < spm_capacity(self.intrinsic_targets); i = i + 1) {
-        if (spm_slot_occupied(self.intrinsic_targets, i)) {
-            type_free(spm_slot_value(self.intrinsic_targets, i) as Type*);
+    for (let intrinsic_i = 0; intrinsic_i < spm_capacity(self.intrinsic_targets); intrinsic_i = intrinsic_i + 1) {
+        if (spm_slot_occupied(self.intrinsic_targets, intrinsic_i)) {
+            type_free(spm_slot_value(self.intrinsic_targets, intrinsic_i) as Type*);
         }
     }
     spm_free(self.intrinsic_targets);

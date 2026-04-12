@@ -72,8 +72,8 @@ func sc_free(self: ScopeContext*) {
     for (let i = 0; i < vec_size(self.owned_vars); i = i + 1) {
         sc_var_free(ptr_vec_get(self.owned_vars, i) as ScopeVar*);
     }
-    for (let i = 0; i < vec_size(self.declared_vars); i = i + 1) {
-        sc_var_free(ptr_vec_get(self.declared_vars, i) as ScopeVar*);
+    for (let declared_i = 0; declared_i < vec_size(self.declared_vars); declared_i = declared_i + 1) {
+        sc_var_free(ptr_vec_get(self.declared_vars, declared_i) as ScopeVar*);
     }
     vec_free(self.owned_vars);
     vec_free(self.declared_vars);

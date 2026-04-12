@@ -164,8 +164,8 @@ func lc_func_env_free(self: FunctionEnv*) {
     }
     vec_free(self.arm_scopes);
     vec_free(self.block_scopes);
-    for (let i = 0; i < vec_size(self.scopes); i = i + 1) {
-        lc_scope_free(ptr_vec_get(self.scopes, i) as Scope*);
+    for (let scope_i = 0; scope_i < vec_size(self.scopes); scope_i = scope_i + 1) {
+        lc_scope_free(ptr_vec_get(self.scopes, scope_i) as Scope*);
     }
     vec_free(self.scopes);
     drop self;
@@ -492,8 +492,8 @@ func lc_make_function_env(module_name: string, unit: DriverUnit*, decl: FuncDecl
         *slot = ScopeSlot(null);
     }
 
-    for (let i = 0; i < vec_size(decl.params); i = i + 1) {
-        let param = ptr_vec_get(decl.params, i) as Param*;
+    for (let param_i = 0; param_i < vec_size(decl.params); param_i = param_i + 1) {
+        let param = ptr_vec_get(decl.params, param_i) as Param*;
         lc_scope_define(env.root_scope, param.name, LK_PARAM, param as void*);
     }
 

@@ -116,6 +116,7 @@ func test_typing_let_diag_err() {
     with (let cfg = log_config_create(LL_SILENT, false) => drop cfg) {
         let result = analysis_analyze_entry(sp, "typing_let_diag_err", cfg);
         assert(analysis_has_errors(result), "expected typing errors for typing_let_diag_err");
+        assert(has_diag_code(result, "TYP-0020"), "expected duplicate local declaration error");
         assert(has_diag_code(result, "TYP-0050"), "expected void local annotation error");
         assert(has_diag_code(result, "TYP-0052"), "expected null-inference let error");
         assert(has_diag_code(result, "TYP-0053"), "expected void-initializer let error");

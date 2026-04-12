@@ -60,9 +60,9 @@ func test_vec_push_and_grow() {
 
     // Read back values
     printl_s("Reading values back...");
-    for (let i = 0; i < vec_size(vec); i = i + 1) {
-        let val = vec_get(vec, i) as int*;
-        printl_ii(i, *val);
+    for (let after_zap_i = 0; after_zap_i < vec_size(vec); after_zap_i = after_zap_i + 1) {
+        let val = vec_get(vec, after_zap_i) as int*;
+        printl_ii(after_zap_i, *val);
     }
 
     vec_free(vec);
@@ -84,9 +84,9 @@ func test_vec_push_int() {
     printl_si("  size:", vec_size(vec));
 
     printl_s("Reading back...");
-    for (let i = 0; i < vec_size(vec); i = i + 1) {
-        let val = vec_get(vec, i) as int*;
-        printl_ii(i, *val);
+    for (let after_zap_i = 0; after_zap_i < vec_size(vec); after_zap_i = after_zap_i + 1) {
+        let val = vec_get(vec, after_zap_i) as int*;
+        printl_ii(after_zap_i, *val);
     }
 
     vec_free(vec);
@@ -217,18 +217,18 @@ func test_vec_zap() {
     vec_push_int(vec, 333);
 
     printl_s("Before zap:");
-    for (let i = 0; i < vec_size(vec); i = i + 1) {
-        let val = vec_get(vec, i) as int*;
-        printl_ii(i, *val);
+    for (let read_i = 0; read_i < vec_size(vec); read_i = read_i + 1) {
+        let val = vec_get(vec, read_i) as int*;
+        printl_ii(read_i, *val);
     }
 
     printl_s("Zapping index 1...");
     vec_zap(vec, 1);
 
     printl_s("After zap:");
-    for (let i = 0; i < vec_size(vec); i = i + 1) {
-        let val = vec_get(vec, i) as int*;
-        printl_ii(i, *val);
+    for (let after_zap_i = 0; after_zap_i < vec_size(vec); after_zap_i = after_zap_i + 1) {
+        let val = vec_get(vec, after_zap_i) as int*;
+        printl_ii(after_zap_i, *val);
     }
 
     vec_free(vec);
@@ -261,9 +261,9 @@ func test_vec_clear() {
     printl_si("  size:", vec_size(vec));
 
     printl_s("Reading values:");
-    for (let i = 0; i < vec_size(vec); i = i + 1) {
-        let val = vec_get(vec, i) as int*;
-        printl_ii(i, *val);
+    for (let clear_read_i = 0; clear_read_i < vec_size(vec); clear_read_i = clear_read_i + 1) {
+        let val = vec_get(vec, clear_read_i) as int*;
+        printl_ii(clear_read_i, *val);
     }
 
     vec_free(vec);

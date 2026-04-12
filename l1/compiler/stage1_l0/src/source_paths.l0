@@ -169,8 +169,8 @@ func sp_resolve(self: SourceSearchPaths*, module_name: string) -> string? {
         }
     }
 
-    for (let i = 0; i < vs_size(self.project_roots); i = i + 1) {
-        let candidate = join(vs_get(self.project_roots, i), rel);
+    for (let project_i = 0; project_i < vs_size(self.project_roots); project_i = project_i + 1) {
+        let candidate = join(vs_get(self.project_roots, project_i), rel);
         if (exists(candidate)) {
             return candidate;
         }
@@ -298,8 +298,8 @@ func sp_build_from_roots(project_roots: VectorString*, sys_roots: VectorString*)
         sp_add_system_root(sp, vs_get(sys_roots, i));
     }
 
-    for (let i = 0; i < vs_size(project_roots); i = i + 1) {
-        sp_add_project_root(sp, vs_get(project_roots, i));
+    for (let project_i = 0; project_i < vs_size(project_roots); project_i = project_i + 1) {
+        sp_add_project_root(sp, vs_get(project_roots, project_i));
     }
 
     return sp;

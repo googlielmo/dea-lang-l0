@@ -847,8 +847,8 @@ func cem_emit_enum(self: CEmitter*, module_name: string, decl: EnumDecl*, enum_i
     ccb_emit(self.out, "union {");
     ccb_indent(self.out);
 
-    for (let i = 0; i < vec_size(decl.variants); i = i + 1) {
-        let variant2 = ptr_vec_get(decl.variants, i) as EnumVariant*;
+    for (let variant_i = 0; variant_i < vec_size(decl.variants); variant_i = variant_i + 1) {
+        let variant2 = ptr_vec_get(decl.variants, variant_i) as EnumVariant*;
         let info = cem_find_enum_variant_info(enum_info, variant2.name);
         if (info == null) {
             cem_ice(concat4_s("[ICE-1271] missing VariantInfo for ", module_name, ".", concat3_s(decl.name, ".", variant2.name)));
@@ -1091,22 +1091,22 @@ func cem_prepare_optional_wrappers(self: CEmitter*) {
         }
     }
 
-    for (let i = 0; i < spm_capacity(tables.struct_infos); i = i + 1) {
-        if (!spm_slot_occupied(tables.struct_infos, i)) {
+    for (let struct_info_i = 0; struct_info_i < spm_capacity(tables.struct_infos); struct_info_i = struct_info_i + 1) {
+        if (!spm_slot_occupied(tables.struct_infos, struct_info_i)) {
             continue;
         }
-        let info = spm_slot_value(tables.struct_infos, i) as StructInfo*;
+        let info = spm_slot_value(tables.struct_infos, struct_info_i) as StructInfo*;
         for (let j = 0; j < vec_size(info.fields); j = j + 1) {
             let field_info = ptr_vec_get(info.fields, j) as StructFieldInfo*;
             cem_collect_opt_wrappers_from_type(self, field_info.field_type);
         }
     }
 
-    for (let i = 0; i < spm_capacity(tables.enum_infos); i = i + 1) {
-        if (!spm_slot_occupied(tables.enum_infos, i)) {
+    for (let enum_info_i = 0; enum_info_i < spm_capacity(tables.enum_infos); enum_info_i = enum_info_i + 1) {
+        if (!spm_slot_occupied(tables.enum_infos, enum_info_i)) {
             continue;
         }
-        let enum_info = spm_slot_value(tables.enum_infos, i) as EnumInfo*;
+        let enum_info = spm_slot_value(tables.enum_infos, enum_info_i) as EnumInfo*;
         for (let j = 0; j < vec_size(enum_info.variants); j = j + 1) {
             let variant_info = ptr_vec_get(enum_info.variants, j) as EnumVariantInfo*;
             for (let k = 0; k < vec_size(variant_info.field_types); k = k + 1) {
@@ -1115,9 +1115,9 @@ func cem_prepare_optional_wrappers(self: CEmitter*) {
         }
     }
 
-    for (let i = 0; i < spm_capacity(analysis.expr_types); i = i + 1) {
-        if (spm_slot_occupied(analysis.expr_types, i)) {
-            cem_collect_opt_wrappers_from_type(self, spm_slot_value(analysis.expr_types, i) as Type*);
+    for (let expr_type_i = 0; expr_type_i < spm_capacity(analysis.expr_types); expr_type_i = expr_type_i + 1) {
+        if (spm_slot_occupied(analysis.expr_types, expr_type_i)) {
+            cem_collect_opt_wrappers_from_type(self, spm_slot_value(analysis.expr_types, expr_type_i) as Type*);
         }
     }
 }
@@ -2318,9 +2318,9 @@ func cem_emit_value_cleanup(self: CEmitter*, c_expr: string, ty: Type*) {
 
             ccb_emit(self.out, concat3_s("case ", cem_emit_enum_tag(ty, variant.name), ": {"));
             ccb_indent(self.out);
-            for (let j = 0; j < vec_size((info2 as EnumVariantInfo*).field_types); j = j + 1) {
-                let field_decl = ptr_vec_get(variant.fields, j) as FieldDecl*;
-                let field_ty = ptr_vec_get((info2 as EnumVariantInfo*).field_types, j) as Type*;
+            for (let cleanup_j = 0; cleanup_j < vec_size((info2 as EnumVariantInfo*).field_types); cleanup_j = cleanup_j + 1) {
+                let field_decl = ptr_vec_get(variant.fields, cleanup_j) as FieldDecl*;
+                let field_ty = ptr_vec_get((info2 as EnumVariantInfo*).field_types, cleanup_j) as Type*;
                 cem_emit_value_cleanup(self, cem_emit_enum_payload_field_access(c_expr, variant.name, field_decl.name), field_ty);
             }
             cem_emit_exit_switch(self);
@@ -2398,9 +2398,9 @@ func cem_emit_enum_cleanup(self: CEmitter*, c_ptr_expr: string, enum_type: Type*
 
         ccb_emit(self.out, concat3_s("case ", cem_emit_enum_tag(enum_type, variant.name), ": {"));
         ccb_indent(self.out);
-        for (let j = 0; j < vec_size((info2 as EnumVariantInfo*).field_types); j = j + 1) {
-            let field_decl = ptr_vec_get(variant.fields, j) as FieldDecl*;
-            let field_ty = ptr_vec_get((info2 as EnumVariantInfo*).field_types, j) as Type*;
+        for (let cleanup_j = 0; cleanup_j < vec_size((info2 as EnumVariantInfo*).field_types); cleanup_j = cleanup_j + 1) {
+            let field_decl = ptr_vec_get(variant.fields, cleanup_j) as FieldDecl*;
+            let field_ty = ptr_vec_get((info2 as EnumVariantInfo*).field_types, cleanup_j) as Type*;
             cem_emit_value_cleanup(self, concat4_s(c_ptr_expr, "->data.", variant.name, concat_s(".", field_decl.name)),
                 field_ty);
         }

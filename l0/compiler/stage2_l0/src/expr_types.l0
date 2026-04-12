@@ -257,7 +257,7 @@ func etc_check_local_declaration(self: ExpressionTypeChecker*, name: string, spa
     }
     let unit = self.current_unit as DriverUnit*;
     if (sim_has(current as StringIntMap*, name)) {
-        etc_diag_warn(self, "TYP-0020", concat3_s("local variable '", name, "' already declared in this scope"),
+        etc_diag_error(self, "TYP-0020", concat3_s("local variable '", name, "' already declared in this scope"),
             unit.path, span);
         return;
     }

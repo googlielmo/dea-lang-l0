@@ -81,9 +81,9 @@ func test_lmss() {
 
     // Test iteration
     printl_s("\nIterating over map...");
-    for (let i = 0; i < lmss_len(m); i = i + 1) {
-        let k = lmss_key_at(m, i);
-        let v = lmss_value_at(m, i);
+    for (let final_i = 0; final_i < lmss_len(m); final_i = final_i + 1) {
+        let k = lmss_key_at(m, final_i);
+        let v = lmss_value_at(m, final_i);
         printl_s(concat4_s("  ", k, " => ", v));
     }
 
@@ -168,9 +168,9 @@ func test_lmis() {
 
     // Test iteration
     printl_s("\nIterating over map...");
-    for (let i = 0; i < lmis_len(m); i = i + 1) {
-        let k = lmis_key_at(m, i);
-        let val = lmis_value_at(m, i);
+    for (let final_i = 0; final_i < lmis_len(m); final_i = final_i + 1) {
+        let k = lmis_key_at(m, final_i);
+        let val = lmis_value_at(m, final_i);
         printl_si("  key:", k);
         printl_ss("    value:", val);
     }

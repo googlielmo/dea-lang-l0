@@ -652,12 +652,12 @@ func nr_resolve(driver_state: DriverState*, diags: DiagCollector*) -> NameResolu
     ptr_vec_push(result.envs, dea_env as void*);
     spm_put(result.by_name, us_clone_s(dea_env.module_name), dea_env as void*);
 
-    for (let i = 0; i < vec_size(result.envs); i = i + 1) {
-        nr_collect_locals(ptr_vec_get(result.envs, i) as ModuleEnv*, diags);
+    for (let env_i = 0; env_i < vec_size(result.envs); env_i = env_i + 1) {
+        nr_collect_locals(ptr_vec_get(result.envs, env_i) as ModuleEnv*, diags);
     }
 
-    for (let i = 0; i < vec_size(result.envs); i = i + 1) {
-        nr_open_imports(result, ptr_vec_get(result.envs, i) as ModuleEnv*, diags);
+    for (let import_i = 0; import_i < vec_size(result.envs); import_i = import_i + 1) {
+        nr_open_imports(result, ptr_vec_get(result.envs, import_i) as ModuleEnv*, diags);
     }
 
     return result;

@@ -442,19 +442,19 @@ func sig_tables_free(self: SignatureTables*) {
             type_free(spm_slot_value(self.func_types, i) as Type*);
         }
     }
-    for (let i = 0; i < spm_capacity(self.struct_infos); i = i + 1) {
-        if (spm_slot_occupied(self.struct_infos, i)) {
-            struct_info_free(spm_slot_value(self.struct_infos, i) as StructInfo*);
+    for (let struct_i = 0; struct_i < spm_capacity(self.struct_infos); struct_i = struct_i + 1) {
+        if (spm_slot_occupied(self.struct_infos, struct_i)) {
+            struct_info_free(spm_slot_value(self.struct_infos, struct_i) as StructInfo*);
         }
     }
-    for (let i = 0; i < spm_capacity(self.enum_infos); i = i + 1) {
-        if (spm_slot_occupied(self.enum_infos, i)) {
-            enum_info_free(spm_slot_value(self.enum_infos, i) as EnumInfo*);
+    for (let enum_i = 0; enum_i < spm_capacity(self.enum_infos); enum_i = enum_i + 1) {
+        if (spm_slot_occupied(self.enum_infos, enum_i)) {
+            enum_info_free(spm_slot_value(self.enum_infos, enum_i) as EnumInfo*);
         }
     }
-    for (let i = 0; i < spm_capacity(self.let_types); i = i + 1) {
-        if (spm_slot_occupied(self.let_types, i)) {
-            type_free(spm_slot_value(self.let_types, i) as Type*);
+    for (let let_i = 0; let_i < spm_capacity(self.let_types); let_i = let_i + 1) {
+        if (spm_slot_occupied(self.let_types, let_i)) {
+            type_free(spm_slot_value(self.let_types, let_i) as Type*);
         }
     }
     spm_free(self.func_types);

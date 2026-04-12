@@ -1056,8 +1056,8 @@ func be_dependency_sets_free(sets: VectorBase*?) {
 func be_collect_type_keys(self: Backend*) -> VectorString* {
     let out = vs_create(8);
 
-    for (let i = 0; i < driver_unit_count(self.result.driver_state); i = i + 1) {
-        let unit = driver_unit_get(self.result.driver_state, i);
+    for (let enum_unit_i = 0; enum_unit_i < driver_unit_count(self.result.driver_state); enum_unit_i = enum_unit_i + 1) {
+        let unit = driver_unit_get(self.result.driver_state, enum_unit_i);
         if (unit.parse_result.root_module == null) {
             continue;
         }
@@ -1153,8 +1153,8 @@ func be_emit_type_definitions(self: Backend*) {
             be_ice("[ICE-1340] value-type cycle detected in type definitions");
         }
 
-        for (let i = 0; i < vs_size(ordered); i = i + 1) {
-            let key = vs_get(ordered, i);
+        for (let ordered_i = 0; ordered_i < vs_size(ordered); ordered_i = ordered_i + 1) {
+            let key = vs_get(ordered, ordered_i);
             let module_name = be_type_key_module(key);
             let type_name = be_type_key_name(key);
 
@@ -1302,8 +1302,8 @@ func be_emit_let_declarations(self: Backend*) {
     }
 
     let any_lets = false;
-    for (let i = 0; i < driver_unit_count(self.result.driver_state); i = i + 1) {
-        let unit = driver_unit_get(self.result.driver_state, i);
+    for (let unit_i = 0; unit_i < driver_unit_count(self.result.driver_state); unit_i = unit_i + 1) {
+        let unit = driver_unit_get(self.result.driver_state, unit_i);
         if (unit.parse_result.root_module == null) {
             continue;
         }
@@ -2379,10 +2379,10 @@ func be_emit_with_stmt(self: Backend*, stmt: StmtNode*) {
                 }
             }
 
-            for (let i = 0; i < vec_size(items); i = i + 1) {
-                let item = ptr_vec_get(items, i) as WithItem*;
+            for (let item_i = 0; item_i < vec_size(items); item_i = item_i + 1) {
+                let item = ptr_vec_get(items, item_i) as WithItem*;
                 let init_stmt = stmt_arena_get(be_current_stmt_arena(self), item.init);
-                let predecl_ty = spm_get(predecl_types, int_to_string(i));
+                let predecl_ty = spm_get(predecl_types, int_to_string(item_i));
                 if (predecl_ty != null && ord(init_stmt.kind) == ord(ST_LET)) {
                     be_emit_with_cleanup_header_let_assign(self, init_stmt, predecl_ty as Type*);
                 } else {

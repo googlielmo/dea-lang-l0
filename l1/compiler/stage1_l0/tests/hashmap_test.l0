@@ -199,17 +199,17 @@ func test_spm_grow() {
     assert(spm_capacity(m) > initial_cap, "capacity should have grown");
 
     /* Verify all entries survive rehash */
-    for (let i: int = 0; i < 20; i = i + 1) {
-        let key = make_key("key_", i);
+    for (let verify_i: int = 0; verify_i < 20; verify_i = verify_i + 1) {
+        let key = make_key("key_", verify_i);
         assert(spm_has(m, key), "key should survive rehash");
         let r = spm_get(m, key) as int*;
-        assert(*r == i * 10, "value should survive rehash");
+        assert(*r == verify_i * 10, "value should survive rehash");
     }
 
     /* Cleanup: free all heap-allocated values */
-    for (let i: int = 0; i < spm_capacity(m); i = i + 1) {
-        if (spm_slot_occupied(m, i)) {
-            let v = spm_slot_value(m, i) as int*;
+    for (let slot_i: int = 0; slot_i < spm_capacity(m); slot_i = slot_i + 1) {
+        if (spm_slot_occupied(m, slot_i)) {
+            let v = spm_slot_value(m, slot_i) as int*;
             drop v;
         }
     }
@@ -360,10 +360,10 @@ func test_sim_grow() -> Unit? {
     assert(sim_size(m) == 50, "size should be 50");
     printl_si("  capacity after 50 inserts:", sim_capacity(m));
 
-    for (let i: int = 0; i < 50; i = i + 1) {
-        let key = make_key("item_", i);
+    for (let verify_i: int = 0; verify_i < 50; verify_i = verify_i + 1) {
+        let key = make_key("item_", verify_i);
         let val = sim_get(m, key)?;
-        assert(val == i * 100, "value should survive rehash");
+        assert(val == verify_i * 100, "value should survive rehash");
     }
 
     sim_free(m);
@@ -448,8 +448,8 @@ func test_ss_grow() {
     assert(ss_size(s) == 30, "size should be 30");
     printl_si("  capacity after 30 adds:", ss_capacity(s));
 
-    for (let i: int = 0; i < 30; i = i + 1) {
-        let key = make_key("elem_", i);
+    for (let verify_i: int = 0; verify_i < 30; verify_i = verify_i + 1) {
+        let key = make_key("elem_", verify_i);
         assert(ss_has(s, key), "element should survive rehash");
     }
 
@@ -499,41 +499,41 @@ func test_stress() -> Unit? {
     assert(sim_size(m) == 200, "size should be 200");
 
     /* Remove even-numbered entries */
-    for (let i: int = 0; i < 200; i = i + 2) {
-        let key = make_key("stress_", i);
+    for (let remove_i: int = 0; remove_i < 200; remove_i = remove_i + 2) {
+        let key = make_key("stress_", remove_i);
         sim_remove(m, key);
     }
     assert(sim_size(m) == 100, "size should be 100 after removing evens");
 
     /* Verify odd entries remain */
-    for (let i: int = 1; i < 200; i = i + 2) {
-        let key = make_key("stress_", i);
+    for (let odd_i: int = 1; odd_i < 200; odd_i = odd_i + 2) {
+        let key = make_key("stress_", odd_i);
         assert(sim_has(m, key), "odd key should remain");
         let val = sim_get(m, key)?;
-        assert(val == i, "odd value should match");
+        assert(val == odd_i, "odd value should match");
     }
 
     /* Verify even entries are gone */
-    for (let i: int = 0; i < 200; i = i + 2) {
-        let key = make_key("stress_", i);
+    for (let even_i: int = 0; even_i < 200; even_i = even_i + 2) {
+        let key = make_key("stress_", even_i);
         assert(!sim_has(m, key), "even key should be removed");
     }
 
     /* Re-insert even entries with new values */
-    for (let i: int = 0; i < 200; i = i + 2) {
-        let key = make_key("stress_", i);
-        sim_put(m, key, i + 1000);
+    for (let reinsert_i: int = 0; reinsert_i < 200; reinsert_i = reinsert_i + 2) {
+        let key = make_key("stress_", reinsert_i);
+        sim_put(m, key, reinsert_i + 1000);
     }
     assert(sim_size(m) == 200, "size should be 200 after re-insert");
 
     /* Verify all entries */
-    for (let i: int = 0; i < 200; i = i + 1) {
-        let key = make_key("stress_", i);
+    for (let verify_i: int = 0; verify_i < 200; verify_i = verify_i + 1) {
+        let key = make_key("stress_", verify_i);
         let val = sim_get(m, key)?;
-        if (i % 2 == 1) {
-            assert(val == i, "odd value should be original");
+        if (verify_i % 2 == 1) {
+            assert(val == verify_i, "odd value should be original");
         } else {
-            assert(val == i + 1000, "even value should be updated");
+            assert(val == verify_i + 1000, "even value should be updated");
         }
     }
 

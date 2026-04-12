@@ -547,8 +547,8 @@ func test_emitter_top_level_forms_match_stage1_shape() {
     drop point_info;
 
     type_free(color_info.enum_type);
-    for (let i = 0; i < vec_size(color_info.variants); i = i + 1) {
-        let variant = ptr_vec_get(color_info.variants, i) as EnumVariantInfo*;
+    for (let variant_i = 0; variant_i < vec_size(color_info.variants); variant_i = variant_i + 1) {
+        let variant = ptr_vec_get(color_info.variants, variant_i) as EnumVariantInfo*;
         for (let j = 0; j < vec_size(variant.field_types); j = j + 1) {
             type_free(ptr_vec_get(variant.field_types, j) as Type*);
         }

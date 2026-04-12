@@ -958,8 +958,8 @@ func bd_build_to_exe(opts: CliOptions*, cfg: LogConfig*, exe_path: string, keep_
             for (let i = 0; i < vs_size(env_opts); i = i + 1) {
                 vs_push(extra_opts, vs_get(env_opts, i));
             }
-            for (let i = 0; i < vs_size(cli_opts); i = i + 1) {
-                vs_push(extra_opts, vs_get(cli_opts, i));
+            for (let cli_i = 0; cli_i < vs_size(cli_opts); cli_i = cli_i + 1) {
+                vs_push(extra_opts, vs_get(cli_opts, cli_i));
             }
 
             cg_opts.emit_line_directives = !opts.no_line_directives;
@@ -1042,8 +1042,8 @@ func bd_build_to_exe(opts: CliOptions*, cfg: LogConfig*, exe_path: string, keep_
             vs_push(command_words, c_path as string);
             bd_push_output_flags(command_words, family, exe_path);
 
-            for (let i = 0; i < vs_size(extra_opts); i = i + 1) {
-                vs_push(command_words, vs_get(extra_opts, i));
+            for (let extra_i = 0; extra_i < vs_size(extra_opts); extra_i = extra_i + 1) {
+                vs_push(command_words, vs_get(extra_opts, extra_i));
             }
             if (eq_s(family, "unknown")) {
                 log_warning(cfg, concat4_s("Unsupported compiler '", compiler as string,

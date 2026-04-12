@@ -503,11 +503,11 @@ func sig_cycle_visit(tables: SignatureTables*, key: string, visiting: StringSet*
                 let field = ptr_vec_get(info.fields, i) as StructFieldInfo*;
                 sig_extract_dependencies(field.field_type, deps);
             }
-            for (let i = 0; i < ss_capacity(deps); i = i + 1) {
-                if (!ss_slot_occupied(deps, i)) {
+            for (let dep_i = 0; dep_i < ss_capacity(deps); dep_i = dep_i + 1) {
+                if (!ss_slot_occupied(deps, dep_i)) {
                     continue;
                 }
-                if (sig_cycle_visit(tables, ss_slot_key(deps, i), visiting, visited, diags)) {
+                if (sig_cycle_visit(tables, ss_slot_key(deps, dep_i), visiting, visited, diags)) {
                     sig_diag_error(
                         diags,
                         "SIG-0040",
@@ -531,11 +531,11 @@ func sig_cycle_visit(tables: SignatureTables*, key: string, visiting: StringSet*
                     sig_extract_dependencies(ptr_vec_get(variant.field_types, j) as Type*, deps2);
                 }
             }
-            for (let i = 0; i < ss_capacity(deps2); i = i + 1) {
-                if (!ss_slot_occupied(deps2, i)) {
+            for (let dep2_i = 0; dep2_i < ss_capacity(deps2); dep2_i = dep2_i + 1) {
+                if (!ss_slot_occupied(deps2, dep2_i)) {
                     continue;
                 }
-                if (sig_cycle_visit(tables, ss_slot_key(deps2, i), visiting, visited, diags)) {
+                if (sig_cycle_visit(tables, ss_slot_key(deps2, dep2_i), visiting, visited, diags)) {
                     sig_diag_error(
                         diags,
                         "SIG-0040",
@@ -570,8 +570,8 @@ func sig_detect_value_type_cycles(tables: SignatureTables*, diags: DiagCollector
                 return;
             }
         }
-        for (let i = 0; i < vs_size(enum_keys); i = i + 1) {
-            if (sig_cycle_visit(tables, vs_get(enum_keys, i), visiting, visited, diags)) {
+        for (let enum_key_i = 0; enum_key_i < vs_size(enum_keys); enum_key_i = enum_key_i + 1) {
+            if (sig_cycle_visit(tables, vs_get(enum_keys, enum_key_i), visiting, visited, diags)) {
                 return;
             }
         }

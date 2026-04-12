@@ -789,8 +789,8 @@ func module_free(self: Module*) {
     }
     vec_free(self.imports);
 
-    for (let i = 0; i < vec_size(self.decls); i = i + 1) {
-        let decl = ptr_vec_get(self.decls, i) as TopLevelDecl*;
+    for (let decl_i = 0; decl_i < vec_size(self.decls); decl_i = decl_i + 1) {
+        let decl = ptr_vec_get(self.decls, decl_i) as TopLevelDecl*;
         top_level_decl_free(decl);
     }
     vec_free(self.decls);
