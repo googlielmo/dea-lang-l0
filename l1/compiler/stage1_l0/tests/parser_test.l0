@@ -164,6 +164,14 @@ func test_type_expr_call_arg_ok() {
 }
 
 /**
+ * Tests small integer builtin names in type positions.
+ */
+func test_small_integer_type_positions_ok() {
+    let src = "module main; extern func sizeof(x: int) -> int; struct S { a: tiny; b: short?; c: ushort*; } func f(a: tiny, b: short?, c: ushort*) -> short { let x: tiny* = new tiny(1); let y: ushort? = null; return sizeof(short) as short; }";
+    expect_ok(src);
+}
+
+/**
  * Tests test_reserved_binary_and_error.
  */
 func test_reserved_binary_and_error() {
@@ -258,6 +266,7 @@ func main() {
     test_prefixed_int_literals_err();
     test_postfix_chain_ok();
     test_type_expr_call_arg_ok();
+    test_small_integer_type_positions_ok();
     test_reserved_binary_and_error();
     test_reserved_binary_shift_error();
     test_qualified_expr_module_path_ok();

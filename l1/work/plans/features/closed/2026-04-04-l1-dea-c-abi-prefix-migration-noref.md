@@ -22,7 +22,7 @@
   - `compiler/stage1_l0/tests/backend_test.l0`
   - backend golden fixture refresh/verification
 - Related:
-  - `l1/work/plans/features/2026-04-04-l1-small-int-builtins-on-dea-abi-noref.md`
+  - `l1/work/plans/features/closed/2026-04-04-l1-small-int-builtins-on-dea-abi-noref.md`
 - Repro: `make test-stage1 TESTS="c_emitter_test backend_test"`
 
 ## Summary

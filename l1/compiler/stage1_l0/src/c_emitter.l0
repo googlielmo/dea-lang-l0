@@ -501,11 +501,20 @@ func cem_opt_wrapper_name_for_inner(inner: Type*) -> string {
  * @return C spelling for `typ`.
  */
 func cem_emit_type(typ: Type*) -> string {
+    if (type_is_builtin(typ, "tiny")) {
+        return "dea_tiny";
+    }
+    if (type_is_builtin(typ, "short")) {
+        return "dea_short";
+    }
     if (type_is_builtin(typ, "int")) {
         return "dea_int";
     }
     if (type_is_builtin(typ, "byte")) {
         return "dea_byte";
+    }
+    if (type_is_builtin(typ, "ushort")) {
+        return "dea_ushort";
     }
     if (type_is_builtin(typ, "bool")) {
         return "dea_bool";
@@ -608,7 +617,13 @@ func cem_emit_widen_int(c_expr: string, src_type: Type*, dst_type: Type*) -> str
     if (eq_s(src_type.name, dst_type.name)) {
         return c_expr;
     }
-    if (type_is_builtin(src_type, "byte") && type_is_builtin(dst_type, "int")) {
+    if ((type_is_builtin(src_type, "tiny") && type_is_builtin(dst_type, "short")) ||
+        (type_is_builtin(src_type, "tiny") && type_is_builtin(dst_type, "int")) ||
+        (type_is_builtin(src_type, "byte") && type_is_builtin(dst_type, "short")) ||
+        (type_is_builtin(src_type, "byte") && type_is_builtin(dst_type, "ushort")) ||
+        (type_is_builtin(src_type, "byte") && type_is_builtin(dst_type, "int")) ||
+        (type_is_builtin(src_type, "short") && type_is_builtin(dst_type, "int")) ||
+        (type_is_builtin(src_type, "ushort") && type_is_builtin(dst_type, "int"))) {
         return cem_emit_cast(cem_emit_type(dst_type), c_expr);
     }
     return cem_ice_string(concat4_s("[ICE-1293] unsupported widening cast ", type_format(src_type), " -> ",

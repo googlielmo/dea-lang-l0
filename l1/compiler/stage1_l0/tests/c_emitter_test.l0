@@ -165,11 +165,17 @@ func test_emitter_name_mangling() {
  */
 func test_emitter_type_lowering_and_null_forms() {
     let builtin_int_ty = type_builtin_int();
+    let tiny_ty = type_builtin_tiny();
+    let short_ty = type_builtin_short();
+    let ushort_ty = type_builtin_ushort();
     let point_ty = type_new_struct("demo.main", "Point");
     let point_ptr_ty = type_new_pointer(type_clone(point_ty));
     let point_opt_ty = type_new_nullable(type_clone(point_ty));
 
     assert(eq_s(cem_emit_type(builtin_int_ty), "dea_int"), "builtin int type mismatch");
+    assert(eq_s(cem_emit_type(tiny_ty), "dea_tiny"), "builtin tiny type mismatch");
+    assert(eq_s(cem_emit_type(short_ty), "dea_short"), "builtin short type mismatch");
+    assert(eq_s(cem_emit_type(ushort_ty), "dea_ushort"), "builtin ushort type mismatch");
     assert(eq_s(cem_emit_type(point_ty), "struct dea_demo_main_Point"), "struct type mismatch");
     assert(eq_s(cem_emit_type(point_ptr_ty), "struct dea_demo_main_Point*"), "pointer type mismatch");
     assert(eq_s(cem_emit_type(point_opt_ty), "dea_opt_s_dea_demo_main_Point"), "nullable struct type mismatch");
@@ -181,6 +187,9 @@ func test_emitter_type_lowering_and_null_forms() {
     assert(eq_s(cem_emit_null_literal(point_ptr_ty, false), "NULL"), "pointer null mismatch");
 
     type_free(builtin_int_ty);
+    type_free(tiny_ty);
+    type_free(short_ty);
+    type_free(ushort_ty);
     type_free(point_ty);
     type_free(point_ptr_ty);
     type_free(point_opt_ty);
@@ -262,6 +271,8 @@ func test_emitter_expression_and_statement_helpers() {
         assert(eq_s(cem_emit_function_call("fn", "x, y"), "fn(x, y)"), "function call helper mismatch");
         assert(eq_s(cem_emit_field_access("obj", "x", false), "(obj).x"), "field access helper mismatch");
         assert(eq_s(cem_emit_cast("dea_int", "b"), "((dea_int)(b))"), "cast helper mismatch");
+        assert(eq_s(cem_emit_checked_narrow_cast("dea_tiny", "x"), "(_rt_narrow_dea_tiny(x))"),
+            "tiny narrow helper mismatch");
         assert(eq_s(cem_emit_optional_has_value("opt"), "(opt).has_value"), "optional has-value helper mismatch");
         assert(eq_s(cem_emit_optional_value("opt"), "(opt).value"), "optional value helper mismatch");
         assert(eq_s(cem_emit_enum_tag_access("value"), "(value).tag"), "enum tag helper mismatch");
@@ -401,7 +412,8 @@ func test_emitter_forward_decls_follow_loaded_module_order() {
 func test_emitter_optional_wrappers_emit_early_then_late() {
     let result = cet_empty_analysis_result();
     result.signatures = sig_make_tables();
-    let params = ptr_vec_create(2);
+    let params = ptr_vec_create(3);
+    ptr_vec_push(params, type_new_nullable(type_builtin_short()) as void*);
     ptr_vec_push(params, type_new_nullable(type_builtin_int()) as void*);
     ptr_vec_push(params, type_new_nullable(type_new_enum("demo.main", "Color")) as void*);
     let func_ty = type_new_func(params, type_new_nullable(type_new_struct("demo.main", "Point")));
@@ -418,6 +430,11 @@ func test_emitter_optional_wrappers_emit_early_then_late() {
         sb_append(expected, "#define DEA_OPT_INT_DEFINED\n");
         sb_append(expected, "typedef struct { dea_bool has_value; dea_int value; } dea_opt_int;\n");
         sb_append(expected, "#endif /* DEA_OPT_INT_DEFINED */\n");
+        sb_append(expected, "\n");
+        sb_append(expected, "#ifndef DEA_OPT_SHORT_DEFINED\n");
+        sb_append(expected, "#define DEA_OPT_SHORT_DEFINED\n");
+        sb_append(expected, "typedef struct { dea_bool has_value; dea_short value; } dea_opt_short;\n");
+        sb_append(expected, "#endif /* DEA_OPT_SHORT_DEFINED */\n");
         sb_append(expected, "\n");
         sb_append(expected, "#ifndef DEA_OPT_E_DEA_DEMO_MAIN_COLOR_DEFINED\n");
         sb_append(expected, "#define DEA_OPT_E_DEA_DEMO_MAIN_COLOR_DEFINED\n");

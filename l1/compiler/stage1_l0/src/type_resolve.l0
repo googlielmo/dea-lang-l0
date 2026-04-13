@@ -361,10 +361,16 @@ func tr_resolve_type_ref(tables: SignatureTables*, nr: NameResolution*, env: Mod
     if (tref.module_path == null && type_is_builtin_name(tref.name)) {
         if (eq_s(tref.name, "bool")) {
             base = type_builtin_bool();
+        } else if (eq_s(tref.name, "tiny")) {
+            base = type_builtin_tiny();
         } else if (eq_s(tref.name, "byte")) {
             base = type_builtin_byte();
+        } else if (eq_s(tref.name, "short")) {
+            base = type_builtin_short();
         } else if (eq_s(tref.name, "int")) {
             base = type_builtin_int();
+        } else if (eq_s(tref.name, "ushort")) {
+            base = type_builtin_ushort();
         } else if (eq_s(tref.name, "string")) {
             base = type_builtin_string();
         } else {

@@ -373,6 +373,51 @@ func test_typing_cast_int_to_byte_overflow() {
 }
 
 /**
+ * Tests implemented small integer builtin typing behavior.
+ */
+func test_typing_small_int_ok() {
+    let sp = make_paths();
+    with (let cfg = log_config_create(LL_SILENT, false) => drop cfg) {
+        let result = analysis_analyze_entry(sp, "typing_small_int_ok", cfg);
+        assert(!analysis_has_errors(result), "expected no typing errors for typing_small_int_ok");
+        analysis_result_free(result);
+    }
+    sp_free(sp);
+}
+
+/**
+ * Tests rejected nonliteral implicit narrowing for small integer builtins.
+ */
+func test_typing_small_int_err() {
+    let sp = make_paths();
+    with (let cfg = log_config_create(LL_SILENT, false) => drop cfg) {
+        let result = analysis_analyze_entry(sp, "typing_small_int_err", cfg);
+        assert(analysis_has_errors(result), "expected typing errors for typing_small_int_err");
+        assert(count_diag_code(result, "TYP-0315") == 1, "expected one return mismatch");
+        assert(count_diag_code(result, "TYP-0311") == 1, "expected one assignment mismatch");
+        assert(count_diag_code(result, "TYP-0312") == 1, "expected one call argument mismatch");
+        assert(count_diag_code(result, "TYP-0313") == 1, "expected one struct field mismatch");
+        analysis_result_free(result);
+    }
+    sp_free(sp);
+}
+
+/**
+ * Tests compile-time integer literal range diagnostics for small integer targets.
+ */
+func test_typing_small_int_literal_overflow() {
+    let sp = make_paths();
+    with (let cfg = log_config_create(LL_SILENT, false) => drop cfg) {
+        let result = analysis_analyze_entry(sp, "typing_small_int_literal_overflow", cfg);
+        assert(analysis_has_errors(result), "expected typing errors for typing_small_int_literal_overflow");
+        assert(count_diag_code(result, "TYP-0700") == 6, "expected six small-int literal range diagnostics");
+        assert(!has_diag_code(result, "TYP-0315"), "did not expect secondary return mismatch on overflow literals");
+        analysis_result_free(result);
+    }
+    sp_free(sp);
+}
+
+/**
  * Tests that prefixed integer literals keep ordinary `int` typing behavior.
  */
 func test_typing_prefixed_int_literals_ok() {
@@ -627,6 +672,9 @@ func main() {
     test_typing_cast_ok();
     test_typing_cast_err();
     test_typing_cast_int_to_byte_overflow();
+    test_typing_small_int_ok();
+    test_typing_small_int_err();
+    test_typing_small_int_literal_overflow();
     test_typing_prefixed_int_literals_ok();
     test_typing_cast_null_unwrap_err();
     test_typing_nullable_assignment();

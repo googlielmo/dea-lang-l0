@@ -19,7 +19,7 @@
   - `compiler/stage1_l0/tests/lexer_test.l0`
   - `compiler/stage1_l0/tests/parser_test.l0`
 - Related:
-  - `l1/work/plans/features/2026-04-04-l1-small-int-builtins-on-dea-abi-noref.md`
+  - `l1/work/plans/features/closed/2026-04-04-l1-small-int-builtins-on-dea-abi-noref.md`
   - `l1/work/plans/features/2026-04-04-l1-float-double-literals-noref.md`
 - Repro: `make test-stage1 TESTS="lexer_test parser_test"`
 

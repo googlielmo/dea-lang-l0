@@ -681,6 +681,46 @@ func test_backend_generate_string_copy_retains() {
 }
 
 /**
+ * Tests generation for implemented small integer builtin types and checked casts.
+ */
+func test_backend_generate_small_integer_builtins() {
+    with (let filenames = vs_create(1) => vs_free(filenames),
+          let sources = vs_create(1) => vs_free(sources),
+          let lines = vs_create(14) => vs_free(lines),
+          let cfg = log_config_create(LL_ERROR, false) => drop cfg,
+          let opts = cg_options_create() => cg_options_free(opts)) {
+        opts.emit_line_directives = false;
+        vs_push(filenames, "demo/main.l1");
+        vs_push(lines, "module demo.main;");
+        vs_push(lines, "func main(x: int, b: byte, u: ushort) -> int {");
+        vs_push(lines, "    let a: tiny = 1;");
+        vs_push(lines, "    let c: byte = 65;");
+        vs_push(lines, "    let s: short = c;");
+        vs_push(lines, "    let us: ushort = c;");
+        vs_push(lines, "    let n: tiny = x as tiny;");
+        vs_push(lines, "    let m: tiny = b as tiny;");
+        vs_push(lines, "    let q: short = u as short;");
+        vs_push(lines, "    return a + c + s + us + n + m + q;");
+        vs_push(lines, "}");
+        vs_push(sources, bt_source(lines));
+
+        let result = bt_analyze_sources("demo.main", filenames, sources);
+        assert(!analysis_has_errors(result), "analysis should succeed for small integer fixture");
+
+        let generated = backend_generate(result, opts, cfg);
+        assert(contains_s(generated, "dea_tiny a = 1;"), "tiny let lowering mismatch");
+        assert(contains_s(generated, "dea_byte c = 65;"), "byte contextual literal lowering mismatch");
+        assert(contains_s(generated, "dea_short s = ((dea_short)(c));"), "byte-to-short widening lowering mismatch");
+        assert(contains_s(generated, "dea_ushort us = ((dea_ushort)(c));"), "byte-to-ushort widening lowering mismatch");
+        assert(contains_s(generated, "dea_tiny n = (_rt_narrow_dea_tiny(x));"), "int-to-tiny narrowing mismatch");
+        assert(contains_s(generated, "dea_tiny m = (_rt_narrow_dea_tiny(b));"), "byte-to-tiny range check mismatch");
+        assert(contains_s(generated, "dea_short q = (_rt_narrow_dea_short(u));"), "ushort-to-short range check mismatch");
+
+        analysis_result_free(result);
+    }
+}
+
+/**
  * Main entry point for the module.
  */
 func main() {
@@ -700,5 +740,6 @@ func main() {
     test_backend_generate_intrinsics_use_analyzed_target_types();
     test_backend_generate_dea_intrinsics_respect_symbol_origin();
     test_backend_generate_string_copy_retains();
+    test_backend_generate_small_integer_builtins();
     printl_s("backend_test: all tests passed");
 }

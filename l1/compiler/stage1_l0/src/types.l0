@@ -143,6 +143,15 @@ func type_builtin_bool() -> Type* {
 }
 
 /**
+ * Create the builtin `tiny` type.
+ *
+ * @return New `tiny` type.
+ */
+func type_builtin_tiny() -> Type* {
+    return type_new_builtin("tiny");
+}
+
+/**
  * Create the builtin `byte` type.
  *
  * @return New `byte` type.
@@ -152,12 +161,30 @@ func type_builtin_byte() -> Type* {
 }
 
 /**
+ * Create the builtin `short` type.
+ *
+ * @return New `short` type.
+ */
+func type_builtin_short() -> Type* {
+    return type_new_builtin("short");
+}
+
+/**
  * Create the builtin `int` type.
  *
  * @return New `int` type.
  */
 func type_builtin_int() -> Type* {
     return type_new_builtin("int");
+}
+
+/**
+ * Create the builtin `ushort` type.
+ *
+ * @return New `ushort` type.
+ */
+func type_builtin_ushort() -> Type* {
+    return type_new_builtin("ushort");
 }
 
 /**
@@ -258,7 +285,9 @@ func type_is_builtin(self: Type*, name: string) -> bool {
  * @return `true` if `name` names a builtin type.
  */
 func type_is_builtin_name(name: string) -> bool {
-    return eq_s(name, "bool") || eq_s(name, "byte") || eq_s(name, "int") || eq_s(name, "string") || eq_s(name, "void");
+    return eq_s(name, "bool") || eq_s(name, "tiny") || eq_s(name, "byte") ||
+           eq_s(name, "short") || eq_s(name, "int") || eq_s(name, "ushort") ||
+           eq_s(name, "string") || eq_s(name, "void");
 }
 
 /**

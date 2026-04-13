@@ -333,7 +333,7 @@ and reuse supplement for applying this registry within L0.
 | `TYP-0315` | All   | Return expression type mismatch                                                                        |
 | `TYP-0316` | All   | Heap allocation initializer type mismatch                                                              |
 | `TYP-0319` | All   | Internal default code for widening-context type mismatches                                             |
-| `TYP-0700` | All   | Explicit `int` to `byte` cast overflows the byte range                                                 |
+| `TYP-0700` | All   | Integer literal is outside the target integer type range                                               |
 | `TYP-0701` | All   | Explicit nullable-pointer-to-pointer cast is provably null at compile time                             |
 | `TYP-9209` | All   | Internal error: variant does not produce enum type                                                     |
 | `TYP-9288` | All   | Internal error: 'new' outside function context                                                         |

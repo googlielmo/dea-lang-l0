@@ -285,6 +285,15 @@ func test_real_literal_boundaries() {
 }
 
 /**
+ * Tests implemented and still-reserved integer builtin names.
+ */
+func test_small_integer_builtin_words() {
+    expect_two_tokens("tiny short", "ident(tiny)", "ident(short)");
+    expect_two_tokens("ushort long", "ident(ushort)", "<future-extension>");
+    expect_two_tokens("uint ulong", "<future-extension>", "<future-extension>");
+}
+
+/**
  * Main entry point for the module.
  */
 func main() {
@@ -295,5 +304,6 @@ func main() {
     test_real_literals_ok();
     test_real_literals_err();
     test_real_literal_boundaries();
+    test_small_integer_builtin_words();
     printl_s("lexer_test: all tests passed");
 }

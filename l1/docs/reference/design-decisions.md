@@ -150,11 +150,16 @@ Rationale:
 
 The bootstrap compiler keeps integer behavior defined rather than inheriting host-C vagueness:
 
-- planned builtin integer names are `tiny`, `short`, `int`, `long`, `byte`, `ushort`, `uint`, and `ulong`
+- implemented builtin integer names are `tiny`, `short`, `int`, `byte`, and `ushort`
+- reserved-but-unimplemented builtin integer names are `long`, `uint`, and `ulong`
 - `tiny` is 8-bit signed semantics
 - `byte` is 8-bit unsigned semantics
+- `short` is 16-bit signed semantics
+- `ushort` is 16-bit unsigned semantics
 - `int` is 32-bit signed semantics
 - overflow-sensitive arithmetic and narrowing go through checked runtime helpers
+- integer literals remain `int` literals; fitting integer literals may be used in narrower typed integer contexts
+  without a runtime check, while nonliteral narrowing requires an explicit cast
 
 That policy is part of the language contract even though the current implementation is lowered through C. Some planned
 integer builtin names are documented in the grammar before the current bootstrap compiler implements them.

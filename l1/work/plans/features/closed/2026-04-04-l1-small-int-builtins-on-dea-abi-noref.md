@@ -3,7 +3,7 @@
 ## Add `tiny`, `short`, and `ushort` to L1 on the `dea_*` ABI base
 
 - Date: 2026-04-04
-- Status: Draft
+- Status: Completed
 - Title: Add `tiny`, `short`, and `ushort` to L1 on the `dea_*` ABI base
 - Kind: Feature
 - Severity: High
@@ -15,6 +15,7 @@
   - `compiler/stage1_l0/src/types.l0`
   - `compiler/stage1_l0/src/type_resolve.l0`
   - `compiler/stage1_l0/src/expr_types.l0`
+  - `compiler/stage1_l0/src/backend.l0`
   - `compiler/stage1_l0/src/c_emitter.l0`
   - `compiler/shared/runtime/l1_runtime.h`
   - `compiler/stage1_l0/tests/lexer_test.l0`
@@ -24,6 +25,7 @@
   - `compiler/stage1_l0/tests/c_emitter_test.l0`
   - `compiler/stage1_l0/tests/backend_test.l0`
   - `docs/reference/design-decisions.md`
+  - `docs/specs/compiler/diagnostic-code-catalog.md`
 - Test modules:
   - `compiler/stage1_l0/tests/lexer_test.l0`
   - `compiler/stage1_l0/tests/parser_test.l0`
@@ -32,7 +34,7 @@
   - `compiler/stage1_l0/tests/c_emitter_test.l0`
   - `compiler/stage1_l0/tests/backend_test.l0`
 - Related:
-  - `l1/work/plans/features/2026-04-04-l1-dea-c-abi-prefix-migration-noref.md`
+  - `l1/work/plans/features/closed/2026-04-04-l1-dea-c-abi-prefix-migration-noref.md`
 - Repro: `make test-stage1 TESTS="lexer_test parser_test type_resolve_test expr_types_test c_emitter_test backend_test"`
 
 ## Summary
@@ -41,8 +43,9 @@ After the public C ABI migration to `dea_*`, L1 can add its first new integral b
 `short`, and `ushort`.
 
 This tranche keeps the feature intentionally narrow. It makes those three names real builtin types in the Stage 1
-compiler, keeps integer literals inferred as `int`, and introduces only the minimum conversion and runtime-helper
-surface required for declarations, calls, returns, assignments, casts, and code generation.
+compiler, keeps integer literals inferred as `int`, keeps literals represented as `TT_INT` tokens and `EX_INT` nodes,
+and introduces only the minimum conversion and runtime-helper surface required for declarations, calls, returns,
+assignments, casts, and code generation.
 
 ## Dependency
 
@@ -69,13 +72,18 @@ header and emitted C surface already use `dea_*` / `DEA_*` names.
 
 ## Defaults Chosen
 
-1. `tiny` is 8-bit signed and lowers to `dea_tiny`.
-2. `byte` remains 8-bit unsigned and is distinct from `tiny`.
-3. `short` is 16-bit signed and lowers to `dea_short`.
-4. `ushort` is 16-bit unsigned and lowers to `dea_ushort`.
-5. Integer literals remain inferred as `int`; this tranche does not add suffixes or non-`int` literal inference.
-6. Implicit conversions stay intentionally narrow and only cover explicit widening cases.
-7. `long`, `uint`, and `ulong` remain reserved but unimplemented after this tranche.
+01. `tiny` is 8-bit signed and lowers to `dea_tiny`.
+02. `byte` remains 8-bit unsigned and is distinct from `tiny`.
+03. `short` is 16-bit signed and lowers to `dea_short`.
+04. `ushort` is 16-bit unsigned and lowers to `dea_ushort`.
+05. Integer literals remain inferred as `int`; this tranche does not add suffixes or non-`int` literal inference.
+06. Integer literals reuse `TT_INT` tokens and `EX_INT` expression nodes; no small-int literal token or AST node kinds
+    are introduced.
+07. Fitting compile-time `int` literals may flow into narrower typed integer contexts without a runtime check.
+08. Nonliteral narrowing remains explicit and lowers through checked runtime helpers where the destination range cannot
+    contain the source range.
+09. Implicit nonliteral conversions stay intentionally narrow and only cover explicit widening cases.
+10. `long`, `uint`, and `ulong` remain reserved but unimplemented after this tranche.
 
 ## Goal
 
@@ -110,8 +118,15 @@ only:
 
 Reject all other implicit signedness-changing or narrowing conversions.
 
-Allow explicit casts among all implemented integral builtins. Add constant-range diagnostics for casts from compile-time
-`int` literals into narrower targets:
+Allow fitting compile-time `int` literals to flow into narrower typed integer contexts, including annotated lets,
+assignments, returns, call arguments, struct/enum constructor fields, and nullable wrapping. These checks reuse existing
+`TT_INT` / `EX_INT` literal representation and emit no runtime range check when the literal fits.
+
+Reject nonliteral narrowing in typed contexts unless it is written as an explicit cast, e.g. reject
+`let x: tiny = someint + 1` but accept `let x: tiny = (someint + 1) as tiny`.
+
+Allow explicit casts among all implemented integral builtins. Add one shared `TYP-0700` constant-range diagnostic for
+compile-time `int` literals outside narrower target ranges:
 
 - `tiny`: `-128..127`
 - `byte`: `0..255`
@@ -142,7 +157,7 @@ Update design-decision documentation so implemented integer types and widths/sig
 ## Non-Goals
 
 - implementing `long`, `uint`, or `ulong`
-- changing integer literal syntax or inference
+- changing integer literal syntax, inference, token kinds, or AST node kinds
 - introducing arithmetic promotion beyond the explicit widening set above
 - changing L0 semantics or runtime naming
 - adding floating-point behavior
@@ -153,11 +168,27 @@ Update design-decision documentation so implemented integer types and widths/sig
    longer future-extension words.
 2. `make -C l1 test-stage1 TESTS="parser_test type_resolve_test"` passes with declarations, parameters, returns,
    pointers, nullable types, and type-position intrinsics using the new builtins.
-3. `make -C l1 test-stage1 TESTS="expr_types_test"` passes with positive widening cases, negative forbidden-implicit
-   conversion cases, and explicit-cast overflow coverage for the new targets.
+3. `make -C l1 test-stage1 TESTS="expr_types_test"` passes with positive widening cases, contextual literal narrowing
+   cases, negative forbidden nonliteral narrowing cases, and explicit-cast overflow coverage for the new targets.
 4. `make -C l1 test-stage1 TESTS="c_emitter_test backend_test"` passes with generated C using `dea_tiny`, `dea_short`,
    `dea_ushort`, and the new checked narrowing helpers.
 5. After the change, `long`, `uint`, and `ulong` still behave as reserved-but-unimplemented names.
+
+## Outcome
+
+1. `tiny`, `short`, and `ushort` are implemented builtin integer types in the Stage 1 frontend, type resolver, type
+   checker, backend, C emitter, and runtime header.
+2. Integer literals remain ordinary `TT_INT` / `EX_INT` literals. Fitting literals may be used in narrower typed integer
+   contexts; nonliteral narrowing requires an explicit cast.
+3. `TYP-0700` now reports the shared meaning "integer literal is outside the target integer type range" for both
+   contextual literal narrowing and explicit cast constant-range failures.
+4. Generated C uses the `dea_*` ABI names for the new builtin types, optional wrappers, and checked narrowing helpers.
+5. `docs/reference/design-decisions.md` and `docs/specs/compiler/diagnostic-code-catalog.md` document the resulting
+   integer model and diagnostic meaning.
+6. Verification passed with:
+   - `make -C l1 test-stage1 TESTS="lexer_test parser_test type_resolve_test expr_types_test c_emitter_test backend_test"`
+   - `make -C l1 test-stage1 TESTS="expr_types_test diagnostic_code_parity_test.py diagnostic_message_parity_test.py"`
+   - `make -C l1 test-stage1`
 
 ## Open Design Constraints
 

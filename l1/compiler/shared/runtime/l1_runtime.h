@@ -128,7 +128,7 @@
 
 typedef uint8_t  dea_bool;
 
-typedef int8_t   dea_tiny; /**< future use */
+typedef int8_t   dea_tiny;
 typedef int16_t  dea_short;
 typedef int32_t  dea_int;
 typedef int64_t  dea_long;
@@ -206,17 +206,35 @@ static dea_string DEA_STRING_EMPTY = { 0, { .s_str = { 0, NULL } } };
 typedef struct { dea_bool has_value; dea_bool value; } dea_opt_bool;
 #endif /* DEA_OPT_BOOL_DEFINED */
 
+#ifndef DEA_OPT_TINY_DEFINED
+#define DEA_OPT_TINY_DEFINED
+/** @struct dea_opt_tiny Optional tiny wrapper. */
+typedef struct { dea_bool has_value; dea_tiny value; } dea_opt_tiny;
+#endif /* DEA_OPT_TINY_DEFINED */
+
 #ifndef DEA_OPT_BYTE_DEFINED
 #define DEA_OPT_BYTE_DEFINED
 /** @struct dea_opt_byte Optional byte wrapper. */
 typedef struct { dea_bool has_value; dea_byte value; } dea_opt_byte;
 #endif /* DEA_OPT_BYTE_DEFINED */
 
+#ifndef DEA_OPT_SHORT_DEFINED
+#define DEA_OPT_SHORT_DEFINED
+/** @struct dea_opt_short Optional short wrapper. */
+typedef struct { dea_bool has_value; dea_short value; } dea_opt_short;
+#endif /* DEA_OPT_SHORT_DEFINED */
+
 #ifndef DEA_OPT_INT_DEFINED
 #define DEA_OPT_INT_DEFINED
 /** @struct dea_opt_int Optional integer wrapper. */
 typedef struct { dea_bool has_value; dea_int value; } dea_opt_int;
 #endif /* DEA_OPT_INT_DEFINED */
+
+#ifndef DEA_OPT_USHORT_DEFINED
+#define DEA_OPT_USHORT_DEFINED
+/** @struct dea_opt_ushort Optional ushort wrapper. */
+typedef struct { dea_bool has_value; dea_ushort value; } dea_opt_ushort;
+#endif /* DEA_OPT_USHORT_DEFINED */
 
 #ifndef DEA_OPT_STRING_DEFINED
 #define DEA_OPT_STRING_DEFINED
@@ -433,17 +451,36 @@ static dea_int _rt_imul(dea_int a, dea_int b) {
     return a * b;
 }
 
-/**
- * Narrow dea_int to dea_byte with range check.
- *
- * @param value Integer value.
- * @return Byte value.
- */
+/** Narrow dea_int to dea_tiny with range check. */
+dea_tiny _rt_narrow_dea_tiny(dea_int value) {
+    if (value < -128 || value > 127) {
+        _rt_panic("integer to tiny cast overflow");
+    }
+    return (dea_tiny)value;
+}
+
+/** Narrow dea_int to dea_byte with range check. */
 dea_byte _rt_narrow_dea_byte(dea_int value) {
     if (value < 0 || value > 255) {
-        _rt_panic("int to byte cast overflow");
+        _rt_panic("integer to byte cast overflow");
     }
     return (dea_byte)value;
+}
+
+/** Narrow dea_int to dea_short with range check. */
+dea_short _rt_narrow_dea_short(dea_int value) {
+    if (value < -32768 || value > 32767) {
+        _rt_panic("integer to short cast overflow");
+    }
+    return (dea_short)value;
+}
+
+/** Narrow dea_int to dea_ushort with range check. */
+dea_ushort _rt_narrow_dea_ushort(dea_int value) {
+    if (value < 0 || value > 65535) {
+        _rt_panic("integer to ushort cast overflow");
+    }
+    return (dea_ushort)value;
 }
 
 /* =========================================================================

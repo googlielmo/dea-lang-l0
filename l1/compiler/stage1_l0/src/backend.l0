@@ -761,13 +761,15 @@ func be_emit_copy_expr_with_retains(self: Backend*, c_expr: string, ty: Type*) -
  * Return whether a type behaves like an integer.
  *
  * @param ty Type to inspect.
- * @return `true` for `int` and `byte`.
+ * @return `true` for implemented integer builtins.
  */
 func be_is_int_assignable(ty: Type*?) -> bool {
     if (ty == null) {
         return false;
     }
-    return type_is_builtin(ty as Type*, "int") || type_is_builtin(ty as Type*, "byte");
+    return type_is_builtin(ty as Type*, "tiny") || type_is_builtin(ty as Type*, "byte") ||
+           type_is_builtin(ty as Type*, "short") || type_is_builtin(ty as Type*, "ushort") ||
+           type_is_builtin(ty as Type*, "int");
 }
 
 /**
@@ -777,13 +779,79 @@ func be_is_int_assignable(ty: Type*?) -> bool {
  * @return Byte width for supported integer types.
  */
 func be_int_type_size(ty: Type*) -> int {
+    if (type_is_builtin(ty, "tiny")) {
+        return 1;
+    }
     if (type_is_builtin(ty, "byte")) {
         return 1;
+    }
+    if (type_is_builtin(ty, "short")) {
+        return 2;
+    }
+    if (type_is_builtin(ty, "ushort")) {
+        return 2;
     }
     if (type_is_builtin(ty, "int")) {
         return 4;
     }
     return 0;
+}
+
+/**
+ * Return the minimum representable value for an integer builtin.
+ *
+ * @param ty Type to inspect.
+ * @return Minimum value for supported integer types.
+ */
+func be_int_type_min(ty: Type*) -> int {
+    if (type_is_builtin(ty, "tiny")) return -128;
+    if (type_is_builtin(ty, "byte")) return 0;
+    if (type_is_builtin(ty, "short")) return -32768;
+    if (type_is_builtin(ty, "ushort")) return 0;
+    return -2147483648;
+}
+
+/**
+ * Return the maximum representable value for an integer builtin.
+ *
+ * @param ty Type to inspect.
+ * @return Maximum value for supported integer types.
+ */
+func be_int_type_max(ty: Type*) -> int {
+    if (type_is_builtin(ty, "tiny")) return 127;
+    if (type_is_builtin(ty, "byte")) return 255;
+    if (type_is_builtin(ty, "short")) return 32767;
+    if (type_is_builtin(ty, "ushort")) return 65535;
+    return 2147483647;
+}
+
+/**
+ * Check whether every source value fits in a destination integer type.
+ *
+ * @param dst Destination type.
+ * @param src Source type.
+ * @return `true` when no runtime check is needed.
+ */
+func be_int_range_contains(dst: Type*, src: Type*) -> bool {
+    return be_int_type_min(dst) <= be_int_type_min(src) && be_int_type_max(dst) >= be_int_type_max(src);
+}
+
+/**
+ * Check whether an implicit integer widening is supported.
+ *
+ * @param dst Destination type.
+ * @param src Source type.
+ * @return `true` if `src` can widen into `dst`.
+ */
+func be_can_widen_int(dst: Type*, src: Type*) -> bool {
+    if (type_is_builtin(dst, "short") && type_is_builtin(src, "tiny")) return true;
+    if (type_is_builtin(dst, "int") && type_is_builtin(src, "tiny")) return true;
+    if (type_is_builtin(dst, "short") && type_is_builtin(src, "byte")) return true;
+    if (type_is_builtin(dst, "ushort") && type_is_builtin(src, "byte")) return true;
+    if (type_is_builtin(dst, "int") && type_is_builtin(src, "byte")) return true;
+    if (type_is_builtin(dst, "int") && type_is_builtin(src, "short")) return true;
+    if (type_is_builtin(dst, "int") && type_is_builtin(src, "ushort")) return true;
+    return false;
 }
 
 /**
@@ -811,7 +879,7 @@ func be_convert_expr_with_expected_type(c_expr: string, natural_ty: Type*?, expe
         return cem_emit_some_value_for_nullable(expected, c_expr);
     }
 
-    if (type_is_builtin(natural, "byte") && type_is_builtin(expected, "int")) {
+    if (be_can_widen_int(expected, natural)) {
         return cem_emit_widen_int(c_expr, natural, expected);
     }
 
@@ -1445,7 +1513,7 @@ func be_emit_lvalue(self: Backend*, expr_id: ExprId) -> string {
 
                 if (index_has_effects) {
                     let idx_temp = cem_fresh_tmp(self.emitter, "idx");
-                    cem_emit_temp_decl(self.emitter, "l0_int", idx_temp, final_index);
+                    cem_emit_temp_decl(self.emitter, "dea_int", idx_temp, final_index);
                     final_index = idx_temp;
                 }
 
@@ -1866,7 +1934,7 @@ func be_emit_expr(self: Backend*, expr_id: ExprId) -> string {
                 if (src_ty != null &&
                     be_is_int_assignable(src_ty as Type*) &&
                     be_is_int_assignable(dst_ty as Type*) &&
-                    be_int_type_size(src_ty as Type*) > be_int_type_size(dst_ty as Type*)) {
+                    !be_int_range_contains(dst_ty as Type*, src_ty as Type*)) {
                     return cem_emit_checked_narrow_cast(c_dst, c_inner);
                 }
 
