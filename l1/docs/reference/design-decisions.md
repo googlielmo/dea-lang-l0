@@ -40,7 +40,16 @@ semantics.
 Generated code should stay within conservative C99 usage. Platform/compiler quirks belong in the runtime boundary, not
 in the language definition.
 
-## 3a. C ABI Naming Policy
+Current policy also distinguishes between:
+
+- conservative C99 usage that is acceptable as a lowering vehicle
+- host/compiler behavior that is too vague to define L1 semantics directly
+
+Where L1 semantics depend on properties not guaranteed uniformly by every C99 target, the backend must validate those
+properties and reject unsupported targets rather than silently inheriting implementation-defined or underspecified host
+behavior.
+
+## 4. C ABI Naming Policy
 
 Current L1 C ABI policy uses:
 
@@ -56,7 +65,7 @@ user/source identifiers so generated C cannot collide with backend/runtime-owned
 One temporary exception remains: `l0_siphash.h` is still used as an internal include name until the shared cross-level
 SipHash include migration lands.
 
-## 4. Future Evolution
+## 5. Future Evolution
 
 Near-term L1 evolution should preserve the current bootstrap implementation and semantics unless a targeted bug fix or a
 decision-complete feature addition requires a deliberate change.
@@ -64,7 +73,7 @@ decision-complete feature addition requires a deliberate change.
 When `stage2_l1` is eventually implemented, it should preserve these language/runtime decisions unless the L1 reference
 docs are intentionally revised.
 
-## 5. Bootstrap Adaptation Strategy
+## 6. Bootstrap Adaptation Strategy
 
 The current L1 subtree is intentionally bootstrapped from the mature L0 toolchain rather than started from a blank
 implementation.
@@ -83,7 +92,7 @@ Rationale:
 - it preserves a known-good baseline while L1-specific divergence is still small
 - it favors incremental retargeting over speculative greenfield design
 
-## 6. Pointer and Ownership Policy
+## 7. Pointer and Ownership Policy
 
 Current bootstrap policy includes:
 
@@ -107,7 +116,7 @@ Current bootstrap status:
 
 These docs should not be read as excluding either feature from L1 going forward.
 
-## 7. Nullability, Casts, and Introspection
+## 8. Nullability, Casts, and Introspection
 
 Current policy:
 
@@ -119,7 +128,7 @@ Current policy:
 For non-pointer nullable values, generated C uses wrapper representations rather than exposing host-specific niche
 assumptions.
 
-## 8. The `dea` Prelude Module
+## 9. The `dea` Prelude Module
 
 The compiler synthesizes one implicit module, `dea`, for language-level primitives.
 
@@ -146,7 +155,7 @@ Rationale:
 - leave room for future compiler-owned type aliases and other prelude-level symbols without introducing a synthetic
   source file
 
-## 9. Integer and Failure Semantics
+## 10. Integer and Failure Semantics
 
 The bootstrap compiler keeps integer behavior defined rather than inheriting host-C vagueness:
 
@@ -165,16 +174,80 @@ The bootstrap compiler keeps integer behavior defined rather than inheriting hos
   target is known
 - fitting integer literals may be used in narrower typed integer contexts without a runtime check, while nonliteral
   narrowing and cross-signedness conversions require an explicit cast
+- integer division by zero is a defined runtime error, not host-C undefined behavior
 
 That policy is part of the language contract even though the current implementation is lowered through C.
 
-## 10. I/O and Runtime API Shape
+## 11. Floating-Point Semantics and Backend Contract
+
+L1 now includes builtin `float` and `double` types and floating-point (FP) literals. Their semantic contract is
+intentionally narrow and must not be left as an accident of generated C.
+
+Current policy:
+
+- `float` and `double` are builtin noninteger numeric types
+- unsuffixed real literals denote `double`
+- a trailing `f` or `F` denotes `float`
+- floating arithmetic is non-panicking
+- floating division by zero is defined and does not panic
+- on supported targets, floating arithmetic uses IEEE-style non-trapping behavior with signed zero, infinities, and NaNs
+- integer checked arithmetic and floating arithmetic remain distinct lowering paths
+- floating `/` does not route through checked integer helpers
+- the language-level meaning of floating operations belongs to L1 and is not delegated to unspecified host C behavior
+
+Current conversion and typing policy stays intentionally narrow:
+
+- implicit `float -> double` widening is allowed
+- implicit `double -> float` is not allowed
+- implicit `int -> float` and `int -> double` are not generally allowed
+- implicit `float -> int` and `double -> int` are not allowed
+- mixed integer and real binary arithmetic requires an explicit cast to a matching floating type
+- explicit numeric `as` casts among `int`, `float`, and `double` are part of the current bootstrap surface
+
+One current implementation irregularity remains documented rather than silently normalized away: direct integer literals
+may already flow into typed real contexts in some places. That behavior must be treated as an explicit special-case rule
+where it exists, with tests and documentation, rather than as evidence of a general implicit `int -> real` promotion
+policy.
+
+Current operator policy for real values:
+
+- unary `-` is allowed for `float` and `double`
+- binary `+`, `-`, `*`, and `/` require matching real types after the allowed `float -> double` widening step
+- `float op double` and `double op float` widen to `double`
+- comparison operators on real values follow the same narrow compatibility rule and yield `bool`
+
+Current backend contract for FP-using programs:
+
+- `float` lowers to C `float`
+- `double` lowers to C `double`
+- the lowered C types must have the required binary-radix representation and precision expected by the L1 types they
+  stand for
+- the target must provide infinities and NaNs for the lowered types
+- floating arithmetic must be non-trapping in ordinary execution
+- backend modes or optimization assumptions that would invalidate NaN, infinity, signed-zero, or ordinary ordered
+  comparison semantics relied on by L1 are not valid for FP-using programs
+- if these requirements are not met, the backend must reject programs that use `float` or `double`
+
+Rationale:
+
+- Dea/L1 wants defined behavior rather than ambient host-language folklore
+- plain C lowering is acceptable only when the target contract that makes it sound is stated explicitly
+- rejecting unsupported FP targets is cleaner than pretending every C99 target means the same thing
+- keeping the conversion lattice narrow avoids accidental promotion creep in the bootstrap compiler
+
+Consequences:
+
+- floating `/ 0.0` is a language-defined non-panicking operation on supported targets
+- FP support is conditional on backend validation rather than assumed on every possible C99 target
+- future backend or optimization changes must preserve the stated FP contract rather than silently weakening it
+
+## 12. I/O and Runtime API Shape
 
 Bootstrap-stage tooling intentionally favors simple whole-file and console APIs over richer streaming abstractions. That
 is sufficient for compiler bootstrapping, diagnostics, and current examples while keeping the language/library surface
 narrow.
 
-## 11. Name Disambiguation
+## 13. Name Disambiguation
 
 Qualified references (`module.path::Name`) are the current cross-module disambiguation mechanism.
 
@@ -189,10 +262,10 @@ Rationale:
 - provide an explicit escape hatch for ambiguity
 - avoid introducing more namespace surface before it is needed
 
-## 12. Numeric Literal Representation in L1
+## 14. Numeric Literal Representation in L1
 
 L1 introduces numeric types that are not native to the L0 implementation language, including implemented integer forms
-such as `uint`, `long`, and `ulong`, plus planned floating-point forms such as `float` and `double`.
+such as `uint`, `long`, and `ulong`, plus still in-progress floating-point forms such as `float` and `double`.
 
 Current decision:
 
@@ -205,11 +278,16 @@ Current decision:
 - IR and semantic nodes remain typed, so the payload encoding is an internal implementation detail rather than a
   language-level contract
 
+For floating-point literals and expressions, the current bootstrap compiler adds the following rule:
+
+- Stage 1 does not perform arithmetic evaluation of floating-point expressions unless it can guarantee results identical
+  to the L1 floating-point contract
+
 Rationale:
 
-- C99 literal syntax and runtime integer helpers already provide a stable execution boundary for bootstrap-only numeric
-  forms
-- correctness and constant folding can be delegated to the downstream C compiler in the bootstrap stage
+- C99 literal syntax such as `1L`, `1.0f`, and `1.0` is already well-defined
+- correctness and constant folding can be delegated to the downstream C compiler in the bootstrap stage only where that
+  delegation remains consistent with the stated L1 contract
 - this keeps the implementation surface small and avoids blocking L1 feature work on arbitrary-precision constant
   infrastructure
 - a later structured constant representation can be introduced without changing the typed IR shape
@@ -219,6 +297,8 @@ Consequences:
 - compile-time constant folding for non-native numeric types is intentionally unavailable in the current bootstrap
   compiler
 - code generation must preserve literal value/base information and emit an equivalent typed C spelling faithfully
+- the compiler and emitted C must not disagree about the meaning of floating literals, arithmetic, division by zero, or
+  non-finite results
 
 Future direction:
 
