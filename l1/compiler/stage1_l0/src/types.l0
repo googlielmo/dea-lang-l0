@@ -188,6 +188,33 @@ func type_builtin_ushort() -> Type* {
 }
 
 /**
+ * Create the builtin `uint` type.
+ *
+ * @return New `uint` type.
+ */
+func type_builtin_uint() -> Type* {
+    return type_new_builtin("uint");
+}
+
+/**
+ * Create the builtin `long` type.
+ *
+ * @return New `long` type.
+ */
+func type_builtin_long() -> Type* {
+    return type_new_builtin("long");
+}
+
+/**
+ * Create the builtin `ulong` type.
+ *
+ * @return New `ulong` type.
+ */
+func type_builtin_ulong() -> Type* {
+    return type_new_builtin("ulong");
+}
+
+/**
  * Create the builtin `string` type.
  *
  * @return New `string` type.
@@ -287,6 +314,7 @@ func type_is_builtin(self: Type*, name: string) -> bool {
 func type_is_builtin_name(name: string) -> bool {
     return eq_s(name, "bool") || eq_s(name, "tiny") || eq_s(name, "byte") ||
            eq_s(name, "short") || eq_s(name, "int") || eq_s(name, "ushort") ||
+           eq_s(name, "uint") || eq_s(name, "long") || eq_s(name, "ulong") ||
            eq_s(name, "string") || eq_s(name, "void");
 }
 

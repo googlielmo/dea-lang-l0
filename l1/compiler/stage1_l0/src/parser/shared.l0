@@ -147,6 +147,19 @@ func tok_is_int(tok: Token) -> bool {
 }
 
 /**
+ * Check whether a token is a bigint literal.
+ *
+ * @param tok Token to inspect.
+ * @return `true` if `tok` is a `TT_BIGINT`.
+ */
+func tok_is_bigint(tok: Token) -> bool {
+    match (tok.token_type) {
+        TT_BIGINT(t, b) => { return true; }
+        _ => { return false; }
+    }
+}
+
+/**
  * Check whether a token is a byte literal.
  *
  * @param tok Token to inspect.
@@ -356,6 +369,16 @@ func ps_check_int(self: ParserState*) -> bool {
 }
 
 /**
+ * Check whether the current token is a bigint literal.
+ *
+ * @param self Parser state to inspect.
+ * @return `true` if the current token is `TT_BIGINT`.
+ */
+func ps_check_bigint(self: ParserState*) -> bool {
+    return tok_is_bigint(ps_peek(self));
+}
+
+/**
  * Consume the current token if it is an integer literal.
  *
  * @param self Parser state to advance.
@@ -363,6 +386,20 @@ func ps_check_int(self: ParserState*) -> bool {
  */
 func ps_match_int(self: ParserState*) -> bool {
     if (ps_check_int(self)) {
+        ps_advance(self);
+        return true;
+    }
+    return false;
+}
+
+/**
+ * Consume the current token if it is a bigint literal.
+ *
+ * @param self Parser state to advance.
+ * @return `true` if a bigint literal token was consumed.
+ */
+func ps_match_bigint(self: ParserState*) -> bool {
+    if (ps_check_bigint(self)) {
         ps_advance(self);
         return true;
     }
@@ -522,6 +559,32 @@ func token_int_text(tok: Token) -> string? {
 func token_int_value(tok: Token) -> int? {
     match (tok.token_type) {
         TT_INT(t, v) => { return v; }
+        _ => { return null; }
+    }
+}
+
+/**
+ * Extract bigint literal text from a token.
+ *
+ * @param tok Token to inspect.
+ * @return Bigint literal payload text, or `null` if `tok` is not `TT_BIGINT`.
+ */
+func token_bigint_text(tok: Token) -> string? {
+    match (tok.token_type) {
+        TT_BIGINT(t, b) => { return t; }
+        _ => { return null; }
+    }
+}
+
+/**
+ * Extract the parsed bigint base from a token.
+ *
+ * @param tok Token to inspect.
+ * @return Parsed base, or `null` if `tok` is not `TT_BIGINT`.
+ */
+func token_bigint_base(tok: Token) -> int? {
+    match (tok.token_type) {
+        TT_BIGINT(t, b) => { return b; }
         _ => { return null; }
     }
 }

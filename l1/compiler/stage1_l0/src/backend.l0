@@ -295,6 +295,63 @@ func be_expr_type(self: Backend*, expr_id: ExprId) -> Type*? {
     return analysis_get_expr_type(self.result, self.current_module as string, expr_id);
 }
 
+func be_bigint_expr_text(self: Backend*, expr_id: ExprId) -> string? {
+    if (expr_id < 0) {
+        return null;
+    }
+    let expr = expr_arena_get(be_current_expr_arena(self), expr_id);
+    if (ord(expr.kind) == ord(EX_BIGINT)) {
+        return expr.text_value;
+    }
+    if (ord(expr.kind) == ord(EX_PAREN)) {
+        return be_bigint_expr_text(self, expr.expr_a);
+    }
+    if (ord(expr.kind) == ord(EX_UNARY) && eq_s(expr.text_value, "-")) {
+        let inner = be_bigint_expr_text(self, expr.expr_a);
+        if (inner == null) {
+            return null;
+        }
+        let text = inner as string;
+        if (len_s(text) > 0 && char_at_s(text, 0) == '-') {
+            return slice_s(text, 1, len_s(text));
+        }
+        return concat_s("-", text);
+    }
+    return null;
+}
+
+func be_bigint_expr_base(self: Backend*, expr_id: ExprId) -> int? {
+    if (expr_id < 0) {
+        return null;
+    }
+    let expr = expr_arena_get(be_current_expr_arena(self), expr_id);
+    if (ord(expr.kind) == ord(EX_BIGINT)) {
+        return expr.base_value;
+    }
+    if (ord(expr.kind) == ord(EX_PAREN) || (ord(expr.kind) == ord(EX_UNARY) && eq_s(expr.text_value, "-"))) {
+        return be_bigint_expr_base(self, expr.expr_a);
+    }
+    return null;
+}
+
+func be_emit_typed_bigint_expr(self: Backend*, expr_id: ExprId, fallback_ty: Type*?) -> string? {
+    let text = be_bigint_expr_text(self, expr_id);
+    let base = be_bigint_expr_base(self, expr_id);
+    if (text == null || base == null) {
+        return null;
+    }
+    with (let expr_ty = be_expr_type(self, expr_id) => type_free_opt(expr_ty)) {
+        let ty = fallback_ty;
+        if (expr_ty != null) {
+            ty = expr_ty as Type*;
+        }
+        if (ty == null) {
+            return cem_emit_bigint_literal(text as string, base as int);
+        }
+        return cem_emit_typed_bigint_literal(text as string, base as int, ty as Type*);
+    }
+}
+
 /**
  * Free a temporary vector of optional owned `Type*` values.
  *
@@ -558,6 +615,7 @@ func be_has_side_effects(self: Backend*, expr_id: ExprId) -> bool {
     let expr = expr_arena_get(be_current_expr_arena(self), expr_id);
     match (expr.kind) {
         EX_INT => { return false; }
+        EX_BIGINT => { return false; }
         EX_BYTE => { return false; }
         EX_STRING => { return false; }
         EX_BOOL => { return false; }
@@ -769,7 +827,19 @@ func be_is_int_assignable(ty: Type*?) -> bool {
     }
     return type_is_builtin(ty as Type*, "tiny") || type_is_builtin(ty as Type*, "byte") ||
            type_is_builtin(ty as Type*, "short") || type_is_builtin(ty as Type*, "ushort") ||
-           type_is_builtin(ty as Type*, "int");
+           type_is_builtin(ty as Type*, "int") || type_is_builtin(ty as Type*, "uint") ||
+           type_is_builtin(ty as Type*, "long") || type_is_builtin(ty as Type*, "ulong");
+}
+
+func be_is_signed_int(ty: Type*) -> bool {
+    return type_is_builtin(ty, "tiny") || type_is_builtin(ty, "short") ||
+           type_is_builtin(ty, "int") || type_is_builtin(ty, "long");
+}
+
+func be_is_legacy_checked_cast_source(ty: Type*) -> bool {
+    return type_is_builtin(ty, "tiny") || type_is_builtin(ty, "byte") ||
+           type_is_builtin(ty, "short") || type_is_builtin(ty, "ushort") ||
+           type_is_builtin(ty, "int");
 }
 
 /**
@@ -793,6 +863,15 @@ func be_int_type_size(ty: Type*) -> int {
     }
     if (type_is_builtin(ty, "int")) {
         return 4;
+    }
+    if (type_is_builtin(ty, "uint")) {
+        return 4;
+    }
+    if (type_is_builtin(ty, "long")) {
+        return 8;
+    }
+    if (type_is_builtin(ty, "ulong")) {
+        return 8;
     }
     return 0;
 }
@@ -833,7 +912,20 @@ func be_int_type_max(ty: Type*) -> int {
  * @return `true` when no runtime check is needed.
  */
 func be_int_range_contains(dst: Type*, src: Type*) -> bool {
-    return be_int_type_min(dst) <= be_int_type_min(src) && be_int_type_max(dst) >= be_int_type_max(src);
+    let dst_size = be_int_type_size(dst);
+    let src_size = be_int_type_size(src);
+    let dst_signed = be_is_signed_int(dst);
+    let src_signed = be_is_signed_int(src);
+    if (dst_size == 0 || src_size == 0) {
+        return false;
+    }
+    if (dst_signed == src_signed) {
+        return dst_size >= src_size;
+    }
+    if (dst_signed && !src_signed) {
+        return dst_size > src_size;
+    }
+    return false;
 }
 
 /**
@@ -845,13 +937,55 @@ func be_int_range_contains(dst: Type*, src: Type*) -> bool {
  */
 func be_can_widen_int(dst: Type*, src: Type*) -> bool {
     if (type_is_builtin(dst, "short") && type_is_builtin(src, "tiny")) return true;
+    if (type_is_builtin(dst, "long") && type_is_builtin(src, "tiny")) return true;
     if (type_is_builtin(dst, "int") && type_is_builtin(src, "tiny")) return true;
     if (type_is_builtin(dst, "short") && type_is_builtin(src, "byte")) return true;
     if (type_is_builtin(dst, "ushort") && type_is_builtin(src, "byte")) return true;
     if (type_is_builtin(dst, "int") && type_is_builtin(src, "byte")) return true;
+    if (type_is_builtin(dst, "uint") && type_is_builtin(src, "byte")) return true;
+    if (type_is_builtin(dst, "long") && type_is_builtin(src, "byte")) return true;
+    if (type_is_builtin(dst, "ulong") && type_is_builtin(src, "byte")) return true;
     if (type_is_builtin(dst, "int") && type_is_builtin(src, "short")) return true;
+    if (type_is_builtin(dst, "long") && type_is_builtin(src, "short")) return true;
     if (type_is_builtin(dst, "int") && type_is_builtin(src, "ushort")) return true;
+    if (type_is_builtin(dst, "uint") && type_is_builtin(src, "ushort")) return true;
+    if (type_is_builtin(dst, "long") && type_is_builtin(src, "ushort")) return true;
+    if (type_is_builtin(dst, "ulong") && type_is_builtin(src, "ushort")) return true;
+    if (type_is_builtin(dst, "long") && type_is_builtin(src, "int")) return true;
+    if (type_is_builtin(dst, "long") && type_is_builtin(src, "uint")) return true;
+    if (type_is_builtin(dst, "ulong") && type_is_builtin(src, "uint")) return true;
     return false;
+}
+
+func be_common_int_type(left: Type*, right: Type*) -> Type*? {
+    if (!be_is_int_assignable(left) || !be_is_int_assignable(right)) {
+        return null;
+    }
+    if ((type_is_builtin(left, "tiny") || type_is_builtin(left, "byte") || type_is_builtin(left, "short") ||
+         type_is_builtin(left, "ushort") || type_is_builtin(left, "int")) &&
+        (type_is_builtin(right, "tiny") || type_is_builtin(right, "byte") || type_is_builtin(right, "short") ||
+         type_is_builtin(right, "ushort") || type_is_builtin(right, "int"))) {
+        return type_builtin_int();
+    }
+    if ((type_is_builtin(left, "byte") || type_is_builtin(left, "ushort") || type_is_builtin(left, "uint")) &&
+        (type_is_builtin(right, "byte") || type_is_builtin(right, "ushort") || type_is_builtin(right, "uint"))) {
+        return type_builtin_uint();
+    }
+    if ((type_is_builtin(left, "tiny") || type_is_builtin(left, "byte") || type_is_builtin(left, "short") ||
+         type_is_builtin(left, "ushort") || type_is_builtin(left, "int") || type_is_builtin(left, "uint") ||
+         type_is_builtin(left, "long")) &&
+        (type_is_builtin(right, "tiny") || type_is_builtin(right, "byte") || type_is_builtin(right, "short") ||
+         type_is_builtin(right, "ushort") || type_is_builtin(right, "int") || type_is_builtin(right, "uint") ||
+         type_is_builtin(right, "long"))) {
+        return type_builtin_long();
+    }
+    if ((type_is_builtin(left, "byte") || type_is_builtin(left, "ushort") || type_is_builtin(left, "uint") ||
+         type_is_builtin(left, "ulong")) &&
+        (type_is_builtin(right, "byte") || type_is_builtin(right, "ushort") || type_is_builtin(right, "uint") ||
+         type_is_builtin(right, "ulong"))) {
+        return type_builtin_ulong();
+    }
+    return null;
 }
 
 /**
@@ -1269,9 +1403,14 @@ func be_emit_line_directive(self: Backend*, span: Span) {
  * @return Constant initializer expression.
  */
 func be_emit_let_initializer(self: Backend*, expr_id: ExprId, expected_type: Type*) -> string {
+    let bigint_init = be_emit_typed_bigint_expr(self, expr_id, expected_type);
+    if (bigint_init != null) {
+        return bigint_init as string;
+    }
     let expr = expr_arena_get(be_current_expr_arena(self), expr_id);
     match (expr.kind) {
         EX_INT => { return cem_emit_int_literal(expr.int_value); }
+        EX_BIGINT => { return cem_emit_typed_bigint_literal(expr.text_value, expr.base_value, expected_type); }
         EX_BYTE => { return cem_emit_byte_literal(expr.int_value as byte); }
         EX_BOOL => { return cem_emit_const_bool_literal(expr.bool_value); }
         EX_STRING => { return cem_emit_const_string_literal(expr.text_value); }
@@ -1564,24 +1703,63 @@ func be_emit_binary_op(self: Backend*, expr_id: ExprId) -> string {
         }
     }
 
-    let c_left = be_emit_expr(self, expr.expr_a);
-    let c_right = be_emit_expr(self, expr.expr_b);
-    if (eq_s(expr.text_value, "/")) {
-        return cem_emit_checked_int_div(c_left, c_right);
+    with (let left_ty = be_expr_type(self, expr.expr_a) => type_free_opt(left_ty),
+          let right_ty = be_expr_type(self, expr.expr_b) => type_free_opt(right_ty),
+          let result_ty = be_expr_type(self, expr_id) => type_free_opt(result_ty),
+          let common_int_ty: Type*? = null => type_free_opt(common_int_ty)) {
+        if ((eq_s(expr.text_value, "+") || eq_s(expr.text_value, "-") || eq_s(expr.text_value, "*") ||
+             eq_s(expr.text_value, "/") || eq_s(expr.text_value, "%")) &&
+            result_ty != null && be_is_int_assignable(result_ty as Type*)) {
+            common_int_ty = type_clone(result_ty as Type*);
+        } else if ((eq_s(expr.text_value, "==") || eq_s(expr.text_value, "!=") || eq_s(expr.text_value, "<") ||
+                    eq_s(expr.text_value, "<=") || eq_s(expr.text_value, ">") || eq_s(expr.text_value, ">=")) &&
+            left_ty != null && right_ty != null) {
+            common_int_ty = be_common_int_type(left_ty as Type*, right_ty as Type*);
+        }
+
+        let c_left = be_emit_expr(self, expr.expr_a);
+        let c_right = be_emit_expr(self, expr.expr_b);
+        if (common_int_ty != null) {
+            if (left_ty != null) {
+                c_left = be_convert_expr_with_expected_type(c_left, left_ty as Type*, common_int_ty as Type*);
+            }
+            if (right_ty != null) {
+                c_right = be_convert_expr_with_expected_type(c_right, right_ty as Type*, common_int_ty as Type*);
+            }
+        }
+
+        if (eq_s(expr.text_value, "/")) {
+            if (common_int_ty != null) {
+                return cem_emit_checked_int_div_for_type(common_int_ty as Type*, c_left, c_right);
+            }
+            return cem_emit_checked_int_div(c_left, c_right);
+        }
+        if (eq_s(expr.text_value, "%")) {
+            if (common_int_ty != null) {
+                return cem_emit_checked_int_mod_for_type(common_int_ty as Type*, c_left, c_right);
+            }
+            return cem_emit_checked_int_mod(c_left, c_right);
+        }
+        if (eq_s(expr.text_value, "*")) {
+            if (common_int_ty != null) {
+                return cem_emit_checked_int_mul_for_type(common_int_ty as Type*, c_left, c_right);
+            }
+            return cem_emit_checked_int_mul(c_left, c_right);
+        }
+        if (eq_s(expr.text_value, "+")) {
+            if (common_int_ty != null) {
+                return cem_emit_checked_int_add_for_type(common_int_ty as Type*, c_left, c_right);
+            }
+            return cem_emit_checked_int_add(c_left, c_right);
+        }
+        if (eq_s(expr.text_value, "-")) {
+            if (common_int_ty != null) {
+                return cem_emit_checked_int_sub_for_type(common_int_ty as Type*, c_left, c_right);
+            }
+            return cem_emit_checked_int_sub(c_left, c_right);
+        }
+        return cem_emit_binary_op(expr.text_value, c_left, c_right);
     }
-    if (eq_s(expr.text_value, "%")) {
-        return cem_emit_checked_int_mod(c_left, c_right);
-    }
-    if (eq_s(expr.text_value, "*")) {
-        return cem_emit_checked_int_mul(c_left, c_right);
-    }
-    if (eq_s(expr.text_value, "+")) {
-        return cem_emit_checked_int_add(c_left, c_right);
-    }
-    if (eq_s(expr.text_value, "-")) {
-        return cem_emit_checked_int_sub(c_left, c_right);
-    }
-    return cem_emit_binary_op(expr.text_value, c_left, c_right);
 }
 
 /**
@@ -1854,9 +2032,14 @@ func be_emit_new_expr(self: Backend*, expr_id: ExprId) -> string {
  * @return Lowered expression string.
  */
 func be_emit_expr(self: Backend*, expr_id: ExprId) -> string {
+    let bigint_expr = be_emit_typed_bigint_expr(self, expr_id, null);
+    if (bigint_expr != null) {
+        return bigint_expr as string;
+    }
     let expr = expr_arena_get(be_current_expr_arena(self), expr_id);
     match (expr.kind) {
         EX_INT => { return cem_emit_int_literal(expr.int_value); }
+        EX_BIGINT => { return cem_emit_bigint_literal(expr.text_value, expr.base_value); }
         EX_BYTE => { return cem_emit_byte_literal(expr.int_value as byte); }
         EX_STRING => { return cem_emit_string_literal(expr.text_value); }
         EX_BOOL => { return cem_emit_bool_literal(expr.bool_value); }
@@ -1935,7 +2118,13 @@ func be_emit_expr(self: Backend*, expr_id: ExprId) -> string {
                     be_is_int_assignable(src_ty as Type*) &&
                     be_is_int_assignable(dst_ty as Type*) &&
                     !be_int_range_contains(dst_ty as Type*, src_ty as Type*)) {
-                    return cem_emit_checked_narrow_cast(c_dst, c_inner);
+                    if (be_is_legacy_checked_cast_source(src_ty as Type*)) {
+                        return cem_emit_checked_narrow_cast(c_dst, c_inner);
+                    }
+                    if (be_is_signed_int(src_ty as Type*)) {
+                        return cem_emit_checked_signed_cast(c_dst, c_inner);
+                    }
+                    return cem_emit_checked_unsigned_cast(c_dst, c_inner);
                 }
 
                 if (ord((dst_ty as Type*).kind) == ord(TY_NULLABLE)) {
@@ -2193,9 +2382,14 @@ func be_emit_pattern_bindings(self: Backend*, pattern_id: PatternId, enum_type: 
  * @return Lowered constant expression.
  */
 func be_emit_case_literal(self: Backend*, expr_id: ExprId) -> string {
+    let bigint_literal = be_emit_typed_bigint_expr(self, expr_id, null);
+    if (bigint_literal != null) {
+        return bigint_literal as string;
+    }
     let expr = expr_arena_get(be_current_expr_arena(self), expr_id);
     match (expr.kind) {
         EX_INT => { return cem_emit_int_literal(expr.int_value); }
+        EX_BIGINT => { return cem_emit_bigint_literal(expr.text_value, expr.base_value); }
         EX_BYTE => { return cem_emit_byte_literal(expr.int_value as byte); }
         EX_BOOL => { return cem_emit_bool_literal(expr.bool_value); }
         EX_STRING => { return cem_emit_string_literal(expr.text_value); }

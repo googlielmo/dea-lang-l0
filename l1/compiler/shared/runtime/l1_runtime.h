@@ -236,6 +236,24 @@ typedef struct { dea_bool has_value; dea_int value; } dea_opt_int;
 typedef struct { dea_bool has_value; dea_ushort value; } dea_opt_ushort;
 #endif /* DEA_OPT_USHORT_DEFINED */
 
+#ifndef DEA_OPT_UINT_DEFINED
+#define DEA_OPT_UINT_DEFINED
+/** @struct dea_opt_uint Optional uint wrapper. */
+typedef struct { dea_bool has_value; dea_uint value; } dea_opt_uint;
+#endif /* DEA_OPT_UINT_DEFINED */
+
+#ifndef DEA_OPT_LONG_DEFINED
+#define DEA_OPT_LONG_DEFINED
+/** @struct dea_opt_long Optional long wrapper. */
+typedef struct { dea_bool has_value; dea_long value; } dea_opt_long;
+#endif /* DEA_OPT_LONG_DEFINED */
+
+#ifndef DEA_OPT_ULONG_DEFINED
+#define DEA_OPT_ULONG_DEFINED
+/** @struct dea_opt_ulong Optional ulong wrapper. */
+typedef struct { dea_bool has_value; dea_ulong value; } dea_opt_ulong;
+#endif /* DEA_OPT_ULONG_DEFINED */
+
 #ifndef DEA_OPT_STRING_DEFINED
 #define DEA_OPT_STRING_DEFINED
 /** @struct dea_opt_string Optional string wrapper. */
@@ -481,6 +499,310 @@ dea_ushort _rt_narrow_dea_ushort(dea_int value) {
         _rt_panic("integer to ushort cast overflow");
     }
     return (dea_ushort)value;
+}
+
+/** Narrow dea_int to dea_uint with range check. */
+dea_uint _rt_narrow_dea_uint(dea_int value) {
+    if (value < 0) {
+        _rt_panic("integer to uint cast overflow");
+    }
+    return (dea_uint)value;
+}
+
+/** Narrow dea_int to dea_ulong with range check. */
+dea_ulong _rt_narrow_dea_ulong(dea_int value) {
+    if (value < 0) {
+        _rt_panic("integer to ulong cast overflow");
+    }
+    return (dea_ulong)value;
+}
+
+/**
+ * Safe unsigned integer division.
+ *
+ * @param a Dividend.
+ * @param b Divisor.
+ * @return Quotient.
+ */
+static dea_uint _rt_udiv(dea_uint a, dea_uint b) {
+    if (b == 0) {
+        _rt_panic("division by zero");
+    }
+    return a / b;
+}
+
+/**
+ * Safe unsigned integer modulo.
+ *
+ * @param a Dividend.
+ * @param b Divisor.
+ * @return Remainder.
+ */
+static dea_uint _rt_umod(dea_uint a, dea_uint b) {
+    if (b == 0) {
+        _rt_panic("modulo by zero");
+    }
+    return a % b;
+}
+
+/** Safe unsigned integer addition with overflow check. */
+static dea_uint _rt_uadd(dea_uint a, dea_uint b) {
+    if (UINT32_MAX - a < b) {
+        _rt_panic("uint addition overflow");
+    }
+    return a + b;
+}
+
+/** Safe unsigned integer subtraction with underflow check. */
+static dea_uint _rt_usub(dea_uint a, dea_uint b) {
+    if (a < b) {
+        _rt_panic("uint subtraction underflow");
+    }
+    return a - b;
+}
+
+/** Safe unsigned integer multiplication with overflow check. */
+static dea_uint _rt_umul(dea_uint a, dea_uint b) {
+    if (a == 0 || b == 0) {
+        return 0;
+    }
+    if (a > UINT32_MAX / b) {
+        _rt_panic("uint multiplication overflow");
+    }
+    return a * b;
+}
+
+/** Safe 64-bit signed integer division. */
+static dea_long _rt_ldiv(dea_long a, dea_long b) {
+    if (b == 0) {
+        _rt_panic("division by zero");
+    }
+    if (a == INT64_MIN && b == -1) {
+        _rt_panic("division overflow: INT64_MIN / -1");
+    }
+    return a / b;
+}
+
+/** Safe 64-bit signed integer modulo. */
+static dea_long _rt_lmod(dea_long a, dea_long b) {
+    if (b == 0) {
+        _rt_panic("modulo by zero");
+    }
+    if (a == INT64_MIN && b == -1) {
+        _rt_panic("modulo overflow: INT64_MIN % -1");
+    }
+    return a % b;
+}
+
+/** Safe 64-bit signed integer addition with overflow check. */
+static dea_long _rt_ladd(dea_long a, dea_long b) {
+    if ((b > 0 && a > INT64_MAX - b) || (b < 0 && a < INT64_MIN - b)) {
+        _rt_panic("long addition overflow");
+    }
+    return a + b;
+}
+
+/** Safe 64-bit signed integer subtraction with overflow check. */
+static dea_long _rt_lsub(dea_long a, dea_long b) {
+    if ((b < 0 && a > INT64_MAX + b) || (b > 0 && a < INT64_MIN + b)) {
+        _rt_panic("long subtraction overflow");
+    }
+    return a - b;
+}
+
+/** Safe 64-bit signed integer multiplication with overflow check. */
+static dea_long _rt_lmul(dea_long a, dea_long b) {
+    if (a == 0 || b == 0) {
+        return 0;
+    }
+    if ((a == -1 && b == INT64_MIN) || (b == -1 && a == INT64_MIN)) {
+        _rt_panic("long multiplication overflow");
+    }
+    if (a > 0 && b > 0) {
+        if (a > INT64_MAX / b) {
+            _rt_panic("long multiplication overflow");
+        }
+    } else if (a < 0 && b < 0) {
+        if (a < INT64_MAX / b) {
+            _rt_panic("long multiplication overflow");
+        }
+    } else {
+        if (a > 0) {
+            if (b != -1 && a > INT64_MIN / b) {
+                _rt_panic("long multiplication overflow");
+            }
+        } else {
+            if (a < INT64_MIN / b) {
+                _rt_panic("long multiplication overflow");
+            }
+        }
+    }
+    return a * b;
+}
+
+/** Safe 64-bit unsigned integer division. */
+static dea_ulong _rt_uldiv(dea_ulong a, dea_ulong b) {
+    if (b == 0) {
+        _rt_panic("division by zero");
+    }
+    return a / b;
+}
+
+/** Safe 64-bit unsigned integer modulo. */
+static dea_ulong _rt_ulmod(dea_ulong a, dea_ulong b) {
+    if (b == 0) {
+        _rt_panic("modulo by zero");
+    }
+    return a % b;
+}
+
+/** Safe 64-bit unsigned integer addition with overflow check. */
+static dea_ulong _rt_uladd(dea_ulong a, dea_ulong b) {
+    if (UINT64_MAX - a < b) {
+        _rt_panic("ulong addition overflow");
+    }
+    return a + b;
+}
+
+/** Safe 64-bit unsigned integer subtraction with underflow check. */
+static dea_ulong _rt_ulsub(dea_ulong a, dea_ulong b) {
+    if (a < b) {
+        _rt_panic("ulong subtraction underflow");
+    }
+    return a - b;
+}
+
+/** Safe 64-bit unsigned integer multiplication with overflow check. */
+static dea_ulong _rt_ulmul(dea_ulong a, dea_ulong b) {
+    if (a == 0 || b == 0) {
+        return 0;
+    }
+    if (a > UINT64_MAX / b) {
+        _rt_panic("ulong multiplication overflow");
+    }
+    return a * b;
+}
+
+/** Checked cast from signed 64-bit to dea_tiny. */
+static dea_tiny _rt_cast_dea_tiny_from_signed(dea_long value) {
+    if (value < INT8_MIN || value > INT8_MAX) {
+        _rt_panic("integer to tiny cast overflow");
+    }
+    return (dea_tiny)value;
+}
+
+/** Checked cast from unsigned 64-bit to dea_tiny. */
+static dea_tiny _rt_cast_dea_tiny_from_unsigned(dea_ulong value) {
+    if (value > (dea_ulong)INT8_MAX) {
+        _rt_panic("integer to tiny cast overflow");
+    }
+    return (dea_tiny)value;
+}
+
+/** Checked cast from signed 64-bit to dea_byte. */
+static dea_byte _rt_cast_dea_byte_from_signed(dea_long value) {
+    if (value < 0 || value > UINT8_MAX) {
+        _rt_panic("integer to byte cast overflow");
+    }
+    return (dea_byte)value;
+}
+
+/** Checked cast from unsigned 64-bit to dea_byte. */
+static dea_byte _rt_cast_dea_byte_from_unsigned(dea_ulong value) {
+    if (value > UINT8_MAX) {
+        _rt_panic("integer to byte cast overflow");
+    }
+    return (dea_byte)value;
+}
+
+/** Checked cast from signed 64-bit to dea_short. */
+static dea_short _rt_cast_dea_short_from_signed(dea_long value) {
+    if (value < INT16_MIN || value > INT16_MAX) {
+        _rt_panic("integer to short cast overflow");
+    }
+    return (dea_short)value;
+}
+
+/** Checked cast from unsigned 64-bit to dea_short. */
+static dea_short _rt_cast_dea_short_from_unsigned(dea_ulong value) {
+    if (value > (dea_ulong)INT16_MAX) {
+        _rt_panic("integer to short cast overflow");
+    }
+    return (dea_short)value;
+}
+
+/** Checked cast from signed 64-bit to dea_ushort. */
+static dea_ushort _rt_cast_dea_ushort_from_signed(dea_long value) {
+    if (value < 0 || value > UINT16_MAX) {
+        _rt_panic("integer to ushort cast overflow");
+    }
+    return (dea_ushort)value;
+}
+
+/** Checked cast from unsigned 64-bit to dea_ushort. */
+static dea_ushort _rt_cast_dea_ushort_from_unsigned(dea_ulong value) {
+    if (value > UINT16_MAX) {
+        _rt_panic("integer to ushort cast overflow");
+    }
+    return (dea_ushort)value;
+}
+
+/** Checked cast from signed 64-bit to dea_int. */
+static dea_int _rt_cast_dea_int_from_signed(dea_long value) {
+    if (value < INT32_MIN || value > INT32_MAX) {
+        _rt_panic("integer to int cast overflow");
+    }
+    return (dea_int)value;
+}
+
+/** Checked cast from unsigned 64-bit to dea_int. */
+static dea_int _rt_cast_dea_int_from_unsigned(dea_ulong value) {
+    if (value > (dea_ulong)INT32_MAX) {
+        _rt_panic("integer to int cast overflow");
+    }
+    return (dea_int)value;
+}
+
+/** Checked cast from signed 64-bit to dea_uint. */
+static dea_uint _rt_cast_dea_uint_from_signed(dea_long value) {
+    if (value < 0 || value > UINT32_MAX) {
+        _rt_panic("integer to uint cast overflow");
+    }
+    return (dea_uint)value;
+}
+
+/** Checked cast from unsigned 64-bit to dea_uint. */
+static dea_uint _rt_cast_dea_uint_from_unsigned(dea_ulong value) {
+    if (value > UINT32_MAX) {
+        _rt_panic("integer to uint cast overflow");
+    }
+    return (dea_uint)value;
+}
+
+/** Checked cast from signed 64-bit to dea_long. */
+static dea_long _rt_cast_dea_long_from_signed(dea_long value) {
+    return value;
+}
+
+/** Checked cast from unsigned 64-bit to dea_long. */
+static dea_long _rt_cast_dea_long_from_unsigned(dea_ulong value) {
+    if (value > (dea_ulong)INT64_MAX) {
+        _rt_panic("integer to long cast overflow");
+    }
+    return (dea_long)value;
+}
+
+/** Checked cast from signed 64-bit to dea_ulong. */
+static dea_ulong _rt_cast_dea_ulong_from_signed(dea_long value) {
+    if (value < 0) {
+        _rt_panic("integer to ulong cast overflow");
+    }
+    return (dea_ulong)value;
+}
+
+/** Checked cast from unsigned 64-bit to dea_ulong. */
+static dea_ulong _rt_cast_dea_ulong_from_unsigned(dea_ulong value) {
+    return value;
 }
 
 /* =========================================================================

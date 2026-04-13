@@ -1186,6 +1186,7 @@ func etc_is_case_type(ty: Type*?) -> bool {
 func etc_case_literal_key(expr: ExprNode*) -> string? {
     match (expr.kind) {
         EX_INT => { return concat_s("int:", int_to_string(expr.int_value)); }
+        EX_BIGINT => { return concat4_s("bigint:", int_to_string(expr.base_value), ":", expr.text_value); }
         EX_BYTE => { return concat_s("byte:", int_to_string(expr.int_value)); }
         EX_BOOL => {
             if (expr.bool_value) return "bool:true";
@@ -1289,6 +1290,8 @@ func etc_check_stmt(self: ExpressionTypeChecker*, stmt_id: StmtId) -> StmtFlowKi
                     if (ord(expr_ty.kind) == ord(TY_NULL)) {
                         etc_diag_error(self, "TYP-0052", "cannot infer type from 'null'; explicit type required",
                             unit.path, stmt.span);
+                    } else if (etc_is_bigint_literal_type(expr_ty)) {
+                        etc_diag_bigint_requires_context(self, stmt.expr_a, unit.path);
                     } else if (type_is_builtin(expr_ty, "void")) {
                         let init_expr = expr_arena_get(unit.parse_result.expr_arena, stmt.expr_a);
                         etc_diag_error(self, "TYP-0053", "initializer is 'void', cannot assign to variable",
@@ -1463,7 +1466,29 @@ func etc_check_stmt(self: ExpressionTypeChecker*, stmt_id: StmtId) -> StmtFlowKi
                             let literal_ty = etc_infer_expr(self, arm2.literal);
                             if (literal_ty != null) {
                                 let arm_literal = expr_arena_get(unit.parse_result.expr_arena, arm2.literal);
-                                if (case_ty_ok && !etc_types_equal(literal_ty as Type*, val_ty3 as Type*)) {
+                                let case_literal_ok = true;
+                                if (case_ty_ok && etc_is_bigint_literal_type(literal_ty as Type*)) {
+                                    let assign_result = etc_check_assign_expr(self, val_ty3 as Type*, literal_ty as Type*,
+                                        arm2.literal, unit.path, arm_literal.span);
+                                    if (ord(assign_result) == ord(ASSIGN_REJECT)) {
+                                        case_literal_ok = false;
+                                        etc_diag_error(
+                                            self,
+                                            "TYP-0107",
+                                            concat4_s(
+                                                "'case' arm literal type '",
+                                                type_format(literal_ty as Type*),
+                                                "' does not match scrutinee type '",
+                                                concat_s(type_format(val_ty3 as Type*), "'")
+                                            ),
+                                            unit.path,
+                                            arm_literal.span
+                                        );
+                                    } else if (ord(assign_result) == ord(ASSIGN_REPORTED)) {
+                                        case_literal_ok = false;
+                                    }
+                                } else if (case_ty_ok && !etc_types_equal(literal_ty as Type*, val_ty3 as Type*)) {
+                                    case_literal_ok = false;
                                     etc_diag_error(
                                         self,
                                         "TYP-0107",
@@ -1476,7 +1501,8 @@ func etc_check_stmt(self: ExpressionTypeChecker*, stmt_id: StmtId) -> StmtFlowKi
                                         unit.path,
                                         arm_literal.span
                                     );
-                                } else {
+                                }
+                                if (case_literal_ok) {
                                     let literal_key = etc_case_literal_key(arm_literal);
                                     if (literal_key != null) {
                                         let case_key = literal_key as string;
@@ -1663,7 +1689,209 @@ func etc_is_int(ty: Type*?) -> bool {
     if (ty == null) return false;
     return type_is_builtin(ty as Type*, "tiny") || type_is_builtin(ty as Type*, "byte") ||
            type_is_builtin(ty as Type*, "short") || type_is_builtin(ty as Type*, "ushort") ||
-           type_is_builtin(ty as Type*, "int");
+           type_is_builtin(ty as Type*, "int") || type_is_builtin(ty as Type*, "uint") ||
+           type_is_builtin(ty as Type*, "long") || type_is_builtin(ty as Type*, "ulong");
+}
+
+/**
+ * Check whether a type is the internal placeholder for an uncontextualized bigint literal.
+ *
+ * @param ty Type to inspect.
+ * @return `true` when `ty` is the bigint placeholder type.
+ */
+func etc_is_bigint_literal_type(ty: Type*?) -> bool {
+    if (ty == null) return false;
+    return type_is_builtin(ty as Type*, "__bigint_literal");
+}
+
+func etc_bigint_expr_text(self: ExpressionTypeChecker*, expr_id: ExprId) -> string? {
+    if (expr_id < 0 || self.current_unit == null) {
+        return null;
+    }
+    let expr = expr_arena_get((self.current_unit as DriverUnit*).parse_result.expr_arena, expr_id);
+    if (ord(expr.kind) == ord(EX_BIGINT)) {
+        return expr.text_value;
+    }
+    if (ord(expr.kind) == ord(EX_PAREN)) {
+        return etc_bigint_expr_text(self, expr.expr_a);
+    }
+    if (ord(expr.kind) == ord(EX_UNARY) && eq_s(expr.text_value, "-")) {
+        let inner = etc_bigint_expr_text(self, expr.expr_a);
+        if (inner == null) {
+            return null;
+        }
+        let text = inner as string;
+        if (len_s(text) > 0 && char_at_s(text, 0) == '-') {
+            return slice_s(text, 1, len_s(text));
+        }
+        return concat_s("-", text);
+    }
+    return null;
+}
+
+func etc_bigint_expr_base(self: ExpressionTypeChecker*, expr_id: ExprId) -> int? {
+    if (expr_id < 0 || self.current_unit == null) {
+        return null;
+    }
+    let expr = expr_arena_get((self.current_unit as DriverUnit*).parse_result.expr_arena, expr_id);
+    if (ord(expr.kind) == ord(EX_BIGINT)) {
+        return expr.base_value;
+    }
+    if (ord(expr.kind) == ord(EX_PAREN) || (ord(expr.kind) == ord(EX_UNARY) && eq_s(expr.text_value, "-"))) {
+        return etc_bigint_expr_base(self, expr.expr_a);
+    }
+    return null;
+}
+
+func etc_set_bigint_expr_type(self: ExpressionTypeChecker*, expr_id: ExprId, ty: Type*) {
+    if (expr_id < 0 || self.current_unit == null) {
+        return;
+    }
+    let expr = expr_arena_get((self.current_unit as DriverUnit*).parse_result.expr_arena, expr_id);
+    etc_set_expr_type(self, expr_id, ty);
+    if (ord(expr.kind) == ord(EX_PAREN) || (ord(expr.kind) == ord(EX_UNARY) && eq_s(expr.text_value, "-"))) {
+        etc_set_bigint_expr_type(self, expr.expr_a, ty);
+    }
+}
+
+func etc_diag_bigint_requires_context(self: ExpressionTypeChecker*, expr_id: ExprId, filename: string) {
+    if (self.current_unit == null || expr_id < 0) {
+        return;
+    }
+    let expr = expr_arena_get((self.current_unit as DriverUnit*).parse_result.expr_arena, expr_id);
+    let display = etc_bigint_expr_text(self, expr_id);
+    let base = etc_bigint_expr_base(self, expr_id);
+    if (display != null && base != null) {
+        etc_diag_error(self, "TYP-0702",
+            concat3_s("integer literal ", bigint_to_string(display as string, base as int),
+                " outside 'int' requires a contextual integer type"),
+            filename, expr.span);
+        return;
+    }
+    etc_diag_error(self, "TYP-0702", "integer literal outside 'int' requires a contextual integer type",
+        filename, expr.span);
+}
+
+func etc_diag_bigint_context_error(self: ExpressionTypeChecker*, expr_id: ExprId, dst: Type*, filename: string) {
+    if (self.current_unit == null || expr_id < 0) {
+        return;
+    }
+    let expr = expr_arena_get((self.current_unit as DriverUnit*).parse_result.expr_arena, expr_id);
+    let display = etc_bigint_expr_text(self, expr_id);
+    let base = etc_bigint_expr_base(self, expr_id);
+    if (display != null && base != null) {
+        etc_diag_error(self, "TYP-0703",
+            concat4_s("integer literal ", bigint_to_string(display as string, base as int),
+                " outside 'int' cannot be used in contextual type '", concat_s(type_format(dst), "'")),
+            filename, expr.span);
+        return;
+    }
+    etc_diag_error(self, "TYP-0703",
+        concat3_s("integer literal outside 'int' cannot be used in contextual type '", type_format(dst), "'"),
+        filename, expr.span);
+}
+
+func etc_bigint_is_negative(text: string) -> bool {
+    return len_s(text) > 0 && char_at_s(text, 0) == '-';
+}
+
+func etc_bigint_significant_digits(text: string) -> string {
+    let start = 0;
+    let n = len_s(text);
+    if (etc_bigint_is_negative(text)) {
+        start = 1;
+    }
+    while (start < n && char_at_s(text, start) == '0') {
+        start = start + 1;
+    }
+    if (start >= n) {
+        return "0";
+    }
+    return slice_s(text, start, n);
+}
+
+func etc_bigint_compare_digits(left: string, right: string) -> int {
+    let left_len = len_s(left);
+    let right_len = len_s(right);
+    if (left_len < right_len) return -1;
+    if (left_len > right_len) return 1;
+    for (let i = 0; i < left_len; i = i + 1) {
+        let left_ch = char_at_s(left, i);
+        let right_ch = char_at_s(right, i);
+        if (left_ch < right_ch) return -1;
+        if (left_ch > right_ch) return 1;
+    }
+    return 0;
+}
+
+func etc_bigint_limit_text(dst: Type*, base: int, is_negative: bool) -> string? {
+    if (type_is_builtin(dst, "uint")) {
+        if (is_negative) return null;
+        case (base) {
+             2 => { return "11111111111111111111111111111111"; }
+             8 => { return "37777777777"; }
+            10 => { return "4294967295"; }
+            16 => { return "ffffffff"; }
+        }
+        return null;
+    }
+    if (type_is_builtin(dst, "long")) {
+        if (is_negative) {
+            case (base) {
+                 2 => { return "1000000000000000000000000000000000000000000000000000000000000000"; }
+                 8 => { return "1000000000000000000000"; }
+                10 => { return "9223372036854775808"; }
+                16 => { return "8000000000000000"; }
+            }
+            return null;
+        }
+        case (base) {
+             2 => { return "111111111111111111111111111111111111111111111111111111111111111"; }
+             8 => { return "777777777777777777777"; }
+            10 => { return "9223372036854775807"; }
+            16 => { return "7fffffffffffffff"; }
+        }
+        return null;
+    }
+    if (type_is_builtin(dst, "ulong")) {
+        if (is_negative) return null;
+        case (base) {
+             2 => { return "1111111111111111111111111111111111111111111111111111111111111111"; }
+             8 => { return "1777777777777777777777"; }
+            10 => { return "18446744073709551615"; }
+            16 => { return "ffffffffffffffff"; }
+        }
+        return null;
+    }
+    return null;
+}
+
+func etc_bigint_fits_builtin(dst: Type*, text: string, base: int) -> bool {
+    let limit = etc_bigint_limit_text(dst, base, etc_bigint_is_negative(text));
+    if (limit == null) {
+        return false;
+    }
+    return etc_bigint_compare_digits(etc_bigint_significant_digits(text), limit as string) <= 0;
+}
+
+func etc_diag_bigint_literal_range_error(self: ExpressionTypeChecker*, expr_id: ExprId, dst: Type*, filename: string) {
+    if (self.current_unit == null || expr_id < 0) {
+        return;
+    }
+    let expr = expr_arena_get((self.current_unit as DriverUnit*).parse_result.expr_arena, expr_id);
+    let text = etc_bigint_expr_text(self, expr_id);
+    let base = etc_bigint_expr_base(self, expr_id);
+    if (text != null && base != null) {
+        etc_diag_error(self, "TYP-0700",
+            concat4_s("integer literal ", bigint_to_string(text as string, base as int), " is outside ",
+                concat3_s(etc_builtin_int_range(dst), " for target type '", concat_s(type_format(dst), "'"))),
+            filename, expr.span);
+        return;
+    }
+    etc_diag_error(self, "TYP-0700",
+        concat3_s("integer literal is outside ", etc_builtin_int_range(dst),
+            concat_s(" for target type '", concat_s(type_format(dst), "'"))),
+        filename, expr.span);
 }
 
 /**
@@ -1712,6 +1940,9 @@ func etc_int_value_fits_builtin(dst: Type*, value: int) -> bool {
     if (type_is_builtin(dst, "short")) return fits_in_short(value);
     if (type_is_builtin(dst, "ushort")) return fits_in_ushort(value);
     if (type_is_builtin(dst, "int")) return true;
+    if (type_is_builtin(dst, "uint")) return value >= 0;
+    if (type_is_builtin(dst, "long")) return true;
+    if (type_is_builtin(dst, "ulong")) return value >= 0;
     return false;
 }
 
@@ -1726,6 +1957,10 @@ func etc_builtin_int_range(dst: Type*) -> string {
     if (type_is_builtin(dst, "byte")) return "0..255";
     if (type_is_builtin(dst, "short")) return "-32768..32767";
     if (type_is_builtin(dst, "ushort")) return "0..65535";
+    if (type_is_builtin(dst, "int")) return "-2147483648..2147483647";
+    if (type_is_builtin(dst, "uint")) return "0..4294967295";
+    if (type_is_builtin(dst, "long")) return "-9223372036854775808..9223372036854775807";
+    if (type_is_builtin(dst, "ulong")) return "0..18446744073709551615";
     return "int";
 }
 
@@ -1755,13 +1990,43 @@ func etc_diag_int_literal_range_error(self: ExpressionTypeChecker*, value: int, 
  */
 func etc_can_widen_int(dst: Type*, src: Type*) -> bool {
     if (type_is_builtin(dst, "short") && type_is_builtin(src, "tiny")) return true;
+    if (type_is_builtin(dst, "long") && type_is_builtin(src, "tiny")) return true;
     if (type_is_builtin(dst, "int") && type_is_builtin(src, "tiny")) return true;
     if (type_is_builtin(dst, "short") && type_is_builtin(src, "byte")) return true;
     if (type_is_builtin(dst, "ushort") && type_is_builtin(src, "byte")) return true;
     if (type_is_builtin(dst, "int") && type_is_builtin(src, "byte")) return true;
+    if (type_is_builtin(dst, "uint") && type_is_builtin(src, "byte")) return true;
+    if (type_is_builtin(dst, "long") && type_is_builtin(src, "byte")) return true;
+    if (type_is_builtin(dst, "ulong") && type_is_builtin(src, "byte")) return true;
     if (type_is_builtin(dst, "int") && type_is_builtin(src, "short")) return true;
+    if (type_is_builtin(dst, "long") && type_is_builtin(src, "short")) return true;
     if (type_is_builtin(dst, "int") && type_is_builtin(src, "ushort")) return true;
+    if (type_is_builtin(dst, "uint") && type_is_builtin(src, "ushort")) return true;
+    if (type_is_builtin(dst, "long") && type_is_builtin(src, "ushort")) return true;
+    if (type_is_builtin(dst, "ulong") && type_is_builtin(src, "ushort")) return true;
+    if (type_is_builtin(dst, "long") && type_is_builtin(src, "int")) return true;
+    if (type_is_builtin(dst, "long") && type_is_builtin(src, "uint")) return true;
+    if (type_is_builtin(dst, "ulong") && type_is_builtin(src, "uint")) return true;
     return false;
+}
+
+func etc_check_assign_bigint_expr(self: ExpressionTypeChecker*, dst: Type*, expr_id: ExprId,
+                                  filename: string) -> AssignCheckResult {
+    let text = etc_bigint_expr_text(self, expr_id);
+    let base = etc_bigint_expr_base(self, expr_id);
+    if (text == null || base == null) {
+        return ASSIGN_REJECT;
+    }
+    if (!etc_is_int(dst)) {
+        etc_diag_bigint_context_error(self, expr_id, dst, filename);
+        return ASSIGN_REPORTED;
+    }
+    if (!etc_bigint_fits_builtin(dst, text as string, base as int)) {
+        etc_diag_bigint_literal_range_error(self, expr_id, dst, filename);
+        return ASSIGN_REPORTED;
+    }
+    etc_set_bigint_expr_type(self, expr_id, dst);
+    return ASSIGN_ACCEPT;
 }
 
 /**
@@ -1777,11 +2042,18 @@ func etc_can_widen_int(dst: Type*, src: Type*) -> bool {
  */
 func etc_check_assign_expr(self: ExpressionTypeChecker*, dst: Type*, src: Type*, expr_id: ExprId, filename: string,
                            span: Span) -> AssignCheckResult {
-    if (etc_can_assign(self, dst, src)) return ASSIGN_ACCEPT;
-
     if (ord(dst.kind) == ord(TY_NULLABLE)) {
-        return etc_check_assign_expr(self, dst.inner as Type*, src, expr_id, filename, span);
+        let inner_result = etc_check_assign_expr(self, dst.inner as Type*, src, expr_id, filename, span);
+        if (ord(inner_result) != ord(ASSIGN_REJECT)) {
+            return inner_result;
+        }
     }
+
+    if (etc_is_bigint_literal_type(src)) {
+        return etc_check_assign_bigint_expr(self, dst, expr_id, filename);
+    }
+
+    if (etc_can_assign(self, dst, src)) return ASSIGN_ACCEPT;
 
     if (type_is_builtin(src, "int") && etc_is_int(dst) && !type_is_builtin(dst, "int")) {
         let const_int = etc_cast_const_int(self, expr_id);
@@ -1917,6 +2189,9 @@ func etc_infer_unary(self: ExpressionTypeChecker*, expr_id: ExprId, expr: ExprNo
     let s_ty = sub_ty as Type*;
 
     if (eq_s(expr.text_value, "-")) {
+        if (etc_is_bigint_literal_type(s_ty)) {
+            return s_ty;
+        }
         if (!etc_is_int(s_ty)) {
             etc_diag_error(self, "TYP-0160", concat_s("unary '-' expects int, got ", type_format(s_ty)),
                 (self.current_unit as DriverUnit*).path, expr.span);
@@ -1966,15 +2241,59 @@ func etc_infer_binary(self: ExpressionTypeChecker*, expr_id: ExprId, expr: ExprN
     let l_ty = left_ty as Type*;
     let r_ty = right_ty as Type*;
 
+    if (etc_is_bigint_literal_type(l_ty) || etc_is_bigint_literal_type(r_ty)) {
+        if (etc_is_bigint_literal_type(l_ty)) {
+            etc_diag_bigint_requires_context(self, expr.expr_a, (self.current_unit as DriverUnit*).path);
+        } else {
+            etc_diag_bigint_requires_context(self, expr.expr_b, (self.current_unit as DriverUnit*).path);
+        }
+        type_free(l_ty);
+        type_free(r_ty);
+        return null;
+    }
+
+    let common_int_ty: Type*? = null;
+    if (etc_is_int(l_ty) && etc_is_int(r_ty)) {
+        if ((type_is_builtin(l_ty, "tiny") || type_is_builtin(l_ty, "byte") || type_is_builtin(l_ty, "short") ||
+             type_is_builtin(l_ty, "ushort") || type_is_builtin(l_ty, "int")) &&
+            (type_is_builtin(r_ty, "tiny") || type_is_builtin(r_ty, "byte") || type_is_builtin(r_ty, "short") ||
+             type_is_builtin(r_ty, "ushort") || type_is_builtin(r_ty, "int"))) {
+            common_int_ty = type_builtin_int();
+        } else if ((type_is_builtin(l_ty, "byte") || type_is_builtin(l_ty, "ushort") || type_is_builtin(l_ty, "uint")) &&
+            (type_is_builtin(r_ty, "byte") || type_is_builtin(r_ty, "ushort") || type_is_builtin(r_ty, "uint"))) {
+            common_int_ty = type_builtin_uint();
+        } else if ((type_is_builtin(l_ty, "tiny") || type_is_builtin(l_ty, "byte") || type_is_builtin(l_ty, "short") ||
+             type_is_builtin(l_ty, "ushort") || type_is_builtin(l_ty, "int") || type_is_builtin(l_ty, "uint") ||
+             type_is_builtin(l_ty, "long")) &&
+            (type_is_builtin(r_ty, "tiny") || type_is_builtin(r_ty, "byte") || type_is_builtin(r_ty, "short") ||
+             type_is_builtin(r_ty, "ushort") || type_is_builtin(r_ty, "int") || type_is_builtin(r_ty, "uint") ||
+             type_is_builtin(r_ty, "long"))) {
+            common_int_ty = type_builtin_long();
+        } else if ((type_is_builtin(l_ty, "byte") || type_is_builtin(l_ty, "ushort") || type_is_builtin(l_ty, "uint") ||
+             type_is_builtin(l_ty, "ulong")) &&
+            (type_is_builtin(r_ty, "byte") || type_is_builtin(r_ty, "ushort") || type_is_builtin(r_ty, "uint") ||
+             type_is_builtin(r_ty, "ulong"))) {
+            common_int_ty = type_builtin_ulong();
+        }
+    }
+
     let op = expr.text_value;
     if (eq_s(op, "+") || eq_s(op, "-") || eq_s(op, "*") || eq_s(op, "/") || eq_s(op, "%") ||
         eq_s(op, "&") || eq_s(op, "|") || eq_s(op, "^") || eq_s(op, "<<") || eq_s(op, ">>")) {
         if (!etc_is_int(l_ty) || !etc_is_int(r_ty)) {
             etc_diag_error(self, "TYP-0170", concat4_s("binary '", op, "' expects int, got ", type_format(l_ty)),
                 (self.current_unit as DriverUnit*).path, expr.span);
+        } else if (common_int_ty == null) {
+            etc_diag_error(self, "TYP-0170", concat3_s("binary '", op,
+                concat_s("' has no supported common integer type for '", concat_s(type_format(l_ty),
+                    concat_s("' and '", concat_s(type_format(r_ty), "'"))))),
+                (self.current_unit as DriverUnit*).path, expr.span);
         }
         type_free(l_ty);
         type_free(r_ty);
+        if (common_int_ty != null) {
+            return common_int_ty;
+        }
         return type_builtin_int();
     } else if (eq_s(op, "==") || eq_s(op, "!=")) {
         let is_null_check = false;
@@ -1985,27 +2304,38 @@ func etc_infer_binary(self: ExpressionTypeChecker*, expr_id: ExprId, expr: ExprN
             if (ord(r_ty.kind) == ord(TY_NULL) && (ord(l_ty.kind) == ord(TY_POINTER) || ord(l_ty.kind) == ord(TY_NULLABLE))) {
                 is_null_check = true;
             }
+            if (!is_null_check && common_int_ty != null) {
+                is_null_check = true;
+            }
 
             if (!is_null_check) {
                 etc_diag_error(self, "TYP-0172", concat_s(concat4_s("binary '", op, "' type mismatch: ", type_format(l_ty)),
                     concat_s(" and ", type_format(r_ty))), (self.current_unit as DriverUnit*).path, expr.span);
             }
         }
-        if (!is_null_check && etc_types_equal(l_ty, r_ty) && !etc_is_int(l_ty) && !etc_is_bool(l_ty)) {
+        if (!(common_int_ty != null) && !is_null_check && etc_types_equal(l_ty, r_ty) && !etc_is_int(l_ty) &&
+            !etc_is_bool(l_ty)) {
             etc_diag_error(self, "TYP-0173",
                 concat4_s("equality not supported for type '", type_format(l_ty), "' in this stage", ""),
                 (self.current_unit as DriverUnit*).path, expr.span);
         }
         type_free(l_ty);
         type_free(r_ty);
+        if (common_int_ty != null) type_free(common_int_ty as Type*);
         return type_builtin_bool();
     } else if (eq_s(op, "<") || eq_s(op, "<=") || eq_s(op, ">") || eq_s(op, ">=")) {
         if (!etc_is_int(l_ty) || !etc_is_int(r_ty)) {
             etc_diag_error(self, "TYP-0170", concat4_s("binary '", op, "' expects int, got ", type_format(l_ty)),
                 (self.current_unit as DriverUnit*).path, expr.span);
+        } else if (common_int_ty == null) {
+            etc_diag_error(self, "TYP-0170", concat3_s("binary '", op,
+                concat_s("' has no supported common integer type for '", concat_s(type_format(l_ty),
+                    concat_s("' and '", concat_s(type_format(r_ty), "'"))))),
+                (self.current_unit as DriverUnit*).path, expr.span);
         }
         type_free(l_ty);
         type_free(r_ty);
+        if (common_int_ty != null) type_free(common_int_ty as Type*);
         return type_builtin_bool();
     } else if (eq_s(op, "&&") || eq_s(op, "||")) {
         if (!etc_is_bool(l_ty) || !etc_is_bool(r_ty)) {
@@ -2013,11 +2343,13 @@ func etc_infer_binary(self: ExpressionTypeChecker*, expr_id: ExprId, expr: ExprN
                 (self.current_unit as DriverUnit*).path, expr.span);
         }
         type_free(r_ty);
+        if (common_int_ty != null) type_free(common_int_ty as Type*);
         return l_ty;
     }
 
     type_free(l_ty);
     type_free(r_ty);
+    if (common_int_ty != null) type_free(common_int_ty as Type*);
     return null;
 }
 
@@ -2307,6 +2639,7 @@ func etc_infer_expr(self: ExpressionTypeChecker*, expr_id: ExprId) -> Type*? {
 
     match (expr.kind) {
         EX_INT => { ty = type_builtin_int(); }
+        EX_BIGINT => { ty = type_new_builtin("__bigint_literal"); }
         EX_BYTE => { ty = type_builtin_byte(); }
         EX_BOOL => { ty = type_builtin_bool(); }
         EX_STRING => { ty = type_builtin_string(); }
@@ -2419,7 +2752,13 @@ func etc_infer_expr(self: ExpressionTypeChecker*, expr_id: ExprId) -> Type*? {
                         self.result.names as NameResolution*, self.current_env as ModuleEnv*,
                         expr.type_ref as TypeRef*, self.result.diags, seen);
                     if (target_ty != null) {
-                        if (type_is_builtin(src_ty as Type*, "int") && etc_is_int(target_ty as Type*) &&
+                        if (etc_is_bigint_literal_type(src_ty as Type*)) {
+                            let cast_result = etc_check_assign_bigint_expr(self, target_ty as Type*, expr.expr_a, unit.path);
+                            if (ord(cast_result) == ord(ASSIGN_ACCEPT)) {
+                                ty = target_ty;
+                                target_ty = null;
+                            }
+                        } else if (type_is_builtin(src_ty as Type*, "int") && etc_is_int(target_ty as Type*) &&
                             !type_is_builtin(target_ty as Type*, "int")) {
                             let const_int = etc_cast_const_int(self, expr.expr_a);
                             if (const_int != null && !etc_int_value_fits_builtin(target_ty as Type*, const_int as int)) {

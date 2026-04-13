@@ -330,6 +330,17 @@ func ap_print_expr(id: ExprId, pr: ParseResult*, indent: int) {
                 ap_print_line(indent, sb_to_string(sb));
             }
         }
+        EX_BIGINT => {
+            with (let sb = sb_create() => sb_free(sb)) {
+                sb_append(sb, "BigIntLiteral(text=");
+                sb_append(sb, ap_quote_string(node.text_value));
+                sb_append(sb, ", base=");
+                sb_append_int(sb, node.base_value);
+                sb_append(sb, ")");
+                sb_append(sb, ap_span_suffix(node.span));
+                ap_print_line(indent, sb_to_string(sb));
+            }
+        }
         EX_BYTE => {
             with (let sb = sb_create() => sb_free(sb)) {
                 sb_append(sb, "ByteLiteral(value=");

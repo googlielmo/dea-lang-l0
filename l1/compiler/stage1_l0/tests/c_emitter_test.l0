@@ -168,17 +168,29 @@ func test_emitter_type_lowering_and_null_forms() {
     let tiny_ty = type_builtin_tiny();
     let short_ty = type_builtin_short();
     let ushort_ty = type_builtin_ushort();
+    let uint_ty = type_builtin_uint();
+    let long_ty = type_builtin_long();
+    let ulong_ty = type_builtin_ulong();
     let point_ty = type_new_struct("demo.main", "Point");
     let point_ptr_ty = type_new_pointer(type_clone(point_ty));
     let point_opt_ty = type_new_nullable(type_clone(point_ty));
+    let uint_opt_ty = type_new_nullable(type_builtin_uint());
+    let long_opt_ty = type_new_nullable(type_builtin_long());
+    let ulong_opt_ty = type_new_nullable(type_builtin_ulong());
 
     assert(eq_s(cem_emit_type(builtin_int_ty), "dea_int"), "builtin int type mismatch");
     assert(eq_s(cem_emit_type(tiny_ty), "dea_tiny"), "builtin tiny type mismatch");
     assert(eq_s(cem_emit_type(short_ty), "dea_short"), "builtin short type mismatch");
     assert(eq_s(cem_emit_type(ushort_ty), "dea_ushort"), "builtin ushort type mismatch");
+    assert(eq_s(cem_emit_type(uint_ty), "dea_uint"), "builtin uint type mismatch");
+    assert(eq_s(cem_emit_type(long_ty), "dea_long"), "builtin long type mismatch");
+    assert(eq_s(cem_emit_type(ulong_ty), "dea_ulong"), "builtin ulong type mismatch");
     assert(eq_s(cem_emit_type(point_ty), "struct dea_demo_main_Point"), "struct type mismatch");
     assert(eq_s(cem_emit_type(point_ptr_ty), "struct dea_demo_main_Point*"), "pointer type mismatch");
     assert(eq_s(cem_emit_type(point_opt_ty), "dea_opt_s_dea_demo_main_Point"), "nullable struct type mismatch");
+    assert(eq_s(cem_emit_type(uint_opt_ty), "dea_opt_uint"), "nullable uint type mismatch");
+    assert(eq_s(cem_emit_type(long_opt_ty), "dea_opt_long"), "nullable long type mismatch");
+    assert(eq_s(cem_emit_type(ulong_opt_ty), "dea_opt_ulong"), "nullable ulong type mismatch");
     assert(eq_s(cem_emit_none_value_for_nullable(point_opt_ty), "((dea_opt_s_dea_demo_main_Point){.has_value = 0})"),
         "nullable none mismatch");
     assert(eq_s(cem_emit_null_literal(point_opt_ty, false), "((dea_opt_s_dea_demo_main_Point){.has_value = 0})"),
@@ -190,9 +202,49 @@ func test_emitter_type_lowering_and_null_forms() {
     type_free(tiny_ty);
     type_free(short_ty);
     type_free(ushort_ty);
+    type_free(uint_ty);
+    type_free(long_ty);
+    type_free(ulong_ty);
     type_free(point_ty);
     type_free(point_ptr_ty);
     type_free(point_opt_ty);
+    type_free(uint_opt_ty);
+    type_free(long_opt_ty);
+    type_free(ulong_opt_ty);
+}
+
+/**
+ * Tests test_emitter_large_integer_helpers.
+ */
+func test_emitter_large_integer_helpers() {
+    let uint_ty = type_builtin_uint();
+    let long_ty = type_builtin_long();
+    let ulong_ty = type_builtin_ulong();
+
+    assert(eq_s(cem_emit_typed_bigint_literal("4294967295", 10, uint_ty), "4294967295U"),
+        "typed uint bigint literal mismatch");
+    assert(eq_s(cem_emit_typed_bigint_literal("-8000000000000000", 16, long_ty), "INT64_MIN"),
+        "typed long bigint literal mismatch");
+    assert(eq_s(cem_emit_typed_bigint_literal("ffffffffffffffff", 16, ulong_ty), "0xffffffffffffffffULL"),
+        "typed ulong bigint literal mismatch");
+    assert(eq_s(cem_emit_typed_bigint_literal("11111111", 2, uint_ty), "0xffU"),
+        "binary bigint literal should lower through a C99-safe spelling");
+    assert(eq_s(cem_emit_widen_int("x", uint_ty, ulong_ty), "((dea_ulong)(x))"),
+        "uint-to-ulong widening mismatch");
+    assert(eq_s(cem_emit_checked_int_add_for_type(long_ty, "a", "b"), "(_rt_ladd(a, b))"),
+        "long addition helper mismatch");
+    assert(eq_s(cem_emit_checked_int_div_for_type(ulong_ty, "a", "b"), "(_rt_uldiv(a, b))"),
+        "ulong division helper mismatch");
+    assert(eq_s(cem_emit_checked_signed_cast("dea_short", "value"),
+        "(_rt_cast_dea_short_from_signed((dea_long)(value)))"),
+        "signed checked cast mismatch");
+    assert(eq_s(cem_emit_checked_unsigned_cast("dea_long", "value"),
+        "(_rt_cast_dea_long_from_unsigned((dea_ulong)(value)))"),
+        "unsigned checked cast mismatch");
+
+    type_free(uint_ty);
+    type_free(long_ty);
+    type_free(ulong_ty);
 }
 
 /**
@@ -592,6 +644,7 @@ func main() {
     test_code_builder_tracks_indentation();
     test_emitter_name_mangling();
     test_emitter_type_lowering_and_null_forms();
+    test_emitter_large_integer_helpers();
     test_emitter_header_honors_trace_flags();
     test_emitter_line_directives_normalize_windows_paths();
     test_emitter_string_literals_use_dea_string_const();

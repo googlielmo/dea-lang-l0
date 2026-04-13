@@ -3,7 +3,7 @@
 ## Add `uint`, `long`, and `ulong` to L1 through opaque bigint literals
 
 - Date: 2026-04-13
-- Status: Draft
+- Status: Completed
 - Title: Add `uint`, `long`, and `ulong` to L1 through opaque bigint literals
 - Kind: Feature
 - Severity: High
@@ -55,6 +55,19 @@ representation through the parser, AST, type checker, and C backend without tryi
 
 The emitted C and runtime boundary own the actual `uint`, `long`, and `ulong` arithmetic, cast, range, overflow, and
 underflow behavior.
+
+## Outcome
+
+The implementation landed as planned:
+
+1. `uint`, `long`, and `ulong` are now implemented builtin types in the L1 Stage 1 compiler.
+2. `TT_BIGINT` now parses into `EX_BIGINT` and preserves both the canonical digit payload and the original literal base.
+3. Contextual bigint typing now covers `TYP-0700`, `TYP-0702`, and `TYP-0703`, including range-checked `uint` / `long` /
+   `ulong` targets and typed `case` literals.
+4. Generated C now lowers the widened integer family through `dea_uint`, `dea_long`, and `dea_ulong`, uses checked
+   runtime helpers for arithmetic and explicit casts, and rewrites binary bigint spellings into C99-safe equivalents.
+5. Focused lexer/parser/type-resolution/type-checking/emitter/backend coverage and the related design/diagnostic docs
+   were updated together.
 
 ## Current State
 

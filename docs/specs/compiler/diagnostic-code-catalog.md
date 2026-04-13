@@ -335,6 +335,8 @@ and reuse supplement for applying this registry within L0.
 | `TYP-0319` | All   | Internal default code for widening-context type mismatches                                             |
 | `TYP-0700` | All   | Integer literal is outside the target integer type range                                               |
 | `TYP-0701` | All   | Explicit nullable-pointer-to-pointer cast is provably null at compile time                             |
+| `TYP-0702` | All   | Integer literal outside `int` requires a contextual integer type                                       |
+| `TYP-0703` | All   | Integer literal outside `int` cannot be used in this contextual type                                   |
 | `TYP-9209` | All   | Internal error: variant does not produce enum type                                                     |
 | `TYP-9288` | All   | Internal error: 'new' outside function context                                                         |
 | `TYP-9289` | All   | Internal error: missing module environment for the current function                                    |

@@ -8,7 +8,9 @@ module parser_test;
 import std.io;
 import std.string;
 import std.assert;
+import std.vector;
 
+import ast;
 import parser;
 import std.text;
 
@@ -95,7 +97,7 @@ func test_module_decl_error() {
  */
 func test_reserved_variable_name_error() {
     let src = "module main; func main() -> int { let uint: int = 0; return uint; }";
-    expect_error_code(src, "PAR-0010");
+    expect_error_code(src, "PAR-0011");
 }
 
 /**
@@ -169,6 +171,49 @@ func test_type_expr_call_arg_ok() {
 func test_small_integer_type_positions_ok() {
     let src = "module main; extern func sizeof(x: int) -> int; struct S { a: tiny; b: short?; c: ushort*; } func f(a: tiny, b: short?, c: ushort*) -> short { let x: tiny* = new tiny(1); let y: ushort? = null; return sizeof(short) as short; }";
     expect_ok(src);
+}
+
+/**
+ * Tests large integer builtin names in type positions.
+ */
+func test_large_integer_type_positions_ok() {
+    let src = "module main; extern func sizeof(x: int) -> int; struct S { a: uint; b: long?; c: ulong*; } func f(a: uint, b: long?, c: ulong*) -> long { let x: uint* = new uint(1); let y: ulong? = null; return sizeof(long) as long; }";
+    expect_ok(src);
+}
+
+/**
+ * Tests that out-of-int literals parse as `EX_BIGINT` with preserved text and base.
+ */
+func test_bigint_literal_expr_shape() {
+    let src = "module main; func main() -> long { let x: long = 2147483648; return 0x80000000; }";
+    let result = parse_module_source(src, "<test>");
+    assert(!parse_has_errors(result), "Expected parse to succeed");
+    assert(result.root_module != null, "Expected parsed module");
+
+    let root = result.root_module as Module*;
+    assert(vec_size(root.decls) == 1, "Expected one declaration");
+    let top = ptr_vec_get(root.decls, 0) as TopLevelDecl*;
+    assert(ord(top.kind) == ord(TD_FUNC), "Expected function declaration");
+
+    let func_decl = top.data as FuncDecl*;
+    let body = stmt_arena_get(result.stmt_arena, func_decl.body);
+    assert(body.ids != null, "Expected function body block statements");
+    let stmts = body.ids as VectorBase*;
+    assert(vec_size(stmts) == 2, "Expected let plus return statements");
+
+    let let_stmt = stmt_arena_get(result.stmt_arena, id_vec_get(stmts, 0));
+    let let_expr = expr_arena_get(result.expr_arena, let_stmt.expr_a);
+    assert(ord(let_expr.kind) == ord(EX_BIGINT), "Expected bigint let initializer");
+    assert(eq_s(let_expr.text_value, "2147483648"), "Unexpected decimal bigint payload");
+    assert(let_expr.base_value == 10, "Unexpected decimal bigint base");
+
+    let return_stmt = stmt_arena_get(result.stmt_arena, id_vec_get(stmts, 1));
+    let return_expr = expr_arena_get(result.expr_arena, return_stmt.expr_a);
+    assert(ord(return_expr.kind) == ord(EX_BIGINT), "Expected bigint return expression");
+    assert(eq_s(return_expr.text_value, "80000000"), "Unexpected hexadecimal bigint payload");
+    assert(return_expr.base_value == 16, "Unexpected hexadecimal bigint base");
+
+    parse_result_free(result);
 }
 
 /**
@@ -267,6 +312,8 @@ func main() {
     test_postfix_chain_ok();
     test_type_expr_call_arg_ok();
     test_small_integer_type_positions_ok();
+    test_large_integer_type_positions_ok();
+    test_bigint_literal_expr_shape();
     test_reserved_binary_and_error();
     test_reserved_binary_shift_error();
     test_qualified_expr_module_path_ok();

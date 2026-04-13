@@ -721,6 +721,65 @@ func test_backend_generate_small_integer_builtins() {
 }
 
 /**
+ * Tests generation for large integer builtin types, bigint literals, and checked casts.
+ */
+func test_backend_generate_large_integer_builtins() {
+    with (let filenames = vs_create(1) => vs_free(filenames),
+          let sources = vs_create(1) => vs_free(sources),
+          let lines = vs_create(19) => vs_free(lines),
+          let cfg = log_config_create(LL_ERROR, false) => drop cfg,
+          let opts = cg_options_create() => cg_options_free(opts)) {
+        opts.emit_line_directives = false;
+        vs_push(filenames, "demo/main.l1");
+        vs_push(lines, "module demo.main;");
+        vs_push(lines, "let max_uint: uint = 4294967295;");
+        vs_push(lines, "let min_long: long = -(0x8000000000000000);");
+        vs_push(lines, "let max_ulong: ulong = 18446744073709551615;");
+        vs_push(lines, "let bin_ulong: ulong = 0b1111111111111111111111111111111111111111111111111111111111111111;");
+        vs_push(lines, "func main(x: int, u: uint, l: long, ul: ulong, b: byte, us: ushort) -> long {");
+        vs_push(lines, "    let a: uint = b;");
+        vs_push(lines, "    let c: uint = us;");
+        vs_push(lines, "    let d: long = x;");
+        vs_push(lines, "    let e: long = u;");
+        vs_push(lines, "    let f: ulong = u;");
+        vs_push(lines, "    let g: uint = x as uint;");
+        vs_push(lines, "    let h: short = ul as short;");
+        vs_push(lines, "    let i: long = 2147483648;");
+        vs_push(lines, "    let j: long = l + e;");
+        vs_push(lines, "    if (u == c) { return j + i; }");
+        vs_push(lines, "    return j;");
+        vs_push(lines, "}");
+        vs_push(sources, bt_source(lines));
+
+        let result = bt_analyze_sources("demo.main", filenames, sources);
+        assert(!analysis_has_errors(result), "analysis should succeed for large integer fixture");
+
+        let generated = backend_generate(result, opts, cfg);
+        assert(contains_s(generated, "static dea_uint dea_demo_main_max_uint = 4294967295U;"),
+            "uint top-level bigint literal mismatch");
+        assert(contains_s(generated, "static dea_long dea_demo_main_min_long = INT64_MIN;"),
+            "long top-level bigint literal mismatch");
+        assert(contains_s(generated, "static dea_ulong dea_demo_main_max_ulong = 18446744073709551615ULL;"),
+            "ulong top-level bigint literal mismatch");
+        assert(contains_s(generated, "static dea_ulong dea_demo_main_bin_ulong = 0xffffffffffffffffULL;"),
+            "binary ulong bigint literal mismatch");
+        assert(contains_s(generated, "dea_uint a = ((dea_uint)(b));"), "byte-to-uint widening mismatch");
+        assert(contains_s(generated, "dea_uint c = ((dea_uint)(us));"), "ushort-to-uint widening mismatch");
+        assert(contains_s(generated, "dea_long d = ((dea_long)(x));"), "int-to-long widening mismatch");
+        assert(contains_s(generated, "dea_long e = ((dea_long)(u));"), "uint-to-long widening mismatch");
+        assert(contains_s(generated, "dea_ulong f = ((dea_ulong)(u));"), "uint-to-ulong widening mismatch");
+        assert(contains_s(generated, "dea_uint g = (_rt_narrow_dea_uint(x));"), "int-to-uint checked cast mismatch");
+        assert(contains_s(generated, "dea_short h = (_rt_cast_dea_short_from_unsigned((dea_ulong)(ul)));"),
+            "ulong-to-short checked cast mismatch");
+        assert(contains_s(generated, "dea_long i = 2147483648LL;"), "long local bigint literal mismatch");
+        assert(contains_s(generated, "dea_long j = (_rt_ladd(l, e));"), "long addition helper mismatch");
+        assert(contains_s(generated, "return (_rt_ladd(j, i));"), "long return addition helper mismatch");
+
+        analysis_result_free(result);
+    }
+}
+
+/**
  * Main entry point for the module.
  */
 func main() {
@@ -741,5 +800,6 @@ func main() {
     test_backend_generate_dea_intrinsics_respect_symbol_origin();
     test_backend_generate_string_copy_retains();
     test_backend_generate_small_integer_builtins();
+    test_backend_generate_large_integer_builtins();
     printl_s("backend_test: all tests passed");
 }

@@ -117,6 +117,21 @@ func test_tr_resolve_type_ref() {
             type_free(ty_short_opt as Type*);
             drop tref_short_opt;
 
+            let tref_uint = new TypeRef("uint", 0, false, null, null, Span(0,0,0,0));
+            let ty_uint = tr_resolve_type_ref(tables, nr, env, tref_uint, result.diags, seen);
+            assert(ty_uint != null, "uint should resolve");
+            assert(type_is_builtin(ty_uint as Type*, "uint"), "should be uint");
+            type_free(ty_uint as Type*);
+            drop tref_uint;
+
+            let tref_long_opt = new TypeRef("long", 0, true, null, null, Span(0,0,0,0));
+            let ty_long_opt = tr_resolve_type_ref(tables, nr, env, tref_long_opt, result.diags, seen);
+            assert(ty_long_opt != null, "long? should resolve");
+            assert(ord((ty_long_opt as Type*).kind) == ord(TY_NULLABLE), "should be nullable");
+            assert(type_is_builtin((ty_long_opt as Type*).inner as Type*, "long"), "inner should be long");
+            type_free(ty_long_opt as Type*);
+            drop tref_long_opt;
+
             let tref_ushort_ptr = new TypeRef("ushort", 1, false, null, null, Span(0,0,0,0));
             let ty_ushort_ptr = tr_resolve_type_ref(tables, nr, env, tref_ushort_ptr, result.diags, seen);
             assert(ty_ushort_ptr != null, "ushort* should resolve");
@@ -124,6 +139,14 @@ func test_tr_resolve_type_ref() {
             assert(type_is_builtin((ty_ushort_ptr as Type*).inner as Type*, "ushort"), "inner should be ushort");
             type_free(ty_ushort_ptr as Type*);
             drop tref_ushort_ptr;
+
+            let tref_ulong_ptr = new TypeRef("ulong", 1, false, null, null, Span(0,0,0,0));
+            let ty_ulong_ptr = tr_resolve_type_ref(tables, nr, env, tref_ulong_ptr, result.diags, seen);
+            assert(ty_ulong_ptr != null, "ulong* should resolve");
+            assert(ord((ty_ulong_ptr as Type*).kind) == ord(TY_POINTER), "should be pointer");
+            assert(type_is_builtin((ty_ulong_ptr as Type*).inner as Type*, "ulong"), "inner should be ulong");
+            type_free(ty_ulong_ptr as Type*);
+            drop tref_ulong_ptr;
             
             // struct Point (from shared_types)
             let tref2 = new TypeRef("Point", 0, false, null, null, Span(0,0,0,0));

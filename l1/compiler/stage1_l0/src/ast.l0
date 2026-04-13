@@ -380,6 +380,7 @@ func pattern_arena_free(self: PatternArena*) {
  */
 enum ExprKind {
     EX_INT;
+    EX_BIGINT;
     EX_BYTE;
     EX_STRING;
     EX_BOOL;
@@ -407,6 +408,7 @@ struct ExprNode {
     int_value: int;
     bool_value: bool;
     text_value: string;
+    base_value: int;
 
     expr_a: ExprId;
     expr_b: ExprId;
@@ -439,6 +441,7 @@ func expr_node_create(kind: ExprKind, span: Span) -> ExprNode* {
         0,
         false,
         "",
+        0,
         invalid_expr_id(),
         invalid_expr_id(),
         invalid_expr_id(),

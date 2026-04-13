@@ -289,8 +289,8 @@ func test_real_literal_boundaries() {
  */
 func test_small_integer_builtin_words() {
     expect_two_tokens("tiny short", "ident(tiny)", "ident(short)");
-    expect_two_tokens("ushort long", "ident(ushort)", "<future-extension>");
-    expect_two_tokens("uint ulong", "<future-extension>", "<future-extension>");
+    expect_two_tokens("ushort long", "ident(ushort)", "ident(long)");
+    expect_two_tokens("uint ulong", "ident(uint)", "ident(ulong)");
 }
 
 /**

@@ -11,6 +11,7 @@ import std.string;
 import std.text;
 import std.vector;
 import util.diag;
+import util.numbers;
 
 import ast;
 import driver;
@@ -365,6 +366,9 @@ func sig_infer_literal_type(tables: SignatureTables*, nr: NameResolution*, env: 
     if (ord(expr.kind) == ord(EX_INT)) {
         return type_builtin_int();
     }
+    if (ord(expr.kind) == ord(EX_BIGINT)) {
+        return null;
+    }
     if (ord(expr.kind) == ord(EX_BYTE)) {
         return type_builtin_byte();
     }
@@ -427,6 +431,21 @@ func sig_resolve_let(tables: SignatureTables*, nr: NameResolution*, env: ModuleE
     } else {
         let_type = sig_infer_literal_type(tables, nr, env, driver_state, decl.value);
         if (let_type == null) {
+            let unit = driver_find_unit(driver_state, env.module_name);
+            if (unit != null) {
+                let expr = expr_arena_get((unit as DriverUnit*).parse_result.expr_arena, decl.value);
+                if (ord(expr.kind) == ord(EX_BIGINT)) {
+                    sig_diag_error(
+                        diags,
+                        "TYP-0702",
+                        concat3_s("integer literal ", bigint_to_string(expr.text_value, expr.base_value),
+                            " requires a contextual integer type"),
+                        env.module_ptr.filename,
+                        expr.span
+                    );
+                    return;
+                }
+            }
             sig_diag_error(
                 diags,
                 "SIG-0030",

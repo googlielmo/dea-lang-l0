@@ -1,6 +1,6 @@
 # L1 Language and Runtime Design Decisions
 
-Version: 2026-04-04
+Version: 2026-04-13
 
 This document records current design rationale and policy decisions for Dea/L1 as implemented by the bootstrap compiler.
 
@@ -150,19 +150,23 @@ Rationale:
 
 The bootstrap compiler keeps integer behavior defined rather than inheriting host-C vagueness:
 
-- implemented builtin integer names are `tiny`, `short`, `int`, `byte`, and `ushort`
-- reserved-but-unimplemented builtin integer names are `long`, `uint`, and `ulong`
+- implemented builtin integer names are `tiny`, `short`, `int`, `long`, `byte`, `ushort`, `uint`, and `ulong`
 - `tiny` is 8-bit signed semantics
 - `byte` is 8-bit unsigned semantics
 - `short` is 16-bit signed semantics
 - `ushort` is 16-bit unsigned semantics
 - `int` is 32-bit signed semantics
+- `uint` is 32-bit unsigned semantics
+- `long` is 64-bit signed semantics
+- `ulong` is 64-bit unsigned semantics
 - overflow-sensitive arithmetic and narrowing go through checked runtime helpers
-- integer literals remain `int` literals; fitting integer literals may be used in narrower typed integer contexts
-  without a runtime check, while nonliteral narrowing requires an explicit cast
+- integer literals that fit `int` remain ordinary `int` literals
+- integer literals outside `int` are carried as opaque bigint payloads until a contextual `uint`, `long`, or `ulong`
+  target is known
+- fitting integer literals may be used in narrower typed integer contexts without a runtime check, while nonliteral
+  narrowing and cross-signedness conversions require an explicit cast
 
-That policy is part of the language contract even though the current implementation is lowered through C. Some planned
-integer builtin names are documented in the grammar before the current bootstrap compiler implements them.
+That policy is part of the language contract even though the current implementation is lowered through C.
 
 ## 10. I/O and Runtime API Shape
 
@@ -187,20 +191,24 @@ Rationale:
 
 ## 12. Numeric Literal Representation in L1
 
-L1 introduces numeric types that are not native to the L0 implementation language, including planned forms such as
-`long`, `float`, and `double`.
+L1 introduces numeric types that are not native to the L0 implementation language, including implemented integer forms
+such as `uint`, `long`, and `ulong`, plus planned floating-point forms such as `float` and `double`.
 
 Current decision:
 
-- numeric literals of non-native L1 numeric types are represented inside the bootstrap compiler as opaque strings
-- the compiler does not perform compile-time arithmetic on those payloads
-- the generated C99 output emits those literal spellings verbatim
+- integer literals outside native bootstrap `int` are represented inside the compiler as opaque bigint payloads carrying
+  sign, significant digits, and base (`2`, `8`, `10`, or `16`)
+- the compiler does not perform compile-time arithmetic on those payloads; it only performs textual range checks where a
+  contextual integer target is known
+- generated C reconstructs equivalent literal spellings from the stored payload/base pair and adds destination-aware C
+  suffixes or macros where required
 - IR and semantic nodes remain typed, so the payload encoding is an internal implementation detail rather than a
   language-level contract
 
 Rationale:
 
-- C99 literal syntax such as `1L`, `1.0f`, and `1.0` is already well-defined
+- C99 literal syntax and runtime integer helpers already provide a stable execution boundary for bootstrap-only numeric
+  forms
 - correctness and constant folding can be delegated to the downstream C compiler in the bootstrap stage
 - this keeps the implementation surface small and avoids blocking L1 feature work on arbitrary-precision constant
   infrastructure
@@ -210,7 +218,7 @@ Consequences:
 
 - compile-time constant folding for non-native numeric types is intentionally unavailable in the current bootstrap
   compiler
-- code generation must preserve literal spellings and suffixes faithfully
+- code generation must preserve literal value/base information and emit an equivalent typed C spelling faithfully
 
 Future direction:
 

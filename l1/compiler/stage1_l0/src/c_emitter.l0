@@ -19,6 +19,7 @@ import sem_context;
 import signatures;
 import string_escape;
 import types;
+import util.numbers;
 import util.strings;
 
 /**
@@ -510,6 +511,15 @@ func cem_emit_type(typ: Type*) -> string {
     if (type_is_builtin(typ, "int")) {
         return "dea_int";
     }
+    if (type_is_builtin(typ, "uint")) {
+        return "dea_uint";
+    }
+    if (type_is_builtin(typ, "long")) {
+        return "dea_long";
+    }
+    if (type_is_builtin(typ, "ulong")) {
+        return "dea_ulong";
+    }
     if (type_is_builtin(typ, "byte")) {
         return "dea_byte";
     }
@@ -619,11 +629,22 @@ func cem_emit_widen_int(c_expr: string, src_type: Type*, dst_type: Type*) -> str
     }
     if ((type_is_builtin(src_type, "tiny") && type_is_builtin(dst_type, "short")) ||
         (type_is_builtin(src_type, "tiny") && type_is_builtin(dst_type, "int")) ||
+        (type_is_builtin(src_type, "tiny") && type_is_builtin(dst_type, "long")) ||
         (type_is_builtin(src_type, "byte") && type_is_builtin(dst_type, "short")) ||
         (type_is_builtin(src_type, "byte") && type_is_builtin(dst_type, "ushort")) ||
         (type_is_builtin(src_type, "byte") && type_is_builtin(dst_type, "int")) ||
+        (type_is_builtin(src_type, "byte") && type_is_builtin(dst_type, "uint")) ||
+        (type_is_builtin(src_type, "byte") && type_is_builtin(dst_type, "long")) ||
+        (type_is_builtin(src_type, "byte") && type_is_builtin(dst_type, "ulong")) ||
         (type_is_builtin(src_type, "short") && type_is_builtin(dst_type, "int")) ||
-        (type_is_builtin(src_type, "ushort") && type_is_builtin(dst_type, "int"))) {
+        (type_is_builtin(src_type, "short") && type_is_builtin(dst_type, "long")) ||
+        (type_is_builtin(src_type, "ushort") && type_is_builtin(dst_type, "int")) ||
+        (type_is_builtin(src_type, "ushort") && type_is_builtin(dst_type, "uint")) ||
+        (type_is_builtin(src_type, "ushort") && type_is_builtin(dst_type, "long")) ||
+        (type_is_builtin(src_type, "ushort") && type_is_builtin(dst_type, "ulong")) ||
+        (type_is_builtin(src_type, "int") && type_is_builtin(dst_type, "long")) ||
+        (type_is_builtin(src_type, "uint") && type_is_builtin(dst_type, "long")) ||
+        (type_is_builtin(src_type, "uint") && type_is_builtin(dst_type, "ulong"))) {
         return cem_emit_cast(cem_emit_type(dst_type), c_expr);
     }
     return cem_ice_string(concat4_s("[ICE-1293] unsupported widening cast ", type_format(src_type), " -> ",
@@ -1183,6 +1204,101 @@ func cem_emit_int_literal(value: int) -> string {
 }
 
 /**
+ * Emit a bigint literal with its base prefix reconstructed.
+ *
+ * @param text Canonical bigint payload text.
+ * @param base Literal base.
+ * @return C spelling for the literal.
+ */
+func cem_emit_binary_bigint_literal(text: string) -> string {
+    let negative = len_s(text) > 0 && char_at_s(text, 0) == '-';
+    let digits = text;
+    if (negative) {
+        digits = slice_s(text, 1, len_s(text));
+    }
+    while (len_s(digits) > 1 && char_at_s(digits, 0) == '0') {
+        digits = slice_s(digits, 1, len_s(digits));
+    }
+    with (let sb = sb_create() => sb_free(sb)) {
+        if (negative) {
+            sb_append(sb, "-");
+        }
+        sb_append(sb, "0x");
+        let n = len_s(digits);
+        let first_group = n % 4;
+        if (first_group == 0) {
+            first_group = 4;
+        }
+        let start = 0;
+        while (start < n) {
+            let group_len = 4;
+            if (start == 0) {
+                group_len = first_group;
+            }
+            let end = start + group_len;
+            let value = 0;
+            for (let i = start; i < end; i = i + 1) {
+                value = value * 2;
+                if (char_at_s(digits, i) == '1') {
+                    value = value + 1;
+                }
+            }
+            sb_append(sb, int_to_string_base(value, 16));
+            start = end;
+        }
+        return sb_to_string(sb);
+    }
+}
+
+func cem_emit_bigint_literal(text: string, base: int) -> string {
+    if (base == 2) {
+        return cem_emit_binary_bigint_literal(text);
+    }
+    return bigint_to_string(text, base);
+}
+
+func cem_is_long_min_bigint(text: string, base: int) -> bool {
+    if (base == 10) {
+        return eq_s(text, "-9223372036854775808");
+    }
+    if (base == 16) {
+        return eq_s(text, "-8000000000000000");
+    }
+    if (base == 8) {
+        return eq_s(text, "-1000000000000000000000");
+    }
+    if (base == 2) {
+        return eq_s(text, "-1000000000000000000000000000000000000000000000000000000000000000");
+    }
+    return false;
+}
+
+/**
+ * Emit a bigint literal with a destination-aware C suffix.
+ *
+ * @param text Canonical bigint payload text.
+ * @param base Literal base.
+ * @param ty Destination integer type.
+ * @return C spelling for the literal.
+ */
+func cem_emit_typed_bigint_literal(text: string, base: int, ty: Type*) -> string {
+    let literal = cem_emit_bigint_literal(text, base);
+    if (type_is_builtin(ty, "uint")) {
+        return concat_s(literal, "U");
+    }
+    if (type_is_builtin(ty, "long")) {
+        if (cem_is_long_min_bigint(text, base)) {
+            return "INT64_MIN";
+        }
+        return concat_s(literal, "LL");
+    }
+    if (type_is_builtin(ty, "ulong")) {
+        return concat_s(literal, "ULL");
+    }
+    return literal;
+}
+
+/**
  * Emit a boolean literal.
  *
  * @param value Boolean value.
@@ -1396,6 +1512,86 @@ func cem_emit_checked_int_sub(c_left: string, c_right: string) -> string {
     return concat4_s("(_rt_isub(", c_left, ", ", concat_s(c_right, "))"));
 }
 
+func cem_emit_checked_int_div_for_type(result_ty: Type*, c_left: string, c_right: string) -> string {
+    if (type_is_builtin(result_ty, "int")) {
+        return cem_emit_checked_int_div(c_left, c_right);
+    }
+    if (type_is_builtin(result_ty, "uint")) {
+        return concat4_s("(_rt_udiv(", c_left, ", ", concat_s(c_right, "))"));
+    }
+    if (type_is_builtin(result_ty, "long")) {
+        return concat4_s("(_rt_ldiv(", c_left, ", ", concat_s(c_right, "))"));
+    }
+    if (type_is_builtin(result_ty, "ulong")) {
+        return concat4_s("(_rt_uldiv(", c_left, ", ", concat_s(c_right, "))"));
+    }
+    return cem_ice_string(concat3_s("[ICE-1320] unsupported checked division type '", type_format(result_ty), "'"));
+}
+
+func cem_emit_checked_int_mod_for_type(result_ty: Type*, c_left: string, c_right: string) -> string {
+    if (type_is_builtin(result_ty, "int")) {
+        return cem_emit_checked_int_mod(c_left, c_right);
+    }
+    if (type_is_builtin(result_ty, "uint")) {
+        return concat4_s("(_rt_umod(", c_left, ", ", concat_s(c_right, "))"));
+    }
+    if (type_is_builtin(result_ty, "long")) {
+        return concat4_s("(_rt_lmod(", c_left, ", ", concat_s(c_right, "))"));
+    }
+    if (type_is_builtin(result_ty, "ulong")) {
+        return concat4_s("(_rt_ulmod(", c_left, ", ", concat_s(c_right, "))"));
+    }
+    return cem_ice_string(concat3_s("[ICE-1321] unsupported checked modulo type '", type_format(result_ty), "'"));
+}
+
+func cem_emit_checked_int_mul_for_type(result_ty: Type*, c_left: string, c_right: string) -> string {
+    if (type_is_builtin(result_ty, "int")) {
+        return cem_emit_checked_int_mul(c_left, c_right);
+    }
+    if (type_is_builtin(result_ty, "uint")) {
+        return concat4_s("(_rt_umul(", c_left, ", ", concat_s(c_right, "))"));
+    }
+    if (type_is_builtin(result_ty, "long")) {
+        return concat4_s("(_rt_lmul(", c_left, ", ", concat_s(c_right, "))"));
+    }
+    if (type_is_builtin(result_ty, "ulong")) {
+        return concat4_s("(_rt_ulmul(", c_left, ", ", concat_s(c_right, "))"));
+    }
+    return cem_ice_string(concat3_s("[ICE-1322] unsupported checked multiply type '", type_format(result_ty), "'"));
+}
+
+func cem_emit_checked_int_add_for_type(result_ty: Type*, c_left: string, c_right: string) -> string {
+    if (type_is_builtin(result_ty, "int")) {
+        return cem_emit_checked_int_add(c_left, c_right);
+    }
+    if (type_is_builtin(result_ty, "uint")) {
+        return concat4_s("(_rt_uadd(", c_left, ", ", concat_s(c_right, "))"));
+    }
+    if (type_is_builtin(result_ty, "long")) {
+        return concat4_s("(_rt_ladd(", c_left, ", ", concat_s(c_right, "))"));
+    }
+    if (type_is_builtin(result_ty, "ulong")) {
+        return concat4_s("(_rt_uladd(", c_left, ", ", concat_s(c_right, "))"));
+    }
+    return cem_ice_string(concat3_s("[ICE-1323] unsupported checked addition type '", type_format(result_ty), "'"));
+}
+
+func cem_emit_checked_int_sub_for_type(result_ty: Type*, c_left: string, c_right: string) -> string {
+    if (type_is_builtin(result_ty, "int")) {
+        return cem_emit_checked_int_sub(c_left, c_right);
+    }
+    if (type_is_builtin(result_ty, "uint")) {
+        return concat4_s("(_rt_usub(", c_left, ", ", concat_s(c_right, "))"));
+    }
+    if (type_is_builtin(result_ty, "long")) {
+        return concat4_s("(_rt_lsub(", c_left, ", ", concat_s(c_right, "))"));
+    }
+    if (type_is_builtin(result_ty, "ulong")) {
+        return concat4_s("(_rt_ulsub(", c_left, ", ", concat_s(c_right, "))"));
+    }
+    return cem_ice_string(concat3_s("[ICE-1324] unsupported checked subtraction type '", type_format(result_ty), "'"));
+}
+
 /**
  * Emit a function-call expression.
  *
@@ -1452,6 +1648,14 @@ func cem_emit_cast(c_type: string, c_inner: string) -> string {
  */
 func cem_emit_checked_narrow_cast(c_dst_type: string, c_inner: string) -> string {
     return concat4_s("(_rt_narrow_", c_dst_type, "(", concat_s(c_inner, "))"));
+}
+
+func cem_emit_checked_signed_cast(c_dst_type: string, c_inner: string) -> string {
+    return concat4_s("(_rt_cast_", c_dst_type, "_from_signed((dea_long)(", concat_s(c_inner, ")))"));
+}
+
+func cem_emit_checked_unsigned_cast(c_dst_type: string, c_inner: string) -> string {
+    return concat4_s("(_rt_cast_", c_dst_type, "_from_unsigned((dea_ulong)(", concat_s(c_inner, ")))"));
 }
 
 /**
