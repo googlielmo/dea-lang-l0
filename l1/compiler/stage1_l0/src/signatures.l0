@@ -369,6 +369,12 @@ func sig_infer_literal_type(tables: SignatureTables*, nr: NameResolution*, env: 
     if (ord(expr.kind) == ord(EX_BIGINT)) {
         return null;
     }
+    if (ord(expr.kind) == ord(EX_FLOAT)) {
+        return type_builtin_float();
+    }
+    if (ord(expr.kind) == ord(EX_DOUBLE)) {
+        return type_builtin_double();
+    }
     if (ord(expr.kind) == ord(EX_BYTE)) {
         return type_builtin_byte();
     }

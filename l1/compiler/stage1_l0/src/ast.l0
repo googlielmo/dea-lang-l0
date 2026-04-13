@@ -381,6 +381,8 @@ func pattern_arena_free(self: PatternArena*) {
 enum ExprKind {
     EX_INT;
     EX_BIGINT;
+    EX_FLOAT;
+    EX_DOUBLE;
     EX_BYTE;
     EX_STRING;
     EX_BOOL;

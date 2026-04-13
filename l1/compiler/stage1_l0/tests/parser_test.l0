@@ -182,6 +182,14 @@ func test_large_integer_type_positions_ok() {
 }
 
 /**
+ * Tests floating builtin names in type positions.
+ */
+func test_float_type_positions_ok() {
+    let src = "module main; extern func sizeof(x: int) -> int; struct S { a: float; b: double?; c: float*; } func f(a: float, b: double?, c: float*) -> double { let x: float* = new float(1); let y: double? = null; return sizeof(double) as double; }";
+    expect_ok(src);
+}
+
+/**
  * Tests that out-of-int literals parse as `EX_BIGINT` with preserved text and base.
  */
 func test_bigint_literal_expr_shape() {
@@ -214,6 +222,14 @@ func test_bigint_literal_expr_shape() {
     assert(return_expr.base_value == 16, "Unexpected hexadecimal bigint base");
 
     parse_result_free(result);
+}
+
+/**
+ * Tests floating literals in ordinary expressions.
+ */
+func test_real_literals_in_exprs_ok() {
+    let src = "module main; func main() -> double { let x: float = 1.0f; let y: double = 1e3; return -x + y / 2.0; }";
+    expect_ok(src);
 }
 
 /**
@@ -314,6 +330,8 @@ func main() {
     test_small_integer_type_positions_ok();
     test_large_integer_type_positions_ok();
     test_bigint_literal_expr_shape();
+    test_float_type_positions_ok();
+    test_real_literals_in_exprs_ok();
     test_reserved_binary_and_error();
     test_reserved_binary_shift_error();
     test_qualified_expr_module_path_ok();

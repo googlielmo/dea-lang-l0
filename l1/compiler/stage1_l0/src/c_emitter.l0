@@ -526,6 +526,12 @@ func cem_emit_type(typ: Type*) -> string {
     if (type_is_builtin(typ, "ushort")) {
         return "dea_ushort";
     }
+    if (type_is_builtin(typ, "float")) {
+        return "float";
+    }
+    if (type_is_builtin(typ, "double")) {
+        return "double";
+    }
     if (type_is_builtin(typ, "bool")) {
         return "dea_bool";
     }
@@ -1296,6 +1302,16 @@ func cem_emit_typed_bigint_literal(text: string, base: int, ty: Type*) -> string
         return concat_s(literal, "ULL");
     }
     return literal;
+}
+
+/**
+ * Emit a floating-point literal.
+ *
+ * @param text Canonical literal spelling.
+ * @return C spelling for the literal.
+ */
+func cem_emit_real_literal(text: string) -> string {
+    return text;
 }
 
 /**

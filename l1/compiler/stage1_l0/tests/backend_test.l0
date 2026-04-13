@@ -780,6 +780,118 @@ func test_backend_generate_large_integer_builtins() {
 }
 
 /**
+ * Tests generation for builtin `float` and `double` lowering.
+ */
+func test_backend_generate_float_double_builtins() {
+    with (let filenames = vs_create(1) => vs_free(filenames),
+          let sources = vs_create(1) => vs_free(sources),
+          let lines = vs_create(12) => vs_free(lines),
+          let cfg = log_config_create(LL_ERROR, false) => drop cfg,
+          let opts = cg_options_create() => cg_options_free(opts)) {
+        opts.emit_line_directives = false;
+        vs_push(filenames, "demo/main.l1");
+        vs_push(lines, "module demo.main;");
+        vs_push(lines, "func widen(x: float) -> double {");
+        vs_push(lines, "    return x;");
+        vs_push(lines, "}");
+        vs_push(lines, "func main() -> int {");
+        vs_push(lines, "    let seed: float = 1.0f;");
+        vs_push(lines, "    let total: double = widen(seed) + 1.5 + 1.5;");
+        vs_push(lines, "    if (total == 4.0 && total >= 4.0) { return 17; }");
+        vs_push(lines, "    return 0;");
+        vs_push(lines, "}");
+        vs_push(sources, bt_source(lines));
+
+        let result = bt_analyze_sources("demo.main", filenames, sources);
+        assert(!analysis_has_errors(result), "analysis should succeed for float/double fixture");
+
+        let generated = backend_generate(result, opts, cfg);
+        assert(contains_s(generated, "double dea_demo_main_widen(float x);"), "float/double function declaration mismatch");
+        assert(contains_s(generated, "float seed = 1.0f;"), "float literal local lowering mismatch");
+        assert(contains_s(generated, "double total = ((dea_demo_main_widen(seed) + 1.5) + 1.5);"),
+            "double arithmetic lowering mismatch");
+        assert(contains_s(generated, "if ((total == 4.0))"), "double equality comparison lowering mismatch");
+        assert(contains_s(generated, "if ((total >= 4.0))"), "double ordering comparison lowering mismatch");
+
+        analysis_result_free(result);
+    }
+}
+
+/**
+ * Tests direct C lowering for floating-point arithmetic and explicit numeric casts.
+ */
+func test_backend_generate_float_double_ops() {
+    with (let filenames = vs_create(1) => vs_free(filenames),
+          let sources = vs_create(1) => vs_free(sources),
+          let lines = vs_create(16) => vs_free(lines),
+          let cfg = log_config_create(LL_ERROR, false) => drop cfg,
+          let opts = cg_options_create() => cg_options_free(opts)) {
+        opts.emit_line_directives = false;
+        vs_push(filenames, "demo/main.l1");
+        vs_push(lines, "module demo.main;");
+        vs_push(lines, "func main() -> int {");
+        vs_push(lines, "    let lhs: float = 8.0f;");
+        vs_push(lines, "    let rhs: float = 2.0f;");
+        vs_push(lines, "    let diff: float = lhs - rhs;");
+        vs_push(lines, "    let prod: float = rhs * 4.0f;");
+        vs_push(lines, "    let quot: double = 9.0 / 2.0;");
+        vs_push(lines, "    let narrowed: float = quot as float;");
+        vs_push(lines, "    let widened: double = lhs as double;");
+        vs_push(lines, "    if (diff == 6.0f && prod == 8.0f && quot > 4.0 && narrowed > 4.0f && widened == 8.0) { return 21; }");
+        vs_push(lines, "    return 0;");
+        vs_push(lines, "}");
+        vs_push(sources, bt_source(lines));
+
+        let result = bt_analyze_sources("demo.main", filenames, sources);
+        assert(!analysis_has_errors(result), "analysis should succeed for floating operator fixture");
+
+        let generated = backend_generate(result, opts, cfg);
+        assert(contains_s(generated, "float diff = (lhs - rhs);"), "float subtraction should lower to direct C subtraction");
+        assert(contains_s(generated, "float prod = (rhs * 4.0f);"), "float multiplication should lower to direct C multiplication");
+        assert(contains_s(generated, "double quot = (9.0 / 2.0);"), "double division should lower to direct C division");
+        assert(contains_s(generated, "float narrowed = ((float)(quot));"), "double-to-float cast lowering mismatch");
+        assert(contains_s(generated, "double widened = ((double)(lhs));"), "float-to-double cast lowering mismatch");
+        assert(!contains_s(generated, "_rt_isub("), "float subtraction should not use checked integer subtraction");
+        assert(!contains_s(generated, "_rt_imul("), "float multiplication should not use checked integer multiplication");
+        assert(!contains_s(generated, "_rt_idiv("), "double division should not use checked integer division");
+
+        analysis_result_free(result);
+    }
+}
+
+/**
+ * Tests that floating zero-division stays on the plain C operator path.
+ */
+func test_backend_generate_float_zero_division_plain_c() {
+    with (let filenames = vs_create(1) => vs_free(filenames),
+          let sources = vs_create(1) => vs_free(sources),
+          let lines = vs_create(12) => vs_free(lines),
+          let cfg = log_config_create(LL_ERROR, false) => drop cfg,
+          let opts = cg_options_create() => cg_options_free(opts)) {
+        opts.emit_line_directives = false;
+        vs_push(filenames, "demo/main.l1");
+        vs_push(lines, "module demo.main;");
+        vs_push(lines, "func main() -> int {");
+        vs_push(lines, "    let dz: double = 1.0 / 0.0;");
+        vs_push(lines, "    let fz: float = 1.0f / 0.0f;");
+        vs_push(lines, "    if (dz > 0.0 && fz > 0.0f) { return 22; }");
+        vs_push(lines, "    return 0;");
+        vs_push(lines, "}");
+        vs_push(sources, bt_source(lines));
+
+        let result = bt_analyze_sources("demo.main", filenames, sources);
+        assert(!analysis_has_errors(result), "analysis should succeed for floating zero-division fixture");
+
+        let generated = backend_generate(result, opts, cfg);
+        assert(contains_s(generated, "double dz = (1.0 / 0.0);"), "double zero-division should lower to direct C division");
+        assert(contains_s(generated, "float fz = (1.0f / 0.0f);"), "float zero-division should lower to direct C division");
+        assert(!contains_s(generated, "_rt_idiv("), "floating zero-division should not use checked integer division");
+
+        analysis_result_free(result);
+    }
+}
+
+/**
  * Main entry point for the module.
  */
 func main() {
@@ -801,5 +913,8 @@ func main() {
     test_backend_generate_string_copy_retains();
     test_backend_generate_small_integer_builtins();
     test_backend_generate_large_integer_builtins();
+    test_backend_generate_float_double_builtins();
+    test_backend_generate_float_double_ops();
+    test_backend_generate_float_zero_division_plain_c();
     printl_s("backend_test: all tests passed");
 }

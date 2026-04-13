@@ -31,7 +31,9 @@ func ps_is_builtin_type_name(self: ParserState*) -> bool {
     let t = token_ident_text(ps_peek(self)) as string;
     return eq_s(t, "tiny") || eq_s(t, "short") || eq_s(t, "int") ||
            eq_s(t, "byte") || eq_s(t, "ushort") || eq_s(t, "uint") ||
-           eq_s(t, "long") || eq_s(t, "ulong") || eq_s(t, "bool") ||
+           eq_s(t, "byte") || eq_s(t, "ushort") || eq_s(t, "uint") ||
+           eq_s(t, "long") || eq_s(t, "ulong") || eq_s(t, "float") ||
+           eq_s(t, "double") || eq_s(t, "bool") ||
            eq_s(t, "string") || eq_s(t, "void");
 }
 
@@ -424,6 +426,16 @@ func ps_parse_primary_expr(self: ParserState*) -> ExprId? {
         let node = expr_node_create(EX_BIGINT, ps_extend_span(self, start));
         node.text_value = token_bigint_text(tok) as string;
         node.base_value = token_bigint_base(tok) as int;
+        return expr_arena_add(self.expr_arena, node);
+    }
+
+    if (ps_match_real(self)) {
+        let literal_kind = EX_DOUBLE;
+        if (token_real_is_float(tok)) {
+            literal_kind = EX_FLOAT;
+        }
+        let node = expr_node_create(literal_kind, ps_extend_span(self, start));
+        node.text_value = token_real_text(tok) as string;
         return expr_arena_add(self.expr_arena, node);
     }
 

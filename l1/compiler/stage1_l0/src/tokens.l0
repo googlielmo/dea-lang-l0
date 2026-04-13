@@ -205,7 +205,9 @@ func is_reserved_ident_word(word: string) -> bool {
     return eq_s(word, "void") || eq_s(word, "bool") || eq_s(word, "string") ||
            eq_s(word, "tiny") || eq_s(word, "short") || eq_s(word, "int") ||
            eq_s(word, "byte") || eq_s(word, "ushort") || eq_s(word, "uint") ||
-           eq_s(word, "long") || eq_s(word, "ulong");
+           eq_s(word, "byte") || eq_s(word, "ushort") || eq_s(word, "uint") ||
+           eq_s(word, "long") || eq_s(word, "ulong") ||
+           eq_s(word, "float") || eq_s(word, "double");
 }
 
 /**
@@ -285,8 +287,7 @@ func ident_to_token(ident: string, index: int, line: int, col: int) -> Token {
          "cleanup" => return Token(TT_CLEANUP, index, line, col);
          "_" => return Token(TT_UNDERSCORE, index, line, col);
     }
-    if (eq_s(ident, "float") || eq_s(ident, "double") || eq_s(ident, "in") ||
-        eq_s(ident, "const") ) {
+    if (eq_s(ident, "in") || eq_s(ident, "const")) {
         return Token(TT_FUTURE_EXTENSION, index, line, col);
     }
     return Token(TT_IDENT(ident), index, line, col);

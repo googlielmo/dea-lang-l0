@@ -616,6 +616,8 @@ func be_has_side_effects(self: Backend*, expr_id: ExprId) -> bool {
     match (expr.kind) {
         EX_INT => { return false; }
         EX_BIGINT => { return false; }
+        EX_FLOAT => { return false; }
+        EX_DOUBLE => { return false; }
         EX_BYTE => { return false; }
         EX_STRING => { return false; }
         EX_BOOL => { return false; }
@@ -1411,6 +1413,8 @@ func be_emit_let_initializer(self: Backend*, expr_id: ExprId, expected_type: Typ
     match (expr.kind) {
         EX_INT => { return cem_emit_int_literal(expr.int_value); }
         EX_BIGINT => { return cem_emit_typed_bigint_literal(expr.text_value, expr.base_value, expected_type); }
+        EX_FLOAT => { return cem_emit_real_literal(expr.text_value); }
+        EX_DOUBLE => { return cem_emit_real_literal(expr.text_value); }
         EX_BYTE => { return cem_emit_byte_literal(expr.int_value as byte); }
         EX_BOOL => { return cem_emit_const_bool_literal(expr.bool_value); }
         EX_STRING => { return cem_emit_const_string_literal(expr.text_value); }
@@ -1728,35 +1732,52 @@ func be_emit_binary_op(self: Backend*, expr_id: ExprId) -> string {
             }
         }
 
+        let checked_int_op = left_ty != null && right_ty != null &&
+            be_is_int_assignable(left_ty as Type*) && be_is_int_assignable(right_ty as Type*);
         if (eq_s(expr.text_value, "/")) {
-            if (common_int_ty != null) {
-                return cem_emit_checked_int_div_for_type(common_int_ty as Type*, c_left, c_right);
+            if (checked_int_op) {
+                if (common_int_ty != null) {
+                    return cem_emit_checked_int_div_for_type(common_int_ty as Type*, c_left, c_right);
+                }
+                return cem_emit_checked_int_div(c_left, c_right);
             }
-            return cem_emit_checked_int_div(c_left, c_right);
+            return cem_emit_binary_op(expr.text_value, c_left, c_right);
         }
         if (eq_s(expr.text_value, "%")) {
-            if (common_int_ty != null) {
-                return cem_emit_checked_int_mod_for_type(common_int_ty as Type*, c_left, c_right);
+            if (checked_int_op) {
+                if (common_int_ty != null) {
+                    return cem_emit_checked_int_mod_for_type(common_int_ty as Type*, c_left, c_right);
+                }
+                return cem_emit_checked_int_mod(c_left, c_right);
             }
-            return cem_emit_checked_int_mod(c_left, c_right);
+            return cem_emit_binary_op(expr.text_value, c_left, c_right);
         }
         if (eq_s(expr.text_value, "*")) {
-            if (common_int_ty != null) {
-                return cem_emit_checked_int_mul_for_type(common_int_ty as Type*, c_left, c_right);
+            if (checked_int_op) {
+                if (common_int_ty != null) {
+                    return cem_emit_checked_int_mul_for_type(common_int_ty as Type*, c_left, c_right);
+                }
+                return cem_emit_checked_int_mul(c_left, c_right);
             }
-            return cem_emit_checked_int_mul(c_left, c_right);
+            return cem_emit_binary_op(expr.text_value, c_left, c_right);
         }
         if (eq_s(expr.text_value, "+")) {
-            if (common_int_ty != null) {
-                return cem_emit_checked_int_add_for_type(common_int_ty as Type*, c_left, c_right);
+            if (checked_int_op) {
+                if (common_int_ty != null) {
+                    return cem_emit_checked_int_add_for_type(common_int_ty as Type*, c_left, c_right);
+                }
+                return cem_emit_checked_int_add(c_left, c_right);
             }
-            return cem_emit_checked_int_add(c_left, c_right);
+            return cem_emit_binary_op(expr.text_value, c_left, c_right);
         }
         if (eq_s(expr.text_value, "-")) {
-            if (common_int_ty != null) {
-                return cem_emit_checked_int_sub_for_type(common_int_ty as Type*, c_left, c_right);
+            if (checked_int_op) {
+                if (common_int_ty != null) {
+                    return cem_emit_checked_int_sub_for_type(common_int_ty as Type*, c_left, c_right);
+                }
+                return cem_emit_checked_int_sub(c_left, c_right);
             }
-            return cem_emit_checked_int_sub(c_left, c_right);
+            return cem_emit_binary_op(expr.text_value, c_left, c_right);
         }
         return cem_emit_binary_op(expr.text_value, c_left, c_right);
     }
@@ -2040,6 +2061,8 @@ func be_emit_expr(self: Backend*, expr_id: ExprId) -> string {
     match (expr.kind) {
         EX_INT => { return cem_emit_int_literal(expr.int_value); }
         EX_BIGINT => { return cem_emit_bigint_literal(expr.text_value, expr.base_value); }
+        EX_FLOAT => { return cem_emit_real_literal(expr.text_value); }
+        EX_DOUBLE => { return cem_emit_real_literal(expr.text_value); }
         EX_BYTE => { return cem_emit_byte_literal(expr.int_value as byte); }
         EX_STRING => { return cem_emit_string_literal(expr.text_value); }
         EX_BOOL => { return cem_emit_bool_literal(expr.bool_value); }
@@ -2390,6 +2413,8 @@ func be_emit_case_literal(self: Backend*, expr_id: ExprId) -> string {
     match (expr.kind) {
         EX_INT => { return cem_emit_int_literal(expr.int_value); }
         EX_BIGINT => { return cem_emit_bigint_literal(expr.text_value, expr.base_value); }
+        EX_FLOAT => { return cem_emit_real_literal(expr.text_value); }
+        EX_DOUBLE => { return cem_emit_real_literal(expr.text_value); }
         EX_BYTE => { return cem_emit_byte_literal(expr.int_value as byte); }
         EX_BOOL => { return cem_emit_bool_literal(expr.bool_value); }
         EX_STRING => { return cem_emit_string_literal(expr.text_value); }

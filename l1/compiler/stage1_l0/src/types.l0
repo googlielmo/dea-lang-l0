@@ -215,6 +215,24 @@ func type_builtin_ulong() -> Type* {
 }
 
 /**
+ * Create the builtin `float` type.
+ *
+ * @return New `float` type.
+ */
+func type_builtin_float() -> Type* {
+    return type_new_builtin("float");
+}
+
+/**
+ * Create the builtin `double` type.
+ *
+ * @return New `double` type.
+ */
+func type_builtin_double() -> Type* {
+    return type_new_builtin("double");
+}
+
+/**
  * Create the builtin `string` type.
  *
  * @return New `string` type.
@@ -315,6 +333,8 @@ func type_is_builtin_name(name: string) -> bool {
     return eq_s(name, "bool") || eq_s(name, "tiny") || eq_s(name, "byte") ||
            eq_s(name, "short") || eq_s(name, "int") || eq_s(name, "ushort") ||
            eq_s(name, "uint") || eq_s(name, "long") || eq_s(name, "ulong") ||
+           eq_s(name, "uint") || eq_s(name, "long") || eq_s(name, "ulong") ||
+           eq_s(name, "float") || eq_s(name, "double") ||
            eq_s(name, "string") || eq_s(name, "void");
 }
 

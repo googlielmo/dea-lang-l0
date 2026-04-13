@@ -171,6 +171,8 @@ func test_emitter_type_lowering_and_null_forms() {
     let uint_ty = type_builtin_uint();
     let long_ty = type_builtin_long();
     let ulong_ty = type_builtin_ulong();
+    let float_ty = type_builtin_float();
+    let double_ty = type_builtin_double();
     let point_ty = type_new_struct("demo.main", "Point");
     let point_ptr_ty = type_new_pointer(type_clone(point_ty));
     let point_opt_ty = type_new_nullable(type_clone(point_ty));
@@ -185,6 +187,8 @@ func test_emitter_type_lowering_and_null_forms() {
     assert(eq_s(cem_emit_type(uint_ty), "dea_uint"), "builtin uint type mismatch");
     assert(eq_s(cem_emit_type(long_ty), "dea_long"), "builtin long type mismatch");
     assert(eq_s(cem_emit_type(ulong_ty), "dea_ulong"), "builtin ulong type mismatch");
+    assert(eq_s(cem_emit_type(float_ty), "float"), "builtin float type mismatch");
+    assert(eq_s(cem_emit_type(double_ty), "double"), "builtin double type mismatch");
     assert(eq_s(cem_emit_type(point_ty), "struct dea_demo_main_Point"), "struct type mismatch");
     assert(eq_s(cem_emit_type(point_ptr_ty), "struct dea_demo_main_Point*"), "pointer type mismatch");
     assert(eq_s(cem_emit_type(point_opt_ty), "dea_opt_s_dea_demo_main_Point"), "nullable struct type mismatch");
@@ -205,6 +209,8 @@ func test_emitter_type_lowering_and_null_forms() {
     type_free(uint_ty);
     type_free(long_ty);
     type_free(ulong_ty);
+    type_free(float_ty);
+    type_free(double_ty);
     type_free(point_ty);
     type_free(point_ptr_ty);
     type_free(point_opt_ty);

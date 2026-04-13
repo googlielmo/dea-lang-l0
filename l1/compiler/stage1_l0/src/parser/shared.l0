@@ -160,6 +160,19 @@ func tok_is_bigint(tok: Token) -> bool {
 }
 
 /**
+ * Check whether a token is a real literal.
+ *
+ * @param tok Token to inspect.
+ * @return `true` if `tok` is a `TT_REALNUM`.
+ */
+func tok_is_real(tok: Token) -> bool {
+    match (tok.token_type) {
+        TT_REALNUM(sig, exp_text, is_float) => { return true; }
+        _ => { return false; }
+    }
+}
+
+/**
  * Check whether a token is a byte literal.
  *
  * @param tok Token to inspect.
@@ -407,6 +420,30 @@ func ps_match_bigint(self: ParserState*) -> bool {
 }
 
 /**
+ * Check whether the current token is a real literal.
+ *
+ * @param self Parser state to inspect.
+ * @return `true` if the current token is `TT_REALNUM`.
+ */
+func ps_check_real(self: ParserState*) -> bool {
+    return tok_is_real(ps_peek(self));
+}
+
+/**
+ * Consume the current token if it is a real literal.
+ *
+ * @param self Parser state to advance.
+ * @return `true` if a real literal token was consumed.
+ */
+func ps_match_real(self: ParserState*) -> bool {
+    if (ps_check_real(self)) {
+        ps_advance(self);
+        return true;
+    }
+    return false;
+}
+
+/**
  * Check whether the current token is a byte literal.
  *
  * @param self Parser state to inspect.
@@ -577,6 +614,19 @@ func token_bigint_text(tok: Token) -> string? {
 }
 
 /**
+ * Extract canonical real literal text from a token.
+ *
+ * @param tok Token to inspect.
+ * @return Canonical real literal spelling, or `null` if `tok` is not `TT_REALNUM`.
+ */
+func token_real_text(tok: Token) -> string? {
+    match (tok.token_type) {
+        TT_REALNUM(sig, exp_text, is_float) => { return realnum_to_string(sig, exp_text, is_float); }
+        _ => { return null; }
+    }
+}
+
+/**
  * Extract the parsed bigint base from a token.
  *
  * @param tok Token to inspect.
@@ -586,6 +636,19 @@ func token_bigint_base(tok: Token) -> int? {
     match (tok.token_type) {
         TT_BIGINT(t, b) => { return b; }
         _ => { return null; }
+    }
+}
+
+/**
+ * Report whether a real literal token uses the `float` suffix.
+ *
+ * @param tok Token to inspect.
+ * @return `true` for `float` literals, `false` for `double` literals, or `false` when `tok` is not `TT_REALNUM`.
+ */
+func token_real_is_float(tok: Token) -> bool {
+    match (tok.token_type) {
+        TT_REALNUM(sig, exp_text, is_float) => { return is_float; }
+        _ => { return false; }
     }
 }
 

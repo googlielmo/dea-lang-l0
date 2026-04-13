@@ -377,6 +377,16 @@ func tr_resolve_type_ref(tables: SignatureTables*, nr: NameResolution*, env: Mod
             base = type_builtin_long();
         } else if (eq_s(tref.name, "ulong")) {
             base = type_builtin_ulong();
+        } else if (eq_s(tref.name, "float")) {
+            base = type_builtin_float();
+        } else if (eq_s(tref.name, "double")) {
+            base = type_builtin_double();
+        } else if (eq_s(tref.name, "uint")) {
+            base = type_builtin_uint();
+        } else if (eq_s(tref.name, "long")) {
+            base = type_builtin_long();
+        } else if (eq_s(tref.name, "ulong")) {
+            base = type_builtin_ulong();
         } else if (eq_s(tref.name, "string")) {
             base = type_builtin_string();
         } else {

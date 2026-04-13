@@ -431,6 +431,19 @@ func test_typing_large_int_ok() {
 }
 
 /**
+ * Tests floating-point builtin typing behavior.
+ */
+func test_typing_float_ok() {
+    let sp = make_paths();
+    with (let cfg = log_config_create(LL_SILENT, false) => drop cfg) {
+        let result = analysis_analyze_entry(sp, "typing_float_ok", cfg);
+        assert(!analysis_has_errors(result), "expected no typing errors for typing_float_ok");
+        analysis_result_free(result);
+    }
+    sp_free(sp);
+}
+
+/**
  * Tests rejected nonliteral implicit conversions and contextual bigint diagnostics for large integers.
  */
 func test_typing_large_int_err() {
@@ -459,6 +472,25 @@ func test_typing_large_int_literal_overflow() {
         assert(analysis_has_errors(result), "expected typing errors for typing_large_int_literal_overflow");
         assert(count_diag_code(result, "TYP-0700") == 8, "expected eight large-int literal range diagnostics");
         assert(!has_diag_code(result, "TYP-0315"), "did not expect secondary return mismatch on overflow literals");
+        analysis_result_free(result);
+    }
+    sp_free(sp);
+}
+
+/**
+ * Tests rejected implicit narrowing and invalid casts for floating-point builtins.
+ */
+func test_typing_float_err() {
+    let sp = make_paths();
+    with (let cfg = log_config_create(LL_SILENT, false) => drop cfg) {
+        let result = analysis_analyze_entry(sp, "typing_float_err", cfg);
+        assert(analysis_has_errors(result), "expected typing errors for typing_float_err");
+        assert(count_diag_code(result, "TYP-0315") == 1, "expected one float return mismatch");
+        assert(count_diag_code(result, "TYP-0311") == 1, "expected one float assignment mismatch");
+        assert(count_diag_code(result, "TYP-0312") == 1, "expected one float call argument mismatch");
+        assert(count_diag_code(result, "TYP-0313") == 1, "expected one float struct field mismatch");
+        assert(count_diag_code(result, "TYP-0170") == 4, "expected four invalid floating operator diagnostics");
+        assert(count_diag_code(result, "TYP-0230") == 1, "expected one invalid numeric cast diagnostic");
         analysis_result_free(result);
     }
     sp_free(sp);
@@ -725,6 +757,8 @@ func main() {
     test_typing_large_int_ok();
     test_typing_large_int_err();
     test_typing_large_int_literal_overflow();
+    test_typing_float_ok();
+    test_typing_float_err();
     test_typing_prefixed_int_literals_ok();
     test_typing_cast_null_unwrap_err();
     test_typing_nullable_assignment();

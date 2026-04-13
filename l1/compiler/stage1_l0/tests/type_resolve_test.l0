@@ -147,6 +147,21 @@ func test_tr_resolve_type_ref() {
             assert(type_is_builtin((ty_ulong_ptr as Type*).inner as Type*, "ulong"), "inner should be ulong");
             type_free(ty_ulong_ptr as Type*);
             drop tref_ulong_ptr;
+
+            let tref_float = new TypeRef("float", 0, false, null, null, Span(0,0,0,0));
+            let ty_float = tr_resolve_type_ref(tables, nr, env, tref_float, result.diags, seen);
+            assert(ty_float != null, "float should resolve");
+            assert(type_is_builtin(ty_float as Type*, "float"), "should be float");
+            type_free(ty_float as Type*);
+            drop tref_float;
+
+            let tref_double_opt = new TypeRef("double", 0, true, null, null, Span(0,0,0,0));
+            let ty_double_opt = tr_resolve_type_ref(tables, nr, env, tref_double_opt, result.diags, seen);
+            assert(ty_double_opt != null, "double? should resolve");
+            assert(ord((ty_double_opt as Type*).kind) == ord(TY_NULLABLE), "should be nullable");
+            assert(type_is_builtin((ty_double_opt as Type*).inner as Type*, "double"), "inner should be double");
+            type_free(ty_double_opt as Type*);
+            drop tref_double_opt;
             
             // struct Point (from shared_types)
             let tref2 = new TypeRef("Point", 0, false, null, null, Span(0,0,0,0));

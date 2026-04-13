@@ -344,6 +344,108 @@ func test_run_shadowed_qualified_variant() {
 }
 
 /**
+ * Tests float/double build-and-run execution with kept generated C.
+ */
+func test_run_float_build_and_keep_c() {
+    let out_path = run_keep_c_output_path();
+    let c_path = run_keep_c_c_path();
+    rt_delete_file(out_path);
+    rt_delete_file(c_path);
+
+    with (let argv = vs_create(12) => vs_free(argv)) {
+        vs_push(argv, "--run");
+        vs_push(argv, "--keep-c");
+        vs_push(argv, "-P");
+        vs_push(argv, fixture_root());
+        vs_push(argv, "--output");
+        vs_push(argv, out_path);
+        vs_push(argv, "float_main");
+
+        let rc = run_with_argv(argv);
+        assert(rc == 17, "--run --keep-c should compile and execute float_main");
+    }
+
+    let c_text = read_file(c_path);
+    assert(c_text != null, "float_main kept C file should exist");
+    assert(contains_s(c_text as string, "double dea_float_main_widen(float x)"), "float_main widen signature mismatch");
+    assert(contains_s(c_text as string, "float seed = 1.0f;"), "float_main float literal lowering mismatch");
+    assert(contains_s(c_text as string, "double total = ((dea_float_main_widen(seed) + 1.5) + 1.5);"),
+        "float_main double arithmetic lowering mismatch");
+
+    rt_delete_file(out_path);
+    rt_delete_file(c_path);
+}
+
+/**
+ * Tests float/double subtraction, multiplication, division, and casts in `--run --keep-c` mode.
+ */
+func test_run_float_ops_build_and_keep_c() {
+    let out_path = run_keep_c_output_path();
+    let c_path = run_keep_c_c_path();
+    rt_delete_file(out_path);
+    rt_delete_file(c_path);
+
+    with (let argv = vs_create(12) => vs_free(argv)) {
+        vs_push(argv, "--run");
+        vs_push(argv, "--keep-c");
+        vs_push(argv, "-P");
+        vs_push(argv, fixture_root());
+        vs_push(argv, "--output");
+        vs_push(argv, out_path);
+        vs_push(argv, "float_ops_main");
+
+        let rc = run_with_argv(argv);
+        assert(rc == 21, "--run --keep-c should compile and execute float_ops_main");
+    }
+
+    let c_text = read_file(c_path);
+    assert(c_text != null, "float_ops_main kept C file should exist");
+    assert(contains_s(c_text as string, "float diff = (lhs - rhs);"), "float_ops_main subtraction lowering mismatch");
+    assert(contains_s(c_text as string, "float prod = (rhs * 4.0f);"), "float_ops_main multiplication lowering mismatch");
+    assert(contains_s(c_text as string, "double quot = (9.0 / 2.0);"), "float_ops_main division lowering mismatch");
+    assert(contains_s(c_text as string, "float narrowed = ((float)(quot));"), "float_ops_main narrowing cast mismatch");
+    assert(contains_s(c_text as string, "dea_int back_to_int = ((dea_int)(from_int));"),
+        "float_ops_main double-to-int cast mismatch");
+    assert(!contains_s(c_text as string, "_rt_isub("), "float_ops_main subtraction should not use checked integer subtraction");
+    assert(!contains_s(c_text as string, "_rt_imul("), "float_ops_main multiplication should not use checked integer multiplication");
+    assert(!contains_s(c_text as string, "_rt_idiv("), "float_ops_main division should not use checked integer division");
+
+    rt_delete_file(out_path);
+    rt_delete_file(c_path);
+}
+
+/**
+ * Tests floating zero-division lowering in kept generated C.
+ */
+func test_build_float_zero_division_keep_c() {
+    let out_path = build_output_path();
+    let c_path = build_c_output_path();
+    rt_delete_file(out_path);
+    rt_delete_file(c_path);
+
+    with (let argv = vs_create(12) => vs_free(argv)) {
+        vs_push(argv, "-P");
+        vs_push(argv, fixture_root());
+        vs_push(argv, "--output");
+        vs_push(argv, out_path);
+        vs_push(argv, "--keep-c");
+        vs_push(argv, "float_zero_div_main");
+
+        let rc = run_with_argv(argv);
+        assert(rc == 0, "default build mode should succeed for float_zero_div_main");
+    }
+
+    let c_text = read_file(c_path);
+    assert(c_text != null, "float_zero_div_main kept C file should exist");
+    assert(contains_s(c_text as string, "double dz = (1.0 / 0.0);"), "float_zero_div_main double zero-division mismatch");
+    assert(contains_s(c_text as string, "float fz = (1.0f / 0.0f);"), "float_zero_div_main float zero-division mismatch");
+    assert(!contains_s(c_text as string, "_rt_idiv("), "float_zero_div_main should not use checked integer division");
+
+    rt_delete_file(out_path);
+    rt_delete_file(c_path);
+}
+
+/**
  * Tests test_merge_c_option_words_cli_last.
  */
 func test_merge_c_option_words_cli_last() {
@@ -434,6 +536,9 @@ func main() {
     test_run_cleanup_return_precedence();
     test_run_try_chain_short_circuits();
     test_run_shadowed_qualified_variant();
+    test_run_float_build_and_keep_c();
+    test_run_float_ops_build_and_keep_c();
+    test_build_float_zero_division_keep_c();
     test_merge_c_option_words_cli_last();
     test_merge_c_option_words_ignores_empty_inputs();
     test_type_ok();
