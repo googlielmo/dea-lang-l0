@@ -3,7 +3,7 @@
 ## Expand Windows CI and documentation for MSYS2 UCRT64 and MINGW64 developer environments
 
 - Date: 2026-03-31
-- Status: In Progress
+- Status: Closed (implemented)
 - Title: Expand Windows CI and documentation for MSYS2 UCRT64 and MINGW64 developer environments
 - Kind: Tooling
 - Severity: Medium
@@ -31,9 +31,15 @@
 
 ## Summary
 
-Windows CI currently uses native Windows Python (installed by `actions/setup-python`) running inside an MSYS2 bash shell
-(`shell: msys2 {0}`). A developer working in an MSYS2 `MINGW64` or `UCRT64` shell uses MinGW/UCRT Python instead. The
-two Python families differ in observable ways:
+This plan is closed. Windows CI now validates the recommended MSYS2 `UCRT64` Python path by default, keeps manual
+coverage for the alternate `MINGW64` MSYS2 Python path and native Windows Python path, and the related release/snapshot
+and Windows documentation updates have landed.
+
+Manual GitHub validation of the implemented workflow changes passed before closure.
+
+Windows CI previously used native Windows Python (installed by `actions/setup-python`) running inside an MSYS2 bash
+shell (`shell: msys2 {0}`). A developer working in an MSYS2 `MINGW64` or `UCRT64` shell uses MinGW/UCRT Python instead.
+The two Python families differ in observable ways:
 
 | Behavior                         | Native Windows Python        | MinGW Python (MSYS2)          |
 | -------------------------------- | ---------------------------- | ----------------------------- |
@@ -147,7 +153,7 @@ Before modifying workflows, confirm:
 - [x] Matching `python-pip` packages are available in both environments; dependency installation continues through the
   repo's `make venv` / `uv sync` path.
 - [x] `uv` is installable inside both `UCRT64` and `MINGW64`.
-- [ ] `make venv` works with both MSYS2 Python variants.
+- [x] `make venv` works with both MSYS2 Python variants.
 
 ### Phase 2: Update `l0-ci.yml`
 
