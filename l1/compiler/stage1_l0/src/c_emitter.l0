@@ -710,6 +710,43 @@ func cem_emit_unreachable_marker(self: CEmitter*, reason: string) {
 }
 
 /**
+ * Emit compile-time guards for the L1 floating-point backend contract.
+ *
+ * @param self Emitter to update.
+ */
+func cem_emit_float_contract_guard(self: CEmitter*) {
+    if (self.analysis == null || !analysis_uses_floating_point(self.analysis as AnalysisResult*)) {
+        return;
+    }
+
+    ccb_emit(self.out, "/* L1 floating-point backend contract */");
+    ccb_emit(self.out, "#include <float.h>");
+    ccb_emit(self.out, "#include <math.h>");
+    ccb_emit(self.out, "#if !defined(INFINITY) || !defined(NAN)");
+    ccb_emit(self.out, "#error \"L1 float programs require host C infinities and NaNs\"");
+    ccb_emit(self.out, "#endif");
+    ccb_emit(self.out, "#if FLT_RADIX != 2");
+    ccb_emit(self.out, "#error \"L1 float programs require binary-radix C floating-point\"");
+    ccb_emit(self.out, "#endif");
+    ccb_emit(self.out, "#if FLT_MANT_DIG != 24 || FLT_MAX_EXP != 128");
+    ccb_emit(self.out, "#error \"L1 float programs require IEEE-style binary32 C float semantics\"");
+    ccb_emit(self.out, "#endif");
+    ccb_emit(self.out, "#if DBL_MANT_DIG != 53 || DBL_MAX_EXP != 1024");
+    ccb_emit(self.out, "#error \"L1 float programs require IEEE-style binary64 C double semantics\"");
+    ccb_emit(self.out, "#endif");
+    ccb_emit(self.out, "#if defined(__FAST_MATH__)");
+    ccb_emit(self.out, "#error \"L1 float programs reject fast-math / Ofast C compilation modes\"");
+    ccb_emit(self.out, "#endif");
+    ccb_emit(self.out, "#if defined(__FINITE_MATH_ONLY__) && __FINITE_MATH_ONLY__ != 0 && !defined(__TINYC__)");
+    ccb_emit(self.out, "#error \"L1 float programs reject finite-math-only C compilation modes\"");
+    ccb_emit(self.out, "#endif");
+    ccb_emit(self.out, "#if defined(_M_FP_FAST)");
+    ccb_emit(self.out, "#error \"L1 float programs reject MSVC /fp:fast mode\"");
+    ccb_emit(self.out, "#endif");
+    ccb_emit(self.out, "");
+}
+
+/**
  * Emit the fixed header boilerplate for one C translation unit.
  *
  * @param self Emitter to update.
@@ -722,6 +759,7 @@ func cem_emit_header(self: CEmitter*, opts: CodegenOptions*) {
     ccb_emit(self.out, "#include <stdbool.h>");
     ccb_emit(self.out, "#include <stddef.h>");
     ccb_emit(self.out, "");
+    cem_emit_float_contract_guard(self);
     ccb_emit(self.out, "/* Include SipHash runtime implementation in main translation unit */");
     ccb_emit(self.out, "#define SIPHASH_IMPLEMENTATION");
     ccb_emit(self.out, "#include \"l0_siphash.h\"");

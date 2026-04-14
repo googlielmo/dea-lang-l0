@@ -602,6 +602,64 @@ func bd_get_optimize_flag(family: string, extra_opts: VectorString*) -> string? 
 }
 
 /**
+ * Return why one explicit C compiler option violates the L1 floating-point contract.
+ *
+ * @param opt One explicit C compiler option word.
+ * @return Rejection reason, or `null` when the option is acceptable.
+ */
+func bd_float_contract_forbidden_option_reason(opt: string) -> string? {
+    let lowered = to_lower_s(opt);
+    if (eq_s(lowered, "-ofast") || eq_s(lowered, "-ffast-math")) {
+        return "fast-math disables NaN, infinity, or signed-zero semantics required by L1";
+    }
+    if (eq_s(lowered, "-ffinite-math-only")) {
+        return "finite-math-only removes NaN and infinity semantics required by L1";
+    }
+    if (eq_s(lowered, "-fno-signed-zeros")) {
+        return "signed zero is part of the L1 floating-point contract";
+    }
+    if (eq_s(lowered, "-funsafe-math-optimizations") ||
+        eq_s(lowered, "-fassociative-math") ||
+        eq_s(lowered, "-freciprocal-math"))
+    {
+        return "the option allows floating-point rewrites that violate the L1 contract";
+    }
+    if (starts_with_s(lowered, "/fp:fast")) {
+        return "MSVC fast floating-point mode is incompatible with the L1 contract";
+    }
+    return null;
+}
+
+/**
+ * Reject explicit C compiler options that would invalidate the L1 floating-point contract.
+ *
+ * @param result Analysis result to inspect.
+ * @param extra_opts Collected C compiler option words.
+ * @param diags Diagnostic collector for rejection messages.
+ * @return `true` when the option set is acceptable.
+ */
+func bd_validate_float_c_options(result: AnalysisResult*, extra_opts: VectorString*, diags: DiagCollector*) -> bool {
+    if (!analysis_uses_floating_point(result)) {
+        return true;
+    }
+
+    let ok = true;
+    for (let i = 0; i < vs_size(extra_opts); i = i + 1) {
+        let opt = vs_get(extra_opts, i);
+        let reason = bd_float_contract_forbidden_option_reason(opt);
+        if (reason == null) {
+            continue;
+        }
+        diag_error(diags, "l1c", "L1C-0018",
+            concat3_s("floating-point backend contract rejects C compiler option '", opt,
+                concat3_s("': ", reason as string, "")),
+            "", 0, 0, 0, 0);
+        ok = false;
+    }
+    return ok;
+}
+
+/**
  * Return the best available C compiler command or `null`.
  *
  * @return Compiler command string, or `null`.
@@ -965,6 +1023,12 @@ func bd_build_to_exe(opts: CliOptions*, cfg: LogConfig*, exe_path: string, keep_
             cg_opts.emit_line_directives = !opts.no_line_directives;
             cg_opts.trace_arc = opts.trace_arc;
             cg_opts.trace_memory = opts.trace_memory;
+
+            if (!bd_validate_float_c_options(result, extra_opts, cmd_diags)) {
+                dp_print_collector(cmd_diags);
+                analysis_result_free(result);
+                return 1;
+            }
 
             let c_code = backend_generate(result, cg_opts, cfg);
             let temp_stem = bd_temp_stem("build");

@@ -806,6 +806,9 @@ func test_backend_generate_float_double_builtins() {
         assert(!analysis_has_errors(result), "analysis should succeed for float/double fixture");
 
         let generated = backend_generate(result, opts, cfg);
+        assert(contains_s(generated, "#include <float.h>"), "float fixture should emit float contract guards");
+        assert(contains_s(generated, "#if FLT_RADIX != 2"), "float fixture should emit radix guard");
+        assert(contains_s(generated, "__FAST_MATH__"), "float fixture should emit fast-math guard");
         assert(contains_s(generated, "double dea_demo_main_widen(float x);"), "float/double function declaration mismatch");
         assert(contains_s(generated, "float seed = 1.0f;"), "float literal local lowering mismatch");
         assert(contains_s(generated, "double total = ((dea_demo_main_widen(seed) + 1.5) + 1.5);"),

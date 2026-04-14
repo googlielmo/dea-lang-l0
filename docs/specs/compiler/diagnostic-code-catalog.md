@@ -32,16 +32,18 @@ and reuse supplement for applying this registry within L0.
   current L0 Stage 1 registry appear in numeric order within their family tables.
 - Each family is presented as a table so the catalog can be extended incrementally as new compiler rules and diagnostic
   families are implemented.
+- Level-specific compiler-code families that share numeric slots use paired concrete-code columns; blank cells mean no
+  code is registered for that level in that row.
 - For L0 compiler codes, Python Stage 1 is the current L0 oracle inventory and meaning source.
 - `Level` records the Dea-level applicability of the code.
 - `Meaning` records the current canonical issue represented by the code.
-- `Level` uses `All` for shared entries, `L0 only` for L0-specific exceptions, and `L1+` for codes intentionally
-  introduced for L1 and higher levels.
+- `Level` uses `All` for shared entries, `L0 only` and `L1 only` for level-specific compiler-code entries, and `L1+` for
+  codes intentionally introduced for L1 and higher levels.
 - `ICE-xxxx` codes are currently not part of that central register and are therefore not included in this catalog.
 - Any change to the registered compiler inventory should update this document in the same change, including `Level` and
   `Meaning`.
 
-## `LEX`
+## Lexical Analysis
 
 | Code       | Level   | Meaning                                                |
 | ---------- | ------- | ------------------------------------------------------ |
@@ -68,7 +70,7 @@ and reuse supplement for applying this registry within L0.
 | `LEX-0068` | L1+     | Invalid float suffix after integer literal             |
 | `LEX-0070` | All     | Unterminated block comment                             |
 
-## `PAR`
+## Parsing and Parse-Time Analysis
 
 | Code       | Level | Meaning                                                                    |
 | ---------- | ----- | -------------------------------------------------------------------------- |
@@ -176,7 +178,7 @@ and reuse supplement for applying this registry within L0.
 | `PAR-0504` | All   | 'with': cannot have both '=>' and cleanup block                            |
 | `PAR-0505` | All   | 'with': cleanup block required when '=>' is not used                       |
 
-## `DRV`
+## Driver and Environment
 
 | Code       | Level | Meaning                                                                               |
 | ---------- | ----- | ------------------------------------------------------------------------------------- |
@@ -186,28 +188,49 @@ and reuse supplement for applying this registry within L0.
 | `DRV-0030` | All   | Import-related driver error, e.g. cyclic module imports                               |
 | `DRV-0040` | All   | Source decoding error, e.g. input file is not valid UTF-8                             |
 
-## `L0C`
+## Build, Code Generation, and Runtime
 
-| Code       | Level | Meaning                                                                                               |
-| ---------- | ----- | ----------------------------------------------------------------------------------------------------- |
-| `L0C-0009` | All   | No C compiler found: use '--c-compiler' to specify one or set the L0_CC environment variable          |
-| `L0C-0010` | All   | C compilation failed                                                                                  |
-| `L0C-0011` | All   | Invalid entry module name: module components must be valid identifiers                                |
-| `L0C-0012` | All   | Entry module not found in analysis result                                                             |
-| `L0C-0013` | All   | Entry `main` returns a non-preferred type; the generated C entry wrapper ignores the return value     |
-| `L0C-0014` | All   | Runtime library path does not exist or is not a directory                                             |
-| `L0C-0015` | All   | Runtime library directory does not contain any supported `l0runtime` library                          |
-| `L0C-0016` | All   | Missing type information for the entry `main` function                                                |
-| `L0C-0017` | All   | '--output' is ignored in '--run' mode unless '--keep-c' is set; the executable path remains temporary |
-| `L0C-0020` | All   | Analysis or AST command failed with an exception                                                      |
-| `L0C-0030` | All   | Entry module not found in compilation unit                                                            |
-| `L0C-0040` | All   | Cannot read an input source file during token dump                                                    |
-| `L0C-0041` | All   | Source file encoding error during token dump                                                          |
-| `L0C-0050` | All   | Compilation-unit discovery failed during all-modules token dump                                       |
-| `L0C-0060` | All   | Discovered module path could not be resolved during all-modules token dump                            |
-| `L0C-0070` | All   | Entry module path could not be resolved for token dump                                                |
+| L0 code    | L1 code    | Level   | Meaning                                                                                               |
+| ---------- | ---------- | ------- | ----------------------------------------------------------------------------------------------------- |
+| `L0C-0009` | `L1C-0009` | All     | No C compiler found: use '--c-compiler' or the level-specific C compiler environment variable         |
+| `L0C-0010` | `L1C-0010` | All     | C compilation failed                                                                                  |
+| `L0C-0011` | `L1C-0011` | All     | Invalid entry module name: module components must be valid identifiers                                |
+| `L0C-0012` | `L1C-0012` | All     | Entry module not found in analysis result or does not define a build/run `main` function              |
+| `L0C-0013` | `L1C-0013` | All     | Entry `main` returns a non-preferred type; the generated C entry wrapper ignores the return value     |
+| `L0C-0014` | `L1C-0014` | All     | Runtime library path does not exist or is not a directory                                             |
+| `L0C-0015` | `L1C-0015` | All     | Runtime library directory does not contain any supported `l0runtime` library                          |
+| `L0C-0016` | `L1C-0016` | All     | Missing type information for the entry `main` function                                                |
+| `L0C-0017` | `L1C-0017` | All     | '--output' is ignored in '--run' mode unless '--keep-c' is set; the executable path remains temporary |
+|            | `L1C-0018` | L1 only | Explicit C compiler option violates the L1 floating-point backend contract                            |
+| `L0C-0020` |            | L0 only | Analysis or AST command failed with an exception                                                      |
+| `L0C-0030` |            | L0 only | Entry module not found in compilation unit                                                            |
+| `L0C-0040` | `L1C-0040` | All     | Cannot read an input source file during token dump                                                    |
+| `L0C-0041` |            | L0 only | Source file encoding error during token dump                                                          |
+| `L0C-0050` |            | L0 only | Compilation-unit discovery failed during all-modules token dump                                       |
+| `L0C-0060` |            | L0 only | Discovered module path could not be resolved during all-modules token dump                            |
+| `L0C-0070` | `L1C-0070` | All     | Entry module path or unit could not be resolved for token dump or Stage 1 introspection commands      |
+| `L0C-2001` | `L1C-2001` | All     | Unknown command-line option                                                                           |
+| `L0C-2002` | `L1C-2002` | All     | Multiple conflicting mode flags were provided                                                         |
+| `L0C-2003` | `L1C-2003` | All     | Missing value for an option that requires an argument                                                 |
+| `L0C-2010` | `L1C-2010` | All     | '--output' is valid only with '--build', '--gen', or '--run'                                          |
+| `L0C-2011` | `L1C-2011` | All     | '--keep-c' is valid only with '--build' or '--run'                                                    |
+| `L0C-2012` | `L1C-2012` | All     | '--c-compiler' is valid only with '--build' or '--run'                                                |
+| `L0C-2013` | `L1C-2013` | All     | '--c-options' is valid only with '--build' or '--run'                                                 |
+| `L0C-2014` | `L1C-2014` | All     | '--runtime-include' is valid only with '--build' or '--run'                                           |
+| `L0C-2015` | `L1C-2015` | All     | '--runtime-lib' is valid only with '--build' or '--run'                                               |
+| `L0C-2016` | `L1C-2016` | All     | '--no-line-directives' is valid only with '--build', '--gen', or '--run'                              |
+| `L0C-2017` | `L1C-2017` | All     | '--trace-arc' is valid only with '--build', '--gen', or '--run'                                       |
+| `L0C-2018` | `L1C-2018` | All     | '--trace-memory' is valid only with '--build', '--gen', or '--run'                                    |
+| `L0C-2019` | `L1C-2019` | All     | '--all-modules' is valid only with '--ast', '--sym', '--tok', or '--type'                             |
+| `L0C-2020` | `L1C-2020` | All     | '--include-eof' is valid only with '--tok'                                                            |
+| `L0C-2021` | `L1C-2021` | All     | Missing required target module or file name                                                           |
+| `L0C-2022` | `L1C-2022` | All     | '--run' accepts exactly one target; use '--' before runtime program arguments                         |
+| `L0C-2023` | `L1C-2023` | All     | Arguments after '--' are valid only with '--run'                                                      |
+| `L0C-2024` | `L1C-2024` | All     | Multiple targets are not supported yet; pass exactly one target                                       |
+| `L0C-9510` | `L1C-9510` | All     | Requested CLI mode is not implemented in Stage 1 yet                                                  |
+| `L0C-9511` | `L1C-9511` | All     | Cannot write an output file                                                                           |
 
-## `RES`
+## Name Resolution and Import Analysis
 
 | Code       | Level | Meaning                                                                              |
 | ---------- | ----- | ------------------------------------------------------------------------------------ |
@@ -217,7 +240,7 @@ and reuse supplement for applying this registry within L0.
 | `RES-0022` | All   | Ambiguous unqualified import: the same symbol name is imported from multiple modules |
 | `RES-0029` | All   | Import refers to an unknown module                                                   |
 
-## `SIG`
+## Signature Analysis and Type Resolution for Type Declarations, Type Aliases, and Type References
 
 | Code       | Level | Meaning                                                                           |
 | ---------- | ----- | --------------------------------------------------------------------------------- |
@@ -231,7 +254,7 @@ and reuse supplement for applying this registry within L0.
 | `SIG-0040` | All   | Value-type cycle creates an infinitely sized type                                 |
 | `SIG-9029` | All   | Internal error: a type-alias symbol does not reference a type-alias declaration   |
 
-## `TYP`
+## Expression Type Checking, Type Inference, and Type-Related Semantic Analysis
 
 | Code       | Level | Meaning                                                                                                |
 | ---------- | ----- | ------------------------------------------------------------------------------------------------------ |

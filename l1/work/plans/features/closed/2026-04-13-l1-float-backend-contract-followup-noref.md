@@ -3,45 +3,47 @@
 ## Define L1 floating-point semantic and C backend contract
 
 - Date: 2026-04-13
-- Status: Draft
+- Status: Completed
 - Title: Define L1 floating-point semantic and C backend contract
 - Kind: Feature
 - Severity: High
 - Stage: 1
 - Subsystem: Typing / semantics / backend / C emission / validation / tests
 - Modules:
+  - `compiler/stage1_l0/src/build_driver.l0`
   - `compiler/stage1_l0/src/expr_types.l0`
   - `compiler/stage1_l0/src/backend.l0`
   - `compiler/stage1_l0/src/c_emitter.l0`
-  - `compiler/stage1_l0/src/signatures.l0`
+  - `compiler/stage1_l0/src/sem_context.l0`
   - `compiler/stage1_l0/src/types.l0`
-  - `compiler/stage1_l0/src/type_resolve.l0`
   - `compiler/stage1_l0/tests/expr_types_test.l0`
+  - `compiler/stage1_l0/tests/build_driver_test.l0`
   - `compiler/stage1_l0/tests/c_emitter_test.l0`
   - `compiler/stage1_l0/tests/backend_test.l0`
   - `compiler/stage1_l0/tests/l0c_lib_test.l0`
-  - `compiler/stage1_l0/tests/fixtures/typing/typing_float_contract_ok.l1`
-  - `compiler/stage1_l0/tests/fixtures/typing/typing_float_contract_err.l1`
-  - `compiler/stage1_l0/tests/fixtures/driver/float_contract_main.l1`
-  - `compiler/stage1_l0/tests/fixtures/driver/float_zero_div_contract_main.l1`
-  - `l1/docs/reference/design-decisions.md`
-  - `l1/docs/reference/types.md`
+  - `compiler/stage1_l0/tests/fixtures/typing/typing_float_ok.l1`
+  - `compiler/stage1_l0/tests/fixtures/typing/typing_float_err.l1`
+  - `compiler/stage1_l0/tests/fixtures/driver/float_main.l1`
+  - `compiler/stage1_l0/tests/fixtures/driver/float_ops_main.l1`
+  - `compiler/stage1_l0/tests/fixtures/driver/float_zero_div_main.l1`
 - Test modules:
   - `compiler/stage1_l0/tests/expr_types_test.l0`
+  - `compiler/stage1_l0/tests/build_driver_test.l0`
   - `compiler/stage1_l0/tests/c_emitter_test.l0`
   - `compiler/stage1_l0/tests/backend_test.l0`
   - `compiler/stage1_l0/tests/l0c_lib_test.l0`
 - Related:
   - `l1/work/plans/features/closed/2026-04-04-l1-float-double-literals-noref.md`
   - `l1/docs/reference/design-decisions.md`
-- Repro: `make test-stage1 TESTS="expr_types_test c_emitter_test backend_test l0c_lib_test"`
+  - `l1/docs/reference/c-backend-design.md`
+- Repro: `make test-stage1 TESTS="expr_types_test c_emitter_test backend_test build_driver_test l0c_lib_test"`
 
 ## Summary
 
 The completed float-literal tranche added builtin `float` and `double`, real literals, narrow initial typing rules, and
 plain C lowering to `float` / `double`. That work is complete and remains the starting point for this plan.
 
-What it did not finish is the language and backend contract for floating-point behavior. In particular, the closed plan
+What remained to do was the language and backend contract for floating-point behavior. In particular, the closed plan
 allows plain-C lowering for floating division, but leaves too much semantic weight on host C behavior and does not yet
 state when such lowering is valid, what floating division by zero means at the L1 language level, or which backend and
 build configurations must be rejected.

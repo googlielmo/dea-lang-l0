@@ -1,6 +1,6 @@
 # L1 C Backend Design
 
-Version: 2026-04-02
+Version: 2026-04-14
 
 This is the canonical backend implementation document for the current Dea/L1 bootstrap compiler.
 
@@ -61,6 +61,8 @@ Current backend target is a single C translation unit.
 
 - `int` lowers through the runtime integer typedefs in `compiler/shared/runtime/l1_runtime.h`
 - `byte`, `bool`, and `string` likewise lower through runtime-defined C-facing types
+- `float` lowers to C `float` only when the enforced L1 floating-point contract is satisfied
+- `double` lowers to C `double` only when the enforced L1 floating-point contract is satisfied
 - `void` lowers to C `void`
 
 Current L1 prefix policy is:
@@ -76,6 +78,24 @@ legacy `l0` families and the current `dea` families, to avoid collisions in gene
 
 The only intentional legacy-prefixed include that remains in generated output for now is `l0_siphash.h`, which is
 treated as a temporary internal implementation header rather than part of the public L1 ABI.
+
+### Floating-point backend contract
+
+For FP-using programs, the generated C header now emits explicit compile-time checks instead of assuming every host C
+target is acceptable.
+
+Current enforcement:
+
+- generated C includes `float.h` and `math.h` and rejects targets that do not provide `INFINITY` and `NAN`
+- generated C rejects targets unless `FLT_RADIX == 2`, `FLT_MANT_DIG == 24`, `FLT_MAX_EXP == 128`, `DBL_MANT_DIG == 53`,
+  and `DBL_MAX_EXP == 1024`
+- generated C rejects macro-visible fast-math configurations such as `__FAST_MATH__` and MSVC `/fp:fast`
+- build/run mode also rejects known-invalid explicit `L1_CFLAGS` / `--c-options` such as `-ffast-math`, `-Ofast`,
+  `-ffinite-math-only`, `-fno-signed-zeros`, `-funsafe-math-optimizations`, `-fassociative-math`, and
+  `-freciprocal-math`
+
+This keeps plain C lowering honest: `float` and `double` remain direct C scalars only on hosts whose representation and
+build mode preserve the L1 floating-point contract.
 
 ### Structs, enums, pointers, and nullable values
 

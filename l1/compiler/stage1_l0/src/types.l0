@@ -324,6 +324,31 @@ func type_is_builtin(self: Type*, name: string) -> bool {
 }
 
 /**
+ * Report whether one type tree mentions builtin floating-point types.
+ *
+ * @param self Type to inspect.
+ * @return `true` when `self` or any nested type is builtin `float` or `double`.
+ */
+func type_contains_builtin_real(self: Type*) -> bool {
+    if (type_is_builtin(self, "float") || type_is_builtin(self, "double")) {
+        return true;
+    }
+    if (ord(self.kind) == ord(TY_POINTER) || ord(self.kind) == ord(TY_NULLABLE)) {
+        return type_contains_builtin_real(self.inner as Type*);
+    }
+    if (ord(self.kind) == ord(TY_FUNC)) {
+        let params = self.params as VectorBase*;
+        for (let i = 0; i < vec_size(params); i = i + 1) {
+            if (type_contains_builtin_real(ptr_vec_get(params, i) as Type*)) {
+                return true;
+            }
+        }
+        return type_contains_builtin_real(self.result as Type*);
+    }
+    return false;
+}
+
+/**
  * Check whether a type name is one of the builtin names.
  *
  * @param name Type name to inspect.

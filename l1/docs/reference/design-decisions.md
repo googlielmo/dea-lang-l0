@@ -204,10 +204,16 @@ Current conversion and typing policy stays intentionally narrow:
 - mixed integer and real binary arithmetic requires an explicit cast to a matching floating type
 - explicit numeric `as` casts among `int`, `float`, and `double` are part of the current bootstrap surface
 
-One current implementation irregularity remains documented rather than silently normalized away: direct integer literals
-may already flow into typed real contexts in some places. That behavior must be treated as an explicit special-case rule
-where it exists, with tests and documentation, rather than as evidence of a general implicit `int -> real` promotion
-policy.
+Direct integer literal conversion is a narrow contextual rule:
+
+- an integer literal expression may be used directly in a typed `float` or `double` context when the literal value is
+  representable by the target real type
+- this rule applies to parenthesized integer literals and unary-minus integer literals
+- this rule applies to annotated `let` initializers, function call arguments, return expressions, and constructor
+  arguments where the destination type is known
+- this rule does not apply to nonliteral integer expressions or variables
+- this rule does not create general implicit `int -> float` or `int -> double` promotion
+- mixed integer and real binary arithmetic still requires an explicit cast to a matching floating type
 
 Current operator policy for real values:
 

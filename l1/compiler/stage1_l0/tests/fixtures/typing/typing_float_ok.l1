@@ -45,9 +45,9 @@ func arithmetic_ops() -> double {
 func literals_and_calls() -> double {
     let a: float = 1.0f;
     let b: double = 2.0;
-    let c: float = 3;
-    let d: double = -4;
-    let e: float = take_float(5);
+    let c: float = 3; // Preserved direct integer-literal exception in typed real contexts.
+    let d: double = -4; // Preserved direct integer-literal exception in typed real contexts.
+    let e: float = take_float(5); // Preserved direct integer-literal exception for typed real call arguments.
     let f: double = take_double(a);
     let pair = Pair(6.0f, 7.0);
     let neg: float = -a;

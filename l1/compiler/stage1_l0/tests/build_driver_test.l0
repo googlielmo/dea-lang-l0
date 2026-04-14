@@ -134,6 +134,23 @@ func test_get_optimize_flag_defaults_and_overrides() {
 }
 
 /**
+ * Tests rejection of explicit C options that violate the floating-point backend contract.
+ */
+func test_float_contract_option_detection() {
+    assert(bd_float_contract_forbidden_option_reason("-ffast-math") != null, "fast-math should be rejected");
+    assert(bd_float_contract_forbidden_option_reason("-Ofast") != null, "Ofast should be rejected");
+    assert(bd_float_contract_forbidden_option_reason("-ffinite-math-only") != null,
+        "finite-math-only should be rejected");
+    assert(bd_float_contract_forbidden_option_reason("-fno-signed-zeros") != null,
+        "signed-zero disabling should be rejected");
+    assert(bd_float_contract_forbidden_option_reason("-funsafe-math-optimizations") != null,
+        "unsafe math optimizations should be rejected");
+    assert(bd_float_contract_forbidden_option_reason("/FP:FAST") != null, "MSVC fast FP mode should be rejected");
+    assert(bd_float_contract_forbidden_option_reason("-O2") == null, "ordinary optimization should stay allowed");
+    assert(bd_float_contract_forbidden_option_reason("-g") == null, "debug flags should stay allowed");
+}
+
+/**
  * Tests test_output_flag_selection_matches_compiler_family.
  */
 func test_output_flag_selection_matches_compiler_family() {
@@ -179,6 +196,7 @@ func main() {
     test_format_word_list_matches_stage1_logging();
     test_compiler_flag_family_detection();
     test_get_optimize_flag_defaults_and_overrides();
+    test_float_contract_option_detection();
     test_output_flag_selection_matches_compiler_family();
     test_exe_name_helpers_are_consistent();
     printl_s("build_driver_test: all tests passed");

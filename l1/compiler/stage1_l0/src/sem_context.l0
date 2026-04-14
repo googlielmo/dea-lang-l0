@@ -158,6 +158,88 @@ func analysis_locals(self: AnalysisResult*) -> LocalsResult*? {
 }
 
 /**
+ * Report whether any type stored in one map uses builtin floating-point types.
+ *
+ * @param map Type map to inspect.
+ * @return `true` when any stored type mentions `float` or `double`.
+ */
+func analysis_type_map_uses_floating_point(map: StringPtrMap*) -> bool {
+    for (let i = 0; i < spm_capacity(map); i = i + 1) {
+        if (spm_slot_occupied(map, i) && type_contains_builtin_real(spm_slot_value(map, i) as Type*)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
+ * Report whether any stored struct field type uses builtin floating-point types.
+ *
+ * @param map Struct-info map to inspect.
+ * @return `true` when any stored field type mentions `float` or `double`.
+ */
+func analysis_struct_infos_use_floating_point(map: StringPtrMap*) -> bool {
+    for (let i = 0; i < spm_capacity(map); i = i + 1) {
+        if (!spm_slot_occupied(map, i)) {
+            continue;
+        }
+        let info = spm_slot_value(map, i) as StructInfo*;
+        for (let field_i = 0; field_i < vec_size(info.fields); field_i = field_i + 1) {
+            let field = ptr_vec_get(info.fields, field_i) as StructFieldInfo*;
+            if (type_contains_builtin_real(field.field_type)) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+/**
+ * Report whether any stored enum payload type uses builtin floating-point types.
+ *
+ * @param map Enum-info map to inspect.
+ * @return `true` when any stored payload type mentions `float` or `double`.
+ */
+func analysis_enum_infos_use_floating_point(map: StringPtrMap*) -> bool {
+    for (let i = 0; i < spm_capacity(map); i = i + 1) {
+        if (!spm_slot_occupied(map, i)) {
+            continue;
+        }
+        let info = spm_slot_value(map, i) as EnumInfo*;
+        for (let variant_i = 0; variant_i < vec_size(info.variants); variant_i = variant_i + 1) {
+            let variant = ptr_vec_get(info.variants, variant_i) as EnumVariantInfo*;
+            for (let field_i = 0; field_i < vec_size(variant.field_types); field_i = field_i + 1) {
+                if (type_contains_builtin_real(ptr_vec_get(variant.field_types, field_i) as Type*)) {
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
+}
+
+/**
+ * Report whether an analyzed compilation unit uses builtin floating-point support.
+ *
+ * @param self Analysis result to inspect.
+ * @return `true` when any resolved type or expression mentions `float` or `double`.
+ */
+func analysis_uses_floating_point(self: AnalysisResult*) -> bool {
+    if (self.signatures != null) {
+        let tables = self.signatures as SignatureTables*;
+        if (analysis_type_map_uses_floating_point(tables.func_types) ||
+            analysis_type_map_uses_floating_point(tables.let_types) ||
+            analysis_struct_infos_use_floating_point(tables.struct_infos) ||
+            analysis_enum_infos_use_floating_point(tables.enum_infos))
+        {
+            return true;
+        }
+    }
+    return analysis_type_map_uses_floating_point(self.expr_types) ||
+           analysis_type_map_uses_floating_point(self.intrinsic_targets);
+}
+
+/**
  * Build the storage key used for per-expression analysis tables.
  *
  * @param module_name Owning module name.

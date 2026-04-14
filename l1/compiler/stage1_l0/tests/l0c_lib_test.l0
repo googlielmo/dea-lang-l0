@@ -367,6 +367,9 @@ func test_run_float_build_and_keep_c() {
 
     let c_text = read_file(c_path);
     assert(c_text != null, "float_main kept C file should exist");
+    assert(contains_s(c_text as string, "#include <float.h>"), "float_main float contract header missing");
+    assert(contains_s(c_text as string, "#if FLT_RADIX != 2"), "float_main float radix guard missing");
+    assert(contains_s(c_text as string, "__FAST_MATH__"), "float_main fast-math guard missing");
     assert(contains_s(c_text as string, "double dea_float_main_widen(float x)"), "float_main widen signature mismatch");
     assert(contains_s(c_text as string, "float seed = 1.0f;"), "float_main float literal lowering mismatch");
     assert(contains_s(c_text as string, "double total = ((dea_float_main_widen(seed) + 1.5) + 1.5);"),
@@ -443,6 +446,33 @@ func test_build_float_zero_division_keep_c() {
 
     rt_delete_file(out_path);
     rt_delete_file(c_path);
+}
+
+/**
+ * Tests that build mode rejects explicit C options that violate the floating-point contract.
+ */
+func test_build_float_rejects_invalid_math_mode_option() {
+    let out_path = build_output_path();
+    let c_path = build_c_output_path();
+    rt_delete_file(out_path);
+    rt_delete_file(c_path);
+
+    with (let argv = vs_create(14) => vs_free(argv)) {
+        vs_push(argv, "-P");
+        vs_push(argv, fixture_root());
+        vs_push(argv, "--output");
+        vs_push(argv, out_path);
+        vs_push(argv, "--keep-c");
+        vs_push(argv, "--c-options");
+        vs_push(argv, "-fno-signed-zeros");
+        vs_push(argv, "float_main");
+
+        let rc = run_with_argv(argv);
+        assert(rc == 1, "float_main should reject invalid signed-zero-breaking C options");
+    }
+
+    assert(!exists(out_path), "invalid FP mode should fail before producing an executable");
+    assert(!exists(c_path), "invalid FP mode should fail before writing kept generated C");
 }
 
 /**
@@ -539,6 +569,7 @@ func main() {
     test_run_float_build_and_keep_c();
     test_run_float_ops_build_and_keep_c();
     test_build_float_zero_division_keep_c();
+    test_build_float_rejects_invalid_math_mode_option();
     test_merge_c_option_words_cli_last();
     test_merge_c_option_words_ignores_empty_inputs();
     test_type_ok();
