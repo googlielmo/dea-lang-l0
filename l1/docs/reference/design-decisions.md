@@ -178,6 +178,10 @@ The bootstrap compiler keeps integer behavior defined rather than inheriting hos
 
 That policy is part of the language contract even though the current implementation is lowered through C.
 
+At the stdlib layer, shared integer helper contracts belong in `std.math`; copied modules such as `std.time` may consume
+those helpers, but they should not own general-purpose arithmetic utilities. Floating-point helper policy remains
+separate from this integer-focused surface.
+
 ## 11. Floating-Point Semantics and Backend Contract
 
 L1 now includes builtin `float` and `double` types and floating-point (FP) literals. Their semantic contract is

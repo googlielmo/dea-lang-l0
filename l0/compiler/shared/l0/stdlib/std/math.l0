@@ -4,15 +4,99 @@
  */
 
 /**
- * This module provides mathematical utility functions.
+ * This module provides integer-focused mathematical utility functions.
  */
 module std.math;
 
 import std.assert;
 
 /**
+ * Returns the maximum value for a 32-bit signed integer.
+ *
+ * @return INT_MAX.
+ */
+func int_max() -> int {
+    return 2147483647;
+}
+
+/**
+ * Returns the minimum value for a 32-bit signed integer.
+ *
+ * @return INT_MIN.
+ */
+func int_min() -> int {
+    return -2147483647 - 1;
+}
+
+/**
+ * Performs checked integer addition.
+ *
+ * @param a The first operand.
+ * @param b The second operand.
+ * @return The sum, or null on overflow.
+ */
+func checked_add_int(a: int, b: int) -> int? {
+    if (b > 0 && a > int_max() - b) {
+        return null;
+    }
+    if (b < 0 && a < int_min() - b) {
+        return null;
+    }
+    return a + b;
+}
+
+/**
+ * Performs checked integer subtraction.
+ *
+ * @param a The first operand.
+ * @param b The second operand.
+ * @return The difference, or null on overflow.
+ */
+func checked_sub_int(a: int, b: int) -> int? {
+    if (b < 0 && a > int_max() + b) {
+        return null;
+    }
+    if (b > 0 && a < int_min() + b) {
+        return null;
+    }
+    return a - b;
+}
+
+/**
+ * Performs checked integer multiplication.
+ *
+ * @param a The first operand.
+ * @param b The second operand.
+ * @return The product, or null on overflow.
+ */
+func checked_mul_int(a: int, b: int) -> int? {
+    if (a == 0 || b == 0) {
+        return 0;
+    }
+    if ((a == -1 && b == int_min()) || (b == -1 && a == int_min())) {
+        return null;
+    }
+    if (a > 0 && b > 0) {
+        if (a > int_max() / b) {
+            return null;
+        }
+    } else if (a > 0 && b < 0) {
+        if (b < int_min() / a) {
+            return null;
+        }
+    } else if (a < 0 && b > 0) {
+        if (a < int_min() / b) {
+            return null;
+        }
+    } else if (a < int_max() / b) {
+        return null;
+    }
+    return a * b;
+}
+
+/**
  * Calculates the Euclidean modulo: always returns a non-negative result,
- * even if 'a' is negative. Requires b > 0.
+ * even if `a` is negative. Requires `b > 0`.
  *
  * @param a The dividend.
  * @param b The divisor (must be > 0).
@@ -20,9 +104,349 @@ import std.assert;
  */
 func emod(a: int, b: int) -> int {
     assert(b > 0, "emod: divisor must be greater than 0");
-    let r: int = a % b;
+    let r = a % b;
     if (r < 0) {
         return r + b;
     }
     return r;
+}
+
+/**
+ * Calculates the Euclidean quotient paired with `emod`.
+ *
+ * @param a The dividend.
+ * @param b The divisor (must be > 0).
+ * @return The Euclidean quotient.
+ */
+func ediv(a: int, b: int) -> int {
+    assert(b > 0, "ediv: divisor must be greater than 0");
+    return div_floor(a, b);
+}
+
+/**
+ * Calculates the mathematical floor of `a / b`.
+ *
+ * The quotient must be representable as `int`.
+ *
+ * @param a The dividend.
+ * @param b The divisor (must be non-zero).
+ * @return The floor quotient.
+ */
+func div_floor(a: int, b: int) -> int {
+    assert(b != 0, "div_floor: divisor must be non-zero");
+    assert(!(a == int_min() && b == -1), "div_floor: result must be representable");
+
+    let q = a / b;
+    let r = a % b;
+    if (r != 0 && ((r > 0 && b < 0) || (r < 0 && b > 0))) {
+        let out = checked_sub_int(q, 1);
+        assert(out != null, "div_floor: result must be representable");
+        return out as int;
+    }
+    return q;
+}
+
+/**
+ * Calculates the mathematical ceiling of `a / b`.
+ *
+ * The quotient must be representable as `int`.
+ *
+ * @param a The dividend.
+ * @param b The divisor (must be non-zero).
+ * @return The ceiling quotient.
+ */
+func div_ceil(a: int, b: int) -> int {
+    assert(b != 0, "div_ceil: divisor must be non-zero");
+    assert(!(a == int_min() && b == -1), "div_ceil: result must be representable");
+
+    let q = a / b;
+    let r = a % b;
+    if (r != 0 && ((r > 0 && b > 0) || (r < 0 && b < 0))) {
+        let out = checked_add_int(q, 1);
+        assert(out != null, "div_ceil: result must be representable");
+        return out as int;
+    }
+    return q;
+}
+
+/**
+ * Returns the smaller of two integers.
+ *
+ * @param a The first operand.
+ * @param b The second operand.
+ * @return The minimum value.
+ */
+func min(a: int, b: int) -> int {
+    if (a <= b) {
+        return a;
+    }
+    return b;
+}
+
+/**
+ * Returns the larger of two integers.
+ *
+ * @param a The first operand.
+ * @param b The second operand.
+ * @return The maximum value.
+ */
+func max(a: int, b: int) -> int {
+    if (a >= b) {
+        return a;
+    }
+    return b;
+}
+
+/**
+ * Clamps `x` into the closed interval `[lo, hi]`.
+ *
+ * @param x The value to clamp.
+ * @param lo The lower bound.
+ * @param hi The upper bound.
+ * @return The clamped value.
+ */
+func clamp(x: int, lo: int, hi: int) -> int {
+    assert(lo <= hi, "clamp: lower bound must be less than or equal to upper bound");
+    if (x < lo) {
+        return lo;
+    }
+    if (x > hi) {
+        return hi;
+    }
+    return x;
+}
+
+/**
+ * Returns the sign of `x` as `-1`, `0`, or `1`.
+ *
+ * @param x The input value.
+ * @return The sign indicator.
+ */
+func sign(x: int) -> int {
+    if (x < 0) {
+        return -1;
+    }
+    if (x > 0) {
+        return 1;
+    }
+    return 0;
+}
+
+/**
+ * Returns whether `x` is even.
+ *
+ * @param x The input value.
+ * @return True when `x` is evenly divisible by 2.
+ */
+func is_even(x: int) -> bool {
+    return x % 2 == 0;
+}
+
+/**
+ * Returns whether `x` is odd.
+ *
+ * @param x The input value.
+ * @return True when `x` is not evenly divisible by 2.
+ */
+func is_odd(x: int) -> bool {
+    return x % 2 != 0;
+}
+
+/**
+ * Returns whether `a` is a multiple of `b`.
+ *
+ * @param a The dividend.
+ * @param b The divisor (must be non-zero).
+ * @return True when `a` is evenly divisible by `b`.
+ */
+func is_multiple(a: int, b: int) -> bool {
+    assert(b != 0, "is_multiple: divisor must be non-zero");
+    if (b == -1) {
+        return true;
+    }
+    return a % b == 0;
+}
+
+/**
+ * Returns the absolute value of `x`.
+ *
+ * @param x The input value.
+ * @return The absolute value, or null when it is not representable as `int`.
+ */
+func abs(x: int) -> int? {
+    if (x >= 0) {
+        return x;
+    }
+    return checked_sub_int(0, x);
+}
+
+/**
+ * Returns the non-negative greatest common divisor of `a` and `b`.
+ *
+ * @param a The first operand.
+ * @param b The second operand.
+ * @return The greatest common divisor, or null when it is not representable as `int`.
+ */
+func gcd(a: int, b: int) -> int? {
+    let x = a;
+    let y = b;
+    if (x > 0) {
+        x = -x;
+    }
+    if (y > 0) {
+        y = -y;
+    }
+    if (x == 0) {
+        return abs(y);
+    }
+    if (y == 0) {
+        return abs(x);
+    }
+
+    while (y != 0) {
+        if (y == -1) {
+            return 1;
+        }
+        let r = x % y;
+        x = y;
+        y = r;
+    }
+    return abs(x);
+}
+
+/**
+ * Returns the non-negative least common multiple of `a` and `b`.
+ *
+ * @param a The first operand.
+ * @param b The second operand.
+ * @return The least common multiple, or null when it is not representable as `int`.
+ */
+func lcm(a: int, b: int) -> int? {
+    if (a == 0 || b == 0) {
+        return 0;
+    }
+
+    let g = gcd(a, b);
+    if (g == null) {
+        return null;
+    }
+
+    let g_value = g as int;
+    let reduced = a / g_value;
+    let product = checked_mul_int(reduced, b);
+    if (product == null) {
+        return null;
+    }
+    return abs(product as int);
+}
+
+/**
+ * Returns `base` raised to the non-negative exponent `exp`.
+ *
+ * @param base The base value.
+ * @param exp The exponent.
+ * @return The result, or null when `exp < 0` or the result is not representable as `int`.
+ */
+func pow(base: int, exp: int) -> int? {
+    if (exp < 0) {
+        return null;
+    }
+
+    let result = 1;
+    let factor = base;
+    let remaining = exp;
+    while (remaining > 0) {
+        if (is_odd(remaining)) {
+            let next = checked_mul_int(result, factor);
+            if (next == null) {
+                return null;
+            }
+            result = next as int;
+        }
+        remaining = remaining / 2;
+        if (remaining > 0) {
+            let squared = checked_mul_int(factor, factor);
+            if (squared == null) {
+                return null;
+            }
+            factor = squared as int;
+        }
+    }
+    return result;
+}
+
+/**
+ * Returns the floor integer square root of `x`.
+ *
+ * @param x The input value.
+ * @return The floor square root, or null when `x < 0`.
+ */
+func isqrt(x: int) -> int? {
+    if (x < 0) {
+        return null;
+    }
+    if (x == 0) {
+        return 0;
+    }
+
+    let lo = 1;
+    let hi = 46340;
+    let best = 0;
+    if (x < hi) {
+        hi = x;
+    }
+    while (lo <= hi) {
+        let mid = lo + (hi - lo) / 2;
+        if (mid <= x / mid) {
+            best = mid;
+            lo = mid + 1;
+        } else {
+            hi = mid - 1;
+        }
+    }
+    return best;
+}
+
+/**
+ * Rounds `x` down to the nearest multiple of `align`.
+ *
+ * @param x The input value.
+ * @param align The positive alignment.
+ * @return The aligned value, or null when the mathematical result is not representable as `int`.
+ */
+func align_down(x: int, align: int) -> int? {
+    assert(align > 0, "align_down: alignment must be greater than 0");
+    let r = emod(x, align);
+    if (r == 0) {
+        return x;
+    }
+    return checked_sub_int(x, r);
+}
+
+/**
+ * Rounds `x` up to the nearest multiple of `align`.
+ *
+ * @param x The input value.
+ * @param align The positive alignment.
+ * @return The aligned value, or null when the mathematical result is not representable as `int`.
+ */
+func align_up(x: int, align: int) -> int? {
+    assert(align > 0, "align_up: alignment must be greater than 0");
+    let r = emod(x, align);
+    if (r == 0) {
+        return x;
+    }
+    return checked_add_int(x, align - r);
+}
+
+/**
+ * Returns whether `x` is already aligned to `align`.
+ *
+ * @param x The input value.
+ * @param align The positive alignment.
+ * @return True when `x` is a multiple of `align`.
+ */
+func is_aligned(x: int, align: int) -> bool {
+    assert(align > 0, "is_aligned: alignment must be greater than 0");
+    return emod(x, align) == 0;
 }

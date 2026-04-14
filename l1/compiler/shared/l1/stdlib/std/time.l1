@@ -61,24 +61,6 @@ struct CivilDate {
 }
 
 /**
- * Returns the maximum value for a 32-bit signed integer.
- *
- * @return INT_MAX.
- */
-func int_max() -> int {
-    return 2147483647;
-}
-
-/**
- * Returns the minimum value for a 32-bit signed integer.
- *
- * @return INT_MIN.
- */
-func int_min() -> int {
-    return -2147483647 - 1;
-}
-
-/**
  * Checks if the nanosecond component is within valid range [0, 1e9).
  *
  * @param nsec The nanosecond value.
@@ -86,56 +68,6 @@ func int_min() -> int {
  */
 func is_valid_nsec(nsec: int) -> bool {
     return nsec >= 0 && nsec < 1000000000;
-}
-
-/**
- * Performs floor division of two integers.
- *
- * @param a The dividend.
- * @param b The divisor.
- * @return The floor of a/b.
- */
-func floor_div(a: int, b: int) -> int {
-    let q = a / b;
-    let r = a % b;
-    if (r < 0) {
-        return q - 1;
-    }
-    return q;
-}
-
-/**
- * Performs checked integer addition.
- *
- * @param a The first operand.
- * @param b The second operand.
- * @return The sum, or null on overflow.
- */
-func checked_add_int(a: int, b: int) -> int? {
-    if (b > 0 && a > int_max() - b) {
-        return null;
-    }
-    if (b < 0 && a < int_min() - b) {
-        return null;
-    }
-    return a + b;
-}
-
-/**
- * Performs checked integer subtraction.
- *
- * @param a The first operand.
- * @param b The second operand.
- * @return The difference, or null on overflow.
- */
-func checked_sub_int(a: int, b: int) -> int? {
-    if (b < 0 && a > int_max() + b) {
-        return null;
-    }
-    if (b > 0 && a < int_min() + b) {
-        return null;
-    }
-    return a - b;
 }
 
 /**
@@ -245,7 +177,7 @@ func datetime_from_unix_sec(unix_sec: int, nsec: int, utc_offset_sec: int, is_ds
         return null;
     }
 
-    let days = floor_div(unix_sec, 86400);
+    let days = div_floor(unix_sec, 86400);
     let sod = emod(unix_sec, 86400);
 
     let hour = sod / 3600;

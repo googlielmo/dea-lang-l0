@@ -18,7 +18,7 @@
 - Test modules:
   - `compiler/stage1_l0/tests/math_test.l0`
 - Related:
-  - `work/plans/features/2026-04-14-shared-std-math-int-surface-noref.md`
+  - `work/plans/features/closed/2026-04-14-shared-std-math-int-surface-noref.md`
   - `l1/work/plans/features/closed/2026-04-13-l1-uint-long-ulong-bigint-builtins-noref.md`
   - `l1/work/plans/features/2026-04-14-l1-std-real-module-noref.md`
 
@@ -34,9 +34,10 @@ selective.
 
 ## Dependency
 
-This plan depends on the shared `int` surface in `work/plans/features/2026-04-14-shared-std-math-int-surface-noref.md`
-settling first. The shared plan owns the common module identity, precondition style, and signed-helper policy; this
-L1-local follow-up should extend that settled shape rather than redefining it.
+This plan depends on the shared `int` surface in
+`work/plans/features/closed/2026-04-14-shared-std-math-int-surface-noref.md` settling first. The shared plan owns the
+common module identity, precondition style, and signed-helper policy; this L1-local follow-up should extend that settled
+shape rather than redefining it.
 
 It also depends on the completed integer builtin work in
 `l1/work/plans/features/closed/2026-04-13-l1-uint-long-ulong-bigint-builtins-noref.md`, which already made `uint`,

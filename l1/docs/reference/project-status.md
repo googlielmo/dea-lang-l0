@@ -59,7 +59,7 @@ including:
 - explicit nullability, `new` / `drop`, ARC-managed `string`, casts, and postfix `expr?`
 
 The copied stdlib currently includes the core bootstrap modules for I/O, strings, text, paths, filesystem access, time,
-randomness, assertions, optionals, and the current container set.
+randomness, assertions, optionals, the current container set, and the shared integer helper surface in `std.math`.
 
 ## Delivery and Validation
 

@@ -444,8 +444,8 @@ func join_s(parts: VectorString*, sep: string) -> string {
 
     let sep_len = len_s(sep);
     let total_len = sep_len * (count - 1);
-    for (let i = 0; i < count; i = i + 1) {
-        total_len = total_len + len_s(vs_get(parts, i));
+    for (let p = 0; p < count; p = p + 1) {
+        total_len = total_len + len_s(vs_get(parts, p));
     }
 
     with (let cb = cb_create() => cb_free(cb)) {
@@ -502,26 +502,26 @@ func int_to_string_base(value: int, base: int) -> string {
     if (value == 0) {
         return "0";
     }
-    let sign = 1;
+    let sign_value = 1;
     if (value < 0) {
-        sign = -1;
+        sign_value = -1;
     }
 
     let cb = cb_create();
 
     let digit = emod(value, base);
-    if (sign < 0 && digit != 0) {
+    if (sign_value < 0 && digit != 0) {
         digit = base - digit;
     }
     cb_append(cb, digit_to_char(digit));
-    value = value / (sign * base); // divide with sign adjustment
+    value = value / (sign_value * base); // divide with sign adjustment
 
     while (value != 0) {
         digit = emod(value, base);
         cb_append(cb, digit_to_char(digit));
         value = value / base;
     }
-    if (sign < 0) {
+    if (sign_value < 0) {
         cb_append(cb, '-' as byte);
     }
 
@@ -677,7 +677,7 @@ func string_to_byte_base(s: string, base: int) -> byte? {
 func string_to_int_base(s: string, base: int) -> int? {
     assert(base >= 2 && base <= 16, "Base must be between 2 and 16");
 
-    let sign = 1; // 1 for positive, -1 for negative
+    let sign_value = 1; // 1 for positive, -1 for negative
     let start_index: int = 0;
     if (len_s(s) == 0) {
         return null;
@@ -686,7 +686,7 @@ func string_to_int_base(s: string, base: int) -> int? {
         if (len_s(s) == 1) {
             return null; // Just a '-' is not valid
         }
-        sign = -1;
+        sign_value = -1;
         start_index = 1;
     }
     // Ignore leading zeros
@@ -702,7 +702,7 @@ func string_to_int_base(s: string, base: int) -> int? {
     if (!is_digit_base(first_char, base)) {
         return null; // Invalid character
     }
-    result = sign * to_digit_base(first_char, base)?;
+    result = sign_value * to_digit_base(first_char, base)?;
     start_index = start_index + 1;
     for (let i: int = start_index; i < len_s(s); i = i + 1) {
         let c = char_at_s(s, i);
@@ -711,7 +711,7 @@ func string_to_int_base(s: string, base: int) -> int? {
         }
         let digit = to_digit_base(c, base)?;
         // Check for overflow before multiplying and adding
-        if (sign < 0) {
+        if (sign_value < 0) {
             if (result < (-2147483648 + digit) / base) {
                 return null; // Underflow
             }
@@ -720,7 +720,7 @@ func string_to_int_base(s: string, base: int) -> int? {
                 return null; // Overflow
             }
         }
-        result = result * base + sign * digit;
+        result = result * base + sign_value * digit;
     }
     return result;
 }

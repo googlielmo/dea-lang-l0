@@ -215,9 +215,29 @@ For canonical ownership behavior around `new`/`drop`, ARC strings, and container
 
 **Imports:** `std.assert`
 
-| Function | Signature                 | Description                                                             |
-| -------- | ------------------------- | ----------------------------------------------------------------------- |
-| `emod`   | `(a: int, b: int) -> int` | Euclidean modulo. Requires `b > 0`; always returns non-negative result. |
+Shared integer helper module. Floating-point helpers stay out of `std.math`.
+
+| Function      | Signature                           | Description                                                                                               |
+| ------------- | ----------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `emod`        | `(a: int, b: int) -> int`           | Euclidean modulo. Requires `b > 0`; always returns a result in `[0, b)`.                                  |
+| `ediv`        | `(a: int, b: int) -> int`           | Euclidean quotient paired with `emod`. Requires `b > 0`.                                                  |
+| `div_floor`   | `(a: int, b: int) -> int`           | Mathematical floor quotient. Requires `b != 0` and a representable result (excluding `int_min() / -1`).   |
+| `div_ceil`    | `(a: int, b: int) -> int`           | Mathematical ceiling quotient. Requires `b != 0` and a representable result (excluding `int_min() / -1`). |
+| `min`         | `(a: int, b: int) -> int`           | Returns the smaller operand.                                                                              |
+| `max`         | `(a: int, b: int) -> int`           | Returns the larger operand.                                                                               |
+| `clamp`       | `(x: int, lo: int, hi: int) -> int` | Clamps `x` into `[lo, hi]`. Requires `lo <= hi`.                                                          |
+| `sign`        | `(x: int) -> int`                   | Returns `-1`, `0`, or `1` based on the sign of `x`.                                                       |
+| `is_even`     | `(x: int) -> bool`                  | Returns whether `x` is evenly divisible by 2.                                                             |
+| `is_odd`      | `(x: int) -> bool`                  | Returns whether `x` is not evenly divisible by 2.                                                         |
+| `is_multiple` | `(a: int, b: int) -> bool`          | Returns whether `a` is evenly divisible by `b`. Requires `b != 0`.                                        |
+| `abs`         | `(x: int) -> int?`                  | Absolute value. Returns `null` when the mathematical result is not representable as `int`.                |
+| `gcd`         | `(a: int, b: int) -> int?`          | Non-negative greatest common divisor. Returns `null` when the mathematical result is not representable.   |
+| `lcm`         | `(a: int, b: int) -> int?`          | Non-negative least common multiple. Returns `null` on overflow or non-representable results.              |
+| `pow`         | `(base: int, exp: int) -> int?`     | Integer exponentiation. Returns `null` for `exp < 0` or overflow.                                         |
+| `isqrt`       | `(x: int) -> int?`                  | Floor integer square root. Returns `null` when `x < 0`.                                                   |
+| `align_down`  | `(x: int, align: int) -> int?`      | Rounds `x` down to the nearest multiple of `align`. Requires `align > 0`; returns `null` on overflow.     |
+| `align_up`    | `(x: int, align: int) -> int?`      | Rounds `x` up to the nearest multiple of `align`. Requires `align > 0`; returns `null` on overflow.       |
+| `is_aligned`  | `(x: int, align: int) -> bool`      | Returns whether `x` is already aligned to `align`. Requires `align > 0`.                                  |
 
 ### `std.optional`
 

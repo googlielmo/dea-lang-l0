@@ -3,7 +3,7 @@
 ## Expand `std.math` with a shared `int` helper surface for L0 and L1
 
 - Date: 2026-04-14
-- Status: Draft
+- Status: Completed
 - Title: Expand `std.math` with a shared `int` helper surface for L0 and L1
 - Kind: Feature
 - Scope: Shared
@@ -17,8 +17,8 @@
 - Porting rule: Keep the shared `int` API, semantics, and regression inventory mechanically aligned between `l0/` and
   `l1/`; L1-only wider integer helpers stay in the dedicated L1 follow-up plan
 - Target status:
-  - `l0` shared `std.math` `int` surface: Pending
-  - `l1` shared `std.math` `int` surface: Pending
+  - `l0` shared `std.math` `int` surface: Completed
+  - `l1` shared `std.math` `int` surface: Completed
 - Subsystem: stdlib / docs / tests
 - Modules:
   - `l0/compiler/shared/l0/stdlib/std/math.l0`

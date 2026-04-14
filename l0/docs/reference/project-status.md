@@ -65,8 +65,8 @@ The current implemented language surface covers the core bootstrap subset used t
 - explicit nullability, `new`/`drop`, ARC-managed `string`, casts, and postfix `expr?`.
 
 The standard library now includes the core runtime-facing and bootstrap-facing modules for I/O, strings, text, paths,
-filesystem access, time, randomness, assertions, optionals, and the current container set. Use
-[standard-library.md](standard-library.md) for the canonical module-by-module reference.
+filesystem access, the shared integer helper surface in `std.math`, time, randomness, assertions, optionals, and the
+current container set. Use [standard-library.md](standard-library.md) for the canonical module-by-module reference.
 
 ## Delivery and Validation
 
