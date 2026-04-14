@@ -22,5 +22,8 @@ l1c --version
 
 `make use-dev-stage1` auto-prepares the default repo-local upstream `../../l0/build/dea/bin/l0c-stage2` when needed.
 
+`make docker CMD=test-all` runs the explicit Linux container validation path while preserving that same default
+repo-local `../../l0` bootstrap layout.
+
 For a non-default upstream bootstrap compiler, set `L1_BOOTSTRAP_L0C=/path/to/l0c-stage2` when running
 `make build-stage1`.
