@@ -1,6 +1,6 @@
 # L0 Stage 2 Compiler Contract
 
-Version: 2026-03-15
+Version: 2026-04-14
 
 This document covers Stage 2-specific guarantees not part of the shared CLI contract.
 

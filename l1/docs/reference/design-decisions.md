@@ -1,6 +1,6 @@
 # L1 Language and Runtime Design Decisions
 
-Version: 2026-04-13
+Version: 2026-04-14
 
 This document records current design rationale and policy decisions for Dea/L1 as implemented by the bootstrap compiler.
 
@@ -275,7 +275,7 @@ Rationale:
 ## 14. Numeric Literal Representation in L1
 
 L1 introduces numeric types that are not native to the L0 implementation language, including implemented integer forms
-such as `uint`, `long`, and `ulong`, plus still in-progress floating-point forms such as `float` and `double`.
+such as `uint`, `long`, and `ulong`, plus the implemented floating-point forms `float` and `double`.
 
 Current decision:
 

@@ -1,6 +1,6 @@
 # L1 Compiler Architecture
 
-Version: 2026-04-02
+Version: 2026-04-14
 
 This is the canonical architecture document for the current Dea/L1 bootstrap compiler.
 

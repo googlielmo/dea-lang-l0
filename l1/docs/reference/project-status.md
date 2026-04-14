@@ -1,6 +1,6 @@
 # L1 Project Status
 
-Version: 2026-04-04
+Version: 2026-04-14
 
 This document summarizes what is implemented in the Dea/L1 subtree today.
 
@@ -50,16 +50,21 @@ This gives the subtree a complete bootstrap environment without claiming a self-
 
 ## Language and Library Coverage
 
-The current implemented language surface matches the bootstrap subset exercised by the copied compiler and tests,
-including:
+The current implemented language surface matches the bootstrap subset exercised by the copied compiler, tests, and
+example checks, including:
 
 - functions, structs, enums, type aliases, and top-level `let`
 - modules/imports with qualified-name disambiguation
 - structured control flow including `if`, `while`, `for`, `match`, `case`, and `with` / `cleanup`
+- fixed-width integer builtins `tiny`, `short`, `ushort`, `int`, `uint`, `long`, and `ulong`, with contextual wide
+  integer literals carried through the bigint path when they exceed bootstrap `int`
+- builtin `float` and `double`, real literals, the current narrow numeric conversion rules, and backend-validated
+  floating-point lowering
 - explicit nullability, `new` / `drop`, ARC-managed `string`, casts, and postfix `expr?`
 
 The copied stdlib currently includes the core bootstrap modules for I/O, strings, text, paths, filesystem access, time,
 randomness, assertions, optionals, the current container set, and the shared integer helper surface in `std.math`.
+Library follow-up work for `std.real` and the L1-only `_ui` / `_l` / `_ul` `std.math` families is not implemented yet.
 
 ## Delivery and Validation
 
@@ -73,10 +78,14 @@ make test-stage1
 ```
 
 `make use-dev-stage1` auto-prepares the default repo-local upstream `../l0/build/dea/bin/l0c-stage2` when needed.
+`make check-examples` adds warning-free latest-stage `--check` coverage for `examples/*.l1`, while `make test-all`
+combines the implementation tests and example checks.
 
 Validation is currently centered on:
 
 - `make test-stage1` and the `.l0` implementation tests under `compiler/stage1_l0/tests/`
+- `make check-examples` for warning-free latest-stage `--check` coverage across `examples/*.l1`
+- `make test-all` as the combined local Stage 1 validation entry point
 - `compiler/stage1_l0/scripts/run_trace_tests.py` for ARC/memory trace validation
 - keeping the copied stdlib/runtime tree usable by the bootstrap compiler
 

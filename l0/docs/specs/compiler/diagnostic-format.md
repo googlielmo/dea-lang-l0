@@ -1,6 +1,6 @@
 # Diagnostic Output Format Spec
 
-Version: 2026-03-09
+Version: 2026-04-14
 
 Normative specification for compiler diagnostic output in both Stage 1 and Stage 2.
 

@@ -1,6 +1,6 @@
 # L0 Compiler Architecture
 
-Version: 2026-03-15
+Version: 2026-04-14
 
 This is the canonical architecture document for the current compiler pipeline. Stage 1 remains the reference
 implementation and Stage 2 mirrors the same pass structure through code generation and driver execution.

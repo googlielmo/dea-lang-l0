@@ -1,6 +1,6 @@
 # L0 Trace Specification
 
-Version: 2026-03-20
+Version: 2026-04-14
 
 This document specifies the shared trace instrumentation contract for generated C code and runtime behavior in both
 Stage 1 and Stage 2.

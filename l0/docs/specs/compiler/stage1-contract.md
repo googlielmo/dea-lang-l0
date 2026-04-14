@@ -1,6 +1,6 @@
 # L0 Stage 1 Compiler Contract
 
-Version: 2026-03-12
+Version: 2026-04-14
 
 This document is the compact Stage 1 contract and navigation index.
 

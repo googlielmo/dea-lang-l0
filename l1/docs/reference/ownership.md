@@ -1,6 +1,6 @@
 # L1 Ownership and Memory Management Reference
 
-Version: 2026-04-02
+Version: 2026-04-14
 
 This document describes how ownership works in current Dea/L1 bootstrap builds, covering:
 

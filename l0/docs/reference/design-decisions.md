@@ -1,6 +1,6 @@
 # L0 Language and Runtime Design Decisions
 
-Version: 2026-03-21
+Version: 2026-04-14
 
 This document records rationale and policy decisions.
 

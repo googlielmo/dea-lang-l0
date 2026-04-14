@@ -1,6 +1,6 @@
 # The L0 Standard Library
 
-Version: 2026-03-12
+Version: 2026-04-14
 
 The standard library provides ergonomic L0 modules (`std.*`) and low-level runtime bindings (`sys.*`).
 

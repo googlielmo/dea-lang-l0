@@ -1,6 +1,6 @@
 # L0 Ownership and Memory Management Reference
 
-Version: 2026-03-11
+Version: 2026-04-14
 
 This document describes how ownership works in L0 today, covering:
 

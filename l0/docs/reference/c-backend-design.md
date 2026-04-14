@@ -1,6 +1,6 @@
 # L0 C Backend Design
 
-Version: 2026-03-23
+Version: 2026-04-14
 
 This is the canonical backend implementation document for the current C backend. Stage 1 remains the behavioral oracle;
 Stage 2 is expected to emit the same C and reuse the same diagnostic/ICE codes for equivalent backend conditions.
