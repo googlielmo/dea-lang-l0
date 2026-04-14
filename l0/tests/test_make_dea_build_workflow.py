@@ -307,6 +307,7 @@ def main() -> int:
             "test-stage1",
             "test-stage2",
             "test-stage2-trace",
+            "check-examples",
             "test-dist",
             "triple-test",
             "test-all",
@@ -494,6 +495,7 @@ def main() -> int:
             "test-stage1": "pytest -n auto",
             "test-stage2": "./compiler/stage2_l0/scripts/run_tests.py",
             "test-stage2-trace": "./compiler/stage2_l0/scripts/run_trace_tests.py",
+            "check-examples": "../scripts/check_examples.py",
             "test-dist": "./tests/test_make_dist_workflow.py",
             "triple-test": "./compiler/stage2_l0/tests/l0c_triple_bootstrap_test.py",
             "test-all": "./compiler/stage2_l0/scripts/run_trace_tests.py",
@@ -503,9 +505,10 @@ def main() -> int:
         for target, expected in dry_run_expectations.items():
             output = run_checked(make_command(dea_build_rel, target, dry_run=True))
             assert_output_contains(output, expected)
-            if target in {"test-stage2", "test-stage2-trace", "triple-test"}:
+            if target in {"test-stage2", "test-stage2-trace", "triple-test", "check-examples"}:
                 assert_output_contains(output, "./scripts/build-stage2-l0c.sh")
             if target == "test-all":
+                assert_output_contains(output, "../scripts/check_examples.py")
                 assert_output_contains(output, "./tests/test_make_dea_build_workflow.py")
 
         run_checked(make_command(dea_build_rel, "clean-dea-build"))

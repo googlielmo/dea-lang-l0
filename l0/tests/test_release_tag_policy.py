@@ -53,12 +53,24 @@ def assert_contains(text: str, needle: str, *, context: str) -> None:
         fail(f"missing {needle!r} in {context}")
 
 
+def assert_before(text: str, first: str, second: str, *, context: str) -> None:
+    first_index = text.find(first)
+    if first_index < 0:
+        fail(f"missing {first!r} in {context}")
+    second_index = text.find(second)
+    if second_index < 0:
+        fail(f"missing {second!r} in {context}")
+    if first_index >= second_index:
+        fail(f"expected {first!r} before {second!r} in {context}")
+
+
 def check_release_workflow() -> None:
     text = read_text(".github/workflows/l0-release.yml")
     assert_contains(text, '- "l0-v*"', context="l0-release.yml")
     assert_contains(text, 'gh api "repos/$GITHUB_REPOSITORY/pages"', context="l0-release.yml")
     assert_contains(text, "pages_enabled=true", context="l0-release.yml")
     assert_contains(text, "pages_enabled=false", context="l0-release.yml")
+    assert_contains(text, "make check-examples", context="l0-release.yml")
     assert_contains(text, 'export DEA_DIST_VERSION="${RELEASE_VERSION#l0-v}"', context="l0-release.yml")
     assert_contains(text, "name: dea-l0-dist-${{ matrix.os }}-${{ matrix.arch }}", context="l0-release.yml")
     assert_contains(text, "pattern: dea-l0-dist-*", context="l0-release.yml")
@@ -77,11 +89,13 @@ def check_release_workflow() -> None:
         "prev_tag=\"$(git tag --merged HEAD --sort=-v:refname | grep -E '^v[0-9]+\\.[0-9]+\\.[0-9]+$' | head -n 1 || true)\"",
         context="l0-release.yml",
     )
+    assert_before(text, "make check-examples", "make dist | tee build/dist.log", context="l0-release.yml")
 
 
 def check_snapshot_workflow() -> None:
     text = read_text(".github/workflows/l0-snapshot.yml")
     assert_contains(text, 'snapshot_version="l0-snapshot-${stamp}-${short_hash}"', context="l0-snapshot.yml")
+    assert_contains(text, "make check-examples", context="l0-snapshot.yml")
     assert_contains(text, 'export DEA_DIST_VERSION="${SNAPSHOT_VERSION#l0-}"', context="l0-snapshot.yml")
     assert_contains(text, "name: dea-l0-dist-${{ matrix.os }}-${{ matrix.arch }}", context="l0-snapshot.yml")
     assert_contains(text, "pattern: dea-l0-dist-*", context="l0-snapshot.yml")
@@ -95,6 +109,7 @@ def check_snapshot_workflow() -> None:
         "prev_tag=\"$(git tag --merged HEAD --sort=-v:refname | grep -E '^v[0-9]+\\.[0-9]+\\.[0-9]+$' | head -n 1 || true)\"",
         context="l0-snapshot.yml",
     )
+    assert_before(text, "make check-examples", "make dist | tee build/dist.log", context="l0-snapshot.yml")
 
 
 def check_docs_publish_workflow() -> None:

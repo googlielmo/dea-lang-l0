@@ -106,7 +106,8 @@ tooling, and Stage 1-focused testing:
 ./scripts/gen-docs.sh --pdf-fast  # faster preview PDF build (single pdflatex pass)
 make help                         # show the repo-local developer workflow targets
 make venv                         # create or reuse the shared ../.venv
-make docker CMD=test-all         # explicitly run a make target inside the repo-owned Linux test container
+make check-examples               # run latest-stage --check across `examples/*.l0`; fail on warnings or errors
+make docker CMD=test-all          # explicitly run a make target inside the repo-owned Linux test container
 make docker CMD=test-all DOCKER_L0_CC=gcc
 ```
 
@@ -127,7 +128,7 @@ For direct Stage 2 artifact usage, use:
 make use-dev-stage2 # build, install, and select the Stage 2 launcher under build/dea/bin
 source build/dea/bin/l0-env.sh # activate the repo-local Dea build workflow in your shell
 make PREFIX=/tmp/l0-install install # install the self-hosted Stage 2 compiler under one prefix
-make test-all # run the full Stage 1 + Stage 2 validation suite
+make test-all # run the full Stage 1 + Stage 2 validation suite, including example checks
 make triple-test # run the strict triple-bootstrap regression
 ```
 
@@ -158,13 +159,14 @@ For Stage 2 (`compiler/stage2_l0`) changes, finalization checks should include:
 ```bash
 make test-stage2
 make test-stage2-trace
+make check-examples
 make triple-test # this is included in test-stage2 but can be run separately if needed
 ```
 
 Full Stage 1 + Stage 2 validation can be run in parallel (recommended finalization step before commit) with:
 
 ```bash
-make -j test-all # runs all tests in parallel, including Stage 1, Stage 2, and trace tests
+make -j test-all # runs all tests in parallel, including Stage 1, Stage 2, example checks, and trace tests
 ```
 
 For workflow and distribution tooling validation:

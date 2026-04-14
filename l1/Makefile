@@ -22,7 +22,7 @@ PIP_DEPS_CMD = import tomllib,pathlib;\
 	g=tomllib.loads(pathlib.Path('pyproject.toml').read_text()).get('dependency-groups',{});\
 	print(' '.join(d for d in g.get('dev',[])+g.get('docs',[]) if isinstance(d,str)))
 
-.PHONY: help _check-python venv _ensure-bootstrap-l0-stage2 build-stage1 use-dev-stage1 test-stage1 test-all print-l1-build-dir clean docker
+.PHONY: help _check-python venv _ensure-bootstrap-l0-stage2 build-stage1 use-dev-stage1 test-stage1 check-examples test-all print-l1-build-dir clean docker
 
 help:
 	@printf '%s\n' \
@@ -31,8 +31,9 @@ help:
 		'Targets:' \
 		'  venv               Create or reuse the shared monorepo `../.venv`.' \
 		'  use-dev-stage1     Build and switch the repo-local `l1c` alias to Stage 1.' \
-		'  test-all           Run the full L1 validation suite (currently `test-stage1` only).' \
+		'  test-all           Run the full L1 validation suite (`test-stage1` plus example checks).' \
 		'  test-stage1        Run the L1 Stage 1 `.l0` implementation tests with the built repo-local compiler.' \
+		'  check-examples     Validate all `examples/*.l1` sources with the repo-local Stage 1 compiler; fail on warnings or errors.' \
 		'  clean              Remove repo-local build artifacts under `build/*`.' \
 		'' \
 		'Docker:' \
@@ -107,7 +108,10 @@ endif
 test-stage1: venv build-stage1
 	L1_BUILD_DIR="$(L1_BUILD_DIR)" "$(VENV_PYTHON)" ./compiler/stage1_l0/scripts/run_tests.py $(TESTS)
 
-test-all: test-stage1
+check-examples: build-stage1
+	"$(PYTHON)" ../scripts/check_examples.py --compiler "$(L1_BUILD_DIR)/bin/l1c-stage1" --examples-dir examples --extension .l1 --label "L1 Stage 1"
+
+test-all: test-stage1 check-examples
 
 print-l1-build-dir:
 	@printf '%s\n' "$(L1_BUILD_DIR)"

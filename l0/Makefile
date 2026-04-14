@@ -45,6 +45,7 @@ PIP_DEPS_CMD = import tomllib,pathlib;\
 	test-stage1 \
 	test-stage2 \
 	test-stage2-trace \
+	check-examples \
 	test-dist \
 	triple-test \
 	test-dea-build \
@@ -73,11 +74,12 @@ help:
 		'  use-dev-stage1     Install and switch the repo-local `l0c` alias to Stage 1.' \
 		'  use-dev-stage2     Build and switch the repo-local `l0c` alias to Stage 2.' \
 		'  install-dev-stages Prepare both Stage 1 and Stage 2 launchers under DEA_BUILD_DIR.' \
-		'  test-all           Run the full Stage 1, Stage 2, workflow, and distribution validation suite.' \
+		'  test-all           Run the full Stage 1, Stage 2, example, workflow, and distribution validation suite.' \
 		'  test-stage1        Validate the Stage 1 Python compiler test suite.' \
 		'  test-stage2        Validate the Stage 2 compiler test suite; pass TESTS="name1 name2" to run selected cases.' \
 		'  test-stage2-trace  Validate Stage 2 ARC and memory tracing behavior; pass TESTS="name1 name2" to run selected cases.' \
 		'  triple-test        Run the Stage 2 triple-bootstrap check on its own.' \
+		'  check-examples     Validate all `examples/*.l0` sources with the repo-local Stage 2 compiler; fail on warnings or errors.' \
 		'' \
 		'Workflow testing:' \
 		'  test-dist          Validate the `make dist` packaging workflow end to end.' \
@@ -207,6 +209,9 @@ test-stage2: install-dev-stage2 | venv
 test-stage2-trace: install-dev-stage2 | venv
 	DEA_BUILD_DIR="$(DEA_BUILD_DIR)" "$(VENV_PYTHON)" ./compiler/stage2_l0/scripts/run_trace_tests.py $(TESTS)
 
+check-examples: install-dev-stage2
+	"$(PYTHON)" ../scripts/check_examples.py --compiler "$(DEA_BUILD_DIR)/bin/l0c-stage2" --examples-dir examples --extension .l0 --label "L0 Stage 2"
+
 test-dist: | venv
 	"$(VENV_PYTHON)" ./tests/test_make_dist_workflow.py
 
@@ -225,7 +230,7 @@ test-release-tags: | venv
 test-workflows: test-dist test-dea-build test-dist-fallback test-release-tags
 	@printf 'All workflow tests passed!\n'
 
-test-all: test-stage1 test-stage2 test-stage2-trace test-workflows
+test-all: test-stage1 test-stage2 test-stage2-trace check-examples test-workflows
 
 refresh-goldens: venv
 	"$(VENV_PYTHON)" ./scripts/refresh_stage2_backend_goldens.py

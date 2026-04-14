@@ -107,6 +107,22 @@ jobs:
           command -v "${{ matrix.c_compiler }}"
           "${{ matrix.c_compiler }}" --version | head -n 1
 
+      - name: Smoke-test examples
+        if: runner.os != 'Windows'
+        env:
+          L0_CC: ${{ matrix.c_compiler }}
+        run: |
+          make check-examples
+
+      - name: Smoke-test examples
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        env:
+          L0_CC: ${{ matrix.c_compiler }}
+          PYTHON: python
+        run: |
+          make check-examples
+
       - name: Build distribution archive
         if: runner.os != 'Windows'
         env:

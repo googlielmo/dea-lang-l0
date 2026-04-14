@@ -13,8 +13,9 @@ the L1-language fixture programs exercised by the bootstrap compiler tests. The 
 its implementation tests are `.l0` sources and are built or run with the upstream `l0c-stage2` toolchain during
 bootstrap.
 
-Current Stage 1 validation is the `.l0` implementation test suite under `compiler/stage1_l0/tests/`. Exact generated-C
-golden-file parity is not part of the active L1 Stage 1 contract.
+Current Stage 1 validation combines the `.l0` implementation test suite under `compiler/stage1_l0/tests/` with
+warning-free latest-stage `--check` coverage for `examples/*.l1`. Exact generated-C golden-file parity is not part of
+the active L1 Stage 1 contract.
 
 Minimal local workflow:
 

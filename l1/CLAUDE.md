@@ -31,7 +31,9 @@ make use-dev-stage1
 source build/dea/bin/l1-env.sh
 l1c --help
 l1c --version
+make check-examples
 make test-stage1
+make test-all
 ```
 
 ## Current Scope
