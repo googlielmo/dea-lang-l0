@@ -68,7 +68,7 @@ PAR_TRIGGERS = {
         module main;
 
         func main() -> int {
-            let uint: int = 0;
+            let __dea__future__keyword__: int = 0;
             return 0;
         }
         """

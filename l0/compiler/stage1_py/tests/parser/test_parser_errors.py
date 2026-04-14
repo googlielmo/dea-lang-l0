@@ -9,8 +9,8 @@ def test_parser_reserved_variable_names(analyze_single):
     module main;
 
     func main() -> int {
-        let uint: int = 0;
-        return uint;
+        let __dea__future__keyword__: int = 0;
+        return __dea__future__keyword__;
     }
     """
     result = analyze_single("main", src)

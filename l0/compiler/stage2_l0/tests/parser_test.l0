@@ -94,7 +94,7 @@ func test_module_decl_error() {
  * Tests test_reserved_variable_name_error.
  */
 func test_reserved_variable_name_error() {
-    let src = "module main; func main() -> int { let uint: int = 0; return uint; }";
+    let src = "module main; func main() -> int { let __dea__future__keyword__: int = 0; return __dea__future__keyword__; }";
     expect_error_code(src, "PAR-0010");
 }
 

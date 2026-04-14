@@ -280,7 +280,8 @@ func ident_to_token(ident: string, index: int, line: int, col: int) -> Token {
     }
     if (eq_s(ident, "tiny") || eq_s(ident, "short") || eq_s(ident, "long") ||
         eq_s(ident, "ushort") || eq_s(ident, "uint") || eq_s(ident, "ulong") ||
-        eq_s(ident, "float") || eq_s(ident, "double") || eq_s(ident, "in") ||
+        eq_s(ident, "float") || eq_s(ident, "double") ||
+        eq_s(ident, "__dea__future__keyword__") || eq_s(ident, "in") ||
         eq_s(ident, "const") ) {
         return Token(TT_FUTURE_EXTENSION, index, line, col);
     }

@@ -191,7 +191,10 @@ class Parser:
         """Expect and consume a valid variable name (non-reserved identifier)."""
         tok = self._peek()
         if tok.kind == TokenKind.FUTURE_EXTENSION:
-            self._error_bail(f"[PAR-0010] invalid variable name '{tok.text}': reserved keyword", tok)
+            self._error_bail(
+                f"[PAR-0010] invalid variable name '{tok.text}': reserved for future language use",
+                tok,
+            )
         tok = self._expect(TokenKind.IDENT, msg)
         if is_reserved_keyword(tok.text):
             self._error_bail(f"[PAR-0011] invalid variable name '{tok.text}': reserved identifier", tok)

@@ -644,7 +644,8 @@ func ps_expect_variable_name(self: ParserState*, code: string, msg: string) -> T
     let tok = ps_peek(self);
     if (tok_is_future_extension(tok)) {
         let t = token_to_string(tok);
-        ps_emit_error(self, "PAR-0010", concat3_s("invalid variable name '", t, "': reserved keyword"), tok);
+        ps_emit_error(self, "PAR-0010",
+            concat3_s("invalid variable name '", t, "': reserved for future language use"), tok);
         return null;
     }
     let got = ps_expect_ident(self, code, msg)?;

@@ -287,7 +287,8 @@ func ident_to_token(ident: string, index: int, line: int, col: int) -> Token {
          "cleanup" => return Token(TT_CLEANUP, index, line, col);
          "_" => return Token(TT_UNDERSCORE, index, line, col);
     }
-    if (eq_s(ident, "in") || eq_s(ident, "const")) {
+    if (eq_s(ident, "__dea__future__keyword__") || eq_s(ident, "in") ||
+        eq_s(ident, "const")) {
         return Token(TT_FUTURE_EXTENSION, index, line, col);
     }
     return Token(TT_IDENT(ident), index, line, col);

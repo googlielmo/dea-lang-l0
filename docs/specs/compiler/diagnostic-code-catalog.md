@@ -73,7 +73,7 @@ and reuse supplement for applying this registry within L0.
 | Code       | Level | Meaning                                                                    |
 | ---------- | ----- | -------------------------------------------------------------------------- |
 | `PAR-0000` | All   | Fallback parser error when no specific parse/lex diagnostic is available   |
-| `PAR-0010` | All   | Invalid variable name: reserved keyword                                    |
+| `PAR-0010` | All   | Invalid variable name: reserved for future language use                    |
 | `PAR-0011` | All   | Invalid variable name: reserved identifier                                 |
 | `PAR-0020` | All   | Unexpected top-level declaration                                           |
 | `PAR-0030` | All   | Expected 'extern'                                                          |

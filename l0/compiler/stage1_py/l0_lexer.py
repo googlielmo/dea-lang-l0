@@ -207,6 +207,7 @@ KEYWORDS = {
     "ulong": TokenKind.FUTURE_EXTENSION,
     "float": TokenKind.FUTURE_EXTENSION,
     "double": TokenKind.FUTURE_EXTENSION,
+    "__dea__future__keyword__": TokenKind.FUTURE_EXTENSION,
     "in": TokenKind.FUTURE_EXTENSION,
     "const": TokenKind.FUTURE_EXTENSION,
 }
