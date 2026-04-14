@@ -125,8 +125,9 @@ The `$CC` environment variable will be checked as a last resort if none of the a
 
 If you need a specific compiler, set `$L0_CC` to its executable name or path. For example:
 
-For the current `1.0.0.dev0` support matrix, Windows validation is through MSYS2 `MINGW64` with MinGW-w64 GCC.
-MSVC-family builds are still experimental and are not part of the validated release matrix.
+For the current `1.0.0.dev0` support matrix, Windows validation is through MSYS2 `UCRT64` with MinGW-w64 GCC. MSYS2
+`MINGW64` is supported as an alternate environment. MSVC-family builds are still experimental and are not part of the
+validated release matrix.
 
 Specific versions of `gcc` and `clang` whose names include version numbers (e.g. `gcc-14`, `clang-22`) are not probed by
 default but can be used by setting `$L0_CC` accordingly and will be recognized as such.

@@ -3,7 +3,7 @@
 ## Expand Windows CI and documentation for MSYS2 UCRT64 and MINGW64 developer environments
 
 - Date: 2026-03-31
-- Status: Draft
+- Status: In Progress
 - Title: Expand Windows CI and documentation for MSYS2 UCRT64 and MINGW64 developer environments
 - Kind: Tooling
 - Severity: Medium
@@ -13,15 +13,18 @@
   - `.github/workflows/l0-ci.yml`
   - `.github/workflows/l0-release.yml`
   - `.github/workflows/l0-snapshot.yml`
+  - `README.md`
   - `README-WINDOWS.md`
   - `l0/CLAUDE.md`
   - `l0/docs/user/README.md`
   - `l0/docs/user/README-WINDOWS.md`
   - `l0/docs/reference/project-status.md`
+  - `scripts/dea_tooling/launchers.py`
 - Test modules:
   - `tests/test_make_dist_workflow.py`
   - `tests/test_make_dea_build_workflow.py`
   - `tests/test_dist_tools_lib_fallback.py`
+  - `tests/test_release_tag_policy.py`
 - Related:
   - `work/plans/tools/closed/2026-03-11-windows-build-support.md`
   - `work/plans/bug-fixes/closed/2026-03-31-msys2-mingw64-dev-environment-test-failures-noref.md`
@@ -74,7 +77,7 @@ environment.
 - Dropping native Windows Python support — it remains valid for `cmd.exe`-based workflows.
 - Adding MSVC (cl.exe) as a CI compiler — tracked separately.
 - Changing the Linux or macOS CI configurations.
-- Removing `MINGW64` support. It remains a supported MSYS2 option alongside `UCRT64`.
+- Removing `MINGW64` support. It is supported as an MSYS2 option alongside `UCRT64`.
 
 ## Approach Options
 
@@ -132,7 +135,7 @@ the GCC-based `UCRT64` / `MINGW64` families.
 Use **Option A**. Make `UCRT64` + MSYS2 Python the default automatic Windows entry, keep `MINGW64` + MSYS2 Python as a
 manual `workflow_dispatch` target, and keep native Windows Python as another manual target. This matches the current
 state of local validation, moves the default toward the newer MSYS2-recommended environment, and preserves direct
-coverage for the legacy-but-supported `MINGW64` and `cmd.exe`-oriented native Python paths.
+coverage for the alternate `MINGW64` and `cmd.exe`-oriented native Python paths.
 
 ## Implementation Phases
 
@@ -140,9 +143,10 @@ coverage for the legacy-but-supported `MINGW64` and `cmd.exe`-oriented native Py
 
 Before modifying workflows, confirm:
 
-- [ ] `mingw-w64-ucrt-x86_64-python` and `mingw-w64-x86_64-python` are both available in MSYS2 repos.
-- [ ] Matching `python-pip` and `pytest` packages (or the `pip install` path) work in both environments.
-- [ ] `uv` is installable inside both `UCRT64` and `MINGW64`.
+- [x] `mingw-w64-ucrt-x86_64-python` and `mingw-w64-x86_64-python` are both available in MSYS2 repos.
+- [x] Matching `python-pip` packages are available in both environments; dependency installation continues through the
+  repo's `make venv` / `uv sync` path.
+- [x] `uv` is installable inside both `UCRT64` and `MINGW64`.
 - [ ] `make venv` works with both MSYS2 Python variants.
 
 ### Phase 2: Update `l0-ci.yml`
@@ -186,7 +190,7 @@ Windows support so they all say the same thing:
 
 - `UCRT64` and `MINGW64` are both supported MSYS2 environments.
 - `UCRT64` is the recommended default for new Windows setups.
-- `MINGW64` remains supported and tested as an alternate developer environment.
+- `MINGW64` is supported and tested as an alternate developer environment.
 - Native Windows Python remains valid for `cmd.exe`-oriented validation, but it is not the primary developer-parity
   path.
 - User-facing setup examples must either be generic across both supported MSYS2 environments or explicitly rooted in the

@@ -13,15 +13,21 @@ unless noted otherwise.
 
 The recommended Windows path today is:
 
-- MSYS2 `MINGW64`
+- MSYS2 `UCRT64`
 - MinGW-w64 GCC or Clang
 - GNU Make on `PATH`
 
-This is the current validated Dea/L0 Windows path. MSVC-family builds remain outside the validated release matrix.
-Native `cmd.exe` entrypoints are supported; the MSYS2 requirement comes from the supported backend C toolchain, not from
-the `.cmd` launchers themselves.
+MSYS2 `MINGW64` is supported as an alternate environment. MSVC-family builds remain outside the validated release
+matrix. Native `cmd.exe` entrypoints are supported; the MSYS2 requirement comes from the supported backend C toolchain,
+not from the `.cmd` launchers themselves.
 
-Install the validated toolchain packages from MSYS2 with:
+Install the recommended `UCRT64` toolchain packages from MSYS2 with:
+
+```bash
+pacman -S mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-clang make diffutils
+```
+
+For the alternate `MINGW64` environment, use:
 
 ```bash
 pacman -S mingw-w64-x86_64-gcc mingw-w64-x86_64-clang make diffutils
@@ -50,16 +56,19 @@ call C:\l0-install\bin\l0-env.cmd
 l0c --version
 ```
 
-`l0-env.cmd` automatically puts the MSYS2 `mingw64\bin` directory on `PATH` so that the C compiler (GCC or Clang) and
-its support DLLs are visible to `l0c`. It probes for the MSYS2 install in this order:
+`l0-env.cmd` automatically puts a supported MSYS2 toolchain `bin` directory on `PATH` so that the C compiler (GCC or
+Clang) and its support DLLs are visible to `l0c`. It probes for the MSYS2 install in this order:
 
-1. `%MSYS2_ROOT%\mingw64\bin` (set this if MSYS2 is not in the default location).
-2. The Windows registry (`HKCU\Software\MSYS2`, then `HKLM\Software\MSYS2`).
-3. The default path `C:\msys64\mingw64\bin`.
+1. `%MSYS2_TOOLCHAIN_BIN%` if set, for example `C:\msys64\ucrt64\bin` or `C:\msys64\mingw64\bin`.
+2. `%MSYS2_ROOT%\ucrt64\bin`, then `%MSYS2_ROOT%\mingw64\bin` (set `MSYS2_ROOT` if MSYS2 is not in the default
+   location).
+3. The Windows registry (`HKCU\Software\MSYS2`, then `HKLM\Software\MSYS2`), preferring `ucrt64\bin` and then
+   `mingw64\bin`.
+4. The default paths `C:\msys64\ucrt64\bin`, then `C:\msys64\mingw64\bin`.
 
-If none of these resolve, a warning is printed and you must add `mingw64\bin` to `PATH` manually.
+If none of these resolve, a warning is printed and you must add `ucrt64\bin` or `mingw64\bin` to `PATH` manually.
 
-You do not need to open the MSYS2 shell just to invoke `l0c.cmd`. You still need the validated MSYS2 `MINGW64` /
+You do not need to open the MSYS2 shell just to invoke `l0c.cmd`. You still need a validated MSYS2 `UCRT64` or `MINGW64`
 MinGW-w64 GCC or Clang toolchain installed for normal `--build` and `--run` workflows, because those paths require a
 supported C compiler.
 
@@ -71,7 +80,20 @@ Notes:
 
 ## If you are developing Dea/L0 itself
 
-For day-to-day development, MSYS2 bash is the recommended shell.
+For day-to-day development, MSYS2 `UCRT64` bash is the recommended shell. MSYS2 `MINGW64` bash is supported for
+alternate validation.
+
+For repo development in `UCRT64`, install Python and `uv` alongside the C toolchain:
+
+```bash
+pacman -S mingw-w64-ucrt-x86_64-python mingw-w64-ucrt-x86_64-python-pip mingw-w64-ucrt-x86_64-uv
+```
+
+For `MINGW64`, use the matching package family:
+
+```bash
+pacman -S mingw-w64-x86_64-python mingw-w64-x86_64-python-pip mingw-w64-x86_64-uv
+```
 
 ### Work on Stage 2
 
@@ -95,7 +117,8 @@ l0c --version
   `make use-dev-stage2`.
 - Installed Stage 2 works through `<PREFIX>\bin\l0-env.cmd` followed by `l0c`, or through the direct launcher
   `<PREFIX>\bin\l0c.cmd`.
-- `l0-env.cmd` auto-detects MinGW-w64 GCC. Set `MSYS2_ROOT` if MSYS2 is installed in a non-default location.
+- `l0-env.cmd` auto-detects `ucrt64\bin` first, then `mingw64\bin`. Set `MSYS2_TOOLCHAIN_BIN` to force one toolchain
+  `bin` directory, or set `MSYS2_ROOT` if MSYS2 is installed in a non-default location.
 
 ## Technical addendum
 

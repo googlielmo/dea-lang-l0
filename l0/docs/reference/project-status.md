@@ -1,6 +1,6 @@
 # L0 Project Status
 
-Version: 2026-04-01
+Version: 2026-04-14
 
 This document summarizes what is implemented in this repository today and what defines the current Dea/L0 `1.0.0.dev0`
 development branch after the `l0-v0.9.2` release. L0 now lives as one language subtree inside the Dea monorepo; monorepo
@@ -88,8 +88,9 @@ Validation is centered on:
 The current development support baseline remains:
 
 - Tier 1 hosts: Linux and macOS for Stage 1 and Stage 2 workflows.
-- Tier 1 Windows toolchain: MSYS2 `MINGW64` with MinGW-w64 GCC or Clang for build, test, install, and distribution
-  workflows, plus generated native `cmd.exe` launchers for invoking the packaged toolchain outside the MSYS2 shell.
+- Tier 1 Windows toolchain: MSYS2 `UCRT64` with MinGW-w64 GCC or Clang for build, test, install, and distribution
+  workflows. MSYS2 `MINGW64` is supported as an alternate validation environment. Generated native `cmd.exe` launchers
+  can invoke the packaged toolchain outside the MSYS2 shell.
 - Tier 2 / experimental: MSVC-family builds remain outside the validated release matrix.
 
 ## Known Limitations and Constraints

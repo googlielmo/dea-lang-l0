@@ -38,7 +38,8 @@ l0c --build -P examples -o hello examples/hello.l0
 ```
 
 On Windows, see [README-WINDOWS.md](README-WINDOWS.md) before using `--build` or `--run`; the validated Windows path
-still depends on the supported MSYS2 `MINGW64` / MinGW-w64 GCC or Clang toolchain.
+depends on the supported MSYS2 `UCRT64` or `MINGW64` MinGW-w64 GCC or Clang toolchain. `UCRT64` is recommended for new
+setups.
 
 ## Reference docs
 

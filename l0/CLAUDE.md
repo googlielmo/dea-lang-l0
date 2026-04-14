@@ -56,10 +56,11 @@ Also see: `../CONTRIBUTING.md`, `../SECURITY.md`.
   to `python3 -m venv ../.venv && source ../.venv/bin/activate` and install the dev + docs dependency groups from
   `pyproject.toml` manually. The project is not an installable Python package (`[tool.uv] package = false`); there is no
   `pip install -e .` step.
-- **Windows Host Setup:** For Windows validation, use an MSYS2 `MINGW64` shell with MinGW-w64 GCC and GNU Make on
-  `PATH`. Source-tree Stage 1 usage is available through `./scripts/l0c.cmd`, while repo-local and install-prefix
-  workflows now generate `l0-env.cmd` plus the selected `l0c.cmd` alias for native `cmd.exe` usage. Keep the fallback
-  under `scripts/`: the root-level `l0c` name is reserved for the selected dev or installed compiler command.
+- **Windows Host Setup:** For Windows validation, use an MSYS2 `UCRT64` shell with MinGW-w64 GCC and GNU Make on `PATH`.
+  `MINGW64` is supported as an alternate environment. Source-tree Stage 1 usage is available through
+  `./scripts/l0c.cmd`, while repo-local and install-prefix workflows now generate `l0-env.cmd` plus the selected
+  `l0c.cmd` alias for native `cmd.exe` usage. Keep the fallback under `scripts/`: the root-level `l0c` name is reserved
+  for the selected dev or installed compiler command.
 - **Environment Variables:** Source `build/dea/bin/l0-env.sh` only for the repo-local Dea build workflow in POSIX/MSYS2
   bash, or `call build\dea\bin\l0-env.cmd` in `cmd.exe`. For an installed Stage 2 prefix, source
   `<PREFIX>/bin/l0-env.sh` in POSIX/MSYS2 bash or `call <PREFIX>\bin\l0-env.cmd` in `cmd.exe`. For source-tree usage,

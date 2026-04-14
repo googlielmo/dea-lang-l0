@@ -89,11 +89,13 @@ jobs:
           ref: ${{ needs.prepare-snapshot.outputs.snapshot_ref }}
 
       - name: Set up Python
+        if: matrix.os != 'windows'
         uses: actions/setup-python@v6
         with:
           python-version: "3.14"
 
       - name: Set up uv
+        if: matrix.os != 'windows'
         uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
@@ -105,16 +107,31 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y build-essential clang make
 
-      - name: Set up MSYS2 MinGW-w64 toolchain
+      - name: Set up MSYS2 UCRT64 toolchain with MSYS2 Python
         if: runner.os == 'Windows'
         uses: msys2/setup-msys2@v2
         with:
-          msystem: MINGW64
+          msystem: UCRT64
           path-type: inherit
           install: >-
             make
             diffutils
-            mingw-w64-x86_64-gcc
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-python
+            mingw-w64-ucrt-x86_64-python-pip
+            mingw-w64-ucrt-x86_64-uv
+
+      - name: Show Windows environment
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: |
+          printf 'MSYSTEM=%s\n' "${MSYSTEM:-}"
+          command -v python
+          python -VV
+          command -v uv || true
+          uv --version || true
+          command -v "${{ matrix.c_compiler }}"
+          "${{ matrix.c_compiler }}" --version | head -n 1
 
       - name: Build distribution archive
         if: runner.os != 'Windows'
@@ -132,6 +149,7 @@ jobs:
         shell: msys2 {0}
         env:
           L0_CC: ${{ matrix.c_compiler }}
+          PYTHON: python
           DEA_BUILD_ID: gha-${{ github.run_id }}.${{ github.run_attempt }}-snapshot-${{ matrix.os }}-${{ matrix.arch }}
           SNAPSHOT_VERSION: ${{ needs.prepare-snapshot.outputs.snapshot_version }}
         run: |
@@ -140,6 +158,7 @@ jobs:
           make dist | tee build/dist.log
 
       - name: Resolve distribution archive path
+        if: runner.os != 'Windows'
         shell: bash
         run: |
           python - <<'PY'
@@ -159,8 +178,108 @@ jobs:
               handle.write(f"DIST_ARCHIVE_NAME={archive_path.name}\n")
           PY
 
+      - name: Resolve distribution archive path
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import os
+          import re
+
+          log_path = Path("build/dist.log")
+          text = log_path.read_text(encoding="utf-8")
+          match = re.search(r"created distribution archive at (.+)", text)
+          if match is None:
+              raise SystemExit(f"could not parse distribution archive from {log_path}")
+          archive_path = Path(match.group(1).strip())
+          github_env = Path(os.environ["GITHUB_ENV"])
+          with github_env.open("a", encoding="utf-8") as handle:
+              handle.write(f"DIST_ARCHIVE_PATH={archive_path.as_posix()}\n")
+              handle.write(f"DIST_ARCHIVE_NAME={archive_path.name}\n")
+          PY
+
       - name: Smoke-test distribution archive
+        if: runner.os != 'Windows'
         shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import os
+          import subprocess
+          import sys
+          import tarfile
+          import tempfile
+          import zipfile
+
+          archive_path = Path(os.environ["DIST_ARCHIVE_PATH"])
+          if not archive_path.is_file():
+              raise SystemExit(f"missing archive: {archive_path}")
+
+          smoke_root = Path(tempfile.mkdtemp(prefix="snapshot-smoke.", dir="build"))
+          try:
+              if archive_path.suffix == ".zip":
+                  with zipfile.ZipFile(archive_path) as archive:
+                      archive.extractall(smoke_root)
+              else:
+                  with tarfile.open(archive_path, "r:gz") as archive:
+                      archive.extractall(smoke_root)
+
+              dist_root = smoke_root / "dea-l0"
+              version_path = dist_root / "VERSION"
+              if not version_path.is_file():
+                  raise SystemExit(f"missing VERSION file in {dist_root}")
+              version_text = version_path.read_text(encoding="utf-8")
+              for key in ("name:", "version:", "build:", "commit:", "os:", "arch:", "author:", "license:", "source:"):
+                  if key not in version_text:
+                      raise SystemExit(f"missing {key!r} in VERSION file:\n{version_text}")
+
+              for expected in ["README.md", "examples", "docs/reference", "docs/reference/grammar.md"]:
+                  if not (dist_root / expected).exists():
+                      raise SystemExit(f"missing expected path in dist: {dist_root / expected}")
+              windows_readme = dist_root / "README-WINDOWS.md"
+              if archive_path.suffix == ".zip":
+                  if not windows_readme.is_file():
+                      raise SystemExit(f"missing expected path in dist: {windows_readme}")
+              elif windows_readme.exists():
+                  raise SystemExit(f"unexpected path in dist: {windows_readme}")
+
+              for unexpected in [
+                  "CONTRIBUTING.md",
+                  "docs/user",
+                  "docs/reference/blog-poll-workflow.yml",
+                  "docs/reference/grammar/l0.md",
+              ]:
+                  if (dist_root / unexpected).exists():
+                      raise SystemExit(f"unexpected path in dist: {dist_root / unexpected}")
+
+              readme_text = (dist_root / "README.md").read_text(encoding="utf-8")
+              for unexpected in ["MONOREPO.md", "CONTRIBUTING.md", "compiler/stage2_l0/README.md", "cd` into `l0/"]:
+                  if unexpected in readme_text:
+                      raise SystemExit(f"unexpected README content in dist: {unexpected}")
+
+              launcher = dist_root / "bin" / "l0c"
+              if os.name == "nt":
+                  launcher = launcher.with_suffix(".cmd")
+              completed = subprocess.run(
+                  [str(launcher), "--version"],
+                  check=False,
+                  stdout=subprocess.PIPE,
+                  stderr=subprocess.STDOUT,
+                  text=True,
+                  encoding="utf-8",
+                  errors="replace",
+              )
+              if completed.returncode != 0:
+                  raise SystemExit(completed.stdout)
+              sys.stdout.write(completed.stdout)
+          finally:
+              pass
+          PY
+
+      - name: Smoke-test distribution archive
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
         run: |
           python - <<'PY'
           from pathlib import Path

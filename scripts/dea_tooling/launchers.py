@@ -8,29 +8,39 @@
 from __future__ import annotations
 
 
-_MINGW_PROBE_CMD = r"""
-rem -- Put MSYS2 mingw64\bin on PATH (compiler + DLLs) for --build and --run.
-set "_MINGW_BIN="
-if defined MSYS2_ROOT if exist "%MSYS2_ROOT%\mingw64\bin\" set "_MINGW_BIN=%MSYS2_ROOT%\mingw64\bin"
-if defined _MINGW_BIN goto :_mingw_set
+_MSYS2_TOOLCHAIN_PROBE_CMD = r"""
+rem -- Put the supported MSYS2 toolchain bin directory on PATH (compiler + DLLs) for --build and --run.
+set "_MSYS2_BIN="
+if defined MSYS2_TOOLCHAIN_BIN if exist "%MSYS2_TOOLCHAIN_BIN%\" set "_MSYS2_BIN=%MSYS2_TOOLCHAIN_BIN%"
+if defined _MSYS2_BIN goto :_msys2_toolchain_set
+if defined MINGW_PREFIX if exist "%MINGW_PREFIX%\bin\" set "_MSYS2_BIN=%MINGW_PREFIX%\bin"
+if defined _MSYS2_BIN goto :_msys2_toolchain_set
+if defined MSYS2_ROOT if exist "%MSYS2_ROOT%\ucrt64\bin\" set "_MSYS2_BIN=%MSYS2_ROOT%\ucrt64\bin"
+if defined _MSYS2_BIN goto :_msys2_toolchain_set
+if defined MSYS2_ROOT if exist "%MSYS2_ROOT%\mingw64\bin\" set "_MSYS2_BIN=%MSYS2_ROOT%\mingw64\bin"
+if defined _MSYS2_BIN goto :_msys2_toolchain_set
 for /f "tokens=2*" %%A in ('reg query "HKCU\Software\MSYS2" /v "InstallDir" 2^>nul') do (
-    if exist "%%B\mingw64\bin\" set "_MINGW_BIN=%%B\mingw64\bin"
+    if exist "%%B\ucrt64\bin\" set "_MSYS2_BIN=%%B\ucrt64\bin"
+    if not defined _MSYS2_BIN if exist "%%B\mingw64\bin\" set "_MSYS2_BIN=%%B\mingw64\bin"
 )
-if defined _MINGW_BIN goto :_mingw_set
+if defined _MSYS2_BIN goto :_msys2_toolchain_set
 for /f "tokens=2*" %%A in ('reg query "HKLM\Software\MSYS2" /v "InstallDir" 2^>nul') do (
-    if exist "%%B\mingw64\bin\" set "_MINGW_BIN=%%B\mingw64\bin"
+    if exist "%%B\ucrt64\bin\" set "_MSYS2_BIN=%%B\ucrt64\bin"
+    if not defined _MSYS2_BIN if exist "%%B\mingw64\bin\" set "_MSYS2_BIN=%%B\mingw64\bin"
 )
-if defined _MINGW_BIN goto :_mingw_set
-if exist "C:\msys64\mingw64\bin\" set "_MINGW_BIN=C:\msys64\mingw64\bin"
-if defined _MINGW_BIN goto :_mingw_set
-echo [{env_script_label}] warning: MSYS2 mingw64 not found. Set MSYS2_ROOT or add mingw64\bin to PATH. 1>&2
-goto :_mingw_done
-:_mingw_set
+if defined _MSYS2_BIN goto :_msys2_toolchain_set
+if exist "C:\msys64\ucrt64\bin\" set "_MSYS2_BIN=C:\msys64\ucrt64\bin"
+if defined _MSYS2_BIN goto :_msys2_toolchain_set
+if exist "C:\msys64\mingw64\bin\" set "_MSYS2_BIN=C:\msys64\mingw64\bin"
+if defined _MSYS2_BIN goto :_msys2_toolchain_set
+echo [{env_script_label}] warning: MSYS2 UCRT64 or MINGW64 toolchain not found. Set MSYS2_TOOLCHAIN_BIN, set MSYS2_ROOT, or add ucrt64\bin or mingw64\bin to PATH. 1>&2
+goto :_msys2_toolchain_done
+:_msys2_toolchain_set
 set "PATH_PADDED=;%PATH%;"
-if /I not "%PATH_PADDED%"=="%PATH_PADDED:;%_MINGW_BIN%;=%" goto :_mingw_done
-set "PATH=%_MINGW_BIN%;%PATH%"
-:_mingw_done
-set "_MINGW_BIN="
+if /I not "%PATH_PADDED%"=="%PATH_PADDED:;%_MSYS2_BIN%;=%" goto :_msys2_toolchain_done
+set "PATH=%_MSYS2_BIN%;%PATH%"
+:_msys2_toolchain_done
+set "_MSYS2_BIN="
 set "PATH_PADDED="
 """
 
@@ -210,7 +220,7 @@ def render_repo_env_cmd_script(
     """Return the repo-relative Windows activation script."""
 
     bat_rel = repo_relative_from_bin.replace("/", "\\")
-    probe = _MINGW_PROBE_CMD.format(env_script_label=env_script_label)
+    probe = _MSYS2_TOOLCHAIN_PROBE_CMD.format(env_script_label=env_script_label)
     return f"""@echo off
 set "SCRIPT_DIR=%~dp0"
 set "SCRIPT_DIR=%SCRIPT_DIR:~0,-1%"
@@ -332,7 +342,7 @@ def render_prefix_env_cmd_script(
 ) -> str:
     """Return the prefix-relative Windows activation script."""
 
-    probe = _MINGW_PROBE_CMD.format(env_script_label=env_script_label)
+    probe = _MSYS2_TOOLCHAIN_PROBE_CMD.format(env_script_label=env_script_label)
     return f"""@echo off
 set "SCRIPT_DIR=%~dp0"
 set "SCRIPT_DIR=%SCRIPT_DIR:~0,-1%"
