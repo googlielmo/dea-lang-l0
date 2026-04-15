@@ -9,6 +9,7 @@ import sys.rt;
 
 import std.fs;
 import std.io;
+import std.math;
 import std.string;
 import std.text;
 import std.vector;
@@ -97,11 +98,7 @@ func dp_render_snippet(diag: Diagnostic*, src: string) {
         let src_line = vs_get(lines, line_index);
         let line_no = int_to_string(diag.line);
 
-        // gutter_width = max(5, len(line_no_str))
-        let gutter_width = len_s(line_no);
-        if (gutter_width < 5) {
-            gutter_width = 5;
-        }
+        let gutter_width = max(len_s(line_no), 5);
 
         // Right-align line number within gutter
         let pad = repeat_s(" ", gutter_width - len_s(line_no));
@@ -124,10 +121,7 @@ func dp_render_snippet(diag: Diagnostic*, src: string) {
             }
         }
 
-        let caret_width = end_col - start_col;
-        if (caret_width < 1) {
-            caret_width = 1;
-        }
+        let caret_width = max(end_col - start_col, 1);
 
         // Caret line: gutter_width spaces + " | " + offset spaces + carets
         let caret_prefix = repeat_s(" ", gutter_width + 3 + (start_col - 1));
