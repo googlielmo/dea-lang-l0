@@ -845,6 +845,11 @@ def copy_distribution_extras(layout: PrefixLayout) -> None:
     if examples_src.is_dir():
         copy_tree(examples_src, layout.prefix_dir / "examples")
 
+    status_src = REPO_ROOT / "docs" / "project-status.md"
+    if not status_src.is_file():
+        raise FileNotFoundError(f"missing distribution project status doc: {status_src}")
+    copy_file(status_src, layout.prefix_dir / "docs" / "project-status.md")
+
     ref_src = REPO_ROOT / "docs" / "reference"
     ref_dst = layout.prefix_dir / "docs" / "reference"
     reference_docs = (
@@ -853,7 +858,6 @@ def copy_distribution_extras(layout: PrefixLayout) -> None:
         "design-decisions.md",
         "grammar.md",
         "ownership.md",
-        "project-status.md",
         "standard-library.md",
     )
     for name in reference_docs:

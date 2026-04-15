@@ -22,7 +22,7 @@
 - Modules:
   - `.github/workflows/`
   - `MONOREPO.md`
-  - `docs/reference/project-status.md`
+  - `docs/project-status.md`
   - `l1/`
 - Test modules:
   - L1 bootstrap CI smoke checks
@@ -48,7 +48,7 @@ enough to support smoke-tested publication.
 3. `MONOREPO.md` already reserves:
    - stable tags: `l1-vX.Y.Z`
    - snapshot tags: `l1-snapshot-*`
-4. `docs/reference/project-status.md` correctly states that L1 is not yet an install/dist/release-bearing product.
+4. `docs/project-status.md` correctly states that L1 is not yet an install/dist/release-bearing product.
 5. L1 bootstrap currently depends on an explicit upstream L0 compiler contract via `L1_BOOTSTRAP_L0C`.
 
 ## Dependency Statement
@@ -126,7 +126,7 @@ These workflows must consume the stabilized install/dist artifact contract rathe
 3. Release-line docs do not claim that L1 is already a release-bearing product before the prerequisites exist.
 4. Any future `l1-v*` / `l1-snapshot-*` workflow names and triggers do not conflict with the current L0-only release
    surface.
-5. The CI/release policy remains consistent across `MONOREPO.md`, `docs/reference/project-status.md`, and L1-local docs.
+5. The CI/release policy remains consistent across `MONOREPO.md`, `docs/project-status.md`, and L1-local docs.
 
 ## Open Design Constraints
 

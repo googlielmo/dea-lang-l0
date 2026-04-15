@@ -12,16 +12,15 @@ remains the active release line and the canonical user-facing toolchain today.
 
 Use this file as a status snapshot. For implementation details, use:
 
-- [docs/reference/project-status.md](../../../../docs/reference/project-status.md) for the Dea-wide monorepo status
-  snapshot.
-- [architecture.md](architecture.md) for pass structure and data flow.
-- [specs/compiler/stage1-contract.md](../specs/compiler/stage1-contract.md) for external interfaces and guarantees.
-- [c-backend-design.md](c-backend-design.md) for backend lowering and generated C behavior.
-- [specs/runtime/trace.md](../specs/runtime/trace.md) for tracing flags and runtime trace semantics.
-- [grammar.md](grammar.md) for accepted concrete syntax.
-- [standard-library.md](standard-library.md) for current std/sys module APIs.
-- [specs/compiler/cli-contract.md](../specs/compiler/cli-contract.md) for the shared CLI contract across stages.
-- [specs/compiler/stage2-contract.md](../specs/compiler/stage2-contract.md) for Stage 2 contract and provenance.
+- [docs/project-status.md](../../docs/project-status.md) for the Dea-wide monorepo status snapshot.
+- [l0/docs/reference/architecture.md](reference/architecture.md) for pass structure and data flow.
+- [l0/docs/specs/compiler/stage1-contract.md](specs/compiler/stage1-contract.md) for external interfaces and guarantees.
+- [l0/docs/reference/c-backend-design.md](reference/c-backend-design.md) for backend lowering and generated C behavior.
+- [l0/docs/specs/runtime/trace.md](specs/runtime/trace.md) for tracing flags and runtime trace semantics.
+- [l0/docs/reference/grammar.md](reference/grammar.md) for accepted concrete syntax.
+- [l0/docs/reference/standard-library.md](reference/standard-library.md) for current std/sys module APIs.
+- [l0/docs/specs/compiler/cli-contract.md](specs/compiler/cli-contract.md) for the shared CLI contract across stages.
+- [l0/docs/specs/compiler/stage2-contract.md](specs/compiler/stage2-contract.md) for Stage 2 contract and provenance.
 
 ## Current Status
 
@@ -34,7 +33,7 @@ At a high level, it provides:
 
 - the full current frontend pipeline from lexing through type checking,
 - C99 code generation for the implemented L0 language surface,
-- the shared public CLI surface documented in [cli-contract.md](../specs/compiler/cli-contract.md),
+- the shared public CLI surface documented in [l0/docs/specs/compiler/cli-contract.md](specs/compiler/cli-contract.md),
 - tracing support via `--trace-arc` and `--trace-memory`.
 
 ### Stage 2
@@ -66,7 +65,8 @@ The current implemented language surface covers the core bootstrap subset used t
 
 The standard library now includes the core runtime-facing and bootstrap-facing modules for I/O, strings, text, paths,
 filesystem access, the shared integer helper surface in `std.math`, time, randomness, assertions, optionals, and the
-current container set. Use [standard-library.md](standard-library.md) for the canonical module-by-module reference.
+current container set. Use [l0/docs/reference/standard-library.md](reference/standard-library.md) for the canonical
+module-by-module reference.
 
 ## Delivery and Validation
 
@@ -126,4 +126,4 @@ runtime/stdlib scaffolding so later language growth can begin without shifting t
 
 Once Dea/L0 `1.0.0` is cut, further language growth belongs to later levels of the language family:
 
-1. Bitwise operators, top-level `const`, and further language extensions are deferred to Dea/L1.
+- Bitwise operators, top-level `const`, and further language extensions are deferred to Dea/L1.

@@ -14,7 +14,7 @@
   - `compiler/stage1_l0/tests/math_test.l0`
   - `docs/reference/standard-library.md`
   - `docs/reference/design-decisions.md`
-  - `docs/reference/project-status.md`
+  - `docs/project-status.md`
 - Test modules:
   - `compiler/stage1_l0/tests/math_test.l0`
 - Related:
@@ -162,8 +162,8 @@ It also depends on the completed integer builtin work in
 
 1. Update `l1/docs/reference/standard-library.md` with the full `_ui`, `_l`, and `_ul` inventory and concise contract
    notes.
-2. Update `l1/docs/reference/design-decisions.md` and `l1/docs/reference/project-status.md` so the L1-only wide-integer
-   `std.math` extension is documented as part of the current fixed-width integer story.
+2. Update `l1/docs/reference/design-decisions.md` and `l1/docs/project-status.md` so the L1-only wide-integer `std.math`
+   extension is documented as part of the current fixed-width integer story.
 3. Add dedicated tests covering zero, one, min/max, signed minimum, and rounding/alignment edges across the three typed
    families.
 

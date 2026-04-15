@@ -17,12 +17,12 @@ surface, and future language growth beyond L0.
 
 Use this file as the status snapshot. For implementation details, use:
 
-- [architecture.md](architecture.md) for pass structure and data flow
-- [c-backend-design.md](c-backend-design.md) for backend lowering and generated C behavior
-- [design-decisions.md](design-decisions.md) for language and runtime rationale
-- [grammar.md](grammar.md) for accepted concrete syntax
-- [ownership.md](ownership.md) for ownership and cleanup behavior
-- [standard-library.md](standard-library.md) for current std/sys module APIs
+- [l1/docs/reference/architecture.md](reference/architecture.md) for pass structure and data flow
+- [l1/docs/reference/c-backend-design.md](reference/c-backend-design.md) for backend lowering and generated C behavior
+- [l1/docs/reference/design-decisions.md](reference/design-decisions.md) for language and runtime rationale
+- [l1/docs/reference/grammar.md](reference/grammar.md) for accepted concrete syntax
+- [l1/docs/reference/ownership.md](reference/ownership.md) for ownership and cleanup behavior
+- [l1/docs/reference/standard-library.md](reference/standard-library.md) for current std/sys module APIs
 
 ## Current Status
 

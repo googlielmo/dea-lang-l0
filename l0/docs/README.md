@@ -4,6 +4,7 @@ This directory is organized by document intent first, then subsystem.
 
 ## Folders
 
+- `project-status.md`: current implementation status, known limitations, and near-term direction.
 - `reference/`: stable current-state documentation for language and compiler.
 - `user/`: standalone end-user guides used as the source for shipped distribution docs.
 - `specs/`: normative contracts and behavioral specifications.
@@ -27,6 +28,7 @@ also produces a Chirpy-compatible export under `build/docs/blog-export/`, packag
 
 ## Placement Guide
 
+- Use `project-status.md` for the current L0 status snapshot.
 - Use `reference/` when documenting how the system currently works.
 - Use `user/` for standalone end-user docs meant to ship in release archives.
 - Use `specs/` when defining canonical behavior/contracts.
@@ -65,8 +67,9 @@ Version: YYYY-MM-DD
 
 Plans and proposals follow the metadata and lifecycle rules in [`../work/README.md`](../work/README.md).
 
-## Core References
+## Core Docs
 
+- [project-status.md](project-status.md): current implementation status, known limitations, and near-term direction.
 - [reference/architecture.md](reference/architecture.md): compiler pipeline and pass structure.
 - [reference/c-backend-design.md](reference/c-backend-design.md): Stage 1 lowering/runtime interaction details.
 - [reference/standard-library.md](reference/standard-library.md): `std.*` and `sys.*` API surface.

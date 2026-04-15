@@ -48,7 +48,7 @@ The bundled reference set is under `docs/reference/`.
 Useful starting points:
 
 - [Language grammar](docs/reference/grammar.md)
-- [Project status](docs/reference/project-status.md)
+- [Project status](docs/project-status.md)
 - [Standard library](docs/reference/standard-library.md)
 - [Architecture](docs/reference/architecture.md)
 

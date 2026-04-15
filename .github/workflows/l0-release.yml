@@ -224,7 +224,7 @@ jobs:
                   if key not in version_text:
                       raise SystemExit(f"missing {key!r} in VERSION file:\n{version_text}")
 
-              for expected in ["README.md", "examples", "docs/reference", "docs/reference/grammar.md"]:
+              for expected in ["README.md", "examples", "docs/project-status.md", "docs/reference", "docs/reference/grammar.md"]:
                   if not (dist_root / expected).exists():
                       raise SystemExit(f"missing expected path in dist: {dist_root / expected}")
               windows_readme = dist_root / "README-WINDOWS.md"
@@ -236,6 +236,7 @@ jobs:
               for unexpected in [
                   "CONTRIBUTING.md",
                   "docs/user",
+                  "docs/reference/project-status.md",
                   "docs/reference/blog-poll-workflow.yml",
                   "docs/reference/grammar/l0.md",
               ]:
@@ -300,7 +301,7 @@ jobs:
                   if key not in version_text:
                       raise SystemExit(f"missing {key!r} in VERSION file:\n{version_text}")
 
-              for expected in ["README.md", "examples", "docs/reference", "docs/reference/grammar.md"]:
+              for expected in ["README.md", "examples", "docs/project-status.md", "docs/reference", "docs/reference/grammar.md"]:
                   if not (dist_root / expected).exists():
                       raise SystemExit(f"missing expected path in dist: {dist_root / expected}")
               windows_readme = dist_root / "README-WINDOWS.md"
@@ -312,6 +313,7 @@ jobs:
               for unexpected in [
                   "CONTRIBUTING.md",
                   "docs/user",
+                  "docs/reference/project-status.md",
                   "docs/reference/blog-poll-workflow.yml",
                   "docs/reference/grammar/l0.md",
               ]:

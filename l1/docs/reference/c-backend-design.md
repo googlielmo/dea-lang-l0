@@ -8,7 +8,7 @@ Related docs:
 
 - Compiler architecture and pass flow: [architecture.md](architecture.md)
 - Language/runtime rationale and policy: [design-decisions.md](design-decisions.md)
-- Current status snapshot: [project-status.md](project-status.md)
+- Current status snapshot: [l1/docs/project-status.md](../project-status.md)
 
 ## Overview
 

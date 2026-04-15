@@ -65,10 +65,24 @@ make dist
 hosts or `dea-l0-lang_<os>-<arch>_YYYYMMDD-HHMMSS.zip` on Windows, using the lower-case OS/architecture from the
 recorded build host plus the UTC build timestamp in the archive name.
 
-If a repo-root `VERSION` file exists when `make dist` runs, it is copied into the top level of the packaged `dea-l0/`
-tree. For shipped L0 release and snapshot archives, CI injects a single-line product/version value such as
-`dea/l0 1.0.0.dev0-test1` or `dea/l0 snapshot-20260326-2130-abcd123`. `make dist` also defaults `L0_CFLAGS` to `-O2`
-unless you override it explicitly on the command line.
+`make dist` always writes a top-level `dea-l0/VERSION` metadata file; it does not copy a repo-root `VERSION` file into
+the archive. The file uses a key/value format such as:
+
+```text
+name: dea/l0
+version: 0.9.2
+build: gha-...
+commit: 92ce58a2...
+os: Darwin
+arch: arm64
+author: ...
+license: MIT OR Apache-2.0
+source: <repository URL>
+```
+
+CI sets `DEA_DIST_VERSION` for shipped release and snapshot archives, which controls the `version:` value; otherwise
+`make dist` falls back to `dev-<short-commit>`. When `L0_CFLAGS` is unset, `make dist` defaults it to `-O2` on
+non-Windows hosts and `-O2 -static` on Windows.
 
 `install` installs the self-hosted Stage 2 compiler (`Compiler 2` from the triple-bootstrap chain), not the initial
 Stage 1-built artifact. The installed prefix contains:

@@ -27,7 +27,7 @@
   - `compiler/stage1_l0/tests/fixtures/driver/real_transcendental_main.l1`
   - `docs/reference/standard-library.md`
   - `docs/reference/design-decisions.md`
-  - `docs/reference/project-status.md`
+  - `docs/project-status.md`
 - Test modules:
   - `compiler/stage1_l0/tests/c_emitter_test.l0`
   - `compiler/stage1_l0/tests/build_driver_test.l0`
@@ -170,8 +170,8 @@ Work in this phase:
 5. Add the small public wrapper structs needed for `modf_*` and `frexp_*`.
 6. Update `build_driver.l0` so programs that use `sys.real` or `std.real` link the host math library where required
    (`-lm` or equivalent), without broadening that dependency to unrelated float-only programs.
-7. Update `docs/reference/standard-library.md`, `docs/reference/design-decisions.md`, and
-   `docs/reference/project-status.md` so `std.real` and `sys.real` are part of the documented L1 reference set.
+7. Update `docs/reference/standard-library.md`, `docs/reference/design-decisions.md`, and `docs/project-status.md` so
+   `std.real` and `sys.real` are part of the documented L1 reference set.
 8. Add Stage 1 build and smoke coverage for representative finite, infinite, NaN, and signed-zero cases, including the
    intended include/link trigger behavior.
 
@@ -188,8 +188,8 @@ Work in this phase:
    clearly under the current L1 floating-point contract.
 4. Expand `docs/reference/standard-library.md` with a complete `std.real` / `sys.real` inventory and concise behavior
    notes.
-5. Update `docs/reference/design-decisions.md` and `docs/reference/project-status.md` so the floating-point library
-   surface is reflected in the reference set.
+5. Update `docs/reference/design-decisions.md` and `docs/project-status.md` so the floating-point library surface is
+   reflected in the reference set.
 6. Add broader CLI smoke coverage and regression tests across ordinary values, non-finite values, and edge cases that
    matter to the documented contract.
 7. Verify that no `std.real` API silently broadens implicit numeric conversions or smuggles floating-environment

@@ -4,10 +4,10 @@ This root `docs/` tree is for Dea-wide and monorepo-wide stable documentation.
 
 Today it contains:
 
-- Dea-wide current-state reference material
+- Dea-wide current-state material, including `project-status.md`
 - Dea-wide normative specifications
 - monorepo layout and shared automation documentation once stabilized
-- Dea-wide reference/status documents that describe the project as a whole
+- Dea-wide reference documents that describe the project as a whole
 - future cross-level design and release-process documents
 
 Existing level-local stable documentation remains in the owning subtree such as `l0/docs/`.
@@ -23,7 +23,6 @@ Root reference docs live under `docs/reference/` and describe the whole Dea proj
 
 Examples:
 
-- overall project status
 - monorepo-wide release/status policy
 - cross-level architecture notes once they exist
 

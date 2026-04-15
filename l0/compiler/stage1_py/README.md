@@ -6,4 +6,4 @@ Documentation-generation tooling is maintained separately under `compiler/docgen
 See:
 
 - Project overview and usage: [README.md](../../README.md)
-- Current status and roadmap: [docs/project-status.md](../../docs/reference/project-status.md)
+- Current status and roadmap: [docs/project-status.md](../../docs/project-status.md)

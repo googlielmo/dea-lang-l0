@@ -280,7 +280,9 @@ def main() -> int:
         else:
             assert_missing(dist_dir / "README-WINDOWS.md")
         assert_exists(dist_dir / "shared" / "l0" / "stdlib" / "std" / "io.l0")
+        assert_exists(dist_dir / "docs" / "project-status.md")
         assert_exists(dist_dir / "docs" / "reference" / "grammar.md")
+        assert_missing(dist_dir / "docs" / "reference" / "project-status.md")
         assert_missing(dist_dir / "docs" / "reference" / "blog-poll-workflow.yml")
         assert_missing(dist_dir / "docs" / "reference" / "grammar" / "l0.md")
         assert_missing(dist_dir / "docs" / "user")
@@ -316,7 +318,9 @@ def main() -> int:
             assert_exists(unpacked_dist / "README-WINDOWS.md")
         else:
             assert_missing(unpacked_dist / "README-WINDOWS.md")
+        assert_exists(unpacked_dist / "docs" / "project-status.md")
         assert_exists(unpacked_dist / "docs" / "reference" / "grammar.md")
+        assert_missing(unpacked_dist / "docs" / "reference" / "project-status.md")
         assert_missing(unpacked_dist / "docs" / "reference" / "blog-poll-workflow.yml")
         assert_missing(unpacked_dist / "docs" / "reference" / "grammar" / "l0.md")
         assert_missing(unpacked_dist / "docs" / "user")

@@ -12,11 +12,10 @@ can begin inside the monorepo without changing the current L0 release target.
 
 Use this file as the Dea-wide status snapshot. For more specific details, use:
 
-- [MONOREPO.md](../../MONOREPO.md) for monorepo layout and root workflow.
-- [work/plans/](../../work/plans/) for active and closed Dea-wide plans.
-- [l0/docs/reference/project-status.md](../../l0/docs/reference/project-status.md) for the current L0 implementation and
-  release status.
-- [l1/README.md](../../l1/README.md) for the current L1 bootstrap subtree entry point.
+- [MONOREPO.md](../MONOREPO.md) for monorepo layout and root workflow.
+- [work/plans/](../work/plans/) for active and closed Dea-wide plans.
+- [l0/docs/project-status.md](../l0/docs/project-status.md) for the current L0 implementation and release status.
+- [l1/README.md](../l1/README.md) for the current L1 bootstrap subtree entry point.
 
 ## Current Repository Shape
 
@@ -77,7 +76,7 @@ compiler path.
 The monorepo now has a small but real shared top-level layer:
 
 - root `work/plans/` for Dea-wide planning,
-- root `docs/reference/` for Dea-wide status/reference documents,
+- root `docs/` for Dea-wide status and reference documents,
 - root `CLAUDE.md` for monorepo-wide workflow policy,
 - root `Makefile` for shared `help`, `venv`, and `clean`,
 - root `scripts/dea_tooling/` for shared launcher/bootstrap helpers.

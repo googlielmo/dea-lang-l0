@@ -15,7 +15,7 @@ Related canonical docs:
 
 - Backend lowering and generated C details: [c-backend-design.md](c-backend-design.md)
 - Language/runtime rationale and policy: [design-decisions.md](design-decisions.md)
-- Bootstrap status snapshot: [project-status.md](project-status.md)
+- Bootstrap status snapshot: [l1/docs/project-status.md](../project-status.md)
 
 ## 1. High-Level Pipeline
 

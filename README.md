@@ -233,7 +233,7 @@ The compiler resolves modules from system roots (stdlib) then project roots in o
 
 Environment-variable defaults and launcher-specific path behavior are documented in
 [l0/compiler/stage2_l0/README.md](l0/compiler/stage2_l0/README.md),
-[l0/docs/reference/project-status.md](l0/docs/reference/project-status.md), and [README-WINDOWS.md](README-WINDOWS.md).
+[l0/docs/project-status.md](l0/docs/project-status.md), and [README-WINDOWS.md](README-WINDOWS.md).
 
 ### Examples
 
@@ -443,7 +443,7 @@ Trace output contract: [l0/docs/specs/runtime/trace.md](l0/docs/specs/runtime/tr
 
 ## Project status
 
-[l0/docs/reference/project-status.md](l0/docs/reference/project-status.md).
+[l0/docs/project-status.md](l0/docs/project-status.md).
 
 ## Contributing
 
