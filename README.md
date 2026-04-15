@@ -436,7 +436,7 @@ l0c --run --trace-arc --trace-memory app  # trace ARC and allocation to stderr
 l0c -c clang -C "-Og -DDEBUG" hello.l0    # use a specific C compiler with custom flags
 ```
 
-Full CLI contract — mode flags, options, targets, identity strings, exit codes, and stage-specific differences:
+Full CLI contract, mode flags, options, targets, identity strings, exit codes, and stage-specific differences:
 [l0/docs/specs/compiler/cli-contract.md](l0/docs/specs/compiler/cli-contract.md).
 
 Trace output contract: [l0/docs/specs/runtime/trace.md](l0/docs/specs/runtime/trace.md).
