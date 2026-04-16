@@ -28,6 +28,43 @@ import shutil
 import pytest
 
 
+def _quiet_progress_enabled(config) -> bool:
+    """Return whether the Stage 1 quiet-progress mode is enabled."""
+    return bool(config.getoption("--quiet-progress"))
+
+
+def _quiet_progress_is_quiet_cli(config) -> bool:
+    """Return whether quiet-progress is active under pytest quiet mode."""
+    return _quiet_progress_enabled(config) and config.option.verbose < 0
+
+
+def _resolved_xdist_worker_count(config) -> int | None:
+    """Return the resolved xdist worker count for quiet controller output."""
+    if config.getoption("dist") == "no" or not config.getoption("tx"):
+        return None
+
+    numprocesses = config.option.numprocesses
+    if numprocesses in {"auto", "logical"}:
+        return config.hook.pytest_xdist_auto_num_workers(config=config)
+
+    return int(numprocesses)
+
+
+def _disable_terminal_progress(config) -> None:
+    """Disable pytest's built-in progress meter for quiet-progress mode."""
+    if not _quiet_progress_enabled(config):
+        return
+
+    terminal_reporter = config.pluginmanager.getplugin("terminalreporter")
+    if terminal_reporter is None or not hasattr(terminal_reporter, "_show_progress_info"):
+        return
+
+    # Pytest computes progress display mode during terminal reporter startup.
+    # Quiet-progress overrides that late-bound state so xdist runs do not emit
+    # the final colored/right-aligned percentage line.
+    terminal_reporter._show_progress_info = False
+
+
 def pytest_addoption(parser):
     parser.addoption(
         "--quiet-progress",
@@ -39,12 +76,19 @@ def pytest_addoption(parser):
 
 @pytest.hookimpl(tryfirst=True)
 def pytest_report_teststatus(report, config):
-    if not config.getoption("--quiet-progress"):
+    if not _quiet_progress_enabled(config):
         return None
 
-    # Only change the short progress character.
-    # Keep the normal category and verbose word so summaries still work.
-    if report.when in {"setup", "call", "teardown"}:
+    # Mirror pytest's default categories so summary accounting stays correct,
+    # but suppress the noisy progress characters for non-failures.
+    if report.when in {"setup", "teardown"}:
+        if report.failed:
+            return "error", "E", "ERROR"
+        if report.skipped:
+            return "skipped", "", "SKIPPED"
+        return "", "", ""
+
+    if report.when == "call":
         if report.passed:
             return "passed", "", "PASSED"
         if report.failed:
@@ -53,6 +97,29 @@ def pytest_report_teststatus(report, config):
             return "skipped", "", "SKIPPED"
 
     return None
+
+
+@pytest.hookimpl(tryfirst=True)
+def pytest_sessionfinish(session, exitstatus) -> None:
+    del exitstatus
+
+    if os.environ.get("PYTEST_XDIST_WORKER"):
+        return
+
+    if not _quiet_progress_enabled(session.config) or session.testscollected <= 0:
+        return
+
+    terminal_reporter = session.config.pluginmanager.getplugin("terminalreporter")
+    if terminal_reporter is None:
+        return
+
+    terminal_reporter.ensure_newline()
+    terminal_reporter.write("done.", flush=True)
+
+
+@pytest.hookimpl(tryfirst=True)
+def pytest_sessionstart(session) -> None:
+    _disable_terminal_progress(session.config)
 
 
 def _compiler_flag_family(compiler: str) -> str:
@@ -82,12 +149,22 @@ def pytest_configure(config) -> None:
 
     cc = _find_cc()
     msg = f"[L0] C compiler: {cc}\n"
+    worker_count_msg = None
+    if _quiet_progress_is_quiet_cli(config):
+        worker_count = _resolved_xdist_worker_count(config)
+        if worker_count is not None:
+            worker_label = "worker" if worker_count == 1 else "workers"
+            worker_count_msg = f"[L0] xdist {worker_label}: {worker_count}\n"
 
     tr = config.pluginmanager.getplugin("terminalreporter")
     if tr is not None:
         tr.write_line(msg.rstrip("\n"))
+        if worker_count_msg is not None:
+            tr.write_line(worker_count_msg.rstrip("\n"))
     else:
         sys.stderr.write(msg)
+        if worker_count_msg is not None:
+            sys.stderr.write(worker_count_msg)
         sys.stderr.flush()
 
 
