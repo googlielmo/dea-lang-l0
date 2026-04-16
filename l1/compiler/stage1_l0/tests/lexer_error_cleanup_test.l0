@@ -1,0 +1,23 @@
+/*
+ * SPDX-License-Identifier: MIT OR Apache-2.0
+ * Copyright (c) 2026 gwz
+ */
+
+module lexer_error_cleanup_test;
+
+import std.assert;
+import std.io;
+
+import lexer;
+
+/**
+ * Verifies that lexing failure cleans up the partially built token vector.
+ */
+func main() {
+    let ls = ls_create("0x", "<test>");
+    let toks = tokenize(ls);
+    assert(toks == null, "Expected lexing to fail");
+    assert(ls_has_errors(ls), "Expected lexer diagnostics");
+    ls_free(ls);
+    printl_s("lexer_error_cleanup_test: all tests passed");
+}

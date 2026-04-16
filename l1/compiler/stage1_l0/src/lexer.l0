@@ -275,17 +275,25 @@ struct EscapedChar {
  * @return Vector of tokens if successful, or `null` if a lexing error occurs.
  */
 func tokenize(self: LexerState*) -> TokenVector? {
-    let tokens = tv_create();
-    while (true) {
-        let token = ls_next_token(self)?;
-        tv_push(tokens, token);
-        self.prev_kind = token.token_type;
-        match (token.token_type) {
-            TT_EOF => { break; }
-            _ => {}
+    let result: TokenVector? = null;
+    with (let tokens = tv_create()) {
+        while (true) {
+            let token = ls_next_token(self)?;
+            tv_push(tokens, token);
+            self.prev_kind = token.token_type;
+            match (token.token_type) {
+                TT_EOF => { break; }
+                _ => {}
+            }
+        }
+        result = tokens;
+        return result;
+    }
+    cleanup {
+        if (result == null) {
+            tv_free(tokens);
         }
     }
-    return tokens;
 }
 
 /**

@@ -198,7 +198,11 @@ def discover_stage1_l0_tests() -> list[TestCase]:
 def discover_trace_l0_tests() -> list[TestCase]:
     """Return trace-eligible `.l0` L1 Stage 1 implementation tests in deterministic order."""
 
-    filtered = [case for case in discover_stage1_l0_tests() if case.name not in TRACE_EXCLUDED_STAGE1_TESTS]
+    filtered = [
+        case
+        for case in discover_stage1_l0_tests()
+        if case.kind == "l0" and case.name not in TRACE_EXCLUDED_STAGE1_TESTS
+    ]
     return [
         TestCase(index=index, name=case.name, path=case.path, kind=case.kind)
         for index, case in enumerate(filtered)

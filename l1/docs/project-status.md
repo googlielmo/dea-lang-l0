@@ -76,18 +76,19 @@ make use-dev-stage1
 source build/dea/bin/l1-env.sh
 l1c --version
 make test-stage1
+make test-stage1-trace
 ```
 
 `make use-dev-stage1` auto-prepares the default repo-local upstream `../l0/build/dea/bin/l0c-stage2` when needed.
 `make check-examples` adds warning-free latest-stage `--check` coverage for `examples/*.l1`, while `make test-all`
-combines the implementation tests and example checks.
+combines the implementation tests, ARC/memory trace checks, and example checks.
 
 Validation is currently centered on:
 
 - `make test-stage1` and the `.l0` implementation tests under `compiler/stage1_l0/tests/`
+- `make test-stage1-trace` for ARC/memory trace validation across the `.l0` implementation tests
 - `make check-examples` for warning-free latest-stage `--check` coverage across `examples/*.l1`
 - `make test-all` as the combined local Stage 1 validation entry point
-- `compiler/stage1_l0/scripts/run_trace_tests.py` for ARC/memory trace validation
 - keeping the stdlib/runtime tree usable by the bootstrap compiler
 
 Current Stage 1 validation does not include an end-to-end exact generated-C golden-file diff suite.

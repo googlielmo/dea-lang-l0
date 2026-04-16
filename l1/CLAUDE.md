@@ -33,6 +33,7 @@ l1c --help
 l1c --version
 make check-examples
 make test-stage1
+make test-stage1-trace
 make test-all
 ```
 
