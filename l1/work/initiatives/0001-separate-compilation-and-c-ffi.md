@@ -46,8 +46,9 @@ Relevant facts that constrain the plan:
 - Optional tracing (`DEA_TRACE_ARC`, `DEA_TRACE_MEMORY`) is wired through preprocessor toggles resolved at user-TU
   compile time by `--trace-arc` and `--trace-memory`.
 - Build/run mode currently discovers runtime headers with `--runtime-include` / `L1_RUNTIME_INCLUDE` and runtime
-  libraries with `--runtime-lib` / `L1_RUNTIME_LIB`. The runtime-library path validation still looks for historical
-  `libl0runtime.*` names and links `-ll0runtime` when a library path is supplied.
+  libraries with `--runtime-lib` / `L1_RUNTIME_LIB`. L1 does not ship a separate runtime archive yet; the current Stage
+  1 build driver only checks that the configured runtime-library path is a directory and forwards it as a search path.
+  It does not validate specific archive filenames or inject a concrete runtime archive name yet.
 - `extern func` is the only FFI primitive. Extern symbols are intentionally **not name-mangled** at the C boundary;
   everything else uses `dea_{module}_{name}`-style mangling.
 - Integral and floating-point scalar types are already implemented in L1's surface and runtime; the FFI work below
@@ -121,8 +122,8 @@ external. That changes how `extern func rt_foo(...)` resolves:
 - **Today:** the L1 declaration matches an inline `static` definition pulled in via `#include`.
 - **After Phase 1:** the L1 declaration matches an `extern` declaration in a slim public header, backed by a runtime
   archive. The proposed target names are `dea_rt.h`, `dea_siphash.h`, `libdea_rt.a`, and `libdea_rt_traced.a`, but the
-  Phase 1 plan must verify whether those names should replace or coexist temporarily with the current `l1_runtime.h`,
-  `l0_siphash.h`, and `libl0runtime.*` compatibility surface.
+  Phase 1 plan must verify whether those names should replace or coexist temporarily with the current `l1_runtime.h` /
+  `l0_siphash.h` header names and any temporary artifact-name compatibility bridge.
 
 This is a header-vs.-prototype split with no language semantics change, but it requires deciding whether trace builds
 ship as a separate archive (`libdea_rt_traced.a`) or whether tracing becomes runtime-toggleable. Recommend the
@@ -150,8 +151,8 @@ language semantics moving.
   `$(PREFIX)/include/dea_rt.h`, `$(PREFIX)/include/dea_siphash.h`, plus any other public headers.
 - The build driver appends `-I$(L1_HOME)/include -L$(L1_HOME)/lib -ldea_rt` (or `-ldea_rt_traced` when tracing) instead
   of relying on `#include` to inline the runtime. This is a migration of the current `--runtime-include` /
-  `L1_RUNTIME_INCLUDE` and `--runtime-lib` / `L1_RUNTIME_LIB` behavior, including the current `libl0runtime.*`
-  validation and `-ll0runtime` link step.
+  `L1_RUNTIME_INCLUDE` and `--runtime-lib` / `L1_RUNTIME_LIB` directory plumbing into explicit `libdea_rt*` linkage once
+  the real runtime archive exists.
 
 ### Validation
 
@@ -456,8 +457,9 @@ These need resolution during Phase 0 but are not pre-decided here:
     document a `byte*` convention with helper functions in `sys.ffi`?
 05. **Trace runtime delivery.** Separate `libdea_rt_traced.a` archive (recommended) or runtime-toggleable tracing via
     function pointers?
-06. **Runtime artifact transition.** Replace `l1_runtime.h`, `l0_siphash.h`, and `libl0runtime.*` immediately, or carry
-    a short compatibility bridge while the build driver and docs move to `dea_rt.h`, `dea_siphash.h`, and `libdea_rt.*`?
+06. **Runtime artifact transition.** Replace `l1_runtime.h` and `l0_siphash.h` immediately, and retire the inherited
+    `libl0runtime.*` placeholder naming at the same time, or carry a short compatibility bridge while the build driver
+    and docs move to `dea_rt.h`, `dea_siphash.h`, and `libdea_rt.*`?
 07. **External-linking CLI.** Retire the current runtime-specific `-I` / `-L` aliases so they can match C compiler
     convention, or choose different external-linking flag spellings?
 08. **Diagnostic family split.** Keep module/link/FFI diagnostics in existing families, or introduce concrete `MOD-*`,

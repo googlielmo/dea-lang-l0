@@ -11,6 +11,7 @@ import std.string;
 import std.vector;
 
 import build_driver;
+import util.diag;
 
 /**
  * Tests test_with_c_suffix_rewrites_existing_extension.
@@ -169,6 +170,40 @@ func test_output_flag_selection_matches_compiler_family() {
 }
 
 /**
+ * Tests test_runtime_lib_validation_accepts_existing_directory.
+ */
+func test_runtime_lib_validation_accepts_existing_directory() {
+    with (let diags = diag_create() => diag_free(diags)) {
+        assert(bd_validate_runtime_lib(".", diags), "existing runtime-lib directory should be accepted");
+        assert(diag_count(diags) == 0, "expected no diagnostics for existing runtime-lib directory");
+    }
+}
+
+/**
+ * Tests test_runtime_lib_validation_rejects_missing_directory.
+ */
+func test_runtime_lib_validation_rejects_missing_directory() {
+    with (let diags = diag_create() => diag_free(diags)) {
+        let missing = "__dea_missing_runtime_lib_dir__";
+        assert(!bd_validate_runtime_lib(missing, diags), "missing runtime-lib directory should be rejected");
+        assert(diag_count(diags) == 1, "expected one diagnostic for missing runtime-lib directory");
+        assert(eq_s(diag_get(diags, 0).code, "L1C-0014"), "missing runtime-lib diagnostic code mismatch");
+    }
+}
+
+/**
+ * Tests test_runtime_lib_flags_add_search_path_only.
+ */
+func test_runtime_lib_flags_add_search_path_only() {
+    with (let words = vs_create(4) => vs_free(words)) {
+        bd_push_runtime_lib_flags(words, "runtime/lib");
+        assert(vs_size(words) == 2, "runtime-lib flags should add only a search path");
+        assert(eq_s(vs_get(words, 0), "-L"), "runtime-lib search-path flag mismatch");
+        assert(eq_s(vs_get(words, 1), "runtime/lib"), "runtime-lib search-path value mismatch");
+    }
+}
+
+/**
  * Tests test_exe_name_helpers_are_consistent.
  */
 func test_exe_name_helpers_are_consistent() {
@@ -198,6 +233,9 @@ func main() {
     test_get_optimize_flag_defaults_and_overrides();
     test_float_contract_option_detection();
     test_output_flag_selection_matches_compiler_family();
+    test_runtime_lib_validation_accepts_existing_directory();
+    test_runtime_lib_validation_rejects_missing_directory();
+    test_runtime_lib_flags_add_search_path_only();
     test_exe_name_helpers_are_consistent();
     printl_s("build_driver_test: all tests passed");
 }
