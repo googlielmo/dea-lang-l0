@@ -198,7 +198,7 @@ and reuse supplement for applying this registry within L0.
 | `L0C-0012` | `L1C-0012` | All     | Entry module not found in analysis result or does not define a build/run `main` function              |
 | `L0C-0013` | `L1C-0013` | All     | Entry `main` returns a non-preferred type; the generated C entry wrapper ignores the return value     |
 | `L0C-0014` | `L1C-0014` | All     | Runtime library path does not exist or is not a directory                                             |
-| `L0C-0015` | `L1C-0015` | All     | Runtime library directory does not contain any supported `l0runtime` library                          |
+|            | `L1C-0015` | L1 only | Runtime library directory does not contain any supported runtime library                              |
 | `L0C-0016` | `L1C-0016` | All     | Missing type information for the entry `main` function                                                |
 | `L0C-0017` | `L1C-0017` | All     | '--output' is ignored in '--run' mode unless '--keep-c' is set; the executable path remains temporary |
 |            | `L1C-0018` | L1 only | Explicit C compiler option violates the L1 floating-point backend contract                            |

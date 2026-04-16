@@ -375,10 +375,10 @@ def _runtime_include_flags(flag_family: str, runtime_include: str) -> list[str]:
 
 
 def _runtime_library_flags(flag_family: str, runtime_lib: str) -> list[str]:
-    """Return compiler-family-specific runtime library flags."""
+    """Return compiler-family-specific runtime library search-path flags."""
     if flag_family == "msvc":
-        return ["/link", f"/LIBPATH:{runtime_lib}", "l0runtime.lib"]
-    return ["-L", runtime_lib, "-ll0runtime"]
+        return ["/link", f"/LIBPATH:{runtime_lib}"]
+    return ["-L", runtime_lib]
 
 
 def _output_flags(flag_family: str, exe_path: Path) -> list[str]:
@@ -431,29 +431,20 @@ def _check_entry_main_for_build(result: AnalysisResult, entry_name: str, context
 
 
 def _validate_runtime_library_path(runtime_lib_path: str, context: CompilationContext) -> bool:
-    """Validate that the provided runtime library path exists and is valid.
+    """Validate that the provided runtime library path exists and is a directory.
 
     Args:
         runtime_lib_path: Path to the runtime library directory.
         context: The compilation context for logging.
 
     Returns:
-        True if the path is valid and contains runtime libraries, False otherwise.
+        True if the path is a directory, False otherwise.
     """
     runtime_dir = Path(runtime_lib_path)
     if not runtime_dir.is_dir():
         log_error(
             context,
             f"error: [L0C-0014] runtime library path '{runtime_lib_path}' does not exist or is not a directory",
-        )
-        return False
-
-    expected = {"libl0runtime.a", "libl0runtime.so", "libl0runtime.dylib", "l0runtime.lib"}
-    if not any((runtime_dir / name).exists() for name in expected):
-        names = ", ".join(sorted(expected))
-        log_error(
-            context,
-            f"error: [L0C-0015] no l0runtime library found in '{runtime_lib_path}' (expected one of: {names})",
         )
         return False
 
@@ -618,7 +609,7 @@ def cmd_build(args: argparse.Namespace) -> int:
         elif os.getenv("L0_RUNTIME_INCLUDE"):
             cmd.extend(_runtime_include_flags(flag_family, os.getenv("L0_RUNTIME_INCLUDE")))
 
-        # Add runtime library
+        # Add runtime library search path
         runtime_lib_path = args.runtime_lib or os.getenv("L0_RUNTIME_LIB")
         if runtime_lib_path:
             if not _validate_runtime_library_path(runtime_lib_path, context):
@@ -1124,7 +1115,7 @@ def _add_runtime_args(parser: argparse.ArgumentParser) -> None:
     )
     parser.add_argument(
         "--runtime-lib", "-L",
-        help="Path to L0 runtime library (default: $L0_RUNTIME_LIB; valid in: '--build', '--run')",
+        help="Path to L0 runtime library search directory (default: $L0_RUNTIME_LIB; valid in: '--build', '--run')",
     )
 
 

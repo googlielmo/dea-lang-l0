@@ -373,8 +373,8 @@ func cli_print_help() {
     cli_print_line(false, "                        Path to L0 runtime headers (default:");
     cli_print_line(false, "                        $L0_RUNTIME_INCLUDE; valid in: '--build', '--run')");
     cli_print_line(false, "  --runtime-lib, -L RUNTIME_LIB");
-    cli_print_line(false, "                        Path to L0 runtime library (default: $L0_RUNTIME_LIB;");
-    cli_print_line(false, "                        valid in: '--build', '--run')");
+    cli_print_line(false, "                        Path to L0 runtime library search directory (default:");
+    cli_print_line(false, "                        $L0_RUNTIME_LIB; valid in: '--build', '--run')");
     cli_print_line(false, "  --no-line-directives, -NLD");
     cli_print_line(false, "                        Disable #line directives in generated C code (valid");
     cli_print_line(false, "                        in: '--build', '--run', '--gen')");

@@ -675,7 +675,7 @@ func bd_runtime_lib_dir(opts: CliOptions*) -> string? {
 }
 
 /**
- * Validate that a runtime library directory exists and contains an L0 runtime library.
+ * Validate that a runtime library directory exists.
  *
  * @param runtime_lib_path Path to validate.
  * @param diags Diagnostic collector for failures.
@@ -689,30 +689,6 @@ func bd_validate_runtime_lib(runtime_lib_path: string, diags: DiagCollector*) ->
             "l0c",
             "L0C-0014",
             concat3_s("runtime library path '", runtime_lib_path, "' does not exist or is not a directory"),
-            "",
-            0,
-            0,
-            0,
-            0
-        );
-        return false;
-    }
-
-    let has_runtime = exists(join(runtime_lib_path, "libl0runtime.a")) ||
-        exists(join(runtime_lib_path, "libl0runtime.so")) ||
-        exists(join(runtime_lib_path, "libl0runtime.dylib")) ||
-        exists(join(runtime_lib_path, "l0runtime.lib"));
-    if (!has_runtime) {
-        diag_error(
-            diags,
-            "l0c",
-            "L0C-0015",
-            concat4_s(
-                "no l0runtime library found in '",
-                runtime_lib_path,
-                "' (expected one of: libl0runtime.a, libl0runtime.dylib, libl0runtime.so, l0runtime.lib)",
-                ""
-            ),
             "",
             0,
             0,
@@ -1066,7 +1042,6 @@ func bd_build_to_exe(opts: CliOptions*, cfg: LogConfig*, exe_path: string, keep_
             if (runtime_lib != null) {
                 vs_push(command_words, "-L");
                 vs_push(command_words, runtime_lib as string);
-                vs_push(command_words, "-ll0runtime");
             }
             log_info(cfg, "Compiling:");
             log_info(cfg, bd_join_display_words(command_words));

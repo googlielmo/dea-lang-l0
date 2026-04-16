@@ -261,10 +261,12 @@ fi
 assert_contains "$WORK_DIR/runtime_lib_missing.log" "L0C-0014"
 
 mkdir "$WORK_DIR/empty-lib"
-if "$STAGE2_L0C" --build --runtime-lib "$(native_path "$WORK_DIR/empty-lib")" -P "$(native_path "$FIXTURE_ROOT")" ok_main >"$WORK_DIR/runtime_lib_empty.log" 2>&1; then
-    fail "expected empty runtime-lib directory to fail"
+if ! "$STAGE2_L0C" --build --runtime-lib "$(native_path "$WORK_DIR/empty-lib")" -P "$(native_path "$FIXTURE_ROOT")" ok_main >"$WORK_DIR/runtime_lib_empty.log" 2>&1; then
+    fail "expected empty runtime-lib directory to be accepted"
 fi
-assert_contains "$WORK_DIR/runtime_lib_empty.log" "L0C-0015"
+if grep -F "L0C-0015" "$WORK_DIR/runtime_lib_empty.log" >/dev/null; then
+    fail "did not expect retired L0C-0015 in $WORK_DIR/runtime_lib_empty.log"
+fi
 
 if "$STAGE2_L0C" --build -P "$(native_path "$FIXTURE_ROOT")" no_main >"$WORK_DIR/no_main.log" 2>&1; then
     fail "expected missing-main build to fail"

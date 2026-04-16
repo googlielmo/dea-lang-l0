@@ -69,6 +69,9 @@ relaxed in a future revision.
 
 C compiler flags are merged as: `$L0_CFLAGS` first, then `--c-options`.
 
+`--runtime-lib` / `$L0_RUNTIME_LIB` provide an additional runtime library search directory for build/run. When supplied,
+the path must exist and be a directory.
+
 ## 4. Target and Separator Rules
 
 - Exactly one target is required per invocation. Omitting the target or providing multiple targets is a fatal CLI error

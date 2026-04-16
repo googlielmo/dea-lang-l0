@@ -129,7 +129,7 @@ def test_check_rejects_invalid_entry_module_name(tmp_path, capsys):
     assert "[L0C-0011]" in capsys.readouterr().err
 
 
-def test_build_fails_when_configured_runtime_lib_is_missing(tmp_path, monkeypatch, capsys):
+def test_build_accepts_existing_runtime_lib_directory(tmp_path, monkeypatch):
     _write_module(
         tmp_path,
         "main",
@@ -140,12 +140,20 @@ def test_build_fails_when_configured_runtime_lib_is_missing(tmp_path, monkeypatc
     )
     runtime_dir = tmp_path / "runtime_lib"
     runtime_dir.mkdir()
-    monkeypatch.setattr("l0c.subprocess.run", lambda *args, **kwargs: _RunResult(returncode=0))
+    captured = {}
+
+    def _fake_run(cmd, *args, **kwargs):
+        captured["cmd"] = cmd
+        return _RunResult(returncode=0)
+
+    monkeypatch.setattr("l0c.subprocess.run", _fake_run)
 
     rc = cmd_build(_build_args(tmp_path, "main", runtime_lib=str(runtime_dir)))
 
-    assert rc == 1
-    assert "[L0C-0015]" in capsys.readouterr().err
+    assert rc == 0
+    assert "-L" in captured["cmd"]
+    assert str(runtime_dir) in captured["cmd"]
+    assert "-ll0runtime" not in captured["cmd"]
 
 
 def test_build_uses_l0_cflags_when_c_options_are_not_provided(tmp_path, monkeypatch):
@@ -246,7 +254,6 @@ def test_build_uses_msvc_flag_forms_for_output_and_runtime_paths(tmp_path, monke
     )
     runtime_lib = tmp_path / "runtime_lib"
     runtime_lib.mkdir()
-    (runtime_lib / "l0runtime.lib").write_text("", encoding="utf-8")
     captured = {}
 
     def _fake_run(cmd, *args, **kwargs):
@@ -270,7 +277,7 @@ def test_build_uses_msvc_flag_forms_for_output_and_runtime_paths(tmp_path, monke
     assert any(arg.startswith("/I") for arg in captured["cmd"])
     assert "/link" in captured["cmd"]
     assert any(arg.startswith("/LIBPATH:") for arg in captured["cmd"])
-    assert "l0runtime.lib" in captured["cmd"]
+    assert "l0runtime.lib" not in captured["cmd"]
 
 
 def test_run_forwards_c_options_to_build(tmp_path, monkeypatch):
