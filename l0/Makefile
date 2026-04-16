@@ -201,7 +201,7 @@ endif
 	@printf '\n------------------------------------------------------------------------------\n'
 
 test-stage1: | venv
-	"$(VENV_PYTHON)" -m pytest -n auto -qq --quiet-progress
+	"$(VENV_PYTHON)" -m pytest -n auto -q --quiet-progress
 
 test-stage2: install-dev-stage2 | venv
 	DEA_BUILD_DIR="$(DEA_BUILD_DIR)" "$(VENV_PYTHON)" ./compiler/stage2_l0/scripts/run_tests.py $(TESTS)
