@@ -67,8 +67,8 @@ checks, including:
 The stdlib currently includes the core bootstrap modules for I/O, strings, text, paths, filesystem access, time,
 randomness, assertions, optionals, the current container set, the shared `int` helper surface in `std.math`, L1-only
 `_ui` / `_l` / `_ul` `std.math` families for `uint`, `long`, and `ulong`, wide integer string conversions in `std.text`,
-and `std.io` numeric print plus integer token-read helpers for the implemented fixed-width integer family. Library
-follow-up work for `std.real` is not implemented yet.
+`std.real` for floating-point classification and basic math functions, and `std.io` numeric print plus integer
+token-read helpers for the implemented fixed-width integer family.
 
 ## Delivery and Validation
 

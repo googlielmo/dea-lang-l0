@@ -548,6 +548,66 @@ func test_sym_all_modules_ok() {
     }
 }
 
+func test_run_real_classify() {
+    with (let argv = vs_create(8) => vs_free(argv)) {
+        vs_push(argv, "--run");
+        vs_push(argv, "-P");
+        vs_push(argv, fixture_root());
+        vs_push(argv, "real_classify_main");
+
+        let rc = run_with_argv(argv);
+        assert(rc == 0, "real_classify_main failed");
+    }
+}
+
+func test_run_real_basic() {
+    with (let argv = vs_create(8) => vs_free(argv)) {
+        vs_push(argv, "--run");
+        vs_push(argv, "-P");
+        vs_push(argv, fixture_root());
+        vs_push(argv, "real_basic_main");
+
+        let rc = run_with_argv(argv);
+        assert(rc == 0, "real_basic_main failed");
+    }
+}
+
+func test_run_real_round() {
+    with (let argv = vs_create(8) => vs_free(argv)) {
+        vs_push(argv, "--run");
+        vs_push(argv, "-P");
+        vs_push(argv, fixture_root());
+        vs_push(argv, "real_round_main");
+
+        let rc = run_with_argv(argv);
+        assert(rc == 0, "real_round_main failed");
+    }
+}
+
+func test_run_real_decompose() {
+    with (let argv = vs_create(8) => vs_free(argv)) {
+        vs_push(argv, "--run");
+        vs_push(argv, "-P");
+        vs_push(argv, fixture_root());
+        vs_push(argv, "real_decompose_main");
+
+        let rc = run_with_argv(argv);
+        assert(rc == 0, "real_decompose_main failed");
+    }
+}
+
+func test_run_real_transcendental() {
+    with (let argv = vs_create(8) => vs_free(argv)) {
+        vs_push(argv, "--run");
+        vs_push(argv, "-P");
+        vs_push(argv, fixture_root());
+        vs_push(argv, "real_transcendental_main");
+
+        let rc = run_with_argv(argv);
+        assert(rc == 0, "real_transcendental_main failed");
+    }
+}
+
 /**
  * Main entry point for the module.
  */
@@ -575,5 +635,10 @@ func main() {
     test_type_ok();
     test_sym_ok();
     test_sym_all_modules_ok();
+    test_run_real_classify();
+    test_run_real_basic();
+    test_run_real_round();
+    test_run_real_decompose();
+    test_run_real_transcendental();
     printl_s("l0c_lib_test: all tests passed");
 }

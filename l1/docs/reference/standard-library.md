@@ -335,6 +335,57 @@ Unsigned `ulong` helpers intentionally omit signed-only concepts such as `sign_u
 | `align_up_ul`    | `(x: ulong, align: ulong) -> ulong?`        | Rounds `x` up to the nearest multiple of `align`. Requires `align > 0`; returns `null` on overflow. |
 | `is_aligned_ul`  | `(x: ulong, align: ulong) -> bool`          | Returns whether `x` is already aligned to `align`. Requires `align > 0`.                            |
 
+### `std.real`
+
+**Imports:** `sys.real`
+
+Floating-point helper module for classification, basic operations, rounding, remainder/decomposition, and transcendental
+math.
+
+`PI_F`, `PI`, `E_F`, and `E` are module-level `let` values. NaN and infinity remain `nan_*()` / `inf_*()` getters until
+Stage 1 can initialize top-level `let` bindings from runtime calls.
+
+| Member         | Signature / Type                                          | Description                                                           |
+| -------------- | --------------------------------------------------------- | --------------------------------------------------------------------- |
+| `PI_F`         | `float`                                                   | Single-precision approximation of pi.                                 |
+| `PI`           | `double`                                                  | Double-precision approximation of pi.                                 |
+| `E_F`          | `float`                                                   | Single-precision approximation of Euler's number.                     |
+| `E`            | `double`                                                  | Double-precision approximation of Euler's number.                     |
+| `nan_*`        | `() -> float`, `() -> double`                             | Returns a NaN value.                                                  |
+| `inf_*`        | `() -> float`, `() -> double`                             | Returns positive infinity.                                            |
+| `is_nan_*`     | `(x: float) -> bool`, `(x: double) -> bool`               | Returns true if `x` is NaN.                                           |
+| `is_inf_*`     | `(x: float) -> bool`, `(x: double) -> bool`               | Returns true if `x` is positive or negative infinity.                 |
+| `is_finite_*`  | `(x: float) -> bool`, `(x: double) -> bool`               | Returns true if `x` is neither NaN nor infinite.                      |
+| `signbit_*`    | `(x: float) -> bool`, `(x: double) -> bool`               | Returns true if the sign bit of `x` is set.                           |
+| `abs_*`        | `(x: float) -> float`, `(x: double) -> double`            | Returns the absolute value of `x`.                                    |
+| `sqrt_*`       | `(x: float) -> float`, `(x: double) -> double`            | Returns the square root of `x`.                                       |
+| `cbrt_*`       | `(x: float) -> float`, `(x: double) -> double`            | Returns the cube root of `x`.                                         |
+| `hypot_*`      | `(x: float, y: float) -> float`, `...`                    | Returns the hypotenuse without intermediate overflow or underflow.    |
+| `floor_*`      | `(x: float) -> float`, `(x: double) -> double`            | Returns the largest integral value not greater than `x`.              |
+| `ceil_*`       | `(x: float) -> float`, `(x: double) -> double`            | Returns the smallest integral value not less than `x`.                |
+| `trunc_*`      | `(x: float) -> float`, `(x: double) -> double`            | Rounds `x` toward zero to an integral value.                          |
+| `round_*`      | `(x: float) -> float`, `(x: double) -> double`            | Rounds `x` to the nearest integral value.                             |
+| `fmod_*`       | `(x: float, y: float) -> float`, `...`                    | Returns the floating-point remainder of `x/y`.                        |
+| `remainder_*`  | `(x: float, y: float) -> float`, `...`                    | Returns the IEEE 754 floating-point remainder.                        |
+| `modf_*`       | `(x: float) -> FracPartsF`, `(x: double) -> FracPartsD`   | Decomposes `x` into integral and fractional parts.                    |
+| `frexp_*`      | `(x: float) -> FrexpPartsF`, `(x: double) -> FrexpPartsD` | Decomposes `x` into a normalized fraction and an integral power of 2. |
+| `ldexp_*`      | `(x: float, exp: int) -> float`, `...`                    | Multiplies `x` by 2 raised to the power `exp`.                        |
+| `copy_sign_*`  | `(x: float, y: float) -> float`, `...`                    | Returns a value with the magnitude of `x` and the sign of `y`.        |
+| `next_after_*` | `(x: float, y: float) -> float`, `...`                    | Returns the next representable value of `x` in the direction of `y`.  |
+| `exp_*`        | `(x: float) -> float`, `(x: double) -> double`            | Returns e raised to the power of `x`.                                 |
+| `exp2_*`       | `(x: float) -> float`, `(x: double) -> double`            | Returns 2 raised to the power of `x`.                                 |
+| `log_*`        | `(x: float) -> float`, `(x: double) -> double`            | Returns the natural logarithm of `x`.                                 |
+| `log10_*`      | `(x: float) -> float`, `(x: double) -> double`            | Returns the base-10 logarithm of `x`.                                 |
+| `log2_*`       | `(x: float) -> float`, `(x: double) -> double`            | Returns the base-2 logarithm of `x`.                                  |
+| `pow_*`        | `(x: float, y: float) -> float`, `...`                    | Returns `x` raised to the power `y`.                                  |
+| `sin_*`        | `(x: float) -> float`, `(x: double) -> double`            | Returns the sine of `x`.                                              |
+| `cos_*`        | `(x: float) -> float`, `(x: double) -> double`            | Returns the cosine of `x`.                                            |
+| `tan_*`        | `(x: float) -> float`, `(x: double) -> double`            | Returns the tangent of `x`.                                           |
+| `asin_*`       | `(x: float) -> float`, `(x: double) -> double`            | Returns the arc-sine of `x`.                                          |
+| `acos_*`       | `(x: float) -> float`, `(x: double) -> double`            | Returns the arc-cosine of `x`.                                        |
+| `atan_*`       | `(x: float) -> float`, `(x: double) -> double`            | Returns the arc-tangent of `x`.                                       |
+| `atan2_*`      | `(x: float, y: float) -> float`, `...`                    | Returns the quadrant-aware arc-tangent for the pair `(x, y)`.         |
+
 ### `std.optional`
 
 **Imports:** `std.assert`
@@ -490,6 +541,11 @@ Low-level runtime FFI for hashing raw values and pointers. Uses the siphash-1-3 
 Low-level runtime FFI for strings, I/O, process/system, time, and errors. Also defines `RtTimeParts`
 (`struct { sec: int; nsec: int; }`) and `RtFileInfo`
 (`struct { exists: bool; is_file: bool; is_dir: bool; size: int?; mtime_sec: int?; mtime_nsec: int?; }`).
+
+### `sys.real`
+
+Low-level runtime FFI for floating-point math helpers. Used by `std.real` for classification, roots,
+remainder/decomposition, rounding, and transcendental math.
 
 ### `sys.unsafe`
 

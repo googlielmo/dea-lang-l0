@@ -915,6 +915,22 @@ func bd_push_runtime_lib_flags(words: VectorString*, runtime_lib: string) {
 }
 
 /**
+ * Push extra link flags required for `sys.real`.
+ *
+ * @param words Command words to extend.
+ * @param family Compiler flag-family name.
+ * @param uses_sys_real Whether the analyzed program imports `sys.real`.
+ * @return `true` when one or more flags were appended.
+ */
+func bd_push_sys_real_link_flags(words: VectorString*, family: string, uses_sys_real: bool) -> bool {
+    if (!uses_sys_real || eq_s(family, "msvc")) {
+        return false;
+    }
+    vs_push(words, "-lm");
+    return true;
+}
+
+/**
  * Replay compiler output captured into temp files.
  *
  * @param cfg Logging configuration.
@@ -1106,6 +1122,10 @@ func bd_build_to_exe(opts: CliOptions*, cfg: LogConfig*, exe_path: string, keep_
             if (optimize != null) {
                 log_info(cfg, concat_s("Adding optimization flag: ", optimize as string));
                 vs_push(command_words, optimize as string);
+            }
+
+            if (bd_push_sys_real_link_flags(command_words, family, analysis_uses_sys_real(result))) {
+                log_info(cfg, "Linking host math library for sys.real");
             }
 
             let runtime_include = bd_runtime_include_dir(opts);

@@ -3,42 +3,42 @@
 ## Add `std.real` floating-point standard library module
 
 - Date: 2026-04-14
-- Status: Draft
+- Status: Completed
 - Title: Add `std.real` floating-point standard library module
 - Kind: Feature
 - Severity: Medium
-- Stage: 1
+- Stage: L1
 - Subsystem: Stdlib / runtime / build / docs / tests
 - Modules:
-  - `compiler/shared/l1/stdlib/std/real.l1`
-  - `compiler/shared/l1/stdlib/sys/real.l1`
-  - `compiler/shared/runtime/l1_runtime.h`
-  - `compiler/shared/runtime/l1_real.h`
-  - `compiler/stage1_l0/src/c_emitter.l0`
-  - `compiler/stage1_l0/src/build_driver.l0`
-  - `compiler/stage1_l0/src/sem_context.l0`
-  - `compiler/stage1_l0/tests/c_emitter_test.l0`
-  - `compiler/stage1_l0/tests/build_driver_test.l0`
-  - `compiler/stage1_l0/tests/l0c_lib_test.l0`
-  - `compiler/stage1_l0/tests/fixtures/driver/real_classify_main.l1`
-  - `compiler/stage1_l0/tests/fixtures/driver/real_basic_main.l1`
-  - `compiler/stage1_l0/tests/fixtures/driver/real_round_main.l1`
-  - `compiler/stage1_l0/tests/fixtures/driver/real_decompose_main.l1`
-  - `compiler/stage1_l0/tests/fixtures/driver/real_transcendental_main.l1`
-  - `docs/reference/standard-library.md`
-  - `docs/reference/design-decisions.md`
-  - `docs/project-status.md`
+  - `l1/compiler/shared/l1/stdlib/std/real.l1`
+  - `l1/compiler/shared/l1/stdlib/sys/real.l1`
+  - `l1/compiler/shared/runtime/l1_runtime.h`
+  - `l1/compiler/shared/runtime/l1_real.h`
+  - `l1/compiler/stage1_l0/src/c_emitter.l0`
+  - `l1/compiler/stage1_l0/src/build_driver.l0`
+  - `l1/compiler/stage1_l0/src/sem_context.l0`
+  - `l1/compiler/stage1_l0/tests/c_emitter_test.l0`
+  - `l1/compiler/stage1_l0/tests/build_driver_test.l0`
+  - `l1/compiler/stage1_l0/tests/l0c_lib_test.l0`
+  - `l1/compiler/stage1_l0/tests/fixtures/driver/real_classify_main.l1`
+  - `l1/compiler/stage1_l0/tests/fixtures/driver/real_basic_main.l1`
+  - `l1/compiler/stage1_l0/tests/fixtures/driver/real_round_main.l1`
+  - `l1/compiler/stage1_l0/tests/fixtures/driver/real_decompose_main.l1`
+  - `l1/compiler/stage1_l0/tests/fixtures/driver/real_transcendental_main.l1`
+  - `l1/docs/reference/standard-library.md`
+  - `l1/docs/reference/design-decisions.md`
+  - `l1/docs/project-status.md`
 - Test modules:
-  - `compiler/stage1_l0/tests/c_emitter_test.l0`
-  - `compiler/stage1_l0/tests/build_driver_test.l0`
-  - `compiler/stage1_l0/tests/l0c_lib_test.l0`
+  - `l1/compiler/stage1_l0/tests/c_emitter_test.l0`
+  - `l1/compiler/stage1_l0/tests/build_driver_test.l0`
+  - `l1/compiler/stage1_l0/tests/l0c_lib_test.l0`
 - Related:
   - `l1/work/plans/features/closed/2026-04-04-l1-float-double-literals-noref.md`
   - `l1/work/plans/features/closed/2026-04-13-l1-float-backend-contract-followup-noref.md`
   - `l1/docs/reference/standard-library.md`
   - `l1/docs/reference/design-decisions.md`
   - `l1/docs/reference/c-backend-design.md`
-- Repro: `make test-stage1 TESTS="build_driver_test l0c_lib_test"`
+- Repro: `make -C l1 test-stage1 TESTS="build_driver_test l0c_lib_test"`
 
 ## Summary
 
@@ -117,6 +117,10 @@ This plan depends on the completed floating-point language work in
 The public module should expose separate `float` and `double` entry points with explicit suffixes. Phase 1 only needs
 the minimum useful subset; later phases fill out the broader agreed surface.
 
+- Constants: `PI_F`, `PI`, `E_F`, `E` exposed via module-level `let`. `NAN_F`, `NAN`, `INFINITY_F`, and `INFINITY`
+  remain temporary `nan_*()` / `inf_*()` getters until
+  [l1/work/plans/features/2026-04-17-l1-let-non-constant-initializers-noref.md](l1/work/plans/features/2026-04-17-l1-let-non-constant-initializers-noref.md)
+  lands.
 - Classification: `is_nan_f`, `is_nan_d`, `is_inf_f`, `is_inf_d`, `is_finite_f`, `is_finite_d`, `signbit_f`,
   `signbit_d`.
 - Basic ops: `abs_f`, `abs_d`, `sqrt_f`, `sqrt_d`, `cbrt_f`, `cbrt_d`, `hypot_f`, `hypot_d`.
@@ -146,7 +150,9 @@ Where the public API benefits from value-returning wrappers, define explicit str
 - `FrexpPartsD { significand: double; exp: int; }`
 
 This keeps the public surface idiomatic for L1 while leaving `sys.real` free to use output-pointer FFI where that maps
-naturally to C.
+naturally to C. The implementation can mimic the `std.time` wrapper-struct idiom (allocating a temporary object on the
+heap via `new` and passing it to the runtime layer where it decays to a pointer) to satisfy the C output-pointer
+signatures without needing raw address-of (`&`) semantics on local variables.
 
 ## Implementation Phases
 
@@ -156,10 +162,13 @@ This phase creates the actual module boundary and makes the feature real rather 
 
 Work in this phase:
 
-1. Add `compiler/shared/l1/stdlib/sys/real.l1` with the low-level `extern func` declarations.
-2. Add `compiler/shared/l1/stdlib/std/real.l1` as the public wrapper module.
-3. Add runtime real-helper wrappers in `compiler/shared/runtime/l1_real.h`, with `compiler/shared/runtime/l1_runtime.h`
-   remaining the umbrella runtime header, for:
+1. Add `l1/compiler/shared/l1/stdlib/sys/real.l1` with the low-level `extern func` declarations.
+2. Add `l1/compiler/shared/l1/stdlib/std/real.l1` as the public wrapper module.
+3. Add runtime real-helper wrappers in `l1/compiler/shared/runtime/l1_real.h`, with
+   `l1/compiler/shared/runtime/l1_runtime.h` remaining the umbrella runtime header, for:
+   - constants: `PI_F`, `PI`, `E_F`, `E`; NaN and infinity remain temporary getter functions until
+     [l1/work/plans/features/2026-04-17-l1-let-non-constant-initializers-noref.md](l1/work/plans/features/2026-04-17-l1-let-non-constant-initializers-noref.md)
+     lands
    - classification: `is_nan_*`, `is_inf_*`, `is_finite_*`, `signbit_*`
    - basic ops: `abs_*`, `sqrt_*`, `cbrt_*`, `hypot_*`
    - rounding: `floor_*`, `ceil_*`, `trunc_*`, `round_*`
@@ -168,10 +177,12 @@ Work in this phase:
 4. Reuse or refine the existing floating-point-usage analysis so emitted code only pulls in `l1_real.h` when it actually
    needs `sys.real`-backed helpers, rather than when it merely uses builtin floating-point types.
 5. Add the small public wrapper structs needed for `modf_*` and `frexp_*`.
-6. Update `build_driver.l0` so programs that use `sys.real` or `std.real` link the host math library where required
-   (`-lm` or equivalent), without broadening that dependency to unrelated float-only programs.
-7. Update `docs/reference/standard-library.md`, `docs/reference/design-decisions.md`, and `docs/project-status.md` so
-   `std.real` and `sys.real` are part of the documented L1 reference set.
+6. Update `l1/compiler/stage1_l0/src/build_driver.l0` so programs that use `sys.real` or `std.real` link the host math
+   library where required. This should be toolchain-aware (e.g., linking `-lm` on POSIX/Unix and MSYS2, but explicitly
+   structured to easily omit it for future native Windows MSVC support) without broadening the dependency to unrelated
+   float-only programs.
+7. Update `l1/docs/reference/standard-library.md`, `l1/docs/reference/design-decisions.md`, and
+   `l1/docs/project-status.md` so `std.real` and `sys.real` are part of the documented L1 reference set.
 8. Add Stage 1 build and smoke coverage for representative finite, infinite, NaN, and signed-zero cases, including the
    intended include/link trigger behavior.
 
@@ -186,10 +197,10 @@ Work in this phase:
 2. Add the trigonometric family: `sin_*`, `cos_*`, `tan_*`, `asin_*`, `acos_*`, `atan_*`, `atan2_*`.
 3. Review whether any additional C99 helpers belong in this tranche and admit them only if their behavior can be stated
    clearly under the current L1 floating-point contract.
-4. Expand `docs/reference/standard-library.md` with a complete `std.real` / `sys.real` inventory and concise behavior
+4. Expand `l1/docs/reference/standard-library.md` with a complete `std.real` / `sys.real` inventory and concise behavior
    notes.
-5. Update `docs/reference/design-decisions.md` and `docs/project-status.md` so the floating-point library surface is
-   reflected in the reference set.
+5. Update `l1/docs/reference/design-decisions.md` and `l1/docs/project-status.md` so the floating-point library surface
+   is reflected in the reference set.
 6. Add broader CLI smoke coverage and regression tests across ordinary values, non-finite values, and edge cases that
    matter to the documented contract.
 7. Verify that no `std.real` API silently broadens implicit numeric conversions or smuggles floating-environment
@@ -219,6 +230,26 @@ Work in this phase:
 5. The public API remains explicit between `float` and `double`; no implicit library-level overloading is introduced.
 6. The new stdlib surface remains consistent with the existing L1 floating-point contract on supported targets.
 7. The runtime boundary, not ad hoc backend rewrites, owns the host-specific C99 math calls.
+
+## Completion Notes
+
+1. `l1/compiler/shared/l1/stdlib/std/real.l1` and `l1/compiler/shared/l1/stdlib/sys/real.l1` now expose the planned
+   floating-point helper surface, including decomposition wrapper structs for `modf_*` and `frexp_*`.
+2. `l1/compiler/shared/runtime/l1_real.h` now owns the C99 math wrappers, and `l1/compiler/shared/runtime/l1_runtime.h`
+   includes it only when emitted code defines `DEA_USE_SYS_REAL`.
+3. `l1/compiler/stage1_l0/src/sem_context.l0`, `l1/compiler/stage1_l0/src/c_emitter.l0`, and
+   `l1/compiler/stage1_l0/src/build_driver.l0` now gate `sys.real` runtime inclusion and `-lm` linkage on actual
+   `sys.real` usage instead of general floating-point usage.
+4. `l1/compiler/stage1_l0/tests/build_driver_test.l0`, `l1/compiler/stage1_l0/tests/c_emitter_test.l0`, and
+   `l1/compiler/stage1_l0/tests/l0c_lib_test.l0` now cover the include/link trigger behavior plus representative real
+   helper smoke cases.
+5. Live docs were refreshed in `l1/docs/reference/standard-library.md`, `l1/docs/reference/design-decisions.md`,
+   `l1/docs/project-status.md`, and `l1/docs/roadmap.md`.
+6. NaN and infinity remain temporary `nan_*()` / `inf_*()` getters; the follow-up plan
+   `l1/work/plans/features/2026-04-17-l1-let-non-constant-initializers-noref.md` tracks the later module-level `let`
+   initializer support needed to expose them as `let` values.
+7. Verification passed with `make test-stage1 TESTS="build_driver_test c_emitter_test l0c_lib_test"` and
+   `make test-stage1`.
 
 ## Open Design Constraints
 

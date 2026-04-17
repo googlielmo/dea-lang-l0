@@ -219,6 +219,16 @@ func analysis_enum_infos_use_floating_point(map: StringPtrMap*) -> bool {
 }
 
 /**
+ * Report whether an analyzed compilation unit uses the `sys.real` module.
+ *
+ * @param self Analysis result to inspect.
+ * @return `true` when `sys.real` is among the loaded compilation units.
+ */
+func analysis_uses_sys_real(self: AnalysisResult*) -> bool {
+    return driver_find_unit(self.driver_state, "sys.real") != null;
+}
+
+/**
  * Report whether an analyzed compilation unit uses builtin floating-point support.
  *
  * @param self Analysis result to inspect.

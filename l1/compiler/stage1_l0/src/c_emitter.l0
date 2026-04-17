@@ -771,6 +771,9 @@ func cem_emit_header(self: CEmitter*, opts: CodegenOptions*) {
     if (opts.trace_memory) {
         ccb_emit(self.out, "#define DEA_TRACE_MEMORY 1");
     }
+    if (self.analysis != null && analysis_uses_sys_real(self.analysis as AnalysisResult*)) {
+        ccb_emit(self.out, "#define DEA_USE_SYS_REAL 1");
+    }
     ccb_emit(self.out, "#include \"l1_runtime.h\"");
     ccb_emit(self.out, "");
 }

@@ -24,7 +24,7 @@
 - Related:
   - `l1/work/plans/features/closed/2026-04-13-l1-uint-long-ulong-bigint-builtins-noref.md`
   - `l1/work/plans/features/closed/2026-04-14-l1-std-math-wide-integer-followup-noref.md`
-  - `l1/work/plans/features/2026-04-14-l1-std-real-module-noref.md`
+  - `l1/work/plans/features/closed/2026-04-14-l1-std-real-module-noref.md`
 - Repro:
   - `make test-stage1 TESTS="util_text_test io_runtime_test.py"`
   - `make test-stage1`

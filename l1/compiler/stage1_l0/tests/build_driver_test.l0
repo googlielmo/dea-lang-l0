@@ -152,6 +152,33 @@ func test_float_contract_option_detection() {
 }
 
 /**
+ * Tests that `sys.real` math-library flags are only added for non-MSVC toolchains.
+ */
+func test_sys_real_link_flags_follow_family_and_usage() {
+    with (let gcc_words = vs_create(2) => vs_free(gcc_words)) {
+        assert(bd_push_sys_real_link_flags(gcc_words, "gcc", true), "gcc sys.real build should append link flags");
+        assert(vs_size(gcc_words) == 1, "gcc sys.real build should append one link flag");
+        assert(eq_s(vs_get(gcc_words, 0), "-lm"), "gcc sys.real link flag mismatch");
+    }
+
+    with (let cc_words = vs_create(2) => vs_free(cc_words)) {
+        assert(bd_push_sys_real_link_flags(cc_words, "cc", true), "cc sys.real build should append link flags");
+        assert(vs_size(cc_words) == 1, "cc sys.real build should append one link flag");
+        assert(eq_s(vs_get(cc_words, 0), "-lm"), "cc sys.real link flag mismatch");
+    }
+
+    with (let msvc_words = vs_create(2) => vs_free(msvc_words)) {
+        assert(!bd_push_sys_real_link_flags(msvc_words, "msvc", true), "msvc sys.real build should not append flags");
+        assert(vs_size(msvc_words) == 0, "msvc sys.real build should not append link flags");
+    }
+
+    with (let unused_words = vs_create(2) => vs_free(unused_words)) {
+        assert(!bd_push_sys_real_link_flags(unused_words, "gcc", false), "float-only build should not append flags");
+        assert(vs_size(unused_words) == 0, "float-only build should not append link flags");
+    }
+}
+
+/**
  * Tests test_output_flag_selection_matches_compiler_family.
  */
 func test_output_flag_selection_matches_compiler_family() {
@@ -232,6 +259,7 @@ func main() {
     test_compiler_flag_family_detection();
     test_get_optimize_flag_defaults_and_overrides();
     test_float_contract_option_detection();
+    test_sys_real_link_flags_follow_family_and_usage();
     test_output_flag_selection_matches_compiler_family();
     test_runtime_lib_validation_accepts_existing_directory();
     test_runtime_lib_validation_rejects_missing_directory();

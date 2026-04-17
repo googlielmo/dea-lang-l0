@@ -197,7 +197,12 @@ helpers, but they should not own general-purpose arithmetic utilities. The unsuf
 `int` surface. L1-only `uint`, `long`, and `ulong` helpers use explicit `_ui`, `_l`, and `_ul` suffixes so wider fixed
 widths do not shadow or blur the shared API. Signed `long` helpers follow the same checked representability policy as
 the `int` helpers, while unsigned helpers use plain `div_*` / `mod_*` names and omit signed-only concepts such as
-`sign`, `abs`, `ediv`, and `emod`. Floating-point helper policy remains separate from this integer-focused surface.
+`sign`, `abs`, `ediv`, and `emod`.
+
+Floating-point helpers belong in `std.real` with their runtime C FFI backed by `sys.real`. Explicit `_f` and `_d`
+suffixes prevent shadowing and ambiguity between `float` and `double`. To minimize runtime footprints, the host math
+library (`-lm`) and the `l1_real.h` C wrapper are only linked and included when the compilation unit actually uses
+`sys.real`, rather than treating every float-using program as a math-library consumer.
 
 ## 11. Floating-Point Semantics and Backend Contract
 

@@ -292,6 +292,32 @@ func test_emitter_header_emits_float_contract_guards() {
     assert(contains_s(text, "#if FLT_RADIX != 2"), "float radix guard missing");
     assert(contains_s(text, "__FAST_MATH__"), "fast-math guard missing");
     assert(contains_s(text, "__FINITE_MATH_ONLY__"), "finite-math guard missing");
+    assert(!contains_s(text, "#define DEA_USE_SYS_REAL 1"), "float-only programs should not enable sys.real helpers");
+
+    cg_options_free(opts);
+    cem_free(emitter);
+    analysis_result_free(result);
+}
+
+/**
+ * Tests that `sys.real` users emit the runtime guard needed by `l1_real.h`.
+ */
+func test_emitter_header_emits_sys_real_guard() {
+    let result = cet_empty_analysis_result();
+    let decls_main = ptr_vec_create(0);
+    let decls_sys_real = ptr_vec_create(0);
+    cet_push_module(result, cet_module("demo.main", "demo/main.l1", decls_main));
+    cet_push_module(result, cet_module("sys.real", "std/sys/real.l1", decls_sys_real));
+
+    let emitter = cem_create();
+    let opts = cg_options_create();
+    cem_set_analysis(emitter, result);
+
+    cem_emit_header(emitter, opts);
+    let text = cem_get_output(emitter);
+
+    assert(contains_s(text, "#define DEA_USE_SYS_REAL 1"), "sys.real programs should enable runtime helpers");
+    assert(contains_s(text, "#include \"l1_runtime.h\""), "runtime include missing");
 
     cg_options_free(opts);
     cem_free(emitter);
@@ -678,6 +704,7 @@ func main() {
     test_emitter_large_integer_helpers();
     test_emitter_header_honors_trace_flags();
     test_emitter_header_emits_float_contract_guards();
+    test_emitter_header_emits_sys_real_guard();
     test_emitter_line_directives_normalize_windows_paths();
     test_emitter_string_literals_use_dea_string_const();
     test_emitter_expression_and_statement_helpers();

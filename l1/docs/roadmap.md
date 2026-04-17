@@ -65,6 +65,10 @@ L1 carries post-L0 language growth and bootstrap compiler work.
   [l1/work/plans/features/closed/2026-04-13-l1-float-backend-contract-followup-noref.md](../work/plans/features/closed/2026-04-13-l1-float-backend-contract-followup-noref.md)
   defined the L1 floating-point semantic and C backend contract.
 - Feature
+  [l1/work/plans/features/closed/2026-04-14-l1-std-real-module-noref.md](../work/plans/features/closed/2026-04-14-l1-std-real-module-noref.md)
+  added the `std.real` / `sys.real` floating-point library surface, scoped runtime helper inclusion, and math-library
+  linkage gating.
+- Feature
   [l1/work/plans/features/closed/2026-04-13-l1-uint-long-ulong-bigint-builtins-noref.md](../work/plans/features/closed/2026-04-13-l1-uint-long-ulong-bigint-builtins-noref.md)
   added `uint`, `long`, and `ulong` through contextual bigint literals.
 - Feature
@@ -88,8 +92,8 @@ L1 carries post-L0 language growth and bootstrap compiler work.
   [l1/work/plans/tools/2026-04-02-l1-bootstrap-productization-noref.md](../work/plans/tools/2026-04-02-l1-bootstrap-productization-noref.md)
   defines the first L1 bootstrap install/dist/product workflow.
 - Feature
-  [l1/work/plans/features/2026-04-14-l1-std-real-module-noref.md](../work/plans/features/2026-04-14-l1-std-real-module-noref.md)
-  adds the planned `std.real` / `sys.real` floating-point library surface.
+  [l1/work/plans/features/2026-04-17-l1-let-non-constant-initializers-noref.md](../work/plans/features/2026-04-17-l1-let-non-constant-initializers-noref.md)
+  supports non-constant initializers for top-level `let` declarations via module-level init functions.
 
 ## Backlog
 
