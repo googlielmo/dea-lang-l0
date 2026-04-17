@@ -1706,6 +1706,23 @@ func etc_is_bigint_literal_type(ty: Type*?) -> bool {
     return type_is_builtin(ty as Type*, "__bigint_literal");
 }
 
+/**
+ * Return the payload type for exactly one nullable integer layer.
+ *
+ * @param ty Type to inspect.
+ * @return Borrowed integer payload type for `T?`, otherwise `null`.
+ */
+func etc_nullable_integer_inner(ty: Type*) -> Type*? {
+    if (ord(ty.kind) != ord(TY_NULLABLE)) {
+        return null;
+    }
+    let inner = ty.inner as Type*;
+    if (!etc_is_int(inner)) {
+        return null;
+    }
+    return inner;
+}
+
 func etc_bigint_expr_text(self: ExpressionTypeChecker*, expr_id: ExprId) -> string? {
     if (expr_id < 0 || self.current_unit == null) {
         return null;
@@ -2173,6 +2190,11 @@ func etc_can_assign(self: ExpressionTypeChecker*, dst: Type*, src: Type*) -> boo
 func etc_can_cast(self: ExpressionTypeChecker*, dst: Type*, src: Type*) -> bool {
     if (etc_can_assign(self, dst, src)) {
         return true;
+    }
+
+    let nullable_dst_inner = etc_nullable_integer_inner(dst);
+    if (nullable_dst_inner != null && etc_is_int(src)) {
+        return etc_can_cast(self, nullable_dst_inner as Type*, src);
     }
 
     if (etc_is_numeric(dst) && etc_is_numeric(src)) {
@@ -2866,11 +2888,33 @@ func etc_infer_expr(self: ExpressionTypeChecker*, expr_id: ExprId) -> Type*? {
                         self.result.names as NameResolution*, self.current_env as ModuleEnv*,
                         expr.type_ref as TypeRef*, self.result.diags, seen);
                     if (target_ty != null) {
+                        let nullable_target_inner = etc_nullable_integer_inner(target_ty as Type*);
                         if (etc_is_bigint_literal_type(src_ty as Type*)) {
-                            let cast_result = etc_check_assign_bigint_expr(self, target_ty as Type*, expr.expr_a, unit.path);
+                            let bigint_target = target_ty as Type*;
+                            if (nullable_target_inner != null) {
+                                bigint_target = nullable_target_inner as Type*;
+                            }
+                            let cast_result = etc_check_assign_bigint_expr(self, bigint_target, expr.expr_a, unit.path);
                             if (ord(cast_result) == ord(ASSIGN_ACCEPT)) {
                                 ty = target_ty;
                                 target_ty = null;
+                            }
+                        } else if (type_is_builtin(src_ty as Type*, "int") &&
+                            nullable_target_inner != null &&
+                            !type_is_builtin(nullable_target_inner as Type*, "int")) {
+                            let target_inner = nullable_target_inner as Type*;
+                            let const_int = etc_cast_const_int(self, expr.expr_a);
+                            if (const_int != null && !etc_int_value_fits_builtin(target_inner, const_int as int)) {
+                                etc_diag_int_literal_range_error(self, const_int as int, target_inner, unit.path,
+                                    expr.span);
+                            } else if (etc_can_cast(self, target_inner, src_ty as Type*)) {
+                                ty = target_ty;
+                                target_ty = null;
+                            } else {
+                                etc_diag_error(self, "TYP-0230",
+                                    concat4_s("cannot cast from '", type_format(src_ty as Type*),
+                                        concat_s("' to '", type_format(target_ty as Type*)), "'"),
+                                    unit.path, expr.span);
                             }
                         } else if (type_is_builtin(src_ty as Type*, "int") && etc_is_int(target_ty as Type*) &&
                             !type_is_builtin(target_ty as Type*, "int")) {

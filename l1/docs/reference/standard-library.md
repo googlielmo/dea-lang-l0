@@ -1,6 +1,6 @@
 # The L1 Standard Library
 
-Version: 2026-04-14
+Version: 2026-04-16
 
 The standard library provides ergonomic L1 modules (`std.*`) and low-level runtime bindings (`sys.*`).
 
@@ -215,7 +215,8 @@ For canonical ownership behavior around `new`/`drop`, ARC strings, and container
 
 **Imports:** `std.assert`
 
-Shared integer helper module. Floating-point helpers stay out of `std.math`.
+Integer helper module. The unsuffixed surface is the shared `int` API; L1-only fixed-width helpers use explicit `_ui`,
+`_l`, and `_ul` suffixes for `uint`, `long`, and `ulong`. Floating-point helpers stay out of `std.math`.
 
 | Function      | Signature                           | Description                                                                                               |
 | ------------- | ----------------------------------- | --------------------------------------------------------------------------------------------------------- |
@@ -238,6 +239,73 @@ Shared integer helper module. Floating-point helpers stay out of `std.math`.
 | `align_down`  | `(x: int, align: int) -> int?`      | Rounds `x` down to the nearest multiple of `align`. Requires `align > 0`; returns `null` on overflow.     |
 | `align_up`    | `(x: int, align: int) -> int?`      | Rounds `x` up to the nearest multiple of `align`. Requires `align > 0`; returns `null` on overflow.       |
 | `is_aligned`  | `(x: int, align: int) -> bool`      | Returns whether `x` is already aligned to `align`. Requires `align > 0`.                                  |
+
+Unsigned `uint` helpers use ordinary unsigned division names because Euclidean and ordinary unsigned division coincide.
+
+| Function         | Signature                               | Description                                                                                         |
+| ---------------- | --------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `div_ui`         | `(a: uint, b: uint) -> uint`            | Unsigned quotient. Requires `b != 0`.                                                               |
+| `mod_ui`         | `(a: uint, b: uint) -> uint`            | Unsigned remainder. Requires `b != 0`.                                                              |
+| `div_ceil_ui`    | `(a: uint, b: uint) -> uint`            | Unsigned ceiling quotient. Requires `b != 0`.                                                       |
+| `min_ui`         | `(a: uint, b: uint) -> uint`            | Returns the smaller operand.                                                                        |
+| `max_ui`         | `(a: uint, b: uint) -> uint`            | Returns the larger operand.                                                                         |
+| `clamp_ui`       | `(x: uint, lo: uint, hi: uint) -> uint` | Clamps `x` into `[lo, hi]`. Requires `lo <= hi`.                                                    |
+| `is_even_ui`     | `(x: uint) -> bool`                     | Returns whether `x` is evenly divisible by 2.                                                       |
+| `is_odd_ui`      | `(x: uint) -> bool`                     | Returns whether `x` is not evenly divisible by 2.                                                   |
+| `is_multiple_ui` | `(a: uint, b: uint) -> bool`            | Returns whether `a` is evenly divisible by `b`. Requires `b != 0`.                                  |
+| `gcd_ui`         | `(a: uint, b: uint) -> uint`            | Greatest common divisor.                                                                            |
+| `lcm_ui`         | `(a: uint, b: uint) -> uint?`           | Least common multiple. Returns `null` on overflow.                                                  |
+| `pow_ui`         | `(base: uint, exp: int) -> uint?`       | Integer exponentiation. Returns `null` for `exp < 0` or overflow.                                   |
+| `isqrt_ui`       | `(x: uint) -> uint`                     | Floor integer square root.                                                                          |
+| `align_down_ui`  | `(x: uint, align: uint) -> uint`        | Rounds `x` down to the nearest multiple of `align`. Requires `align > 0`.                           |
+| `align_up_ui`    | `(x: uint, align: uint) -> uint?`       | Rounds `x` up to the nearest multiple of `align`. Requires `align > 0`; returns `null` on overflow. |
+| `is_aligned_ui`  | `(x: uint, align: uint) -> bool`        | Returns whether `x` is already aligned to `align`. Requires `align > 0`.                            |
+
+Signed `long` helpers mirror the shared signed policy, including nullable results for `LONG_MIN` representability and
+overflow edges.
+
+| Function        | Signature                               | Description                                                                                                |
+| --------------- | --------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `emod_l`        | `(a: long, b: long) -> long`            | Euclidean modulo. Requires `b > 0`; always returns a result in `[0, b)`.                                   |
+| `ediv_l`        | `(a: long, b: long) -> long`            | Euclidean quotient paired with `emod_l`. Requires `b > 0`.                                                 |
+| `div_floor_l`   | `(a: long, b: long) -> long`            | Mathematical floor quotient. Requires `b != 0` and a representable result (excluding `long_min() / -1`).   |
+| `div_ceil_l`    | `(a: long, b: long) -> long`            | Mathematical ceiling quotient. Requires `b != 0` and a representable result (excluding `long_min() / -1`). |
+| `min_l`         | `(a: long, b: long) -> long`            | Returns the smaller operand.                                                                               |
+| `max_l`         | `(a: long, b: long) -> long`            | Returns the larger operand.                                                                                |
+| `clamp_l`       | `(x: long, lo: long, hi: long) -> long` | Clamps `x` into `[lo, hi]`. Requires `lo <= hi`.                                                           |
+| `sign_l`        | `(x: long) -> int`                      | Returns `-1`, `0`, or `1` based on the sign of `x`.                                                        |
+| `is_even_l`     | `(x: long) -> bool`                     | Returns whether `x` is evenly divisible by 2.                                                              |
+| `is_odd_l`      | `(x: long) -> bool`                     | Returns whether `x` is not evenly divisible by 2.                                                          |
+| `is_multiple_l` | `(a: long, b: long) -> bool`            | Returns whether `a` is evenly divisible by `b`. Requires `b != 0`.                                         |
+| `abs_l`         | `(x: long) -> long?`                    | Absolute value. Returns `null` when the mathematical result is not representable as `long`.                |
+| `gcd_l`         | `(a: long, b: long) -> long?`           | Non-negative greatest common divisor. Returns `null` when the mathematical result is not representable.    |
+| `lcm_l`         | `(a: long, b: long) -> long?`           | Non-negative least common multiple. Returns `null` on overflow or non-representable results.               |
+| `pow_l`         | `(base: long, exp: int) -> long?`       | Integer exponentiation. Returns `null` for `exp < 0` or overflow.                                          |
+| `isqrt_l`       | `(x: long) -> long?`                    | Floor integer square root. Returns `null` when `x < 0`.                                                    |
+| `align_down_l`  | `(x: long, align: long) -> long?`       | Rounds `x` down to the nearest multiple of `align`. Requires `align > 0`; returns `null` on overflow.      |
+| `align_up_l`    | `(x: long, align: long) -> long?`       | Rounds `x` up to the nearest multiple of `align`. Requires `align > 0`; returns `null` on overflow.        |
+| `is_aligned_l`  | `(x: long, align: long) -> bool`        | Returns whether `x` is already aligned to `align`. Requires `align > 0`.                                   |
+
+Unsigned `ulong` helpers intentionally omit signed-only concepts such as `sign_ul`, `abs_ul`, `ediv_ul`, and `emod_ul`.
+
+| Function         | Signature                                   | Description                                                                                         |
+| ---------------- | ------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `div_ul`         | `(a: ulong, b: ulong) -> ulong`             | Unsigned quotient. Requires `b != 0`.                                                               |
+| `mod_ul`         | `(a: ulong, b: ulong) -> ulong`             | Unsigned remainder. Requires `b != 0`.                                                              |
+| `div_ceil_ul`    | `(a: ulong, b: ulong) -> ulong`             | Unsigned ceiling quotient. Requires `b != 0`.                                                       |
+| `min_ul`         | `(a: ulong, b: ulong) -> ulong`             | Returns the smaller operand.                                                                        |
+| `max_ul`         | `(a: ulong, b: ulong) -> ulong`             | Returns the larger operand.                                                                         |
+| `clamp_ul`       | `(x: ulong, lo: ulong, hi: ulong) -> ulong` | Clamps `x` into `[lo, hi]`. Requires `lo <= hi`.                                                    |
+| `is_even_ul`     | `(x: ulong) -> bool`                        | Returns whether `x` is evenly divisible by 2.                                                       |
+| `is_odd_ul`      | `(x: ulong) -> bool`                        | Returns whether `x` is not evenly divisible by 2.                                                   |
+| `is_multiple_ul` | `(a: ulong, b: ulong) -> bool`              | Returns whether `a` is evenly divisible by `b`. Requires `b != 0`.                                  |
+| `gcd_ul`         | `(a: ulong, b: ulong) -> ulong`             | Greatest common divisor.                                                                            |
+| `lcm_ul`         | `(a: ulong, b: ulong) -> ulong?`            | Least common multiple. Returns `null` on overflow.                                                  |
+| `pow_ul`         | `(base: ulong, exp: int) -> ulong?`         | Integer exponentiation. Returns `null` for `exp < 0` or overflow.                                   |
+| `isqrt_ul`       | `(x: ulong) -> ulong`                       | Floor integer square root.                                                                          |
+| `align_down_ul`  | `(x: ulong, align: ulong) -> ulong`         | Rounds `x` down to the nearest multiple of `align`. Requires `align > 0`.                           |
+| `align_up_ul`    | `(x: ulong, align: ulong) -> ulong?`        | Rounds `x` up to the nearest multiple of `align`. Requires `align > 0`; returns `null` on overflow. |
+| `is_aligned_ul`  | `(x: ulong, align: ulong) -> bool`          | Returns whether `x` is already aligned to `align`. Requires `align > 0`.                            |
 
 ### `std.optional`
 

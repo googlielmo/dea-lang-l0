@@ -22,6 +22,7 @@ from test_runner_common import (
     REPO_ROOT,
     SCRIPT_DIR,
     TRACE_EXCLUDED_STAGE1_TESTS,
+    TRACE_SLOW_STAGE1_TESTS,
     discover_trace_l0_tests,
     first_lines,
     repo_stage1_command,
@@ -54,6 +55,11 @@ def parse_args() -> argparse.Namespace:
         epilog="Parallelism defaults to a bounded auto-detected worker count. Override with L1_TEST_JOBS=<n>.",
     )
     parser.add_argument("-v", "--verbose", action="store_true", help="Show analyzer details for each test.")
+    parser.add_argument(
+        "--include-slow",
+        action="store_true",
+        help="Include trace tests that are intentionally skipped by the default trace suite.",
+    )
     parser.add_argument("--keep-artifacts", action="store_true", help="Keep trace/stdout/report files under the temp directory.")
     parser.add_argument("--max-details", type=int, default=5, help="Pass through to check_trace_log.py detail limit.")
     parser.add_argument(
@@ -154,7 +160,8 @@ def main() -> int:
         return 2
 
     try:
-        cases = select_cases(discover_trace_l0_tests(), args.tests)
+        include_slow = args.include_slow or bool(args.tests)
+        cases = select_cases(discover_trace_l0_tests(include_slow=include_slow), args.tests)
     except ValueError as exc:
         print(f"run_trace_tests.py: {exc}", file=sys.stderr, flush=True)
         return 2
@@ -173,6 +180,13 @@ def main() -> int:
         print(f"Parallel jobs: {jobs}", flush=True)
         if TRACE_EXCLUDED_STAGE1_TESTS:
             print(f"Skipping trace-incompatible tests: {' '.join(sorted(TRACE_EXCLUDED_STAGE1_TESTS))}", flush=True)
+        if TRACE_SLOW_STAGE1_TESTS and not include_slow:
+            print(
+                "Skipping slow trace tests by default: "
+                f"{' '.join(sorted(TRACE_SLOW_STAGE1_TESTS))} "
+                "(use --include-slow or pass the test name explicitly)",
+                flush=True,
+            )
         print("======================================", flush=True)
 
         ready: dict[int, TraceResult] = {}

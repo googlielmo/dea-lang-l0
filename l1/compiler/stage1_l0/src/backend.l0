@@ -1015,6 +1015,22 @@ func be_convert_expr_with_expected_type(c_expr: string, natural_ty: Type*?, expe
         return cem_emit_some_value_for_nullable(expected, c_expr);
     }
 
+    if (ord(expected.kind) == ord(TY_NULLABLE) &&
+        be_is_int_assignable(expected.inner as Type*) &&
+        be_is_int_assignable(natural)) {
+        let inner = expected.inner as Type*;
+        let c_payload = c_expr;
+        if (be_can_widen_int(inner, natural)) {
+            c_payload = cem_emit_widen_int(c_expr, natural, inner);
+        } else if (!type_equals(inner, natural)) {
+            c_payload = cem_emit_cast(cem_emit_type(inner), c_expr);
+        }
+        if (cem_is_niche_nullable(expected)) {
+            return cem_emit_cast(cem_emit_type(expected), c_payload);
+        }
+        return cem_emit_some_value_for_nullable(expected, c_payload);
+    }
+
     if (be_can_widen_int(expected, natural)) {
         return cem_emit_widen_int(c_expr, natural, expected);
     }
@@ -2151,11 +2167,33 @@ func be_emit_expr(self: Backend*, expr_id: ExprId) -> string {
                 }
 
                 if (ord((dst_ty as Type*).kind) == ord(TY_NULLABLE)) {
-                    if (src_ty != null && type_equals((dst_ty as Type*).inner as Type*, src_ty as Type*)) {
+                    let dst_inner = (dst_ty as Type*).inner as Type*;
+                    if (src_ty != null && type_equals(dst_inner, src_ty as Type*)) {
                         if (cem_is_niche_nullable(dst_ty as Type*)) {
                             return cem_emit_cast(c_dst, c_inner);
                         }
                         return cem_emit_some_value_for_nullable(dst_ty as Type*, c_inner);
+                    }
+                    if (src_ty != null && be_is_int_assignable(src_ty as Type*) && be_is_int_assignable(dst_inner)) {
+                        let c_payload = c_inner;
+                        if (!be_int_range_contains(dst_inner, src_ty as Type*)) {
+                            let c_inner_dst = cem_emit_type(dst_inner);
+                            if (be_is_legacy_checked_cast_source(src_ty as Type*)) {
+                                c_payload = cem_emit_checked_narrow_cast(c_inner_dst, c_inner);
+                            } else if (be_is_signed_int(src_ty as Type*)) {
+                                c_payload = cem_emit_checked_signed_cast(c_inner_dst, c_inner);
+                            } else {
+                                c_payload = cem_emit_checked_unsigned_cast(c_inner_dst, c_inner);
+                            }
+                        } else if (be_can_widen_int(dst_inner, src_ty as Type*)) {
+                            c_payload = cem_emit_widen_int(c_inner, src_ty as Type*, dst_inner);
+                        } else {
+                            c_payload = cem_emit_cast(cem_emit_type(dst_inner), c_inner);
+                        }
+                        if (cem_is_niche_nullable(dst_ty as Type*)) {
+                            return cem_emit_cast(c_dst, c_payload);
+                        }
+                        return cem_emit_some_value_for_nullable(dst_ty as Type*, c_payload);
                     }
                 }
 

@@ -32,6 +32,7 @@ L1_BUILD_DIR_ENV = "L1_BUILD_DIR"
 DEFAULT_L1_BUILD_DIR = "build/dea"
 L1_BOOTSTRAP_L0C_ENV = "L1_BOOTSTRAP_L0C"
 TRACE_EXCLUDED_STAGE1_TESTS: set[str] = set()
+TRACE_SLOW_STAGE1_TESTS: set[str] = {"math_runtime_compile_test"}
 
 
 def repo_venv_bin_dir() -> Path:
@@ -195,13 +196,15 @@ def discover_stage1_l0_tests() -> list[TestCase]:
     return cases
 
 
-def discover_trace_l0_tests() -> list[TestCase]:
+def discover_trace_l0_tests(*, include_slow: bool = False) -> list[TestCase]:
     """Return trace-eligible `.l0` L1 Stage 1 implementation tests in deterministic order."""
 
     filtered = [
         case
         for case in discover_stage1_l0_tests()
-        if case.kind == "l0" and case.name not in TRACE_EXCLUDED_STAGE1_TESTS
+        if case.kind == "l0"
+        and case.name not in TRACE_EXCLUDED_STAGE1_TESTS
+        and (include_slow or case.name not in TRACE_SLOW_STAGE1_TESTS)
     ]
     return [
         TestCase(index=index, name=case.name, path=case.path, kind=case.kind)

@@ -1,6 +1,6 @@
 # L1 Language and Runtime Design Decisions
 
-Version: 2026-04-14
+Version: 2026-04-17
 
 This document records current design rationale and policy decisions for Dea/L1 as implemented by the bootstrap compiler.
 
@@ -122,11 +122,23 @@ Current policy:
 
 - `T?` is the nullable form of `T`
 - `null` is the only empty value of a nullable type
+- a value of type `T` may be used in a `T?` context, including returns, assignments, and arguments; generated code wraps
+  the value as present
 - casts with `as` are explicit and checked by the type system/runtime helpers where required
+- integer casts may target nullable integer types directly when the same cast to the nullable inner type is valid; for
+  example, `0 as ulong?` and `9999999999 as long?` are accepted and apply the same range-checking behavior as
+  `0 as ulong` and `9999999999 as long` before wrapping
+- the current nullable-integer cast rule unwraps exactly one nullable layer and is scoped to builtin integer payload
+  types; it does not yet mean that every implicit widening conversion composes with `as`
 - `expr?` is the null-propagation operator
 
 For non-pointer nullable values, generated C uses wrapper representations rather than exposing host-specific niche
 assumptions.
+
+Future direction: broaden the cast rule so `expr as U` is valid whenever there is an explicit cast target `V` for the
+operand and `V` can be implicitly widened to `U`. That would make the current integer-to-optional-integer behavior one
+instance of a general "explicit conversion followed by implicit widening" rule, covering future cases such as broader
+numeric widenings or nullable pointer-family widenings when those conversions are deliberately added.
 
 ## 9. The `dea` Prelude Module
 
@@ -174,13 +186,18 @@ The bootstrap compiler keeps integer behavior defined rather than inheriting hos
   target is known
 - fitting integer literals may be used in narrower typed integer contexts without a runtime check, while nonliteral
   narrowing and cross-signedness conversions require an explicit cast
+- explicit integer casts to nullable integer targets, such as `0 as ulong?`, use the same checked conversion policy as
+  casts to the inner type and then produce a present nullable value
 - integer division by zero is a defined runtime error, not host-C undefined behavior
 
 That policy is part of the language contract even though the current implementation is lowered through C.
 
-At the stdlib layer, shared integer helper contracts belong in `std.math`; copied modules such as `std.time` may consume
-those helpers, but they should not own general-purpose arithmetic utilities. Floating-point helper policy remains
-separate from this integer-focused surface.
+At the stdlib layer, integer helper contracts belong in `std.math`; copied modules such as `std.time` may consume those
+helpers, but they should not own general-purpose arithmetic utilities. The unsuffixed helper names remain the shared
+`int` surface. L1-only `uint`, `long`, and `ulong` helpers use explicit `_ui`, `_l`, and `_ul` suffixes so wider fixed
+widths do not shadow or blur the shared API. Signed `long` helpers follow the same checked representability policy as
+the `int` helpers, while unsigned helpers use plain `div_*` / `mod_*` names and omit signed-only concepts such as
+`sign`, `abs`, `ediv`, and `emod`. Floating-point helper policy remains separate from this integer-focused surface.
 
 ## 11. Floating-Point Semantics and Backend Contract
 

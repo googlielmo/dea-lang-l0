@@ -1,6 +1,6 @@
 # Dea/L1 Roadmap
 
-Version: 2026-04-15
+Version: 2026-04-16
 
 This is the live direction document for the Dea/L1 subtree. It records the current L1 position, the assumptions that
 constrain future work, completed milestones that shape the baseline, active work, and backlog items that have not yet
@@ -67,6 +67,9 @@ L1 carries post-L0 language growth and bootstrap compiler work.
 - Feature
   [l1/work/plans/features/closed/2026-04-13-l1-uint-long-ulong-bigint-builtins-noref.md](../work/plans/features/closed/2026-04-13-l1-uint-long-ulong-bigint-builtins-noref.md)
   added `uint`, `long`, and `ulong` through contextual bigint literals.
+- Feature
+  [l1/work/plans/features/closed/2026-04-14-l1-std-math-wide-integer-followup-noref.md](../work/plans/features/closed/2026-04-14-l1-std-math-wide-integer-followup-noref.md)
+  added L1-only `std.math` helper families for `uint`, `long`, and `ulong`.
 
 </details>
 
@@ -84,9 +87,6 @@ L1 carries post-L0 language growth and bootstrap compiler work.
 - Feature
   [l1/work/plans/features/2026-04-14-l1-std-real-module-noref.md](../work/plans/features/2026-04-14-l1-std-real-module-noref.md)
   adds the planned `std.real` / `sys.real` floating-point library surface.
-- Feature
-  [l1/work/plans/features/2026-04-14-l1-std-math-wide-integer-followup-noref.md](../work/plans/features/2026-04-14-l1-std-math-wide-integer-followup-noref.md)
-  adds planned L1-only `std.math` helper families for `uint`, `long`, and `ulong`.
 
 ## Backlog
 

@@ -3,7 +3,7 @@
 ## Extend `std.math` with L1-only `uint`, `long`, and `ulong` helpers
 
 - Date: 2026-04-14
-- Status: Draft
+- Status: Completed
 - Title: Extend `std.math` with L1-only `uint`, `long`, and `ulong` helpers
 - Kind: Feature
 - Severity: Medium
@@ -11,16 +11,29 @@
 - Subsystem: Stdlib / docs / tests
 - Modules:
   - `compiler/shared/l1/stdlib/std/math.l1`
+  - `compiler/stage1_l0/src/expr_types.l0`
+  - `compiler/stage1_l0/src/backend.l0`
   - `compiler/stage1_l0/tests/math_test.l0`
+  - `compiler/stage1_l0/tests/backend_test.l0`
   - `docs/reference/standard-library.md`
   - `docs/reference/design-decisions.md`
+  - `docs/reference/c-backend-design.md`
+  - `docs/reference/grammar.md`
   - `docs/project-status.md`
+  - `docs/roadmap.md`
 - Test modules:
   - `compiler/stage1_l0/tests/math_test.l0`
+  - `compiler/stage1_l0/tests/backend_test.l0`
+  - `compiler/stage1_l0/tests/expr_types_test.l0`
+  - `compiler/stage1_l0/tests/fixtures/math_runtime/*.l1`
 - Related:
   - `work/plans/features/closed/2026-04-14-shared-std-math-int-surface-noref.md`
   - `l1/work/plans/features/closed/2026-04-13-l1-uint-long-ulong-bigint-builtins-noref.md`
   - `l1/work/plans/features/2026-04-14-l1-std-real-module-noref.md`
+- Repro:
+  - `make test-stage1 TESTS="backend_test math_test expr_types_test"`
+  - `make test-stage1`
+  - `make test-stage1-trace TESTS="math_test"`
 
 ## Summary
 
@@ -31,6 +44,12 @@ This follow-up builds on the shared `int` plan by adding a typed L1-only `std.ma
 that exist only in L1. It keeps the shared unsuffixed `int` API untouched, gives `uint` a direct 32-bit surface rather
 than forcing callers through `ulong`, mirrors the signed shared surface for `long`, and keeps `ulong` deliberately
 selective.
+
+The completed implementation also tightened the adjacent nullable-integer conversion path needed by the new helpers.
+Integer casts to one-level nullable integer targets, such as `0 as long?`, `0 as ulong?`, and `9999999999 as long?`, now
+lower to present nullable wrappers after applying the same checked conversion policy as casts to the inner integer type.
+Contextual integer and bigint literals also flow directly into nullable integer return and assignment contexts, so
+`return 0;` is the idiomatic spelling in a `long?` function when no explicit checked conversion is needed.
 
 ## Dependency
 
@@ -175,7 +194,8 @@ It also depends on the completed integer builtin work in
 - adding floating-point helpers
 - adding bit operations or number-theory extras beyond `gcd`, `lcm`, and integer square root
 - adding saturating arithmetic
-- changing L1 syntax, literal syntax, cast rules, or operator semantics
+- changing L1 syntax, literal syntax, broad cast rules, or operator semantics beyond the scoped one-level
+  nullable-integer conversion relaxation recorded in the completion notes
 
 ## Verification Criteria
 
@@ -189,6 +209,28 @@ It also depends on the completed integer builtin work in
 5. Signed `long` helpers follow the same checked-edge policy as the shared `int` surface rather than quietly diverging
    in the L1-only layer.
 6. The L1-only extension does not change or shadow the shared unsuffixed `int` API.
+7. Nullable integer cast lowering constructs real optional wrappers for casts such as `0 as long?`, `0 as ulong?`, and
+   `9999999999 as long?`, and implicit `T` to `T?` wrapping continues to work for return contexts such as
+   `return 0 as ulong;` in a `ulong?` function.
+8. Contextual integer and bigint literals work directly in nullable integer return contexts, such as `return 0;` in a
+   `long?` function and `return 9999999999;` in a `long?` function.
+
+## Completion Notes
+
+1. `compiler/shared/l1/stdlib/std/math.l1` now exposes the planned `_ui`, `_l`, and `_ul` helper families.
+2. `compiler/stage1_l0/tests/fixtures/math_runtime/wide_math_main.l1` covers representative `uint`, `long`, and `ulong`
+   helper behavior, including boundary values, signed minima, checked nullable overflows, and alignment edges.
+3. `compiler/stage1_l0/src/expr_types.l0` and `compiler/stage1_l0/src/backend.l0` now accept and lower explicit integer
+   casts to one-level nullable integer targets by converting to the inner type and constructing a present nullable
+   wrapper.
+4. Contextual literal returns into nullable integer functions now use the idiomatic direct form in `std.math`, for
+   example `return 0;` instead of `return 0 as long?;`.
+5. `math_test.l0` now remains a fast pure `std.math` trace target, while nested compile/run fixture coverage lives in
+   `math_runtime_compile_test.l0` and is marked as intentionally slow for trace runs.
+6. Live docs were refreshed in `docs/reference/standard-library.md`, `docs/reference/design-decisions.md`,
+   `docs/reference/c-backend-design.md`, `docs/reference/grammar.md`, `docs/project-status.md`, and `docs/roadmap.md`.
+7. Verification passed with `make test-stage1 TESTS="math_test math_runtime_compile_test expr_types_test backend_test"`,
+   `make test-stage1 TESTS="expr_types_test backend_test"`, and `make test-stage1-trace TESTS="math_test"`.
 
 ## Open Design Constraints
 

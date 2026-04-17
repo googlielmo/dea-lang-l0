@@ -9,18 +9,6 @@ import std.assert;
 import std.io;
 import std.math;
 import std.text;
-import std.vector;
-
-import l1c_lib;
-
-/**
- * Return the fixture root used for runtime-failure child modules.
- *
- * @return Repo-local fixture directory.
- */
-func mt_fixture_root() -> string {
-    return "compiler/stage1_l0/tests/fixtures/math_runtime";
-}
 
 /**
  * Assert one integer result.
@@ -68,26 +56,6 @@ func mt_expect_opt_eq(label: string, actual: int?, expected: int) {
  */
 func mt_expect_opt_null(label: string, actual: int?) {
     assert(actual == null, concat3_s("expected null: ", label, ""));
-    printl_ss("[PASS]", label);
-}
-
-/**
- * Compile and run one child fixture that must fail at runtime.
- *
- * @param module_name Temporary module name.
- * @param label Human-readable case label.
- */
-func mt_expect_runtime_failure(module_name: string, label: string) {
-    with (let argv = vs_create(8) => vs_free(argv)) {
-        vs_push(argv, "--run");
-        vs_push(argv, "-P");
-        vs_push(argv, mt_fixture_root());
-        vs_push(argv, module_name);
-
-        let rc = run_with_argv(argv);
-        assert(rc != 0, concat3_s("expected runtime failure: ", label, ""));
-    }
-
     printl_ss("[PASS]", label);
 }
 
@@ -160,18 +128,6 @@ func test_alignment() {
 }
 
 /**
- * Tests runtime-failure preconditions in child processes.
- */
-func test_runtime_failures() {
-    printl_s("== Runtime failure fixtures ==");
-    mt_expect_runtime_failure("math_emod_zero_divisor", "emod divisor precondition");
-    mt_expect_runtime_failure("math_div_floor_zero_divisor", "div_floor divisor precondition");
-    mt_expect_runtime_failure("math_div_ceil_unrepresentable", "div_ceil representability precondition");
-    mt_expect_runtime_failure("math_align_up_zero_alignment", "align_up alignment precondition");
-    mt_expect_runtime_failure("math_clamp_invalid_bounds", "clamp bound ordering precondition");
-}
-
-/**
  * Main entry point for the module.
  */
 func main() {
@@ -179,6 +135,5 @@ func main() {
     test_sign_and_divisibility();
     test_checked_algorithms();
     test_alignment();
-    test_runtime_failures();
     printl_s("math_test: all tests passed");
 }

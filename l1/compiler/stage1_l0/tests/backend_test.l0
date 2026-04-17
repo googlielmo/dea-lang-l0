@@ -430,7 +430,7 @@ func test_backend_generate_match_and_with_cleanup_block() {
 func test_backend_generate_with_cleanup_block_header_try_predeclares_nullable_lets() {
     with (let filenames = vs_create(1) => vs_free(filenames),
           let sources = vs_create(1) => vs_free(sources),
-          let lines = vs_create(20) => vs_free(lines),
+          let lines = vs_create(23) => vs_free(lines),
           let cfg = log_config_create(LL_ERROR, false) => drop cfg,
           let opts = cg_options_create() => cg_options_free(opts)) {
         opts.emit_line_directives = false;
@@ -726,16 +726,23 @@ func test_backend_generate_small_integer_builtins() {
 func test_backend_generate_large_integer_builtins() {
     with (let filenames = vs_create(1) => vs_free(filenames),
           let sources = vs_create(1) => vs_free(sources),
-          let lines = vs_create(19) => vs_free(lines),
+          let lines = vs_create(20) => vs_free(lines),
           let cfg = log_config_create(LL_ERROR, false) => drop cfg,
           let opts = cg_options_create() => cg_options_free(opts)) {
         opts.emit_line_directives = false;
         vs_push(filenames, "demo/main.l1");
         vs_push(lines, "module demo.main;");
-        vs_push(lines, "let max_uint: uint = 4294967295;");
-        vs_push(lines, "let min_long: long = -(0x8000000000000000);");
-        vs_push(lines, "let max_ulong: ulong = 18446744073709551615;");
+        vs_push(lines, "let max_uint: uint = 0xffffffff;");
+        vs_push(lines, "let min_long_hex: long = -0x8000000000000000;");
+        vs_push(lines, "let min_long_dec: long = -9223372036854775808;");
+        vs_push(lines, "let max_ulong: ulong = 0xffffffffffffffff;");
         vs_push(lines, "let bin_ulong: ulong = 0b1111111111111111111111111111111111111111111111111111111111111111;");
+        vs_push(lines, "func zero_ulong_opt_cast_nullable() -> ulong? { return 0 as ulong?; }");
+        vs_push(lines, "func zero_ulong_opt_cast_inner() -> ulong? { return 0 as ulong; }");
+        vs_push(lines, "func big_long_opt_cast_nullable() -> long? { return 9999999999 as long?; }");
+        vs_push(lines, "func direct_long_opt_return() -> long? { return 42; }");
+        vs_push(lines, "func direct_ulong_opt_return() -> ulong? { return 42; }");
+        vs_push(lines, "func direct_big_long_opt_return() -> long? { return 9999999999; }");
         vs_push(lines, "func main(x: int, u: uint, l: long, ul: ulong, b: byte, us: ushort) -> long {");
         vs_push(lines, "    let a: uint = b;");
         vs_push(lines, "    let c: uint = us;");
@@ -745,6 +752,7 @@ func test_backend_generate_large_integer_builtins() {
         vs_push(lines, "    let g: uint = x as uint;");
         vs_push(lines, "    let h: short = ul as short;");
         vs_push(lines, "    let i: long = 2147483648;");
+        vs_push(lines, "    let k: long? = 0 as long?;");
         vs_push(lines, "    let j: long = l + e;");
         vs_push(lines, "    if (u == c) { return j + i; }");
         vs_push(lines, "    return j;");
@@ -755,12 +763,14 @@ func test_backend_generate_large_integer_builtins() {
         assert(!analysis_has_errors(result), "analysis should succeed for large integer fixture");
 
         let generated = backend_generate(result, opts, cfg);
-        assert(contains_s(generated, "static dea_uint dea_demo_main_max_uint = 4294967295U;"),
-            "uint top-level bigint literal mismatch");
-        assert(contains_s(generated, "static dea_long dea_demo_main_min_long = INT64_MIN;"),
-            "long top-level bigint literal mismatch");
-        assert(contains_s(generated, "static dea_ulong dea_demo_main_max_ulong = 18446744073709551615ULL;"),
-            "ulong top-level bigint literal mismatch");
+        assert(contains_s(generated, "static dea_uint dea_demo_main_max_uint = 0xffffffffU;"),
+            "uint top-level hex bigint literal mismatch");
+        assert(contains_s(generated, "static dea_long dea_demo_main_min_long_hex = INT64_MIN;"),
+            "long top-level negative hex bigint literal mismatch");
+        assert(contains_s(generated, "static dea_long dea_demo_main_min_long_dec = INT64_MIN;"),
+            "long top-level negative decimal bigint literal mismatch");
+        assert(contains_s(generated, "static dea_ulong dea_demo_main_max_ulong = 0xffffffffffffffffULL;"),
+            "ulong top-level hex bigint literal mismatch");
         assert(contains_s(generated, "static dea_ulong dea_demo_main_bin_ulong = 0xffffffffffffffffULL;"),
             "binary ulong bigint literal mismatch");
         assert(contains_s(generated, "dea_uint a = ((dea_uint)(b));"), "byte-to-uint widening mismatch");
@@ -772,6 +782,26 @@ func test_backend_generate_large_integer_builtins() {
         assert(contains_s(generated, "dea_short h = (_rt_cast_dea_short_from_unsigned((dea_ulong)(ul)));"),
             "ulong-to-short checked cast mismatch");
         assert(contains_s(generated, "dea_long i = 2147483648LL;"), "long local bigint literal mismatch");
+        assert(contains_s(generated, "dea_opt_long k = ((dea_opt_long){.has_value = 1, .value = ((dea_long)(0))});"),
+            "int-to-nullable-long cast lowering mismatch");
+        assert(contains_s(generated,
+            "dea_opt_ulong dea_demo_main_zero_ulong_opt_cast_nullable(void)\n{\n    return ((dea_opt_ulong){.has_value = 1, .value = (_rt_narrow_dea_ulong(0))});"),
+            "int-to-nullable-ulong cast return lowering mismatch");
+        assert(contains_s(generated,
+            "dea_opt_ulong dea_demo_main_zero_ulong_opt_cast_inner(void)\n{\n    return ((dea_opt_ulong){.has_value = 1, .value = (_rt_narrow_dea_ulong(0))});"),
+            "inner-ulong-to-nullable-ulong return lowering mismatch");
+        assert(contains_s(generated,
+            "dea_opt_long dea_demo_main_big_long_opt_cast_nullable(void)\n{\n    return ((dea_opt_long){.has_value = 1, .value = 9999999999LL});"),
+            "bigint-to-nullable-long cast return lowering mismatch");
+        assert(contains_s(generated,
+            "dea_opt_long dea_demo_main_direct_long_opt_return(void)\n{\n    return ((dea_opt_long){.has_value = 1, .value = ((dea_long)(42))});"),
+            "direct int-literal-to-nullable-long return lowering mismatch");
+        assert(contains_s(generated,
+            "dea_opt_ulong dea_demo_main_direct_ulong_opt_return(void)\n{\n    return ((dea_opt_ulong){.has_value = 1, .value = ((dea_ulong)(42))});"),
+            "direct int-literal-to-nullable-ulong return lowering mismatch");
+        assert(contains_s(generated,
+            "dea_opt_long dea_demo_main_direct_big_long_opt_return(void)\n{\n    return ((dea_opt_long){.has_value = 1, .value = 9999999999LL});"),
+            "direct bigint-to-nullable-long return lowering mismatch");
         assert(contains_s(generated, "dea_long j = (_rt_ladd(l, e));"), "long addition helper mismatch");
         assert(contains_s(generated, "return (_rt_ladd(j, i));"), "long return addition helper mismatch");
 

@@ -30,7 +30,7 @@ func contextual_literals() -> long {
     let a: uint = 0004294967295;
     let b: uint = 0x00000000ffffffff;
     let c: long = 0x0000000080000000;
-    let d: long = -(0x8000000000000000);
+    let d: long = -0x8000000000000000;
     let e: ulong = 0o1777777777777777777777;
     let f: ulong = 0b1111111111111111111111111111111111111111111111111111111111111111;
     let g: uint? = 4294967295;

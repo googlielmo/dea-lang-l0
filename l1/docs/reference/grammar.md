@@ -1,6 +1,6 @@
 # Dea/L<sub>1</sub> Grammar
 
-Version: 2026-04-04
+Version: 2026-04-16
 
 The following is the formal grammar for the Dea/L<sub>1</sub> programming language in EBNF-style. This describes the
 concrete syntax that lexers and parsers should accept.
@@ -401,7 +401,8 @@ Notes:
 - `QualifiedIdent` in expressions resolves to a module-qualified symbol reference. The module must be imported.
 - `Ident` as a primary expression is a simple variable reference. When the identifier resolves to a zero-argument enum
   variant, it acts as a constructor (e.g. `Red` is equivalent to `Red()`).
-- `as` casts support `T?` \<-> `T` conversion.
+- `as` casts support `T?` \<-> `T` conversion. Integer casts may also target nullable integer types when the same cast
+  to the nullable inner type is valid, such as `0 as ulong?`.
 - The `?` type suffix denotes nullable types in the `Type` grammar.
 - `?` as a postfix operator is the **null propagation operator** (also known as the **try operator**).
 - `TypeExpr` allows types in argument position for intrinsics such as `sizeof(int*)` a.k.a. `dea::sizeof(int*)`.

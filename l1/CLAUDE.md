@@ -34,8 +34,13 @@ l1c --version
 make check-examples
 make test-stage1
 make test-stage1-trace
+make test-stage1-trace-all
 make test-all
 ```
+
+`make test-stage1-trace` is the default ARC/memory trace suite and skips intentionally slow trace cases such as
+`math_runtime_compile_test`. Use `make test-stage1-trace-all` to include those slow trace checks, or pass a slow test
+explicitly with `TESTS="math_runtime_compile_test"` when investigating it.
 
 ## Current Scope
 

@@ -358,6 +358,53 @@ func test_typing_cast_err() {
 }
 
 /**
+ * Tests explicit casts to one-level nullable integer targets.
+ */
+func test_typing_cast_optional_int_ok() {
+    let sp = make_paths();
+    with (let cfg = log_config_create(LL_SILENT, false) => drop cfg) {
+        let result = analysis_analyze_entry(sp, "typing_cast_optional_int_ok", cfg);
+        assert(!analysis_has_errors(result), "expected no typing errors for typing_cast_optional_int_ok");
+        analysis_result_free(result);
+    }
+    sp_free(sp);
+}
+
+/**
+ * Tests invalid explicit casts to non-integer nullable targets.
+ */
+func test_typing_cast_optional_int_err() {
+    let sp = make_paths();
+    with (let cfg = log_config_create(LL_SILENT, false) => drop cfg) {
+        let result = analysis_analyze_entry(sp, "typing_cast_optional_int_err", cfg);
+        assert(analysis_has_errors(result), "expected typing errors for typing_cast_optional_int_err");
+        assert(count_diag_code(result, "TYP-0230") == 2, "expected two invalid nullable cast diagnostics");
+        assert(count_diag_code(result, "TYP-0703") == 2, "expected two invalid bigint context diagnostics");
+        assert(!has_diag_code(result, "TYP-0315"), "did not expect secondary return type mismatch on cast errors");
+        analysis_result_free(result);
+    }
+    sp_free(sp);
+}
+
+/**
+ * Tests nullable integer contexts reject nonliteral checked-conversion candidates.
+ */
+func test_typing_optional_int_context_err() {
+    let sp = make_paths();
+    with (let cfg = log_config_create(LL_SILENT, false) => drop cfg) {
+        let result = analysis_analyze_entry(sp, "typing_optional_int_context_err", cfg);
+        assert(analysis_has_errors(result), "expected typing errors for typing_optional_int_context_err");
+        assert(count_diag_code(result, "TYP-0315") == 1, "expected one nullable return mismatch");
+        assert(count_diag_code(result, "TYP-0311") == 1, "expected one nullable assignment mismatch");
+        assert(count_diag_code(result, "TYP-0312") == 1, "expected one nullable call argument mismatch");
+        assert(count_diag_code(result, "TYP-0313") == 1, "expected one nullable struct field mismatch");
+        assert(count_diag_code(result, "TYP-0700") == 1, "expected one nullable integer literal range diagnostic");
+        analysis_result_free(result);
+    }
+    sp_free(sp);
+}
+
+/**
  * Tests explicit int-to-byte overflow diagnostics.
  */
 func test_typing_cast_int_to_byte_overflow() {
@@ -750,6 +797,9 @@ func main() {
     test_typing_equality_unsupported();
     test_typing_cast_ok();
     test_typing_cast_err();
+    test_typing_cast_optional_int_ok();
+    test_typing_cast_optional_int_err();
+    test_typing_optional_int_context_err();
     test_typing_cast_int_to_byte_overflow();
     test_typing_small_int_ok();
     test_typing_small_int_err();

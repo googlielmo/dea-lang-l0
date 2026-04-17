@@ -1,6 +1,6 @@
 # L1 Project Status
 
-Version: 2026-04-14
+Version: 2026-04-17
 
 This document summarizes what is implemented in the Dea/L1 subtree today.
 
@@ -61,11 +61,13 @@ checks, including:
   integer literals carried through the bigint path when they exceed bootstrap `int`
 - builtin `float` and `double`, real literals, the current narrow numeric conversion rules, and backend-validated
   floating-point lowering
-- explicit nullability, `new` / `drop`, ARC-managed `string`, casts, and postfix `expr?`
+- explicit nullability, `T` to `T?` wrapping, integer casts to nullable integer targets, `new` / `drop`, ARC-managed
+  `string`, casts, and postfix `expr?`
 
 The stdlib currently includes the core bootstrap modules for I/O, strings, text, paths, filesystem access, time,
-randomness, assertions, optionals, the current container set, and the shared integer helper surface in `std.math`.
-Library follow-up work for `std.real` and the L1-only `_ui` / `_l` / `_ul` `std.math` families is not implemented yet.
+randomness, assertions, optionals, the current container set, the shared `int` helper surface in `std.math`, and L1-only
+`_ui` / `_l` / `_ul` `std.math` families for `uint`, `long`, and `ulong`. Library follow-up work for `std.real` is not
+implemented yet.
 
 ## Delivery and Validation
 
@@ -77,16 +79,21 @@ source build/dea/bin/l1-env.sh
 l1c --version
 make test-stage1
 make test-stage1-trace
+make test-stage1-trace-all
 ```
 
 `make use-dev-stage1` auto-prepares the default repo-local upstream `../l0/build/dea/bin/l0c-stage2` when needed.
-`make check-examples` adds warning-free latest-stage `--check` coverage for `examples/*.l1`, while `make test-all`
-combines the implementation tests, ARC/memory trace checks, and example checks.
+`make test-stage1-trace` runs the default ARC/memory trace suite and skips intentionally slow trace cases such as
+`math_runtime_compile_test`; pass the test name explicitly or use `make test-stage1-trace-all` when that slow trace
+coverage is needed. `make check-examples` adds warning-free latest-stage `--check` coverage for `examples/*.l1`, while
+`make test-all` combines the implementation tests, default ARC/memory trace checks, and example checks.
 
 Validation is currently centered on:
 
 - `make test-stage1` and the `.l0` implementation tests under `compiler/stage1_l0/tests/`
-- `make test-stage1-trace` for ARC/memory trace validation across the `.l0` implementation tests
+- `make test-stage1-trace` for default ARC/memory trace validation across the `.l0` implementation tests
+- `make test-stage1-trace-all` for opt-in slow trace coverage, including nested-compiler cases such as
+  `math_runtime_compile_test`
 - `make check-examples` for warning-free latest-stage `--check` coverage across `examples/*.l1`
 - `make test-all` as the combined local Stage 1 validation entry point
 - keeping the stdlib/runtime tree usable by the bootstrap compiler

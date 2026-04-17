@@ -1,6 +1,6 @@
 # L1 C Backend Design
 
-Version: 2026-04-14
+Version: 2026-04-16
 
 This is the canonical backend implementation document for the current Dea/L1 bootstrap compiler.
 
@@ -103,6 +103,10 @@ build mode preserve the L1 floating-point contract.
 - enums lower to tagged unions
 - pointer-shaped nullable values use `NULL` representation
 - non-pointer nullable values lower to wrapper structs carrying `has_value` plus the wrapped value
+- non-null values used in matching nullable contexts lower to present wrappers; for example, returning `0 as ulong` from
+  a `ulong?` function stores the converted `ulong` payload in `dea_opt_ulong`
+- explicit integer casts to nullable integer targets lower as a checked cast to the inner C type followed by wrapper
+  construction; for example, `0 as ulong?` lowers through the same `int` to `ulong` range check as `0 as ulong`
 
 ## Statement and Expression Lowering
 
