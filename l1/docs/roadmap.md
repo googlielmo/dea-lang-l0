@@ -1,6 +1,6 @@
 # Dea/L1 Roadmap
 
-Version: 2026-04-16
+Version: 2026-04-17
 
 This is the live direction document for the Dea/L1 subtree. It records the current L1 position, the assumptions that
 constrain future work, completed milestones that shape the baseline, active work, and backlog items that have not yet
@@ -81,6 +81,9 @@ L1 carries post-L0 language growth and bootstrap compiler work.
 
 ## Active standalone plans
 
+- Bug fix
+  [2026-04-17-l1-diagnostic-tab-caret-alignment-noref](../work/plans/bug-fixes/2026-04-17-l1-diagnostic-tab-caret-alignment-noref.md)
+  aligns stored diagnostic spans and printed carets for source lines that contain ASCII tabs.
 - Tool
   [l1/work/plans/tools/2026-04-02-l1-bootstrap-productization-noref.md](../work/plans/tools/2026-04-02-l1-bootstrap-productization-noref.md)
   defines the first L1 bootstrap install/dist/product workflow.
