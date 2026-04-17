@@ -1,6 +1,6 @@
 # The L1 Standard Library
 
-Version: 2026-04-16
+Version: 2026-04-17
 
 The standard library provides ergonomic L1 modules (`std.*`) and low-level runtime bindings (`sys.*`).
 
@@ -153,15 +153,23 @@ For canonical ownership behavior around `new`/`drop`, ARC strings, and container
 
 ### `std.io`
 
-**Imports:** `sys.rt`, `sys.unsafe`, `std.array`, `std.assert`, `std.unit`
+**Imports:** `sys.rt`, `sys.unsafe`, `std.array`, `std.assert`, `std.string`, `std.text`, `std.unit`
 
-`std.io` classifies I/O success/failure from direct runtime return values (optional/boolean/sentinel results).
+`std.io` classifies I/O success/failure from direct runtime return values (optional/boolean/sentinel results). Wide
+numeric helpers use `_ui`, `_l`, `_ul`, `_f`, and `_d` suffixes for `uint`, `long`, `ulong`, `float`, and `double`.
 
 | Function            | Signature                                            | Description                                                                         |
 | ------------------- | ---------------------------------------------------- | ----------------------------------------------------------------------------------- |
 | `read_line`         | `() -> string?`                                      | Reads line from stdin; `null` on EOF/error.                                         |
 | `read_char`         | `() -> int?`                                         | Reads one byte as int; `null` on EOF/error.                                         |
 | `read_char_or_eof`  | `() -> int`                                          | Reads one byte; returns `-1` on EOF/error.                                          |
+| `read_delim`        | `(delim: byte) -> string?`                           | Reads through one delimiter byte; excludes and consumes it.                         |
+| `read_delim_any`    | `(delims: string) -> string?`                        | Reads through any byte in a non-empty delimiter set.                                |
+| `read_delim_ws`     | `() -> string?`                                      | Skips leading ASCII whitespace, then reads one whitespace-delimited token.          |
+| `read_i`            | `() -> int?`                                         | Parses the next whitespace token as `int`; `null` on EOF, invalid text, or range.   |
+| `read_ui`           | `() -> uint?`                                        | Parses the next whitespace token as `uint`; `null` on EOF, invalid text, or range.  |
+| `read_l`            | `() -> long?`                                        | Parses the next whitespace token as `long`; `null` on EOF, invalid text, or range.  |
+| `read_ul`           | `() -> ulong?`                                       | Parses the next whitespace token as `ulong`; `null` on EOF, invalid text, or range. |
 | `read_stdin_some`   | `(buf: ByteArray*, start: int, count: int) -> int?`  | Reads raw bytes into one checked subrange; `0` means EOF and `null` means error.    |
 | `write_stdout_some` | `(buf: ByteArray*, start: int, count: int) -> int?`  | Writes bytes from one checked subrange to stdout.                                   |
 | `write_stderr_some` | `(buf: ByteArray*, start: int, count: int) -> int?`  | Writes bytes from one checked subrange to stderr.                                   |
@@ -172,9 +180,19 @@ For canonical ownership behavior around `new`/`drop`, ARC strings, and container
 | `printl`            | `() -> void`                                         | Prints newline to stdout.                                                           |
 | `print_s`           | `(s: string) -> void`                                | Prints string to stdout.                                                            |
 | `print_i`           | `(x: int) -> void`                                   | Prints int to stdout.                                                               |
+| `print_ui`          | `(x: uint) -> void`                                  | Prints uint to stdout.                                                              |
+| `print_l`           | `(x: long) -> void`                                  | Prints long to stdout.                                                              |
+| `print_ul`          | `(x: ulong) -> void`                                 | Prints ulong to stdout.                                                             |
+| `print_f`           | `(x: float) -> void`                                 | Prints float to stdout.                                                             |
+| `print_d`           | `(x: double) -> void`                                | Prints double to stdout.                                                            |
 | `print_b`           | `(x: bool) -> void`                                  | Prints bool to stdout.                                                              |
 | `printl_s`          | `(s: string) -> void`                                | Prints string + newline to stdout.                                                  |
 | `printl_i`          | `(x: int) -> void`                                   | Prints int + newline to stdout.                                                     |
+| `printl_ui`         | `(x: uint) -> void`                                  | Prints uint + newline to stdout.                                                    |
+| `printl_l`          | `(x: long) -> void`                                  | Prints long + newline to stdout.                                                    |
+| `printl_ul`         | `(x: ulong) -> void`                                 | Prints ulong + newline to stdout.                                                   |
+| `printl_f`          | `(x: float) -> void`                                 | Prints float + newline to stdout.                                                   |
+| `printl_d`          | `(x: double) -> void`                                | Prints double + newline to stdout.                                                  |
 | `printl_b`          | `(x: bool) -> void`                                  | Prints bool + newline to stdout.                                                    |
 | `print_ss`          | `(s1: string, s2: string) -> void`                   | Prints two values separated by space.                                               |
 | `print_si`          | `(s: string, x: int) -> void`                        | Prints two values separated by space.                                               |
@@ -197,9 +215,19 @@ For canonical ownership behavior around `new`/`drop`, ARC strings, and container
 | `err_printl`        | `() -> void`                                         | Prints newline to stderr.                                                           |
 | `err_print_s`       | `(s: string) -> void`                                | Prints string to stderr.                                                            |
 | `err_print_i`       | `(x: int) -> void`                                   | Prints int to stderr.                                                               |
+| `err_print_ui`      | `(x: uint) -> void`                                  | Prints uint to stderr.                                                              |
+| `err_print_l`       | `(x: long) -> void`                                  | Prints long to stderr.                                                              |
+| `err_print_ul`      | `(x: ulong) -> void`                                 | Prints ulong to stderr.                                                             |
+| `err_print_f`       | `(x: float) -> void`                                 | Prints float to stderr.                                                             |
+| `err_print_d`       | `(x: double) -> void`                                | Prints double to stderr.                                                            |
 | `err_print_b`       | `(x: bool) -> void`                                  | Prints bool to stderr.                                                              |
 | `err_printl_s`      | `(s: string) -> void`                                | Prints string + newline to stderr.                                                  |
 | `err_printl_i`      | `(x: int) -> void`                                   | Prints int + newline to stderr.                                                     |
+| `err_printl_ui`     | `(x: uint) -> void`                                  | Prints uint + newline to stderr.                                                    |
+| `err_printl_l`      | `(x: long) -> void`                                  | Prints long + newline to stderr.                                                    |
+| `err_printl_ul`     | `(x: ulong) -> void`                                 | Prints ulong + newline to stderr.                                                   |
+| `err_printl_f`      | `(x: float) -> void`                                 | Prints float + newline to stderr.                                                   |
+| `err_printl_d`      | `(x: double) -> void`                                | Prints double + newline to stderr.                                                  |
 | `err_printl_b`      | `(x: bool) -> void`                                  | Prints bool + newline to stderr.                                                    |
 | `err_print_ss`      | `(s1: string, s2: string) -> void`                   | Prints two values separated by space.                                               |
 | `err_print_si`      | `(s: string, x: int) -> void`                        | Prints two values separated by space.                                               |
@@ -415,9 +443,15 @@ Unsigned `ulong` helpers intentionally omit signed-only concepts such as `sign_u
 | `int_to_string/int_to_hex_string/int_to_bin_string` | format helpers                                                                                      | Decimal, hex, and binary formatting helpers.                                                              |
 | `bool_to_string/string_to_bool`                     | `(bool) -> string`, `(string) -> bool?`                                                             | Converts booleans to `"true"`/`"false"` and parses strict lowercase boolean text.                         |
 | `byte_to_string/byte_to_string_base`                | `(byte) -> string`, `(byte, base: int) -> string`                                                   | Numeric byte formatting (decimal or base `2..16`).                                                        |
+| `uint_to_string/uint_to_string_base`                | `(uint) -> string`, `(uint, base: int) -> string`                                                   | Numeric uint formatting (decimal or base `2..16`).                                                        |
+| `long_to_string/long_to_string_base`                | `(long) -> string`, `(long, base: int) -> string`                                                   | Numeric long formatting (decimal or base `2..16`).                                                        |
+| `ulong_to_string/ulong_to_string_base`              | `(ulong) -> string`, `(ulong, base: int) -> string`                                                 | Numeric ulong formatting (decimal or base `2..16`).                                                       |
 | `string_to_int`                                     | `(s: string) -> int?`                                                                               | Parses decimal signed integer text; returns `null` on invalid input or 32-bit overflow/underflow.         |
 | `string_to_int_base`                                | `(s: string, base: int) -> int?`                                                                    | Parses signed integer text in base `2..16`; returns `null` on invalid input or 32-bit overflow/underflow. |
 | `string_to_byte/string_to_byte_base`                | `(s: string) -> byte?`, `(s: string, base: int) -> byte?`                                           | Parses numeric byte text; returns `null` on invalid input or out-of-range values (`0..255`).              |
+| `string_to_uint/string_to_uint_base`                | `(s: string) -> uint?`, `(s: string, base: int) -> uint?`                                           | Parses unsigned integer text; rejects negative or out-of-range values.                                    |
+| `string_to_long/string_to_long_base`                | `(s: string) -> long?`, `(s: string, base: int) -> long?`                                           | Parses signed 64-bit integer text; returns `null` on invalid input or overflow/underflow.                 |
+| `string_to_ulong/string_to_ulong_base`              | `(s: string) -> ulong?`, `(s: string, base: int) -> ulong?`                                         | Parses unsigned 64-bit integer text; rejects negative or out-of-range values.                             |
 
 ### `std.time`
 
@@ -490,6 +524,16 @@ All `extern func` symbols exposed to L1 from stdlib modules are listed here.
 | `rt_println_stderr`           | `() -> void`                                  | Prints a newline to stderr.            |
 | `rt_print_int`                | `(x: int) -> void`                            | Prints an int to stdout.               |
 | `rt_print_int_stderr`         | `(x: int) -> void`                            | Prints an int to stderr.               |
+| `rt_print_uint`               | `(x: uint) -> void`                           | Prints a uint to stdout.               |
+| `rt_print_uint_stderr`        | `(x: uint) -> void`                           | Prints a uint to stderr.               |
+| `rt_print_long`               | `(x: long) -> void`                           | Prints a long to stdout.               |
+| `rt_print_long_stderr`        | `(x: long) -> void`                           | Prints a long to stderr.               |
+| `rt_print_ulong`              | `(x: ulong) -> void`                          | Prints a ulong to stdout.              |
+| `rt_print_ulong_stderr`       | `(x: ulong) -> void`                          | Prints a ulong to stderr.              |
+| `rt_print_float`              | `(x: float) -> void`                          | Prints a float to stdout.              |
+| `rt_print_float_stderr`       | `(x: float) -> void`                          | Prints a float to stderr.              |
+| `rt_print_double`             | `(x: double) -> void`                         | Prints a double to stdout.             |
+| `rt_print_double_stderr`      | `(x: double) -> void`                         | Prints a double to stderr.             |
 | `rt_print_bool`               | `(x: bool) -> void`                           | Prints a bool to stdout.               |
 | `rt_print_bool_stderr`        | `(x: bool) -> void`                           | Prints a bool to stderr.               |
 | `rt_read_line`                | `() -> string?`                               | Reads one line from stdin.             |

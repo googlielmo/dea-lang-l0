@@ -274,6 +274,24 @@ Bootstrap-stage tooling intentionally favors simple whole-file and console APIs 
 is sufficient for compiler bootstrapping, diagnostics, and current examples while keeping the language/library surface
 narrow.
 
+Current `std.io` numeric output policy follows the same explicit suffix convention as the rest of the L1 numeric stdlib
+surface:
+
+- `int`, `string`, and `bool` keep the copied ergonomic spellings such as `print_i`, `print_s`, and `print_b`
+- L1-only fixed-width integer output uses `_ui`, `_l`, and `_ul` for `uint`, `long`, and `ulong`
+- floating output uses `_f` and `_d` for `float` and `double`
+- stdout and stderr expose the same one-value numeric families, with newline variants using the existing `printl_*` /
+  `err_printl_*` naming pattern
+- pair-print helpers are not expanded cartesian-style for every numeric type; callers can compose labels with
+  single-value print helpers
+
+Current stdin token policy keeps parsing layered:
+
+- `read_delim`, `read_delim_any`, and `read_delim_ws` own token extraction from stdin
+- typed integer reads use `read_delim_ws` plus the matching `std.text` parser
+- integer parsing remains in `std.text`, not in `std.io`
+- float/double reads are deferred until the library has an explicit floating-point parsing contract
+
 ## 13. Name Disambiguation
 
 Qualified references (`module.path::Name`) are the current cross-module disambiguation mechanism.

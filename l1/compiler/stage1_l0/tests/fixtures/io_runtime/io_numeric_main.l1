@@ -1,0 +1,118 @@
+/*
+ * SPDX-License-Identifier: MIT OR Apache-2.0
+ * Copyright (c) 2026 gwz
+ */
+
+module io_numeric_main;
+
+import std.io;
+import std.math;
+import std.string;
+import std.system;
+import std.text;
+
+func mode_delim() -> int {
+    let first = read_delim(',');
+    let second = read_delim_ws();
+    let third = read_delim(';');
+    let fourth = read_delim_any("|:");
+    if (first == null || second == null || third == null || fourth == null) {
+        return 11;
+    }
+    printl_s(first as string);
+    printl_s(second as string);
+    printl_s(third as string);
+    printl_s(fourth as string);
+    return 0;
+}
+
+func mode_reads() -> int {
+    let i = read_i();
+    let ui = read_ui();
+    let l = read_l();
+    let ul = read_ul();
+    let invalid = read_ui();
+    if (i == null || ui == null || l == null || ul == null || invalid != null) {
+        return 12;
+    }
+    printl_i(i as int);
+    printl_ui(ui as uint);
+    printl_l(l as long);
+    printl_ul(ul as ulong);
+    printl_s("invalid");
+    return 0;
+}
+
+func mode_prints() -> int {
+    print_ui(1 as uint);
+    print_s(" ");
+    print_l(-2 as long);
+    print_s(" ");
+    print_ul(3 as ulong);
+    print_s(" ");
+    print_f(1.5f);
+    print_s(" ");
+    printl_d(0.25);
+
+    err_print_ui(4 as uint);
+    err_print_s(" ");
+    err_print_l(-5 as long);
+    err_print_s(" ");
+    err_print_ul(6 as ulong);
+    err_print_s(" ");
+    err_print_f(2.5f);
+    err_print_s(" ");
+    err_printl_d(0.125);
+    return 0;
+}
+
+func mode_text() -> int {
+    printl_s(uint_to_string(uint_max()));
+    printl_s(uint_to_string_base(uint_max(), 16));
+    printl_s(long_to_string(long_min()));
+    printl_s(long_to_string_base(long_min(), 16));
+    printl_s(ulong_to_string(ulong_max()));
+    printl_s(ulong_to_string_base(ulong_max(), 16));
+
+    let ui = string_to_uint("4294967295");
+    let l = string_to_long("-9223372036854775808");
+    let ul = string_to_ulong("18446744073709551615");
+    if (ui == null || l == null || ul == null) {
+        return 21;
+    }
+    printl_ui(ui as uint);
+    printl_l(l as long);
+    printl_ul(ul as ulong);
+
+    if (string_to_uint("-1") != null || string_to_uint("4294967296") != null) {
+        return 22;
+    }
+    if (string_to_long("9223372036854775808") != null || string_to_long("-9223372036854775809") != null) {
+        return 23;
+    }
+    if (string_to_ulong("-1") != null || string_to_ulong("18446744073709551616") != null) {
+        return 24;
+    }
+    printl_s("invalids");
+    return 0;
+}
+
+func main() -> int {
+    if (argc() < 2) {
+        return 2;
+    }
+    let mode = argv(1);
+    if (eq_s(mode, "delim")) {
+        return mode_delim();
+    }
+    if (eq_s(mode, "reads")) {
+        return mode_reads();
+    }
+    if (eq_s(mode, "prints")) {
+        return mode_prints();
+    }
+    if (eq_s(mode, "text")) {
+        return mode_text();
+    }
+    return 3;
+}

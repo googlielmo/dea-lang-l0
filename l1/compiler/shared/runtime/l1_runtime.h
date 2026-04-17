@@ -34,6 +34,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <inttypes.h>
 #include <stddef.h>
 #include <string.h>
 #include <stdarg.h>
@@ -2237,6 +2238,61 @@ static void rt_print_int(dea_int x) {
 }
 
 /**
+ * Print an unsigned integer to stdout.
+ *
+ * @param x Unsigned integer value.
+ *
+ * L0 signature: `extern func rt_print_uint(x: uint) -> void;`
+ */
+static void rt_print_uint(dea_uint x) {
+    printf("%" PRIu32, (uint32_t)x);
+}
+
+/**
+ * Print a long integer to stdout.
+ *
+ * @param x Long integer value.
+ *
+ * L0 signature: `extern func rt_print_long(x: long) -> void;`
+ */
+static void rt_print_long(dea_long x) {
+    printf("%" PRId64, (int64_t)x);
+}
+
+/**
+ * Print an unsigned long integer to stdout.
+ *
+ * @param x Unsigned long integer value.
+ *
+ * L0 signature: `extern func rt_print_ulong(x: ulong) -> void;`
+ */
+static void rt_print_ulong(dea_ulong x) {
+    printf("%" PRIu64, (uint64_t)x);
+}
+
+/**
+ * Print a float to stdout.
+ *
+ * @param x Float value.
+ *
+ * L0 signature: `extern func rt_print_float(x: float) -> void;`
+ */
+static void rt_print_float(dea_float x) {
+    printf("%.9g", (double)x);
+}
+
+/**
+ * Print a double to stdout.
+ *
+ * @param x Double value.
+ *
+ * L0 signature: `extern func rt_print_double(x: double) -> void;`
+ */
+static void rt_print_double(dea_double x) {
+    printf("%.17g", (double)x);
+}
+
+/**
  * Print an integer to stderr.
  * 
  * @param x Integer value.
@@ -2245,6 +2301,61 @@ static void rt_print_int(dea_int x) {
  */
 static void rt_print_int_stderr(dea_int x) {
     fprintf(stderr, "%d", (int)x);
+}
+
+/**
+ * Print an unsigned integer to stderr.
+ *
+ * @param x Unsigned integer value.
+ *
+ * L0 signature: `extern func rt_print_uint_stderr(x: uint) -> void;`
+ */
+static void rt_print_uint_stderr(dea_uint x) {
+    fprintf(stderr, "%" PRIu32, (uint32_t)x);
+}
+
+/**
+ * Print a long integer to stderr.
+ *
+ * @param x Long integer value.
+ *
+ * L0 signature: `extern func rt_print_long_stderr(x: long) -> void;`
+ */
+static void rt_print_long_stderr(dea_long x) {
+    fprintf(stderr, "%" PRId64, (int64_t)x);
+}
+
+/**
+ * Print an unsigned long integer to stderr.
+ *
+ * @param x Unsigned long integer value.
+ *
+ * L0 signature: `extern func rt_print_ulong_stderr(x: ulong) -> void;`
+ */
+static void rt_print_ulong_stderr(dea_ulong x) {
+    fprintf(stderr, "%" PRIu64, (uint64_t)x);
+}
+
+/**
+ * Print a float to stderr.
+ *
+ * @param x Float value.
+ *
+ * L0 signature: `extern func rt_print_float_stderr(x: float) -> void;`
+ */
+static void rt_print_float_stderr(dea_float x) {
+    fprintf(stderr, "%.9g", (double)x);
+}
+
+/**
+ * Print a double to stderr.
+ *
+ * @param x Double value.
+ *
+ * L0 signature: `extern func rt_print_double_stderr(x: double) -> void;`
+ */
+static void rt_print_double_stderr(dea_double x) {
+    fprintf(stderr, "%.17g", (double)x);
 }
 
 /**

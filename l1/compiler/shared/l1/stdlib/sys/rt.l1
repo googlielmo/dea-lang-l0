@@ -182,11 +182,81 @@ extern func rt_println_stderr() -> void;
 extern func rt_print_int(x: int) -> void;
 
 /**
+ * Print an unsigned integer to standard output.
+ *
+ * @param x The unsigned integer to print.
+ */
+extern func rt_print_uint(x: uint) -> void;
+
+/**
+ * Print a long integer to standard output.
+ *
+ * @param x The long integer to print.
+ */
+extern func rt_print_long(x: long) -> void;
+
+/**
+ * Print an unsigned long integer to standard output.
+ *
+ * @param x The unsigned long integer to print.
+ */
+extern func rt_print_ulong(x: ulong) -> void;
+
+/**
+ * Print a float to standard output.
+ *
+ * @param x The float to print.
+ */
+extern func rt_print_float(x: float) -> void;
+
+/**
+ * Print a double to standard output.
+ *
+ * @param x The double to print.
+ */
+extern func rt_print_double(x: double) -> void;
+
+/**
  * Print an integer to standard error.
  *
  * @param x The integer to print.
  */
 extern func rt_print_int_stderr(x: int) -> void;
+
+/**
+ * Print an unsigned integer to standard error.
+ *
+ * @param x The unsigned integer to print.
+ */
+extern func rt_print_uint_stderr(x: uint) -> void;
+
+/**
+ * Print a long integer to standard error.
+ *
+ * @param x The long integer to print.
+ */
+extern func rt_print_long_stderr(x: long) -> void;
+
+/**
+ * Print an unsigned long integer to standard error.
+ *
+ * @param x The unsigned long integer to print.
+ */
+extern func rt_print_ulong_stderr(x: ulong) -> void;
+
+/**
+ * Print a float to standard error.
+ *
+ * @param x The float to print.
+ */
+extern func rt_print_float_stderr(x: float) -> void;
+
+/**
+ * Print a double to standard error.
+ *
+ * @param x The double to print.
+ */
+extern func rt_print_double_stderr(x: double) -> void;
 
 /**
  * Print a boolean to standard output.

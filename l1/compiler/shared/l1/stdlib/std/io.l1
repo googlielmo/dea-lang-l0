@@ -16,6 +16,8 @@ import sys.unsafe;
 
 import std.array;
 import std.assert;
+import std.string;
+import std.text;
 import std.unit;
 
 /* ---------------------------------
@@ -62,6 +64,145 @@ func read_char_or_eof() -> int {
         return -1;
     }
     return c;
+}
+
+/**
+ * Read bytes from stdin until one delimiter byte or EOF.
+ *
+ * The delimiter is consumed and excluded. EOF before any byte returns null.
+ * EOF after bytes returns the accumulated token.
+ *
+ * @param delim Delimiter byte.
+ * @return The bytes read before the delimiter, or null on EOF before data.
+ */
+func read_delim(delim: byte) -> string? {
+    with (let cb = cb_create() => cb_free(cb)) {
+        while (true) {
+            let c = rt_read_char();
+            if (c == -1) {
+                if (cb_size(cb) == 0) {
+                    return null;
+                }
+                return cb_to_string(cb);
+            }
+            if ((c as byte) == delim) {
+                return cb_to_string(cb);
+            }
+            cb_append(cb, c as byte);
+        }
+    }
+    return null;
+}
+
+/**
+ * Return whether `c` appears in the delimiter set.
+ *
+ * @param delims Delimiter bytes.
+ * @param c Byte to test.
+ * @return True when `c` is a delimiter.
+ */
+func _io_is_delim(delims: string, c: byte) -> bool {
+    for (let i: int = 0; i < len_s(delims); i = i + 1) {
+        if (char_at_s(delims, i) == c) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
+ * Read bytes from stdin until any delimiter byte or EOF.
+ *
+ * The delimiter is consumed and excluded. EOF before any byte returns null.
+ * EOF after bytes returns the accumulated token.
+ *
+ * @param delims Non-empty delimiter byte set.
+ * @return The bytes read before a delimiter, or null on EOF before data.
+ */
+func read_delim_any(delims: string) -> string? {
+    assert(!is_empty_s(delims), "read_delim_any: delimiter set must be non-empty");
+    with (let cb = cb_create() => cb_free(cb)) {
+        while (true) {
+            let c = rt_read_char();
+            if (c == -1) {
+                if (cb_size(cb) == 0) {
+                    return null;
+                }
+                return cb_to_string(cb);
+            }
+            if (_io_is_delim(delims, c as byte)) {
+                return cb_to_string(cb);
+            }
+            cb_append(cb, c as byte);
+        }
+    }
+    return null;
+}
+
+/**
+ * Read the next ASCII-whitespace-delimited token from stdin.
+ *
+ * Leading whitespace is skipped. The trailing whitespace delimiter is consumed
+ * and excluded. EOF before any token returns null.
+ *
+ * @return The next token, or null on EOF before a token.
+ */
+func read_delim_ws() -> string? {
+    with (let cb = cb_create() => cb_free(cb)) {
+        let c = rt_read_char();
+        while (c != -1 && is_space(c as byte)) {
+            c = rt_read_char();
+        }
+        if (c == -1) {
+            return null;
+        }
+
+        while (c != -1 && !is_space(c as byte)) {
+            cb_append(cb, c as byte);
+            c = rt_read_char();
+        }
+        return cb_to_string(cb);
+    }
+}
+
+/**
+ * Read a whitespace-delimited signed integer from stdin.
+ *
+ * @return The parsed integer, or null on EOF, invalid input, or out-of-range input.
+ */
+func read_i() -> int? {
+    let tok = read_delim_ws()?;
+    return string_to_int(tok);
+}
+
+/**
+ * Read a whitespace-delimited unsigned integer from stdin.
+ *
+ * @return The parsed unsigned integer, or null on EOF, invalid input, or out-of-range input.
+ */
+func read_ui() -> uint? {
+    let tok = read_delim_ws()?;
+    return string_to_uint(tok);
+}
+
+/**
+ * Read a whitespace-delimited long integer from stdin.
+ *
+ * @return The parsed long integer, or null on EOF, invalid input, or out-of-range input.
+ */
+func read_l() -> long? {
+    let tok = read_delim_ws()?;
+    return string_to_long(tok);
+}
+
+/**
+ * Read a whitespace-delimited unsigned long integer from stdin.
+ *
+ * @return The parsed unsigned long integer, or null on EOF, invalid input, or out-of-range input.
+ */
+func read_ul() -> ulong? {
+    let tok = read_delim_ws()?;
+    return string_to_ulong(tok);
 }
 
 /**
@@ -246,6 +387,51 @@ func print_i(x: int) -> void {
 }
 
 /**
+ * Print an unsigned integer to standard output.
+ *
+ * @param x The unsigned integer to print.
+ */
+func print_ui(x: uint) -> void {
+    rt_print_uint(x);
+}
+
+/**
+ * Print a long integer to standard output.
+ *
+ * @param x The long integer to print.
+ */
+func print_l(x: long) -> void {
+    rt_print_long(x);
+}
+
+/**
+ * Print an unsigned long integer to standard output.
+ *
+ * @param x The unsigned long integer to print.
+ */
+func print_ul(x: ulong) -> void {
+    rt_print_ulong(x);
+}
+
+/**
+ * Print a float to standard output.
+ *
+ * @param x The float to print.
+ */
+func print_f(x: float) -> void {
+    rt_print_float(x);
+}
+
+/**
+ * Print a double to standard output.
+ *
+ * @param x The double to print.
+ */
+func print_d(x: double) -> void {
+    rt_print_double(x);
+}
+
+/**
  * Print a boolean to standard output.
  *
  * @param x The boolean to print.
@@ -275,6 +461,56 @@ func printl_s(s: string) -> void {
  */
 func printl_i(x: int) -> void {
     rt_print_int(x);
+    rt_println();
+}
+
+/**
+ * Print an unsigned integer to standard output followed by a newline.
+ *
+ * @param x The unsigned integer to print.
+ */
+func printl_ui(x: uint) -> void {
+    rt_print_uint(x);
+    rt_println();
+}
+
+/**
+ * Print a long integer to standard output followed by a newline.
+ *
+ * @param x The long integer to print.
+ */
+func printl_l(x: long) -> void {
+    rt_print_long(x);
+    rt_println();
+}
+
+/**
+ * Print an unsigned long integer to standard output followed by a newline.
+ *
+ * @param x The unsigned long integer to print.
+ */
+func printl_ul(x: ulong) -> void {
+    rt_print_ulong(x);
+    rt_println();
+}
+
+/**
+ * Print a float to standard output followed by a newline.
+ *
+ * @param x The float to print.
+ */
+func printl_f(x: float) -> void {
+    rt_print_float(x);
+    rt_println();
+}
+
+/**
+ * Print a double to standard output followed by a newline.
+ *
+ * @param x The double to print.
+ */
+func printl_d(x: double) -> void {
+    rt_print_double(x);
     rt_println();
 }
 
@@ -555,6 +791,51 @@ func err_print_i(x: int) -> void {
 }
 
 /**
+ * Print an unsigned integer to standard error.
+ *
+ * @param x The unsigned integer to print.
+ */
+func err_print_ui(x: uint) -> void {
+    rt_print_uint_stderr(x);
+}
+
+/**
+ * Print a long integer to standard error.
+ *
+ * @param x The long integer to print.
+ */
+func err_print_l(x: long) -> void {
+    rt_print_long_stderr(x);
+}
+
+/**
+ * Print an unsigned long integer to standard error.
+ *
+ * @param x The unsigned long integer to print.
+ */
+func err_print_ul(x: ulong) -> void {
+    rt_print_ulong_stderr(x);
+}
+
+/**
+ * Print a float to standard error.
+ *
+ * @param x The float to print.
+ */
+func err_print_f(x: float) -> void {
+    rt_print_float_stderr(x);
+}
+
+/**
+ * Print a double to standard error.
+ *
+ * @param x The double to print.
+ */
+func err_print_d(x: double) -> void {
+    rt_print_double_stderr(x);
+}
+
+/**
  * Print a boolean to standard error.
  *
  * @param x The boolean to print.
@@ -584,6 +865,56 @@ func err_printl_s(s: string) -> void {
  */
 func err_printl_i(x: int) -> void {
     rt_print_int_stderr(x);
+    rt_println_stderr();
+}
+
+/**
+ * Print an unsigned integer to standard error followed by a newline.
+ *
+ * @param x The unsigned integer to print.
+ */
+func err_printl_ui(x: uint) -> void {
+    rt_print_uint_stderr(x);
+    rt_println_stderr();
+}
+
+/**
+ * Print a long integer to standard error followed by a newline.
+ *
+ * @param x The long integer to print.
+ */
+func err_printl_l(x: long) -> void {
+    rt_print_long_stderr(x);
+    rt_println_stderr();
+}
+
+/**
+ * Print an unsigned long integer to standard error followed by a newline.
+ *
+ * @param x The unsigned long integer to print.
+ */
+func err_printl_ul(x: ulong) -> void {
+    rt_print_ulong_stderr(x);
+    rt_println_stderr();
+}
+
+/**
+ * Print a float to standard error followed by a newline.
+ *
+ * @param x The float to print.
+ */
+func err_printl_f(x: float) -> void {
+    rt_print_float_stderr(x);
+    rt_println_stderr();
+}
+
+/**
+ * Print a double to standard error followed by a newline.
+ *
+ * @param x The double to print.
+ */
+func err_printl_d(x: double) -> void {
+    rt_print_double_stderr(x);
     rt_println_stderr();
 }
 
