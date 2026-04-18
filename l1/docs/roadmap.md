@@ -71,6 +71,9 @@ L1 carries post-L0 language growth and bootstrap compiler work.
 - Feature
   [2026-04-14-l1-std-math-wide-integer-followup-noref](../work/plans/features/closed/2026-04-14-l1-std-math-wide-integer-followup-noref.md)
   added L1-only `std.math` helper families for `uint`, `long`, and `ulong`.
+- Feature
+  [2026-04-18-l1-bitwise-operators-noref](../work/plans/features/closed/2026-04-18-l1-bitwise-operators-noref.md) added
+  `&`, `|`, `^`, `~`, `<<`, and `>>` with parser precedence, integer typing, and direct C lowering.
 - Bugfix
   [2026-04-17-l1-diagnostic-tab-caret-alignment-noref](../work/plans/bug-fixes/closed/2026-04-17-l1-diagnostic-tab-caret-alignment-noref.md)
   aligned stored diagnostic spans and printed carets for source lines that contain ASCII tabs under a logical-source
@@ -91,8 +94,6 @@ L1 carries post-L0 language growth and bootstrap compiler work.
 - Feature
   [2026-04-17-l1-let-non-constant-initializers-noref](../work/plans/features/2026-04-17-l1-let-non-constant-initializers-noref.md)
   supports non-constant initializers for top-level `let` declarations via module-level init functions.
-- Feature [2026-04-18-l1-bitwise-operators-noref](../work/plans/features/2026-04-18-l1-bitwise-operators-noref.md)
-  lowers the reserved `&`, `|`, `^`, `~`, `<<`, `>>` tokens into real operators with typing, folding, and C codegen.
 - Feature [2026-04-18-l1-const-declarations-noref](../work/plans/features/2026-04-18-l1-const-declarations-noref.md)
   adds `const` declarations with compile-time-evaluable initializers, non-assignability, and static C emission.
 - Feature

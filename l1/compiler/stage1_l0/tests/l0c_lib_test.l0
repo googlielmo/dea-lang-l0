@@ -344,6 +344,43 @@ func test_run_shadowed_qualified_variant() {
 }
 
 /**
+ * Tests integer bitwise lowering and execution in `--run --keep-c` mode.
+ */
+func test_run_bitwise_build_and_keep_c() {
+    let out_path = run_keep_c_output_path();
+    let c_path = run_keep_c_c_path();
+    rt_delete_file(out_path);
+    rt_delete_file(c_path);
+
+    with (let argv = vs_create(12) => vs_free(argv)) {
+        vs_push(argv, "--run");
+        vs_push(argv, "--keep-c");
+        vs_push(argv, "-P");
+        vs_push(argv, fixture_root());
+        vs_push(argv, "--output");
+        vs_push(argv, out_path);
+        vs_push(argv, "bitwise_main");
+
+        let rc = run_with_argv(argv);
+        assert(rc == 29, "--run --keep-c should compile and execute bitwise_main");
+    }
+
+    let c_text = read_file(c_path);
+    assert(c_text != null, "bitwise_main kept C file should exist");
+    assert(contains_s(c_text as string, "dea_byte inverted = ((dea_byte)((~base)));"),
+        "bitwise_main unary bitwise-not lowering mismatch");
+    assert(contains_s(c_text as string, "dea_int masked = (((dea_int)(inverted)) & 15);"),
+        "bitwise_main bitwise-and widening mismatch");
+    assert(contains_s(c_text as string, "dea_long shifted_left = (wide << ((dea_long)(count)));"),
+        "bitwise_main left-shift widening mismatch");
+    assert(contains_s(c_text as string, "dea_long shifted_right = (shifted_left >> ((dea_long)(count)));"),
+        "bitwise_main right-shift widening mismatch");
+
+    rt_delete_file(out_path);
+    rt_delete_file(c_path);
+}
+
+/**
  * Tests float/double build-and-run execution with kept generated C.
  */
 func test_run_float_build_and_keep_c() {
@@ -626,6 +663,7 @@ func main() {
     test_run_cleanup_return_precedence();
     test_run_try_chain_short_circuits();
     test_run_shadowed_qualified_variant();
+    test_run_bitwise_build_and_keep_c();
     test_run_float_build_and_keep_c();
     test_run_float_ops_build_and_keep_c();
     test_build_float_zero_division_keep_c();

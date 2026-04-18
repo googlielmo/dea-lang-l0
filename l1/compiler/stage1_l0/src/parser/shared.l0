@@ -935,33 +935,3 @@ func ps_parse_type(self: ParserState*) -> TypeRef*? {
     let type_name = token_ident_text(name_tok) as string;
     return new TypeRef(type_name, pointer_depth, is_nullable, module_path, name_qualifier, ps_extend_span(self, start));
 }
-/**
- * Reject reserved binary operators at the current parse position.
- *
- * @param self Parser state to inspect.
- * @return `present()` if the token is allowed here, or `null` after emitting an error.
- */
-func ps_check_reserved_binary_op(self: ParserState*) -> Unit? {
-    let tok = ps_peek(self);
-    if (tok_is(tok, ord(TT_AMP))) {
-        ps_emit_error(self, "PAR-0226", "[PAR-0226] '&' (bitwise AND) operator is not yet supported", tok);
-        return null;
-    }
-    if (tok_is(tok, ord(TT_PIPE))) {
-        ps_emit_error(self, "PAR-0226", "[PAR-0226] '|' (bitwise OR) operator is not yet supported", tok);
-        return null;
-    }
-    if (tok_is(tok, ord(TT_CARET))) {
-        ps_emit_error(self, "PAR-0226", "[PAR-0226] '^' (bitwise XOR) operator is not yet supported", tok);
-        return null;
-    }
-    if (tok_is(tok, ord(TT_LSHIFT))) {
-        ps_emit_error(self, "PAR-0226", "[PAR-0226] '<<' (left shift) operator is not yet supported", tok);
-        return null;
-    }
-    if (tok_is(tok, ord(TT_RSHIFT))) {
-        ps_emit_error(self, "PAR-0226", "[PAR-0226] '>>' (right shift) operator is not yet supported", tok);
-        return null;
-    }
-    return present();
-}

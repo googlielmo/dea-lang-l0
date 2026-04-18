@@ -3,7 +3,7 @@
 ## Add L1 bitwise operators
 
 - Date: 2026-04-18
-- Status: Draft
+- Status: Completed
 - Title: Add L1 bitwise operators
 - Kind: Feature
 - Severity: Medium
@@ -22,13 +22,12 @@
 - Related:
   - `l1/docs/roadmap.md`
   - `docs/specs/compiler/diagnostic-code-catalog.md`
-- Repro: `make -C l1 test-stage1 TESTS="parser_test expr_types_test"`
+- Repro: `make -C l1 test-stage1 && make -C l1 check-examples`
 
 ## Summary
 
-L1 currently reserves the bitwise tokens `&`, `|`, `^`, `~`, `<<`, and `>>` in the lexer but the parser rejects them
-with `[PAR-0226] ... is not yet supported`. This plan lowers those diagnostics into real operator implementations with
-precedence, typing rules, compile-time folding, and C backend codegen.
+This completed plan lowered the bitwise tokens `&`, `|`, `^`, `~`, `<<`, and `>>` from reserved lexer surface into real
+operators with precedence, typing rules, and C backend codegen.
 
 ## Current State
 

@@ -136,6 +136,7 @@ def all_codes(stage: str, oracle) -> list[str]:
     skip = set(oracle.CLI_ONLY_CODES) | set(oracle.INTERNAL_CODES)
     if stage == "l1":
         skip.add("LEX-0060")
+        skip.add("PAR-0226")
     return [code for code in codes if code not in skip]
 
 

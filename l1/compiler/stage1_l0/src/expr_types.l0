@@ -2226,11 +2226,50 @@ func etc_cast_const_int(self: ExpressionTypeChecker*, expr_id: ExprId) -> int? {
     if (ord(expr.kind) == ord(EX_PAREN)) {
         return etc_cast_const_int(self, expr.expr_a);
     }
-    if (ord(expr.kind) == ord(EX_UNARY) && eq_s(expr.text_value, "-")) {
+    if (ord(expr.kind) == ord(EX_UNARY)) {
         let inner = etc_cast_const_int(self, expr.expr_a);
-        if (inner != null) {
+        if (inner == null) {
+            return null;
+        }
+        if (eq_s(expr.text_value, "-")) {
             return -(inner as int);
         }
+        if (eq_s(expr.text_value, "~")) {
+            return -((inner as int) + 1);
+        }
+        return null;
+    }
+    if (ord(expr.kind) == ord(EX_BINARY)) {
+        let left = etc_cast_const_int(self, expr.expr_a);
+        let right = etc_cast_const_int(self, expr.expr_b);
+        if (left == null || right == null) {
+            return null;
+        }
+
+        let lhs = left as int;
+        let rhs = right as int;
+        if (eq_s(expr.text_value, "+")) {
+            return lhs + rhs;
+        }
+        if (eq_s(expr.text_value, "-")) {
+            return lhs - rhs;
+        }
+        if (eq_s(expr.text_value, "*")) {
+            return lhs * rhs;
+        }
+        if (eq_s(expr.text_value, "/")) {
+            if (rhs == 0) {
+                return null;
+            }
+            return lhs / rhs;
+        }
+        if (eq_s(expr.text_value, "%")) {
+            if (rhs == 0) {
+                return null;
+            }
+            return lhs % rhs;
+        }
+        return null;
     }
     return null;
 }
@@ -2281,6 +2320,12 @@ func etc_infer_unary(self: ExpressionTypeChecker*, expr_id: ExprId, expr: ExprNo
     } else if (eq_s(expr.text_value, "!")) {
         if (!etc_is_bool(s_ty)) {
             etc_diag_error(self, "TYP-0161", concat_s("unary '!' expects bool, got ", type_format(s_ty)),
+                (self.current_unit as DriverUnit*).path, expr.span);
+        }
+        return s_ty;
+    } else if (eq_s(expr.text_value, "~")) {
+        if (!etc_is_int(s_ty)) {
+            etc_diag_error(self, "TYP-0170", concat_s("unary '~' expects int, got ", type_format(s_ty)),
                 (self.current_unit as DriverUnit*).path, expr.span);
         }
         return s_ty;

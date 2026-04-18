@@ -1728,7 +1728,9 @@ func be_emit_binary_op(self: Backend*, expr_id: ExprId) -> string {
           let result_ty = be_expr_type(self, expr_id) => type_free_opt(result_ty),
           let common_int_ty: Type*? = null => type_free_opt(common_int_ty)) {
         if ((eq_s(expr.text_value, "+") || eq_s(expr.text_value, "-") || eq_s(expr.text_value, "*") ||
-             eq_s(expr.text_value, "/") || eq_s(expr.text_value, "%")) &&
+             eq_s(expr.text_value, "/") || eq_s(expr.text_value, "%") || eq_s(expr.text_value, "&") ||
+             eq_s(expr.text_value, "|") || eq_s(expr.text_value, "^") || eq_s(expr.text_value, "<<") ||
+             eq_s(expr.text_value, ">>")) &&
             result_ty != null && be_is_int_assignable(result_ty as Type*)) {
             common_int_ty = type_clone(result_ty as Type*);
         } else if ((eq_s(expr.text_value, "==") || eq_s(expr.text_value, "!=") || eq_s(expr.text_value, "<") ||
@@ -2130,7 +2132,15 @@ func be_emit_expr(self: Backend*, expr_id: ExprId) -> string {
             return be_ice_string("[ICE-1102] unsupported module-level variable reference");
         }
         EX_UNARY => {
-            return cem_emit_unary_op(expr.text_value, be_emit_expr(self, expr.expr_a));
+            let c_inner = be_emit_expr(self, expr.expr_a);
+            if (eq_s(expr.text_value, "~")) {
+                with (let result_ty = be_expr_type(self, expr_id) => type_free_opt(result_ty)) {
+                    if (result_ty != null && be_is_int_assignable(result_ty as Type*)) {
+                        return cem_emit_cast(cem_emit_type(result_ty as Type*), cem_emit_unary_op(expr.text_value, c_inner));
+                    }
+                }
+            }
+            return cem_emit_unary_op(expr.text_value, c_inner);
         }
         EX_BINARY => { return be_emit_binary_op(self, expr_id); }
         EX_CALL => { return be_emit_call(self, expr_id); }

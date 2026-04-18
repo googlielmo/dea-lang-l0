@@ -188,6 +188,10 @@ The bootstrap compiler keeps integer behavior defined rather than inheriting hos
   narrowing and cross-signedness conversions require an explicit cast
 - explicit integer casts to nullable integer targets, such as `0 as ulong?`, use the same checked conversion policy as
   casts to the inner type and then produce a present nullable value
+- binary `&`, `|`, `^`, `<<`, and `>>` use the same common-integer-type lattice as the other integer binary operators
+- unary `~` preserves the operand's integer type; the backend casts the promoted C result back to that L1 type
+- right shift follows the signedness of the normalized operand type, so signed shifts are arithmetic and unsigned shifts
+  are logical on supported targets
 - integer division by zero is a defined runtime error, not host-C undefined behavior
 
 That policy is part of the language contract even though the current implementation is lowered through C.

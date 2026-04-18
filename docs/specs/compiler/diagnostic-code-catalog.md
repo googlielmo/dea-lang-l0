@@ -149,7 +149,7 @@ and reuse supplement for applying this registry within L0.
 | `PAR-0223` | All   | Expected ')' after arguments to 'new'                                      |
 | `PAR-0224` | All   | Expected ')' after expression                                              |
 | `PAR-0225` | All   | Expected expression                                                        |
-| `PAR-0226` | All   | Operator is not yet supported                                              |
+| `PAR-0226` | L0    | Operator is not yet supported                                              |
 | `PAR-0230` | All   | Expected 'case'                                                            |
 | `PAR-0231` | All   | Expected '('                                                               |
 | `PAR-0232` | All   | Expected ')'                                                               |

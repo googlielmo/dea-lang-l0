@@ -104,11 +104,35 @@ func test_reserved_variable_name_error() {
 }
 
 /**
- * Tests test_reserved_operator_error.
+ * Tests unary-bitwise precedence shape.
  */
-func test_reserved_operator_error() {
-    let src = "module main; func main() -> int { let x: int = ~1; return x; }";
-    expect_error_code(src, "PAR-0226");
+func test_bitwise_unary_precedence_shape() {
+    let src = "module main; func main() -> int { return ~1 + 2; }";
+    let result = parse_module_source(src, "<test>");
+    assert(!parse_has_errors(result), "Expected parse to succeed");
+    assert(result.root_module != null, "Expected parsed module");
+
+    let root = result.root_module as Module*;
+    assert(vec_size(root.decls) == 1, "Expected one declaration");
+    let top = ptr_vec_get(root.decls, 0) as TopLevelDecl*;
+    assert(ord(top.kind) == ord(TD_FUNC), "Expected function declaration");
+
+    let func_decl = top.data as FuncDecl*;
+    let body = stmt_arena_get(result.stmt_arena, func_decl.body);
+    assert(body.ids != null, "Expected function body statements");
+    let stmts = body.ids as VectorBase*;
+    assert(vec_size(stmts) == 1, "Expected one return statement");
+
+    let return_stmt = stmt_arena_get(result.stmt_arena, id_vec_get(stmts, 0));
+    let return_expr = expr_arena_get(result.expr_arena, return_stmt.expr_a);
+    assert(ord(return_expr.kind) == ord(EX_BINARY), "Expected binary top-level expression");
+    assert(eq_s(return_expr.text_value, "+"), "Expected '+' at the root");
+
+    let left = expr_arena_get(result.expr_arena, return_expr.expr_a);
+    assert(ord(left.kind) == ord(EX_UNARY), "Expected unary left operand");
+    assert(eq_s(left.text_value, "~"), "Expected unary '~' operand");
+
+    parse_result_free(result);
 }
 
 /**
@@ -236,19 +260,67 @@ func test_real_literals_in_exprs_ok() {
 }
 
 /**
- * Tests test_reserved_binary_and_error.
+ * Tests bitwise operators in ordinary expressions.
  */
-func test_reserved_binary_and_error() {
-    let src = "module main; func main() -> int { let x: int = 1 & 2; return x; }";
-    expect_error_code(src, "PAR-0226");
+func test_bitwise_binary_ops_ok() {
+    let src = "module main; func main() -> int { let x: int = (1 & 3) | (2 ^ 4); return x + (~1); }";
+    expect_ok(src);
 }
 
 /**
- * Tests test_reserved_binary_shift_error.
+ * Tests bitwise precedence across binary layers.
  */
-func test_reserved_binary_shift_error() {
-    let src = "module main; func main() -> int { let x: int = 1 << 2; return x; }";
-    expect_error_code(src, "PAR-0226");
+func test_bitwise_precedence_shape() {
+    let src = "module main; func main() -> int { return 1 | 2 ^ 3 & 4 == 5 < 6 << 1 + 2 * 3; }";
+    let result = parse_module_source(src, "<test>");
+    assert(!parse_has_errors(result), "Expected parse to succeed");
+    assert(result.root_module != null, "Expected parsed module");
+
+    let root = result.root_module as Module*;
+    assert(vec_size(root.decls) == 1, "Expected one declaration");
+    let top = ptr_vec_get(root.decls, 0) as TopLevelDecl*;
+    assert(ord(top.kind) == ord(TD_FUNC), "Expected function declaration");
+
+    let func_decl = top.data as FuncDecl*;
+    let body = stmt_arena_get(result.stmt_arena, func_decl.body);
+    assert(body.ids != null, "Expected function body statements");
+    let stmts = body.ids as VectorBase*;
+    assert(vec_size(stmts) == 1, "Expected one return statement");
+
+    let return_stmt = stmt_arena_get(result.stmt_arena, id_vec_get(stmts, 0));
+    let root_expr = expr_arena_get(result.expr_arena, return_stmt.expr_a);
+    assert(ord(root_expr.kind) == ord(EX_BINARY), "Expected binary root expression");
+    assert(eq_s(root_expr.text_value, "|"), "Expected '|' at the root");
+
+    let xor_expr = expr_arena_get(result.expr_arena, root_expr.expr_b);
+    assert(ord(xor_expr.kind) == ord(EX_BINARY), "Expected '^' expression");
+    assert(eq_s(xor_expr.text_value, "^"), "Expected '^' below '|'");
+
+    let and_expr = expr_arena_get(result.expr_arena, xor_expr.expr_b);
+    assert(ord(and_expr.kind) == ord(EX_BINARY), "Expected '&' expression");
+    assert(eq_s(and_expr.text_value, "&"), "Expected '&' below '^'");
+
+    let eq_expr = expr_arena_get(result.expr_arena, and_expr.expr_b);
+    assert(ord(eq_expr.kind) == ord(EX_BINARY), "Expected equality expression");
+    assert(eq_s(eq_expr.text_value, "=="), "Expected '==' below '&'");
+
+    let rel_expr = expr_arena_get(result.expr_arena, eq_expr.expr_b);
+    assert(ord(rel_expr.kind) == ord(EX_BINARY), "Expected relational expression");
+    assert(eq_s(rel_expr.text_value, "<"), "Expected '<' below '=='");
+
+    let shift_expr = expr_arena_get(result.expr_arena, rel_expr.expr_b);
+    assert(ord(shift_expr.kind) == ord(EX_BINARY), "Expected shift expression");
+    assert(eq_s(shift_expr.text_value, "<<"), "Expected '<<' below '<'");
+
+    let add_expr = expr_arena_get(result.expr_arena, shift_expr.expr_b);
+    assert(ord(add_expr.kind) == ord(EX_BINARY), "Expected additive expression");
+    assert(eq_s(add_expr.text_value, "+"), "Expected '+' below '<<'");
+
+    let mul_expr = expr_arena_get(result.expr_arena, add_expr.expr_b);
+    assert(ord(mul_expr.kind) == ord(EX_BINARY), "Expected multiplicative expression");
+    assert(eq_s(mul_expr.text_value, "*"), "Expected '*' below '+'");
+
+    parse_result_free(result);
 }
 
 /**
@@ -268,11 +340,11 @@ func test_qualified_type_name_ok() {
 }
 
 /**
- * Tests test_top_level_let_expr_error.
+ * Tests bitwise expressions in top-level `let` initializers.
  */
-func test_top_level_let_expr_error() {
+func test_top_level_let_bitwise_ok() {
     let src = "module main; let x: int = ~1;";
-    expect_error_code(src, "PAR-0226");
+    expect_ok(src);
 }
 
 /**
@@ -300,11 +372,11 @@ func test_enum_variant_field_error() {
 }
 
 /**
- * Tests test_new_expr_bad_arg_error.
+ * Tests bitwise expressions inside `new` arguments.
  */
-func test_new_expr_bad_arg_error() {
+func test_new_expr_bitwise_arg_ok() {
     let src = "module main; func main() -> int { let x: Foo* = new Foo(~1); return 0; }";
-    expect_error_code(src, "PAR-0226");
+    expect_ok(src);
 }
 
 /**
@@ -322,7 +394,7 @@ func main() {
     test_valid_module();
     test_module_decl_error();
     test_reserved_variable_name_error();
-    test_reserved_operator_error();
+    test_bitwise_unary_precedence_shape();
     test_with_mixed_forms_error();
     test_case_empty_error();
     test_expr_precedence_postfix_and_qualified_type_ok();
@@ -335,15 +407,15 @@ func main() {
     test_bigint_literal_expr_shape();
     test_float_type_positions_ok();
     test_real_literals_in_exprs_ok();
-    test_reserved_binary_and_error();
-    test_reserved_binary_shift_error();
+    test_bitwise_binary_ops_ok();
+    test_bitwise_precedence_shape();
     test_qualified_expr_module_path_ok();
     test_qualified_type_name_ok();
-    test_top_level_let_expr_error();
+    test_top_level_let_bitwise_ok();
     test_type_alias_missing_semi_error();
     test_struct_field_error();
     test_enum_variant_field_error();
-    test_new_expr_bad_arg_error();
+    test_new_expr_bitwise_arg_ok();
     test_top_level_multi_error_collection();
     printl_s("parser_test: all tests passed");
 }

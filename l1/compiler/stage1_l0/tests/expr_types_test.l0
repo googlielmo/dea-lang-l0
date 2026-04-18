@@ -420,6 +420,33 @@ func test_typing_cast_int_to_byte_overflow() {
 }
 
 /**
+ * Tests implemented bitwise-operator typing behavior.
+ */
+func test_typing_bitwise_ok() {
+    let sp = make_paths();
+    with (let cfg = log_config_create(LL_SILENT, false) => drop cfg) {
+        let result = analysis_analyze_entry(sp, "typing_bitwise_ok", cfg);
+        assert(!analysis_has_errors(result), "expected no typing errors for typing_bitwise_ok");
+        analysis_result_free(result);
+    }
+    sp_free(sp);
+}
+
+/**
+ * Tests rejected bitwise-operator operand kinds.
+ */
+func test_typing_bitwise_err() {
+    let sp = make_paths();
+    with (let cfg = log_config_create(LL_SILENT, false) => drop cfg) {
+        let result = analysis_analyze_entry(sp, "typing_bitwise_err", cfg);
+        assert(analysis_has_errors(result), "expected typing errors for typing_bitwise_err");
+        assert(count_diag_code(result, "TYP-0170") == 4, "expected four invalid bitwise operator diagnostics");
+        analysis_result_free(result);
+    }
+    sp_free(sp);
+}
+
+/**
  * Tests implemented small integer builtin typing behavior.
  */
 func test_typing_small_int_ok() {
@@ -801,6 +828,8 @@ func main() {
     test_typing_cast_optional_int_err();
     test_typing_optional_int_context_err();
     test_typing_cast_int_to_byte_overflow();
+    test_typing_bitwise_ok();
+    test_typing_bitwise_err();
     test_typing_small_int_ok();
     test_typing_small_int_err();
     test_typing_small_int_literal_overflow();

@@ -72,15 +72,16 @@ implementation. In addition, `in` and `const` are reserved for future extensions
 { } ( ) [ ] ; , : . ::
 -> => 
 = == != < <= > >=
-+ - * /
++ - * / %
 && || !
-& | ^ ~ << >> (* reserved in the current bootstrap implementation *)
+& | ^ ~ << >>
 ?   (* used in types and as postfix try operator *)
 ```
 
-Note: the current bootstrap implementation reserves `&`, but no forward-looking design decision has been made yet on
-whether address-of will become part of the L<sub>1</sub> language surface. Likewise, the presence of postfix indexing
-syntax in this grammar should not be read as freezing the final semantic contract of pointer indexing.
+Note: the current bootstrap implementation uses `&` only as the binary bitwise-AND operator. No forward-looking design
+decision has been made yet on whether prefix address-of will become part of the L<sub>1</sub> language surface.
+Likewise, the presence of postfix indexing syntax in this grammar should not be read as freezing the final semantic
+contract of pointer indexing.
 
 ### 1.5 Special identifier `_`
 
@@ -334,18 +335,16 @@ Precedence (from lowest to highest):
 05. `&` (bitwise AND)
 06. `==`, `!=`
 07. `<`, `<=`, `>`, `>=`
-08. `+`, `-`
-09. `*`, `/`
-10. unary `-`, `!`, `*`, `~`
-11. postfix call/index/field/try
+08. `<<`, `>>`
+09. `+`, `-`
+10. `*`, `/`, `%`
+11. unary `-`, `!`, `*`, `~`
+12. postfix call/index/field/try
 
 There is **no** ternary `?:` operator in L<sub>1</sub>.
 
-Note: precedence levels `3` (`|` bitwise OR), `4` (`^` bitwise XOR), `5` (`&` bitwise AND), the shift level (`<<`,
-`>>`), and unary `~` correspond to tokens that are lexed and reserved for future use, but are currently rejected by the
-parser with diagnostic `PAR-0226` ("operator is not yet supported"). The precedence table and productions below retain
-these levels to document the intended shape for when the feature lands; see the bitwise-operators bullet in
-[l1/docs/roadmap.md](../roadmap.md) for the tracking plan.
+Bitwise operators follow the C-family ordering shown here: shifts bind tighter than relational operators, and unary `~`
+shares the ordinary unary-precedence level with `-`, `!`, and dereference `*`.
 
 ```ebnf
 Expr                ::=     OrExpr
@@ -366,9 +365,9 @@ ShiftExpr           ::=     AddExpr ( ( "<<" | ">>" ) AddExpr )*
 
 AddExpr             ::=     MulExpr ( ( "+" | "-" ) MulExpr )*
 
-MulExpr             ::=     UnaryExpr ( ( "*" | "/" ) UnaryExpr )*
+MulExpr             ::=     UnaryExpr ( ( "*" | "/" | "%" ) UnaryExpr )*
 
-UnaryExpr           ::=     ( "-" | "!" | "~" ) UnaryExpr
+UnaryExpr           ::=     ( "-" | "!" | "*" | "~" ) UnaryExpr
                       |     CastExpr
 
 CastExpr            ::=     PostfixExpr ( "as" Type )?
