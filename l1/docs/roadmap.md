@@ -27,8 +27,7 @@ L1 carries post-L0 language growth and bootstrap compiler work.
 - Closed plans document shipped L1 baseline decisions. Draft plans and active initiatives describe intended work, not
   implemented behavior.
 - Any future `stage2_l1` implementation should preserve the L1 language/runtime decisions documented in
-  [l1/docs/reference/design-decisions.md](reference/design-decisions.md) unless the reference set is deliberately
-  updated.
+  [design-decisions](reference/design-decisions.md) unless the reference set is deliberately updated.
 - The L1 public C ABI should continue using the `dea_*` / `DEA_*` naming policy. Historical `l0_*` names are not part of
   the current L1 ABI except for documented temporary internal compatibility such as `l0_siphash.h`.
 - The first L1 productization steps should remain bootstrap-oriented until a later plan explicitly makes L1 a release
@@ -40,48 +39,45 @@ L1 carries post-L0 language growth and bootstrap compiler work.
 <summary>These are the major completed milestones that shape the current L1 baseline (click to expand).
 </summary>
 
-- Feature
-  [l1/work/plans/features/closed/2026-04-03-dea-virtual-module-noref.md](../work/plans/features/closed/2026-04-03-dea-virtual-module-noref.md)
+- Feature [2026-04-03-dea-virtual-module-noref](../work/plans/features/closed/2026-04-03-dea-virtual-module-noref.md)
   introduced the compiler-synthesized `dea` prelude module that contains `sizeof` and `ord` intrinsics.
 - Bugfix
-  [l1/work/plans/bug-fixes/closed/2026-04-03-l1-stage1-pointer-cast-parity-noref.md](../work/plans/bug-fixes/closed/2026-04-03-l1-stage1-pointer-cast-parity-noref.md)
+  [2026-04-03-l1-stage1-pointer-cast-parity-noref](../work/plans/bug-fixes/closed/2026-04-03-l1-stage1-pointer-cast-parity-noref.md)
   restored L1 Stage 1 explicit-cast validation and mismatch diagnostic parity.
 - Feature
-  [l1/work/plans/features/closed/2026-04-04-l1-dea-c-abi-prefix-migration-noref.md](../work/plans/features/closed/2026-04-04-l1-dea-c-abi-prefix-migration-noref.md)
+  [2026-04-04-l1-dea-c-abi-prefix-migration-noref](../work/plans/features/closed/2026-04-04-l1-dea-c-abi-prefix-migration-noref.md)
   moved L1 public generated/runtime C ABI names to `dea_*` / `DEA_*`.
 - Feature
-  [l1/work/plans/features/closed/2026-04-04-l1-prefixed-int-literals-noref.md](../work/plans/features/closed/2026-04-04-l1-prefixed-int-literals-noref.md)
+  [2026-04-04-l1-prefixed-int-literals-noref](../work/plans/features/closed/2026-04-04-l1-prefixed-int-literals-noref.md)
   added hexadecimal, binary, and octal integer literals for L1.
 - Feature
-  [l1/work/plans/features/closed/2026-04-04-l1-small-int-builtins-on-dea-abi-noref.md](../work/plans/features/closed/2026-04-04-l1-small-int-builtins-on-dea-abi-noref.md)
+  [2026-04-04-l1-small-int-builtins-on-dea-abi-noref](../work/plans/features/closed/2026-04-04-l1-small-int-builtins-on-dea-abi-noref.md)
   added `tiny`, `short`, and `ushort` builtin integer types.
 - Feature
-  [l1/work/plans/features/closed/2026-04-10-l1-numeric-literal-lexer-groundwork-noref.md](../work/plans/features/closed/2026-04-10-l1-numeric-literal-lexer-groundwork-noref.md)
+  [2026-04-10-l1-numeric-literal-lexer-groundwork-noref](../work/plans/features/closed/2026-04-10-l1-numeric-literal-lexer-groundwork-noref.md)
   established the broader numeric-literal lexer/token groundwork.
 - Feature
-  [l1/work/plans/features/closed/2026-04-04-l1-float-double-literals-noref.md](../work/plans/features/closed/2026-04-04-l1-float-double-literals-noref.md)
+  [2026-04-04-l1-float-double-literals-noref](../work/plans/features/closed/2026-04-04-l1-float-double-literals-noref.md)
   added builtin `float` and `double` types plus real literals.
 - Feature
-  [l1/work/plans/features/closed/2026-04-13-l1-float-backend-contract-followup-noref.md](../work/plans/features/closed/2026-04-13-l1-float-backend-contract-followup-noref.md)
+  [2026-04-13-l1-float-backend-contract-followup-noref](../work/plans/features/closed/2026-04-13-l1-float-backend-contract-followup-noref.md)
   defined the L1 floating-point semantic and C backend contract.
-- Feature
-  [l1/work/plans/features/closed/2026-04-14-l1-std-real-module-noref.md](../work/plans/features/closed/2026-04-14-l1-std-real-module-noref.md)
+- Feature [2026-04-14-l1-std-real-module-noref](../work/plans/features/closed/2026-04-14-l1-std-real-module-noref.md)
   added the `std.real` / `sys.real` floating-point library surface, scoped runtime helper inclusion, and math-library
   linkage gating.
 - Feature
-  [l1/work/plans/features/closed/2026-04-13-l1-uint-long-ulong-bigint-builtins-noref.md](../work/plans/features/closed/2026-04-13-l1-uint-long-ulong-bigint-builtins-noref.md)
+  [2026-04-13-l1-uint-long-ulong-bigint-builtins-noref](../work/plans/features/closed/2026-04-13-l1-uint-long-ulong-bigint-builtins-noref.md)
   added `uint`, `long`, and `ulong` through contextual bigint literals.
 - Feature
-  [l1/work/plans/features/closed/2026-04-14-l1-std-math-wide-integer-followup-noref.md](../work/plans/features/closed/2026-04-14-l1-std-math-wide-integer-followup-noref.md)
+  [2026-04-14-l1-std-math-wide-integer-followup-noref](../work/plans/features/closed/2026-04-14-l1-std-math-wide-integer-followup-noref.md)
   added L1-only `std.math` helper families for `uint`, `long`, and `ulong`.
 
 </details>
 
 ## Active initiatives
 
-- Initiative
-  [l1/work/initiatives/0001-separate-compilation-and-c-ffi.md](../work/initiatives/0001-separate-compilation-and-c-ffi.md)
-  sequences separate compilation, a real runtime library, external linking, and full C FFI.
+- Initiative [0001-separate-compilation-and-c-ffi](../work/initiatives/0001-separate-compilation-and-c-ffi.md) sequences
+  separate compilation, a real runtime library, external linking, and full C FFI.
 
 ## Active standalone plans
 
@@ -89,20 +85,24 @@ L1 carries post-L0 language growth and bootstrap compiler work.
   [2026-04-17-l1-diagnostic-tab-caret-alignment-noref](../work/plans/bug-fixes/2026-04-17-l1-diagnostic-tab-caret-alignment-noref.md)
   aligns stored diagnostic spans and printed carets for source lines that contain ASCII tabs.
 - Tool
-  [l1/work/plans/tools/2026-04-02-l1-bootstrap-productization-noref.md](../work/plans/tools/2026-04-02-l1-bootstrap-productization-noref.md)
+  [2026-04-02-l1-bootstrap-productization-noref](../work/plans/tools/2026-04-02-l1-bootstrap-productization-noref.md)
   defines the first L1 bootstrap install/dist/product workflow.
 - Feature
-  [l1/work/plans/features/2026-04-17-l1-let-non-constant-initializers-noref.md](../work/plans/features/2026-04-17-l1-let-non-constant-initializers-noref.md)
+  [2026-04-17-l1-let-non-constant-initializers-noref](../work/plans/features/2026-04-17-l1-let-non-constant-initializers-noref.md)
   supports non-constant initializers for top-level `let` declarations via module-level init functions.
-- Feature
-  [l1/work/plans/features/2026-04-18-l1-bitwise-operators-noref.md](../work/plans/features/2026-04-18-l1-bitwise-operators-noref.md)
+- Feature [2026-04-18-l1-bitwise-operators-noref](../work/plans/features/2026-04-18-l1-bitwise-operators-noref.md)
   lowers the reserved `&`, `|`, `^`, `~`, `<<`, `>>` tokens into real operators with typing, folding, and C codegen.
-- Feature
-  [l1/work/plans/features/2026-04-18-l1-const-declarations-noref.md](../work/plans/features/2026-04-18-l1-const-declarations-noref.md)
+- Feature [2026-04-18-l1-const-declarations-noref](../work/plans/features/2026-04-18-l1-const-declarations-noref.md)
   adds `const` declarations with compile-time-evaluable initializers, non-assignability, and static C emission.
 - Feature
-  [l1/work/plans/features/2026-04-18-l1-function-pointer-types-noref.md](../work/plans/features/2026-04-18-l1-function-pointer-types-noref.md)
+  [2026-04-18-l1-function-pointer-types-noref](../work/plans/features/2026-04-18-l1-function-pointer-types-noref.md)
   adds first-class `func(...) -> T` function pointer types, indirect calls, and C ABI typedef emission.
+- Feature
+  [2026-04-18-string-equality-operators-noref](../work/plans/features/2026-04-18-string-equality-operators-noref.md)
+  wires `==` and `!=` over `string` operands through typing and the C backend via `rt_string_equals`.
+- Feature
+  [2026-04-18-string-relational-operators-noref](../work/plans/features/2026-04-18-string-relational-operators-noref.md)
+  wires `<`, `<=`, `>`, `>=` over `string` operands through typing and the C backend via `rt_string_compare`.
 
 ## Backlog
 
@@ -113,8 +113,13 @@ surface.
 ### Language core
 
 - Separate compilation, runtime-library split, external linking, and C FFI, including C boundary string design, tracked
-  by Initiative
-  [l1/work/initiatives/0001-separate-compilation-and-c-ffi.md](../work/initiatives/0001-separate-compilation-and-c-ffi.md).
+  by Initiative [0001-separate-compilation-and-c-ffi](../work/initiatives/0001-separate-compilation-and-c-ffi.md).
+- String operators: `==`, `!=`, `<`, `<=`, `>`, `>=`, and `+`. Runtime helpers `rt_string_equals` and
+  `rt_string_compare` already exist and are used by the `case`-over-string lowering; the top-level binary operators are
+  not yet wired. Equality/inequality and ordered comparisons are tracked as two separate feature plans
+  [2026-04-18-string-equality-operators-noref](../work/plans/features/2026-04-18-string-equality-operators-noref.md) and
+  [2026-04-18-string-relational-operators-noref](../work/plans/features/2026-04-18-string-relational-operators-noref.md).
+  String concatenation via `+` remains backlog-only pending ARC result-ownership design.
 - Varargs, with an explicit split between L1 variadic functions and C variadic FFI support.
 - Lambdas/closures, including capture, ownership, and lowering rules.
 - Generics and generic modules.

@@ -1,6 +1,6 @@
 # L1 Language and Runtime Design Decisions
 
-Version: 2026-04-17
+Version: 2026-04-18
 
 This document records current design rationale and policy decisions for Dea/L1 as implemented by the bootstrap compiler.
 
@@ -354,3 +354,30 @@ Future direction:
 
 - when L1 needs target-independent constant evaluation or richer compile-time semantics, migrate the payload
   representation to an APInt/APFloat-style structured form that carries explicit type/width/value information
+
+## 15. String Value Semantics
+
+`string` is an ARC-managed value type. Two `string` values are language-equivalent when their byte contents are equal;
+their runtime representation (static versus heap, deduplicated or not) is not observable through the language.
+
+Current policy:
+
+- equality (`==`, `!=`) and ordering (`<`, `<=`, `>`, `>=`) on `string` compare by content bytes, backed by the runtime
+  helpers `rt_string_equals` and `rt_string_compare` respectively
+- equality is consistent across `==`, `case` arms over `string`, and `std.string::eq_s`
+- ordering is byte-wise lexicographic, consistent with `std.string::cmp_s`
+- string identity, meaning whether two values refer to the same runtime instance, is intentionally not exposed through
+  any operator, cast, or intrinsic
+- any future need for instance equality will be satisfied through an explicit `sys.*` helper with documented
+  implementation-defined semantics, not through a new operator
+
+Rationale:
+
+- identity-based equality would leak backend representation choices such as literal deduplication and static-versus-heap
+  selection into user-observable semantics, contradicting the UB-free/defined-semantics policy stated in §1
+- value equality is the only semantic consistent with existing `case`-over-string behavior and with the backend's
+  freedom to evolve dedup and arena strategies
+
+The top-level `==`, `!=`, `<`, `<=`, `>`, and `>=` operators are not yet wired for `string` operands in the current
+bootstrap compiler; see the L1 roadmap for the tracked operator plans. The semantic contract above is the committed
+target for those operators when they land.

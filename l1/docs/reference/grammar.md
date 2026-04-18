@@ -1,6 +1,6 @@
 # Dea/L<sub>1</sub> Grammar
 
-Version: 2026-04-16
+Version: 2026-04-18
 
 The following is the formal grammar for the Dea/L<sub>1</sub> programming language in EBNF-style. This describes the
 concrete syntax that lexers and parsers should accept.
@@ -340,6 +340,12 @@ Precedence (from lowest to highest):
 11. postfix call/index/field/try
 
 There is **no** ternary `?:` operator in L<sub>1</sub>.
+
+Note: precedence levels `3` (`|` bitwise OR), `4` (`^` bitwise XOR), `5` (`&` bitwise AND), the shift level (`<<`,
+`>>`), and unary `~` correspond to tokens that are lexed and reserved for future use, but are currently rejected by the
+parser with diagnostic `PAR-0226` ("operator is not yet supported"). The precedence table and productions below retain
+these levels to document the intended shape for when the feature lands; see the bitwise-operators bullet in
+[l1/docs/roadmap.md](../roadmap.md) for the tracking plan.
 
 ```ebnf
 Expr                ::=     OrExpr
