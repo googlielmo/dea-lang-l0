@@ -1,6 +1,6 @@
 # Dea/L1 Roadmap
 
-Version: 2026-04-17
+Version: 2026-04-18
 
 This is the live direction document for the Dea/L1 subtree. It records the current L1 position, the assumptions that
 constrain future work, completed milestones that shape the baseline, active work, and backlog items that have not yet
@@ -94,6 +94,15 @@ L1 carries post-L0 language growth and bootstrap compiler work.
 - Feature
   [l1/work/plans/features/2026-04-17-l1-let-non-constant-initializers-noref.md](../work/plans/features/2026-04-17-l1-let-non-constant-initializers-noref.md)
   supports non-constant initializers for top-level `let` declarations via module-level init functions.
+- Feature
+  [l1/work/plans/features/2026-04-18-l1-bitwise-operators-noref.md](../work/plans/features/2026-04-18-l1-bitwise-operators-noref.md)
+  lowers the reserved `&`, `|`, `^`, `~`, `<<`, `>>` tokens into real operators with typing, folding, and C codegen.
+- Feature
+  [l1/work/plans/features/2026-04-18-l1-const-declarations-noref.md](../work/plans/features/2026-04-18-l1-const-declarations-noref.md)
+  adds `const` declarations with compile-time-evaluable initializers, non-assignability, and static C emission.
+- Feature
+  [l1/work/plans/features/2026-04-18-l1-function-pointer-types-noref.md](../work/plans/features/2026-04-18-l1-function-pointer-types-noref.md)
+  adds first-class `func(...) -> T` function pointer types, indirect calls, and C ABI typedef emission.
 
 ## Backlog
 
@@ -106,11 +115,7 @@ surface.
 - Separate compilation, runtime-library split, external linking, and C FFI, including C boundary string design, tracked
   by Initiative
   [l1/work/initiatives/0001-separate-compilation-and-c-ffi.md](../work/initiatives/0001-separate-compilation-and-c-ffi.md).
-- Bitwise operators (`&`, `|`, `^`, `~`, `<<`, `>>`). The tokens are reserved and currently produce explicit
-  not-yet-supported diagnostics.
-- `const` declarations, including top-level `const` and their compile-time initializer and ABI rules.
 - Varargs, with an explicit split between L1 variadic functions and C variadic FFI support.
-- Function pointer types, calls, nullability, and C ABI representation.
 - Lambdas/closures, including capture, ownership, and lowering rules.
 - Generics and generic modules.
 - Typed arrays, buffers, shared buffers, and slices as general language features. The current `std.array` / `std.vector`
