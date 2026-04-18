@@ -3,7 +3,7 @@
 ## Land string equality and inequality operators
 
 - Date: 2026-04-18
-- Status: Draft
+- Status: Completed
 - Title: Land string equality and inequality operators
 - Kind: Feature
 - Severity: Medium
@@ -12,25 +12,25 @@
 - Modules:
   - `l1/compiler/stage1_l0/src/expr_types.l0`
   - `l1/compiler/stage1_l0/src/backend.l0`
-  - `l1/compiler/stage1_l0/src/c_emitter.l0` (possibly unchanged; helper already exists)
   - `l1/compiler/stage1_l0/tests/expr_types_test.l0`
   - `l1/compiler/stage1_l0/tests/backend_test.l0`
   - `l1/compiler/stage1_l0/tests/c_emitter_test.l0`
+  - `l1/compiler/stage1_l0/tests/l0c_lib_test.l0`
   - `l1/compiler/stage1_l0/tests/fixtures/typing/typing_equality_unsupported.l1`
   - `l1/compiler/stage1_l0/tests/fixtures/typing/typing_string_equality_ok.l1` (new)
   - `l1/compiler/stage1_l0/tests/fixtures/driver/string_equality_main.l1` (new)
   - `l1/docs/reference/design-decisions.md`
   - `l1/docs/roadmap.md`
-  - `docs/specs/compiler/diagnostic-code-catalog.md` (TYP-0173 meaning narrowed)
 - Test modules:
   - `l1/compiler/stage1_l0/tests/expr_types_test.l0`
   - `l1/compiler/stage1_l0/tests/backend_test.l0`
   - `l1/compiler/stage1_l0/tests/c_emitter_test.l0`
-  - `l1/compiler/stage1_l0/tests/l0c_lib_test.l0` (CLI smoke, if warranted)
+  - `l1/compiler/stage1_l0/tests/l0c_lib_test.l0`
 - Related:
   - `l1/work/plans/features/2026-04-18-string-relational-operators-noref.md`
   - `l1/work/plans/docs/2026-04-18-l1-string-value-semantics-decision-noref.md` (this meta-plan)
-- Repro: `make -C l1 test-stage1 TESTS="expr_types_test backend_test c_emitter_test"`
+- Repro:
+  `make -C l1 test-stage1 TESTS="expr_types_test backend_test c_emitter_test l0c_lib_test" && make -C l1 test-all`
 
 ## Summary
 
@@ -39,6 +39,18 @@ runtime helper `rt_string_equals` and the emitter helper `cem_emit_string_equals
 used by the `case`-over-string lowering. This plan wires the equality path through typing and backend so that `s1 == s2`
 and `s1 != s2` compile and execute with value-equality semantics, matching the behavior of `case` arms and
 `std.string::eq_s`.
+
+## Completion Notes
+
+1. `etc_infer_binary` now accepts `string == string` and `string != string`, while mixed `string` / non-`string`
+   equality still reports `TYP-0172`.
+2. `be_emit_binary_op` now lowers string equality through `rt_string_equals(...)` and string inequality through
+   `!rt_string_equals(...)`.
+3. Regression coverage now includes a positive typing fixture, backend and emitter assertions, and a kept-C CLI/runtime
+   fixture that exercises both literal and heap-built strings.
+4. `l1/docs/reference/design-decisions.md` and `l1/docs/roadmap.md` now describe string equality as shipped behavior.
+5. `docs/specs/compiler/diagnostic-code-catalog.md` already carried the narrowed generic `TYP-0173` wording, so no
+   shared-doc edit was required in this change.
 
 ## Current State
 
@@ -139,6 +151,6 @@ new emitter helper is required.
 3. `make -C l1 test-stage1 TESTS="backend_test"` passes, including lowering coverage for `==` and `!=` on string
    operands.
 4. `make -C l1 test-all` passes end-to-end.
-5. The new driver fixture runs to exit code 0 under `make check-examples` (or the equivalent entry point).
+5. The new driver fixture compiles, runs, and keeps generated C under `l1/compiler/stage1_l0/tests/l0c_lib_test.l0`.
 6. `design-decisions.md`, `roadmap.md`, and the diagnostic-code catalog reflect the narrowed `TYP-0173` meaning and the
    landed operator support.

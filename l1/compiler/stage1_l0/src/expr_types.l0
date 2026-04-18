@@ -2466,7 +2466,7 @@ func etc_infer_binary(self: ExpressionTypeChecker*, expr_id: ExprId, expr: ExprN
         let is_null_check = false;
         let comparable = false;
         if (etc_types_equal(l_ty, r_ty)) {
-            comparable = etc_is_int(l_ty) || etc_is_bool(l_ty) || etc_is_real(l_ty);
+            comparable = etc_is_int(l_ty) || etc_is_bool(l_ty) || etc_is_real(l_ty) || etc_is_string(l_ty);
         } else if (etc_is_real(l_ty) && etc_is_real(r_ty)) {
             comparable = true;
         }

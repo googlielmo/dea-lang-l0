@@ -316,14 +316,28 @@ func test_typing_try_err() {
 }
 
 /**
- * Tests unsupported equality diagnostics for strings.
+ * Tests unsupported equality diagnostics for non-string types.
  */
 func test_typing_equality_unsupported() {
     let sp = make_paths();
     with (let cfg = log_config_create(LL_SILENT, false) => drop cfg) {
         let result = analysis_analyze_entry(sp, "typing_equality_unsupported", cfg);
         assert(analysis_has_errors(result), "expected typing errors for typing_equality_unsupported");
-        assert(count_diag_code(result, "TYP-0173") == 2, "expected both string equality operators to report TYP-0173");
+        assert(count_diag_code(result, "TYP-0173") == 2, "expected both struct equality operators to report TYP-0173");
+        assert(count_diag_code(result, "TYP-0172") == 1, "expected mixed string equality to report TYP-0172");
+        analysis_result_free(result);
+    }
+    sp_free(sp);
+}
+
+/**
+ * Tests supported string equality typing behavior.
+ */
+func test_typing_string_equality_ok() {
+    let sp = make_paths();
+    with (let cfg = log_config_create(LL_SILENT, false) => drop cfg) {
+        let result = analysis_analyze_entry(sp, "typing_string_equality_ok", cfg);
+        assert(!analysis_has_errors(result), "expected no typing errors for typing_string_equality_ok");
         analysis_result_free(result);
     }
     sp_free(sp);
@@ -822,6 +836,7 @@ func main() {
     test_typing_try_ok();
     test_typing_try_err();
     test_typing_equality_unsupported();
+    test_typing_string_equality_ok();
     test_typing_cast_ok();
     test_typing_cast_err();
     test_typing_cast_optional_int_ok();

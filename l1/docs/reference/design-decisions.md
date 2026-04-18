@@ -366,10 +366,10 @@ their runtime representation (static versus heap, deduplicated or not) is not ob
 
 Current policy:
 
-- equality (`==`, `!=`) and ordering (`<`, `<=`, `>`, `>=`) on `string` compare by content bytes, backed by the runtime
-  helpers `rt_string_equals` and `rt_string_compare` respectively
+- equality (`==`, `!=`) on `string` compares by content bytes, backed by the runtime helper `rt_string_equals`
 - equality is consistent across `==`, `case` arms over `string`, and `std.string::eq_s`
-- ordering is byte-wise lexicographic, consistent with `std.string::cmp_s`
+- ordered comparisons (`<`, `<=`, `>`, `>=`) remain tracked separately; when they land they will compare by content
+  bytes via `rt_string_compare`, consistent with `std.string::cmp_s`
 - string identity, meaning whether two values refer to the same runtime instance, is intentionally not exposed through
   any operator, cast, or intrinsic
 - any future need for instance equality will be satisfied through an explicit `sys.*` helper with documented
@@ -382,6 +382,6 @@ Rationale:
 - value equality is the only semantic consistent with existing `case`-over-string behavior and with the backend's
   freedom to evolve dedup and arena strategies
 
-The top-level `==`, `!=`, `<`, `<=`, `>`, and `>=` operators are not yet wired for `string` operands in the current
-bootstrap compiler; see the L1 roadmap for the tracked operator plans. The semantic contract above is the committed
-target for those operators when they land.
+The top-level `==` and `!=` operators are now wired for `string` operands in the current bootstrap compiler. Ordered
+`string` comparisons remain tracked separately in the L1 roadmap, but the semantic contract above is already fixed for
+when they land.

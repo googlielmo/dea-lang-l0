@@ -681,6 +681,41 @@ func test_backend_generate_string_copy_retains() {
 }
 
 /**
+ * Tests string equality and inequality lowering through the runtime helper.
+ */
+func test_backend_generate_string_equality_ops() {
+    with (let filenames = vs_create(1) => vs_free(filenames),
+          let sources = vs_create(1) => vs_free(sources),
+          let lines = vs_create(12) => vs_free(lines),
+          let cfg = log_config_create(LL_ERROR, false) => drop cfg,
+          let opts = cg_options_create() => cg_options_free(opts)) {
+        opts.emit_line_directives = false;
+        vs_push(filenames, "demo/main.l1");
+        vs_push(lines, "module demo.main;");
+        vs_push(lines, "func main() -> int {");
+        vs_push(lines, "    let lhs = \"dea\";");
+        vs_push(lines, "    let same = \"dea\";");
+        vs_push(lines, "    let different = \"dea!\";");
+        vs_push(lines, "    if (lhs == same && lhs != different) {");
+        vs_push(lines, "        return 23;");
+        vs_push(lines, "    }");
+        vs_push(lines, "    return 0;");
+        vs_push(lines, "}");
+        vs_push(sources, bt_source(lines));
+
+        let result = bt_analyze_sources("demo.main", filenames, sources);
+        assert(!analysis_has_errors(result), "analysis should succeed for string equality fixture");
+
+        let generated = backend_generate(result, opts, cfg);
+        assert(contains_s(generated, "rt_string_equals(lhs, same)"), "string equality should lower through runtime helper");
+        assert(contains_s(generated, "(!rt_string_equals(lhs, different))"),
+            "string inequality should lower through negated runtime helper");
+
+        analysis_result_free(result);
+    }
+}
+
+/**
  * Tests generation for implemented small integer builtin types and checked casts.
  */
 func test_backend_generate_small_integer_builtins() {
@@ -944,6 +979,7 @@ func main() {
     test_backend_generate_intrinsics_use_analyzed_target_types();
     test_backend_generate_dea_intrinsics_respect_symbol_origin();
     test_backend_generate_string_copy_retains();
+    test_backend_generate_string_equality_ops();
     test_backend_generate_small_integer_builtins();
     test_backend_generate_large_integer_builtins();
     test_backend_generate_float_double_builtins();

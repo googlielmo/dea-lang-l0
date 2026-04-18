@@ -1749,6 +1749,15 @@ func be_emit_binary_op(self: Backend*, expr_id: ExprId) -> string {
                 c_right = be_convert_expr_with_expected_type(c_right, right_ty as Type*, common_int_ty as Type*);
             }
         }
+        if ((eq_s(expr.text_value, "==") || eq_s(expr.text_value, "!=")) &&
+            left_ty != null && right_ty != null &&
+            type_is_builtin(left_ty as Type*, "string") && type_is_builtin(right_ty as Type*, "string")) {
+            let c_cmp = cem_emit_string_equals_call(c_left, c_right);
+            if (eq_s(expr.text_value, "!=")) {
+                return cem_emit_unary_op("!", c_cmp);
+            }
+            return c_cmp;
+        }
 
         let checked_int_op = left_ty != null && right_ty != null &&
             be_is_int_assignable(left_ty as Type*) && be_is_int_assignable(right_ty as Type*);

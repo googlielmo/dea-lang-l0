@@ -74,6 +74,9 @@ L1 carries post-L0 language growth and bootstrap compiler work.
 - Feature
   [2026-04-18-l1-bitwise-operators-noref](../work/plans/features/closed/2026-04-18-l1-bitwise-operators-noref.md) added
   `&`, `|`, `^`, `~`, `<<`, and `>>` with parser precedence, integer typing, and direct C lowering.
+- Feature
+  [2026-04-18-string-equality-operators-noref](../work/plans/features/closed/2026-04-18-string-equality-operators-noref.md)
+  wired `==` and `!=` over `string` operands through typing and the C backend via `rt_string_equals`.
 - Bugfix
   [2026-04-17-l1-diagnostic-tab-caret-alignment-noref](../work/plans/bug-fixes/closed/2026-04-17-l1-diagnostic-tab-caret-alignment-noref.md)
   aligned stored diagnostic spans and printed carets for source lines that contain ASCII tabs under a logical-source
@@ -100,9 +103,6 @@ L1 carries post-L0 language growth and bootstrap compiler work.
   [2026-04-18-l1-function-pointer-types-noref](../work/plans/features/2026-04-18-l1-function-pointer-types-noref.md)
   adds first-class `func(...) -> T` function pointer types, indirect calls, and C ABI typedef emission.
 - Feature
-  [2026-04-18-string-equality-operators-noref](../work/plans/features/2026-04-18-string-equality-operators-noref.md)
-  wires `==` and `!=` over `string` operands through typing and the C backend via `rt_string_equals`.
-- Feature
   [2026-04-18-string-relational-operators-noref](../work/plans/features/2026-04-18-string-relational-operators-noref.md)
   wires `<`, `<=`, `>`, `>=` over `string` operands through typing and the C backend via `rt_string_compare`.
 
@@ -116,10 +116,9 @@ surface.
 
 - Separate compilation, runtime-library split, external linking, and C FFI, including C boundary string design, tracked
   by Initiative [0001-separate-compilation-and-c-ffi](../work/initiatives/0001-separate-compilation-and-c-ffi.md).
-- String operators: `==`, `!=`, `<`, `<=`, `>`, `>=`, and `+`. Runtime helpers `rt_string_equals` and
-  `rt_string_compare` already exist and are used by the `case`-over-string lowering; the top-level binary operators are
-  not yet wired. Equality/inequality and ordered comparisons are tracked as two separate feature plans
-  [2026-04-18-string-equality-operators-noref](../work/plans/features/2026-04-18-string-equality-operators-noref.md) and
+- String operators: `==` and `!=` now compare `string` values by content bytes through `rt_string_equals`, consistent
+  with `case`-over-string lowering and `std.string::eq_s`. Ordered comparisons `<`, `<=`, `>`, and `>=` remain tracked
+  by Feature
   [2026-04-18-string-relational-operators-noref](../work/plans/features/2026-04-18-string-relational-operators-noref.md).
   String concatenation via `+` remains backlog-only pending ARC result-ownership design.
 - Varargs, with an explicit split between L1 variadic functions and C variadic FFI support.
