@@ -1,6 +1,6 @@
 # L1 Compiler Architecture
 
-Version: 2026-04-14
+Version: 2026-04-18
 
 This is the canonical architecture document for the current Dea/L1 bootstrap compiler.
 
@@ -139,9 +139,13 @@ Important analysis tables include:
 1. The current L1 compiler is bootstrap-only and implemented in Dea/L0.
 2. Import closure construction is explicit and checked before later semantic passes.
 3. Source locations are propagated for diagnostics.
-4. Semantic failures are reported as diagnostics rather than internal crashes on normal invalid input paths.
-5. Generated output is currently one C99 translation unit.
-6. Any future `stage2_l1` implementation should match the public L1 language/runtime behavior documented here and in the
+4. Diagnostic columns follow a logical-source contract: every non-newline source byte, including ASCII horizontal tabs,
+   advances the stored column by exactly one. Snippet rendering normalizes displayed source lines to the same model
+   (each tab is printed as a single space) so the caret underline and the displayed line always agree, independent of
+   terminal tab-stop behavior. Unicode display-width handling is out of scope for this contract.
+5. Semantic failures are reported as diagnostics rather than internal crashes on normal invalid input paths.
+6. Generated output is currently one C99 translation unit.
+7. Any future `stage2_l1` implementation should match the public L1 language/runtime behavior documented here and in the
    other L1 reference documents.
 
 ## 5. File/Module Layout

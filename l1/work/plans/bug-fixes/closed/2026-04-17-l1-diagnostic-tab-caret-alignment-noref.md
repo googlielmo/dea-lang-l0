@@ -3,7 +3,7 @@
 ## Align L1 diagnostic spans and printed carets on tab-bearing lines
 
 - Date: 2026-04-17
-- Status: Draft
+- Status: Done
 - Title: Align L1 diagnostic spans and printed carets on tab-bearing lines
 - Kind: Bug Fix
 - Severity: Medium
@@ -144,6 +144,24 @@ explicit.
    covered afterward.
 4. `make -C l1 test-stage1 TESTS="diag_print_test lexer_test parser_test"` passes.
 5. `make -C l1 test-stage1` passes.
+
+## Resolution
+
+Chosen contract: **logical-source columns**. Each non-newline source byte, including ASCII horizontal tabs, advances the
+stored column by exactly one. Snippet rendering normalizes the displayed source line to match (each tab becomes a single
+space), so stored columns, caret offsets, and visible output all use the same width model.
+
+Changes landed together:
+
+- `compiler/stage1_l0/src/diag_print.l0` — added `dp_normalize_line_for_display` and a pure `dp_format_snippet` used by
+  `dp_render_snippet`; snippet rendering now emits a tab-normalized source line.
+- `compiler/stage1_l0/tests/diag_print_test.l0` — tab-before-token, tab-inside-span, mixed tabs/spaces, and non-tab
+  regressions assert the exact formatted snippet.
+- `compiler/stage1_l0/tests/lexer_test.l0` — `test_tab_advances_one_column` locks the lexer side of the contract.
+- `docs/reference/architecture.md` — invariants section documents the logical-source column contract.
+
+Lexer column advancement and parser span extension were already consistent with this contract and did not need to
+change.
 
 ## Open Design Constraints
 

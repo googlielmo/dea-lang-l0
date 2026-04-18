@@ -71,6 +71,10 @@ L1 carries post-L0 language growth and bootstrap compiler work.
 - Feature
   [2026-04-14-l1-std-math-wide-integer-followup-noref](../work/plans/features/closed/2026-04-14-l1-std-math-wide-integer-followup-noref.md)
   added L1-only `std.math` helper families for `uint`, `long`, and `ulong`.
+- Bugfix
+  [2026-04-17-l1-diagnostic-tab-caret-alignment-noref](../work/plans/bug-fixes/closed/2026-04-17-l1-diagnostic-tab-caret-alignment-noref.md)
+  aligned stored diagnostic spans and printed carets for source lines that contain ASCII tabs under a logical-source
+  column contract.
 
 </details>
 
@@ -81,9 +85,6 @@ L1 carries post-L0 language growth and bootstrap compiler work.
 
 ## Active standalone plans
 
-- Bug fix
-  [2026-04-17-l1-diagnostic-tab-caret-alignment-noref](../work/plans/bug-fixes/2026-04-17-l1-diagnostic-tab-caret-alignment-noref.md)
-  aligns stored diagnostic spans and printed carets for source lines that contain ASCII tabs.
 - Tool
   [2026-04-02-l1-bootstrap-productization-noref](../work/plans/tools/2026-04-02-l1-bootstrap-productization-noref.md)
   defines the first L1 bootstrap install/dist/product workflow.
