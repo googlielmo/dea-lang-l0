@@ -344,6 +344,33 @@ func test_typing_string_equality_ok() {
 }
 
 /**
+ * Tests supported string relational typing behavior.
+ */
+func test_typing_string_relational_ok() {
+    let sp = make_paths();
+    with (let cfg = log_config_create(LL_SILENT, false) => drop cfg) {
+        let result = analysis_analyze_entry(sp, "typing_string_relational_ok", cfg);
+        assert(!analysis_has_errors(result), "expected no typing errors for typing_string_relational_ok");
+        analysis_result_free(result);
+    }
+    sp_free(sp);
+}
+
+/**
+ * Tests mixed string relational mismatch diagnostics.
+ */
+func test_typing_string_relational_err() {
+    let sp = make_paths();
+    with (let cfg = log_config_create(LL_SILENT, false) => drop cfg) {
+        let result = analysis_analyze_entry(sp, "typing_string_relational_err", cfg);
+        assert(analysis_has_errors(result), "expected typing errors for typing_string_relational_err");
+        assert(count_diag_code(result, "TYP-0170") == 2, "expected two invalid string relational diagnostics");
+        analysis_result_free(result);
+    }
+    sp_free(sp);
+}
+
+/**
  * Tests successful typing for explicit cast parity cases.
  */
 func test_typing_cast_ok() {

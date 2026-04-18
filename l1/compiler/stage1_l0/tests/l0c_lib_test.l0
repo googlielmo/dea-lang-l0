@@ -416,6 +416,45 @@ func test_run_string_equality_build_and_keep_c() {
 }
 
 /**
+ * Tests string relational execution in `--run --keep-c` mode.
+ */
+func test_run_string_relational_build_and_keep_c() {
+    let out_path = run_keep_c_output_path();
+    let c_path = run_keep_c_c_path();
+    rt_delete_file(out_path);
+    rt_delete_file(c_path);
+
+    with (let argv = vs_create(12) => vs_free(argv)) {
+        vs_push(argv, "--run");
+        vs_push(argv, "--keep-c");
+        vs_push(argv, "-P");
+        vs_push(argv, fixture_root());
+        vs_push(argv, "--output");
+        vs_push(argv, out_path);
+        vs_push(argv, "string_relational_main");
+
+        let rc = run_with_argv(argv);
+        assert(rc == 23, "--run --keep-c should compile and execute string_relational_main");
+    }
+
+    let c_text = read_file(c_path);
+    assert(c_text != null, "string_relational_main kept C file should exist");
+    assert(contains_s(c_text as string, "(rt_string_compare(short_value, longer_value) < 0)"),
+        "string_relational_main less-than lowering mismatch");
+    assert(contains_s(c_text as string, "(rt_string_compare(short_value, same_value) <= 0)"),
+        "string_relational_main less-equal lowering mismatch");
+    assert(contains_s(c_text as string, "(rt_string_compare(longer_value, short_value) > 0)"),
+        "string_relational_main greater-than lowering mismatch");
+    assert(contains_s(c_text as string, "(rt_string_compare(longer_value, same_value) >= 0)"),
+        "string_relational_main greater-equal lowering mismatch");
+    assert(contains_s(c_text as string, "(rt_string_compare(built_same, short_value) >= 0)"),
+        "string_relational_main heap-string ordering lowering mismatch");
+
+    rt_delete_file(out_path);
+    rt_delete_file(c_path);
+}
+
+/**
  * Tests float/double build-and-run execution with kept generated C.
  */
 func test_run_float_build_and_keep_c() {

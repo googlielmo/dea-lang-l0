@@ -3,7 +3,7 @@
 ## Land string relational comparison operators
 
 - Date: 2026-04-18
-- Status: Draft
+- Status: Completed
 - Title: Land string relational comparison operators
 - Kind: Feature
 - Severity: Medium
@@ -16,7 +16,9 @@
   - `l1/compiler/stage1_l0/tests/expr_types_test.l0`
   - `l1/compiler/stage1_l0/tests/backend_test.l0`
   - `l1/compiler/stage1_l0/tests/c_emitter_test.l0`
+  - `l1/compiler/stage1_l0/tests/l0c_lib_test.l0`
   - `l1/compiler/stage1_l0/tests/fixtures/typing/typing_string_relational_ok.l1` (new)
+  - `l1/compiler/stage1_l0/tests/fixtures/typing/typing_string_relational_err.l1` (new)
   - `l1/compiler/stage1_l0/tests/fixtures/driver/string_relational_main.l1` (new)
   - `l1/docs/reference/design-decisions.md`
   - `l1/docs/roadmap.md`
@@ -24,11 +26,12 @@
   - `l1/compiler/stage1_l0/tests/expr_types_test.l0`
   - `l1/compiler/stage1_l0/tests/backend_test.l0`
   - `l1/compiler/stage1_l0/tests/c_emitter_test.l0`
-  - `l1/compiler/stage1_l0/tests/l0c_lib_test.l0` (CLI smoke, if warranted)
+  - `l1/compiler/stage1_l0/tests/l0c_lib_test.l0`
 - Related:
-  - `l1/work/plans/features/2026-04-18-string-equality-operators-noref.md`
+  - `l1/work/plans/features/closed/2026-04-18-string-equality-operators-noref.md`
   - `l1/work/plans/docs/2026-04-18-l1-string-value-semantics-decision-noref.md` (meta-plan)
-- Repro: `make -C l1 test-stage1 TESTS="expr_types_test backend_test c_emitter_test"`
+- Repro:
+  `make -C l1 test-stage1 TESTS="expr_types_test backend_test c_emitter_test l0c_lib_test" && make -C l1 test-all`
 
 ## Summary
 
@@ -39,6 +42,18 @@ with the semantics documented in the string-value-semantics decision.
 
 This plan should land after, or alongside, the equality plan (`2026-04-18-string-equality-operators-noref.md`). It does
 not depend on the equality plan landing first, but sharing review and emitter-test coverage is efficient.
+
+## Completion Notes
+
+1. `etc_infer_binary` now accepts `string < <= > >= string` and still reports `TYP-0170` for mixed `string` /
+   non-`string` relational operands.
+2. `cem_emit_string_compare_call` now lowers ordered string comparisons as `(rt_string_compare(lhs, rhs) op 0)`, and
+   `be_emit_binary_op` routes all four relational operators through that helper for `string` operands.
+3. Regression coverage now includes a positive typing fixture, a mixed-operand typing error fixture, backend and emitter
+   assertions, and a kept-C CLI/runtime fixture that exercises empty strings, prefix ordering, equality via `<=` / `>=`,
+   and heap-built strings.
+4. `l1/docs/reference/design-decisions.md` and `l1/docs/roadmap.md` now describe ordered string comparison as shipped
+   behavior, and this plan is closed under `l1/work/plans/features/closed/`.
 
 ## Current State
 
@@ -128,5 +143,5 @@ operator spelling preserved. Other typed relational paths remain unchanged.
 2. `make -C l1 test-stage1 TESTS="c_emitter_test"` passes with the new helper assertion.
 3. `make -C l1 test-stage1 TESTS="backend_test"` passes with lowering coverage for all four relational operators.
 4. `make -C l1 test-all` passes end-to-end.
-5. The new driver fixture runs to exit code 0 under `make check-examples` (or equivalent).
+5. The new driver fixture compiles, runs, and keeps generated C under `l1/compiler/stage1_l0/tests/l0c_lib_test.l0`.
 6. `design-decisions.md` and `roadmap.md` reflect the landed feature.

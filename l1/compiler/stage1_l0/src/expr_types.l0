@@ -2500,7 +2500,8 @@ func etc_infer_binary(self: ExpressionTypeChecker*, expr_id: ExprId, expr: ExprN
         return type_builtin_bool();
     } else if (eq_s(op, "<") || eq_s(op, "<=") || eq_s(op, ">") || eq_s(op, ">=")) {
         let real_cmp = etc_real_binary_result_type(l_ty, r_ty);
-        if ((!etc_is_int(l_ty) || !etc_is_int(r_ty)) && real_cmp == null) {
+        let string_cmp = etc_is_string(l_ty) && etc_is_string(r_ty);
+        if (!string_cmp && ((!etc_is_int(l_ty) || !etc_is_int(r_ty)) && real_cmp == null)) {
             etc_diag_error(self, "TYP-0170",
                 concat_s(concat4_s("binary '", op, "' expects matching numeric operands, got ", type_format(l_ty)),
                     concat_s(" and ", type_format(r_ty))),

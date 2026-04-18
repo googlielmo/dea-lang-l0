@@ -389,6 +389,8 @@ func test_emitter_expression_and_statement_helpers() {
             "(value).data.Some.inner"), "enum payload helper mismatch");
         assert(eq_s(cem_emit_string_equals_call("lhs", "rhs"), "rt_string_equals(lhs, rhs)"),
             "string-equals helper mismatch");
+        assert(eq_s(cem_emit_string_compare_call("<=", "lhs", "rhs"), "(rt_string_compare(lhs, rhs) <= 0)"),
+            "string-compare helper mismatch");
         assert(eq_s(cem_emit_unary_op("!", cem_emit_string_equals_call("lhs", "rhs")), "(!rt_string_equals(lhs, rhs))"),
             "string-not-equals helper mismatch");
         assert(eq_s(cem_emit_discard_expr("tmp"), "(void)(tmp)"), "discard helper mismatch");

@@ -27,7 +27,7 @@
   - `l1/compiler/stage1_l0/tests/c_emitter_test.l0`
   - `l1/compiler/stage1_l0/tests/l0c_lib_test.l0`
 - Related:
-  - `l1/work/plans/features/2026-04-18-string-relational-operators-noref.md`
+  - `l1/work/plans/features/closed/2026-04-18-string-relational-operators-noref.md`
   - `l1/work/plans/docs/2026-04-18-l1-string-value-semantics-decision-noref.md` (this meta-plan)
 - Repro:
   `make -C l1 test-stage1 TESTS="expr_types_test backend_test c_emitter_test l0c_lib_test" && make -C l1 test-all`

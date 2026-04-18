@@ -716,6 +716,47 @@ func test_backend_generate_string_equality_ops() {
 }
 
 /**
+ * Tests string relational lowering through the runtime helper.
+ */
+func test_backend_generate_string_relational_ops() {
+    with (let filenames = vs_create(1) => vs_free(filenames),
+          let sources = vs_create(1) => vs_free(sources),
+          let lines = vs_create(14) => vs_free(lines),
+          let cfg = log_config_create(LL_ERROR, false) => drop cfg,
+          let opts = cg_options_create() => cg_options_free(opts)) {
+        opts.emit_line_directives = false;
+        vs_push(filenames, "demo/main.l1");
+        vs_push(lines, "module demo.main;");
+        vs_push(lines, "func main() -> int {");
+        vs_push(lines, "    let lhs = \"dea\";");
+        vs_push(lines, "    let same = \"dea\";");
+        vs_push(lines, "    let longer = \"dea!\";");
+        vs_push(lines, "    let higher = \"deb\";");
+        vs_push(lines, "    if (lhs < longer && lhs <= same && higher > lhs && higher >= same) {");
+        vs_push(lines, "        return 23;");
+        vs_push(lines, "    }");
+        vs_push(lines, "    return 0;");
+        vs_push(lines, "}");
+        vs_push(sources, bt_source(lines));
+
+        let result = bt_analyze_sources("demo.main", filenames, sources);
+        assert(!analysis_has_errors(result), "analysis should succeed for string relational fixture");
+
+        let generated = backend_generate(result, opts, cfg);
+        assert(contains_s(generated, "(rt_string_compare(lhs, longer) < 0)"),
+            "string less-than should lower through runtime helper");
+        assert(contains_s(generated, "(rt_string_compare(lhs, same) <= 0)"),
+            "string less-equal should lower through runtime helper");
+        assert(contains_s(generated, "(rt_string_compare(higher, lhs) > 0)"),
+            "string greater-than should lower through runtime helper");
+        assert(contains_s(generated, "(rt_string_compare(higher, same) >= 0)"),
+            "string greater-equal should lower through runtime helper");
+
+        analysis_result_free(result);
+    }
+}
+
+/**
  * Tests generation for implemented small integer builtin types and checked casts.
  */
 func test_backend_generate_small_integer_builtins() {

@@ -1824,6 +1824,18 @@ func cem_emit_string_equals_call(lhs: string, rhs: string) -> string {
 }
 
 /**
+ * Emit the runtime string-compare helper call plus a relational check.
+ *
+ * @param op Relational operator token.
+ * @param lhs Left operand.
+ * @param rhs Right operand.
+ * @return Parenthesized comparison expression.
+ */
+func cem_emit_string_compare_call(op: string, lhs: string, rhs: string) -> string {
+    return concat4_s("(rt_string_compare(", lhs, ", ", concat4_s(rhs, ") ", op, " 0)"));
+}
+
+/**
  * Emit a statement-context discard wrapper for an expression.
  *
  * @param c_expr Expression to discard.

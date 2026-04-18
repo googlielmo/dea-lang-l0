@@ -1758,6 +1758,12 @@ func be_emit_binary_op(self: Backend*, expr_id: ExprId) -> string {
             }
             return c_cmp;
         }
+        if ((eq_s(expr.text_value, "<") || eq_s(expr.text_value, "<=") ||
+                eq_s(expr.text_value, ">") || eq_s(expr.text_value, ">=")) &&
+            left_ty != null && right_ty != null &&
+            type_is_builtin(left_ty as Type*, "string") && type_is_builtin(right_ty as Type*, "string")) {
+            return cem_emit_string_compare_call(expr.text_value, c_left, c_right);
+        }
 
         let checked_int_op = left_ty != null && right_ty != null &&
             be_is_int_assignable(left_ty as Type*) && be_is_int_assignable(right_ty as Type*);

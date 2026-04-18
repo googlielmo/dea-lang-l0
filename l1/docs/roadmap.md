@@ -77,6 +77,9 @@ L1 carries post-L0 language growth and bootstrap compiler work.
 - Feature
   [2026-04-18-string-equality-operators-noref](../work/plans/features/closed/2026-04-18-string-equality-operators-noref.md)
   wired `==` and `!=` over `string` operands through typing and the C backend via `rt_string_equals`.
+- Feature
+  [2026-04-18-string-relational-operators-noref](../work/plans/features/closed/2026-04-18-string-relational-operators-noref.md)
+  wired `<`, `<=`, `>`, and `>=` over `string` operands through typing and the C backend via `rt_string_compare`.
 - Bugfix
   [2026-04-17-l1-diagnostic-tab-caret-alignment-noref](../work/plans/bug-fixes/closed/2026-04-17-l1-diagnostic-tab-caret-alignment-noref.md)
   aligned stored diagnostic spans and printed carets for source lines that contain ASCII tabs under a logical-source
@@ -102,9 +105,6 @@ L1 carries post-L0 language growth and bootstrap compiler work.
 - Feature
   [2026-04-18-l1-function-pointer-types-noref](../work/plans/features/2026-04-18-l1-function-pointer-types-noref.md)
   adds first-class `func(...) -> T` function pointer types, indirect calls, and C ABI typedef emission.
-- Feature
-  [2026-04-18-string-relational-operators-noref](../work/plans/features/2026-04-18-string-relational-operators-noref.md)
-  wires `<`, `<=`, `>`, `>=` over `string` operands through typing and the C backend via `rt_string_compare`.
 
 ## Backlog
 
@@ -116,11 +116,9 @@ surface.
 
 - Separate compilation, runtime-library split, external linking, and C FFI, including C boundary string design, tracked
   by Initiative [0001-separate-compilation-and-c-ffi](../work/initiatives/0001-separate-compilation-and-c-ffi.md).
-- String operators: `==` and `!=` now compare `string` values by content bytes through `rt_string_equals`, consistent
-  with `case`-over-string lowering and `std.string::eq_s`. Ordered comparisons `<`, `<=`, `>`, and `>=` remain tracked
-  by Feature
-  [2026-04-18-string-relational-operators-noref](../work/plans/features/2026-04-18-string-relational-operators-noref.md).
-  String concatenation via `+` remains backlog-only pending ARC result-ownership design.
+- String operators: `==`, `!=`, `<`, `<=`, `>`, and `>=` now compare `string` values by content bytes through
+  `rt_string_equals` and `rt_string_compare`, consistent with `case`-over-string lowering, `std.string::eq_s`, and
+  `std.string::cmp_s`. String concatenation via `+` remains backlog-only pending ARC result-ownership design.
 - Varargs, with an explicit split between L1 variadic functions and C variadic FFI support.
 - Lambdas/closures, including capture, ownership, and lowering rules.
 - Generics and generic modules.
