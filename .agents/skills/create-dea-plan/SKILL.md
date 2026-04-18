@@ -206,10 +206,21 @@ If you create a new L1-local lifecycle artifact, update `l1/docs/roadmap.md` in 
 
 When editing `l1/docs/roadmap.md`, refresh its `Version: YYYY-MM-DD` metadata if needed.
 
-Use the roadmap link-text convention already used there:
+### Roadmap link legibility rules
 
-- plans: `[plan-slug](../work/plans/<kind>/plan-slug.md)`
-- initiatives: `[NNNN-initiative-slug](../work/initiatives/NNNN-initiative-slug.md)`
+For legibility, the visible link text in `roadmap.md` uses special abbreviated forms. These rules apply only inside
+`roadmap.md`; everywhere else, follow the general "repository-root paths as visible link text" rule from the writing
+rules below.
+
+- plans: `[plan-slug](../work/plans/<kind>/plan-slug.md)` — visible text is the bare plan slug, without the `.md`
+  extension and without the `../work/plans/<kind>/` prefix
+- initiatives: `[NNNN-initiative-slug](../work/initiatives/NNNN-initiative-slug.md)` — visible text is the bare
+  `NNNN-initiative-slug`, without the `.md` extension
+- other documents: visible text is just the filename without extension, for example
+  `[design-decisions](reference/design-decisions.md)` or `[project-status](project-status.md)`
+
+Apply these rules to every link added to `roadmap.md`, including cross-references inside backlog bullets, not just the
+`Active standalone plans` / `Active initiatives` entries.
 
 ## Initiative handoff rule
 
