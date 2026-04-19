@@ -49,7 +49,7 @@
 #include <sys/wait.h>
 #endif
 
-#include "l0_siphash.h"
+#include "dea_siphash.h"
 
 /* =========================================================================
  * Compiler-specific builtins and attributes

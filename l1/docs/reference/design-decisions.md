@@ -62,8 +62,8 @@ Historical `l0_*`, `L0_*`, `_l0_*`, and `_L0_*` names are not part of the curren
 new L1-emitted names. The emitter reserves both the historical prefixes and the current `dea` prefixes when mangling
 user/source identifiers so generated C cannot collide with backend/runtime-owned namespaces.
 
-One temporary exception remains: `l0_siphash.h` is still used as an internal include name until the shared cross-level
-SipHash include migration lands.
+The internal SipHash include now uses the level-local, future-neutral name `dea_siphash.h`, so L1 no longer carries a
+legacy-prefixed include exception there.
 
 ## 5. Future Evolution
 

@@ -41,8 +41,8 @@ Relevant facts that constrain the plan:
 - The L1 compiler emits **one C99 translation unit per program**.
 - The L1 backend reference ([`l1/docs/reference/c-backend-design.md`](../../docs/reference/c-backend-design.md)) is the
   current source of truth for L1 generated C behavior.
-- The runtime (`compiler/shared/runtime/l1_runtime.h` plus the temporary internal `l0_siphash.h` include) is
-  **header-only**: every callable is `static` or `static inline` and is inlined into the single TU at build time.
+- The runtime (`compiler/shared/runtime/l1_runtime.h` plus the internal `dea_siphash.h` include) is **header-only**:
+  every callable is `static` or `static inline` and is inlined into the single TU at build time.
 - Optional tracing (`DEA_TRACE_ARC`, `DEA_TRACE_MEMORY`) is wired through preprocessor toggles resolved at user-TU
   compile time by `--trace-arc` and `--trace-memory`.
 - Build/run mode currently discovers runtime headers with `--runtime-include` / `L1_RUNTIME_INCLUDE` and runtime
@@ -122,8 +122,8 @@ external. That changes how `extern func rt_foo(...)` resolves:
 - **Today:** the L1 declaration matches an inline `static` definition pulled in via `#include`.
 - **After Phase 1:** the L1 declaration matches an `extern` declaration in a slim public header, backed by a runtime
   archive. The proposed target names are `dea_rt.h`, `dea_siphash.h`, `libdea_rt.a`, and `libdea_rt_traced.a`, but the
-  Phase 1 plan must verify whether those names should replace or coexist temporarily with the current `l1_runtime.h` /
-  `l0_siphash.h` header names and any temporary artifact-name compatibility bridge.
+  Phase 1 plan must verify whether those names should replace or coexist temporarily with the current `l1_runtime.h`
+  header name and any temporary artifact-name compatibility bridge.
 
 This is a header-vs.-prototype split with no language semantics change, but it requires deciding whether trace builds
 ship as a separate archive (`libdea_rt_traced.a`) or whether tracing becomes runtime-toggleable. Recommend the
@@ -140,8 +140,8 @@ language semantics moving.
   public macros) plus one or more `.c` files grouped by subsystem: `dea_rt_string.c`, `dea_rt_io.c`, `dea_rt_alloc.c`,
   `dea_rt_hash.c`, `dea_rt_time.c`, `dea_rt_panic.c`, `dea_rt_math.c`. Truly internal helpers stay `static` inside their
   `.c`.
-- Rename or wrap the temporary `l0_siphash.h` internal include as part of the same runtime-archive plan, so L1 does not
-  freeze a new public runtime layout with an unexplained historical include name.
+- Decide whether `dea_siphash.h` stays as a distinct internal helper include or folds into the same runtime-archive
+  split, so L1 does not freeze a new public runtime layout around an unnecessary helper-header boundary.
 - Trace builds are a second archive, `libdea_rt_traced.a`, compiled with `DEA_TRACE_ARC` and `DEA_TRACE_MEMORY`. The
   user-TU build no longer needs the trace toggles at compile time; the build driver picks the archive. (Trace flag
   *names* on the CLI stay as today.)
@@ -457,9 +457,10 @@ These need resolution during Phase 0 but are not pre-decided here:
     document a `byte*` convention with helper functions in `sys.ffi`?
 05. **Trace runtime delivery.** Separate `libdea_rt_traced.a` archive (recommended) or runtime-toggleable tracing via
     function pointers?
-06. **Runtime artifact transition.** Replace `l1_runtime.h` and `l0_siphash.h` immediately, and retire the inherited
-    `libl0runtime.*` placeholder naming at the same time, or carry a short compatibility bridge while the build driver
-    and docs move to `dea_rt.h`, `dea_siphash.h`, and `libdea_rt.*`?
+06. **Runtime artifact transition.** Replace `l1_runtime.h` immediately, decide whether `dea_siphash.h` remains a
+    separate helper header or folds into the same transition, and retire the inherited `libl0runtime.*` placeholder
+    naming at the same time, or carry a short compatibility bridge while the build driver and docs move to `dea_rt.h`,
+    `dea_siphash.h`, and `libdea_rt.*`?
 07. **External-linking CLI.** Retire the current runtime-specific `-I` / `-L` aliases so they can match C compiler
     convention, or choose different external-linking flag spellings?
 08. **Diagnostic family split.** Keep module/link/FFI diagnostics in existing families, or introduce concrete `MOD-*`,

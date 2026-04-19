@@ -6,7 +6,7 @@
 
 /* Include SipHash runtime implementation in main translation unit */
 #define SIPHASH_IMPLEMENTATION
-#include "l0_siphash.h"
+#include "dea_siphash.h"
 
 /* L0 runtime header */
 #include "l0_runtime.h"

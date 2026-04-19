@@ -762,7 +762,7 @@ func cem_emit_header(self: CEmitter*, opts: CodegenOptions*) {
     cem_emit_float_contract_guard(self);
     ccb_emit(self.out, "/* Include SipHash runtime implementation in main translation unit */");
     ccb_emit(self.out, "#define SIPHASH_IMPLEMENTATION");
-    ccb_emit(self.out, "#include \"l0_siphash.h\"");
+    ccb_emit(self.out, "#include \"dea_siphash.h\"");
     ccb_emit(self.out, "");
     ccb_emit(self.out, "/* L1 runtime header */");
     if (opts.trace_arc) {

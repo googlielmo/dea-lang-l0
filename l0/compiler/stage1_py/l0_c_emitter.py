@@ -550,7 +550,7 @@ class CEmitter:
         self.out.emit()
         self.out.emit("/* Include SipHash runtime implementation in main translation unit */")
         self.out.emit("#define SIPHASH_IMPLEMENTATION")
-        self.out.emit('#include "l0_siphash.h"')
+        self.out.emit('#include "dea_siphash.h"')
         self.out.emit()
         self.out.emit("/* L0 runtime header */")
         if self.analysis.context.trace_arc:

@@ -1,6 +1,6 @@
 # L1 C Backend Design
 
-Version: 2026-04-16
+Version: 2026-04-19
 
 This is the canonical backend implementation document for the current Dea/L1 bootstrap compiler.
 
@@ -76,8 +76,8 @@ Current L1 prefix policy is:
 The emitter actively mangles user/source names that start with reserved generated/runtime prefixes, including both the
 legacy `l0` families and the current `dea` families, to avoid collisions in generated C.
 
-The only intentional legacy-prefixed include that remains in generated output for now is `l0_siphash.h`, which is
-treated as a temporary internal implementation header rather than part of the public L1 ABI.
+Generated output now includes the level-local internal helper header `dea_siphash.h`, which is treated as an internal
+implementation detail rather than part of the public L1 ABI.
 
 ### Floating-point backend contract
 

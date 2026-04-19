@@ -29,7 +29,7 @@ L1 carries post-L0 language growth and bootstrap compiler work.
 - Any future `stage2_l1` implementation should preserve the L1 language/runtime decisions documented in
   [design-decisions](reference/design-decisions.md) unless the reference set is deliberately updated.
 - The L1 public C ABI should continue using the `dea_*` / `DEA_*` naming policy. Historical `l0_*` names are not part of
-  the current L1 ABI except for documented temporary internal compatibility such as `l0_siphash.h`.
+  the current L1 ABI, and the internal SipHash helper now uses the level-local `dea_siphash.h` name.
 - The first L1 productization steps should remain bootstrap-oriented until a later plan explicitly makes L1 a release
   line.
 

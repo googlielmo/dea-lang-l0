@@ -1,6 +1,6 @@
 # L0 C Backend Design
 
-Version: 2026-04-14
+Version: 2026-04-19
 
 This is the canonical backend implementation document for the current C backend. Stage 1 remains the behavioral oracle;
 Stage 2 is expected to emit the same C and reuse the same diagnostic/ICE codes for equivalent backend conditions.
@@ -51,7 +51,7 @@ Input is a fully-typed `AnalysisResult`. Output is one C99 translation unit.
 
 The generated C file is organized in this order in both stages:
 
-1. File header and includes (`stdint.h`, `stdbool.h`, `stddef.h`, `l0_siphash.h`, `l0_runtime.h`), with optional trace
+1. File header and includes (`stdint.h`, `stdbool.h`, `stddef.h`, `dea_siphash.h`, `l0_runtime.h`), with optional trace
    defines (`L0_TRACE_ARC`, `L0_TRACE_MEMORY`) emitted before `l0_runtime.h` when enabled via CLI
 2. Forward declarations for all structs/enums
 3. Optional wrapper typedefs (early phase: builtins)

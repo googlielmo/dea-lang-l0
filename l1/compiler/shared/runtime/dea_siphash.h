@@ -7,7 +7,7 @@
  */
 
 /**
- * @file l0_siphash.h
+ * @file dea_siphash.h
  * SipHash-1-3 and SipHash-2-4 (64-bit tag), portable C99.
  *
  * Header-only / single-header pattern:
