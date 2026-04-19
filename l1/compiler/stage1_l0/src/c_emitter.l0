@@ -381,6 +381,25 @@ func cem_mangle_let_name(module_name: string, let_name: string) -> string {
 }
 
 /**
+ * Mangle one hidden module-initializer function name.
+ *
+ * @param module_name Defining module name.
+ * @return Hidden C identifier.
+ */
+func cem_mangle_module_init_name(module_name: string) -> string {
+    return concat3_s("_dea_init_", cem_mangle_module(module_name), "");
+}
+
+/**
+ * Return the hidden global init-chain function name.
+ *
+ * @return Hidden C identifier.
+ */
+func cem_global_init_name() -> string {
+    return "_dea_init_modules";
+}
+
+/**
  * Mangle a local identifier when needed.
  *
  * @param name Identifier to inspect.
@@ -619,6 +638,34 @@ func cem_emit_null_literal(expected_type: Type*, for_initializer: bool) -> strin
         return cem_emit_none_value_for_nullable(expected_type);
     }
     return cem_ice_string(concat3_s("[ICE-1292] invalid expected type for null literal: '", type_format(expected_type), "'"));
+}
+
+/**
+ * Emit a zero/default initializer for one top-level storage binding.
+ *
+ * @param let_type Binding type to lower.
+ * @return C initializer text.
+ */
+func cem_emit_zero_initializer(let_type: Type*) -> string {
+    if (type_is_builtin(let_type, "string")) {
+        return "{0}";
+    }
+    if (type_is_builtin(let_type, "void")) {
+        return cem_ice_string("[ICE-1360] cannot zero-initialize void storage");
+    }
+    if (ord(let_type.kind) == ord(TY_STRUCT) || ord(let_type.kind) == ord(TY_ENUM)) {
+        return "{0}";
+    }
+    if (ord(let_type.kind) == ord(TY_POINTER)) {
+        return "NULL";
+    }
+    if (ord(let_type.kind) == ord(TY_NULLABLE)) {
+        return cem_emit_null_literal(let_type, true);
+    }
+    if (ord(let_type.kind) == ord(TY_FUNC)) {
+        return "NULL";
+    }
+    return "0";
 }
 
 /**
@@ -990,6 +1037,21 @@ func cem_emit_let_declaration(self: CEmitter*, module_name: string, decl: LetDec
 }
 
 /**
+ * Emit one zero/default-initialized top-level `let` declaration.
+ *
+ * @param self Emitter to update.
+ * @param module_name Name of the defining module.
+ * @param decl Binding declaration node.
+ * @param let_type Resolved binding type.
+ */
+func cem_emit_zero_initialized_let_declaration(self: CEmitter*, module_name: string, decl: LetDecl*, let_type: Type*) {
+    let c_type = cem_emit_type(let_type);
+    let c_name = cem_mangle_let_name(module_name, decl.name);
+    let c_init = cem_emit_zero_initializer(let_type);
+    ccb_emit(self.out, concat4_s("static ", c_type, " ", concat3_s(c_name, " = ", concat_s(c_init, ";"))));
+}
+
+/**
  * Build a function parameter list.
  *
  * @param decl Function declaration node.
@@ -1056,6 +1118,18 @@ func cem_emit_function_definition_header(self: CEmitter*, module_name: string, d
 }
 
 /**
+ * Emit a hidden `static void name(void)` function header.
+ *
+ * @param self Emitter to update.
+ * @param c_name Hidden function name.
+ */
+func cem_emit_hidden_void_function_header(self: CEmitter*, c_name: string) {
+    ccb_emit(self.out, concat4_s("static void ", c_name, "(void", ")"));
+    ccb_emit(self.out, "{");
+    ccb_indent(self.out);
+}
+
+/**
  * Emit a function definition footer.
  *
  * @param self Emitter to update.
@@ -1072,8 +1146,10 @@ func cem_emit_function_definition_footer(self: CEmitter*) {
  * @param self Emitter to update.
  * @param entry_module Entry-module name.
  * @param func_type Resolved entry-function type.
+ * @param call_global_init Whether to call the hidden init chain before user `main`.
+ * @param global_init_name Hidden init-chain function name when `call_global_init` is true.
  */
-func cem_emit_main_wrapper(self: CEmitter*, entry_module: string, func_type: Type*) {
+func cem_emit_main_wrapper(self: CEmitter*, entry_module: string, func_type: Type*, call_global_init: bool, global_init_name: string) {
     let mangled_name = cem_mangle_function_name(entry_module, "main");
     let c_return_type = cem_emit_type(func_type.result as Type*);
 
@@ -1082,6 +1158,9 @@ func cem_emit_main_wrapper(self: CEmitter*, entry_module: string, func_type: Typ
     ccb_emit(self.out, "{");
     ccb_indent(self.out);
     ccb_emit(self.out, "_rt_init_args(argc, argv);");
+    if (call_global_init) {
+        ccb_emit(self.out, concat3_s(global_init_name, "(", ");"));
+    }
 
     if (eq_s(c_return_type, "dea_int")) {
         ccb_emit(self.out, concat3_s("return (int) ", mangled_name, "();"));

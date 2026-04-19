@@ -50,10 +50,13 @@ The generated C file is organized in this order:
 4. struct and enum definitions in dependency order
 5. top-level `let` storage
 6. function declarations
-7. non-extern function definitions
-8. C `main` wrapper when the entry module defines `main`
+7. hidden module/global init functions for deferred top-level `let` initializers
+8. non-extern function definitions
+9. C `main` wrapper when the entry module defines `main`
 
-Current backend target is a single C translation unit.
+Current backend target is a single C translation unit. Top-level `const` and constant `let` initializers lower directly
+into C storage initializers; non-constant top-level `let` initializers lower as zero/default-initialized storage plus
+hidden per-module init assignments.
 
 ## Type Lowering
 
@@ -137,6 +140,7 @@ See [ownership.md](ownership.md) for the language-facing ownership rules that th
 When the entry module defines `main`, backend emits a host C `main(int argc, char **argv)` wrapper that:
 
 - initializes runtime argument state
+- calls the hidden global module-init chain when any imported module needs deferred top-level initialization
 - calls the mangled L1 entry function
 - returns `int`/`bool` results as host `int`
 - discards other return values and exits with `0`

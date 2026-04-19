@@ -488,6 +488,52 @@ func test_run_const_build_and_keep_c() {
 }
 
 /**
+ * Tests non-constant top-level `let` execution and hidden init-function C emission in `--run --keep-c` mode.
+ */
+func test_run_nonconstant_top_level_let_build_and_keep_c() {
+    let out_path = run_keep_c_output_path();
+    let c_path = run_keep_c_c_path();
+    rt_delete_file(out_path);
+    rt_delete_file(c_path);
+
+    with (let argv = vs_create(12) => vs_free(argv)) {
+        vs_push(argv, "--run");
+        vs_push(argv, "--keep-c");
+        vs_push(argv, "-P");
+        vs_push(argv, fixture_root());
+        vs_push(argv, "--output");
+        vs_push(argv, out_path);
+        vs_push(argv, "toplet_init_main");
+
+        let rc = run_with_argv(argv);
+        assert(rc == 23, "--run --keep-c should compile and execute toplet_init_main");
+    }
+
+    let c_text = read_file(c_path);
+    assert(c_text != null, "toplet_init_main kept C file should exist");
+    assert(contains_s(c_text as string, "static dea_int dea_toplet_init_dep_BASE = 0;"),
+        "toplet_init_main dep zero-init mismatch");
+    assert(contains_s(c_text as string, "static dea_int dea_toplet_init_main_ANSWER = 0;"),
+        "toplet_init_main main zero-init mismatch");
+    assert(contains_s(c_text as string, "static void _dea_init_toplet_init_dep(void)"),
+        "toplet_init_main dep init function missing");
+    assert(contains_s(c_text as string, "dea_toplet_init_dep_BASE = dea_toplet_init_dep_seed();"),
+        "toplet_init_main dep init assignment mismatch");
+    assert(contains_s(c_text as string, "static void _dea_init_toplet_init_main(void)"),
+        "toplet_init_main main init function missing");
+    assert(contains_s(c_text as string, "dea_toplet_init_main_ANSWER = dea_toplet_init_main_bump(dea_toplet_init_dep_get_base());"),
+        "toplet_init_main main init assignment mismatch");
+    assert(contains_s(c_text as string,
+        "static void _dea_init_modules(void)\n{\n    _dea_init_toplet_init_dep();\n    _dea_init_toplet_init_main();\n}\n"),
+        "toplet_init_main global init order mismatch");
+    assert(contains_s(c_text as string, "_rt_init_args(argc, argv);\n    _dea_init_modules();\n    return (int) dea_toplet_init_main_main();"),
+        "toplet_init_main wrapper init call mismatch");
+
+    rt_delete_file(out_path);
+    rt_delete_file(c_path);
+}
+
+/**
  * Tests float/double build-and-run execution with kept generated C.
  */
 func test_run_float_build_and_keep_c() {
@@ -774,6 +820,7 @@ func main() {
     test_run_string_equality_build_and_keep_c();
     test_run_string_relational_build_and_keep_c();
     test_run_const_build_and_keep_c();
+    test_run_nonconstant_top_level_let_build_and_keep_c();
     test_run_float_build_and_keep_c();
     test_run_float_ops_build_and_keep_c();
     test_build_float_zero_division_keep_c();

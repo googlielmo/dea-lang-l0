@@ -1,6 +1,6 @@
 # The L1 Standard Library
 
-Version: 2026-04-17
+Version: 2026-04-19
 
 The standard library provides ergonomic L1 modules (`std.*`) and low-level runtime bindings (`sys.*`).
 
@@ -342,8 +342,8 @@ Unsigned `ulong` helpers intentionally omit signed-only concepts such as `sign_u
 Floating-point helper module for classification, basic operations, rounding, remainder/decomposition, and transcendental
 math.
 
-`PI_F`, `PI`, `E_F`, and `E` are module-level `let` values. NaN and infinity remain `nan_*()` / `inf_*()` getters until
-Stage 1 can initialize top-level `let` bindings from runtime calls.
+`PI_F`, `PI`, `E_F`, `E`, `NAN_F`, `NAN`, `INFINITY_F`, and `INFINITY` are module-level `let` values. Stage 1 now lowers
+runtime-initialized top-level `let` bindings through hidden module-init functions that run before user `main`.
 
 | Member         | Signature / Type                                          | Description                                                           |
 | -------------- | --------------------------------------------------------- | --------------------------------------------------------------------- |
@@ -351,8 +351,10 @@ Stage 1 can initialize top-level `let` bindings from runtime calls.
 | `PI`           | `double`                                                  | Double-precision approximation of pi.                                 |
 | `E_F`          | `float`                                                   | Single-precision approximation of Euler's number.                     |
 | `E`            | `double`                                                  | Double-precision approximation of Euler's number.                     |
-| `nan_*`        | `() -> float`, `() -> double`                             | Returns a NaN value.                                                  |
-| `inf_*`        | `() -> float`, `() -> double`                             | Returns positive infinity.                                            |
+| `NAN_F`        | `float`                                                   | Single-precision NaN value.                                           |
+| `NAN`          | `double`                                                  | Double-precision NaN value.                                           |
+| `INFINITY_F`   | `float`                                                   | Single-precision positive infinity.                                   |
+| `INFINITY`     | `double`                                                  | Double-precision positive infinity.                                   |
 | `is_nan_*`     | `(x: float) -> bool`, `(x: double) -> bool`               | Returns true if `x` is NaN.                                           |
 | `is_inf_*`     | `(x: float) -> bool`, `(x: double) -> bool`               | Returns true if `x` is positive or negative infinity.                 |
 | `is_finite_*`  | `(x: float) -> bool`, `(x: double) -> bool`               | Returns true if `x` is neither NaN nor infinite.                      |

@@ -30,11 +30,10 @@ let PI: double = 3.14159265358979323846;
 let PI_F: float = 3.14159265358979323846f;
 let E: double = 2.71828182845904523536;
 let E_F: float = 2.71828182845904523536f;
-
-func nan_f() -> float { return rt_real_get_nan_f(); }
-func nan_d() -> double { return rt_real_get_nan_d(); }
-func inf_f() -> float { return rt_real_get_inf_f(); }
-func inf_d() -> double { return rt_real_get_inf_d(); }
+let NAN_F: float = rt_real_get_nan_f();
+let NAN: double = rt_real_get_nan_d();
+let INFINITY_F: float = rt_real_get_inf_f();
+let INFINITY: double = rt_real_get_inf_d();
 
 // Multi-result public types
 struct FracPartsF {

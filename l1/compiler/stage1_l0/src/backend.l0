@@ -1413,17 +1413,17 @@ func be_emit_line_directive(self: Backend*, span: Span) {
 }
 
 /**
- * Emit a constant initializer for a top-level `let`.
+ * Try to emit a constant initializer for a top-level `let`.
  *
  * @param self Backend state to inspect.
  * @param expr_id Expression id to lower.
  * @param expected_type Resolved `let` type.
- * @return Constant initializer expression.
+ * @return Constant initializer expression, or `null` when runtime init is required.
  */
-func be_emit_let_initializer(self: Backend*, expr_id: ExprId, expected_type: Type*) -> string {
+func be_try_emit_let_initializer(self: Backend*, expr_id: ExprId, expected_type: Type*) -> string? {
     let bigint_init = be_emit_typed_bigint_expr(self, expr_id, expected_type);
     if (bigint_init != null) {
-        return bigint_init as string;
+        return bigint_init;
     }
     let expr = expr_arena_get(be_current_expr_arena(self), expr_id);
     match (expr.kind) {
@@ -1435,30 +1435,46 @@ func be_emit_let_initializer(self: Backend*, expr_id: ExprId, expected_type: Typ
         EX_BOOL => { return cem_emit_const_bool_literal(expr.bool_value); }
         EX_STRING => { return cem_emit_const_string_literal(expr.text_value); }
         EX_NULL => { return cem_emit_null_literal(expected_type, true); }
-        EX_CALL => { return be_emit_const_constructor(self, expr_id, expected_type); }
+        EX_CALL => { return be_try_emit_const_constructor(self, expr_id, expected_type); }
         _ => {
-            return be_ice_string("[ICE-1181] unsupported top-level let initializer");
+            return null;
         }
     }
 }
 
 /**
- * Emit a constant constructor initializer for a top-level `let`.
+ * Emit a constant initializer for a top-level `let`.
+ *
+ * @param self Backend state to inspect.
+ * @param expr_id Expression id to lower.
+ * @param expected_type Resolved `let` type.
+ * @return Constant initializer expression.
+ */
+func be_emit_let_initializer(self: Backend*, expr_id: ExprId, expected_type: Type*) -> string {
+    let c_init = be_try_emit_let_initializer(self, expr_id, expected_type);
+    if (c_init == null) {
+        return be_ice_string("[ICE-1181] unsupported top-level let initializer");
+    }
+    return c_init as string;
+}
+
+/**
+ * Try to emit a constant constructor initializer for a top-level `let`.
  *
  * @param self Backend state to inspect.
  * @param expr_id Call expression id.
  * @param expected_type Expected constructed type.
- * @return Constant initializer expression.
+ * @return Constant initializer expression, or `null` when runtime init is required.
  */
-func be_emit_const_constructor(self: Backend*, expr_id: ExprId, expected_type: Type*) -> string {
+func be_try_emit_const_constructor(self: Backend*, expr_id: ExprId, expected_type: Type*) -> string? {
     let expr = expr_arena_get(be_current_expr_arena(self), expr_id);
     if (ord(expr.kind) != ord(EX_CALL)) {
-        return be_ice_string("[ICE-1034] constant constructor helper requires call expression");
+        return null;
     }
     let call = expr;
     let callee = expr_arena_get(be_current_expr_arena(self), call.expr_a);
     if (ord(callee.kind) != ord(EX_VAR_REF)) {
-        return be_ice_string("[ICE-1034] constant constructor callee must be a name");
+        return null;
     }
 
     let sym = be_lookup_symbol(self, callee.text_value, callee.module_path, callee.name_qualifier);
@@ -1479,8 +1495,11 @@ func be_emit_const_constructor(self: Backend*, expr_id: ExprId, expected_type: T
             for (let i = 0; i < vec_size(struct_info.fields); i = i + 1) {
                 let field = ptr_vec_get(struct_info.fields, i) as StructFieldInfo*;
                 vs_push(field_inits, field.name);
-                vs_push(field_inits,
-                    be_emit_let_initializer(self, id_vec_get(call.ids as VectorBase*, i), field.field_type));
+                let field_init = be_try_emit_let_initializer(self, id_vec_get(call.ids as VectorBase*, i), field.field_type);
+                if (field_init == null) {
+                    return null;
+                }
+                vs_push(field_inits, field_init as string);
             }
             return cem_emit_struct_static_initializer_for_type(expected_type, field_inits);
         }
@@ -1508,14 +1527,34 @@ func be_emit_const_constructor(self: Backend*, expr_id: ExprId, expected_type: T
             for (let i = 0; i < vec_size(info2.field_types); i = i + 1) {
                 let field_decl = ptr_vec_get((variant_decl as EnumVariant*).fields, i) as FieldDecl*;
                 vs_push(payload_inits, field_decl.name);
-                vs_push(payload_inits,
-                    be_emit_let_initializer(self, id_vec_get(call.ids as VectorBase*, i), ptr_vec_get(info2.field_types, i) as Type*));
+                let payload_init = be_try_emit_let_initializer(self, id_vec_get(call.ids as VectorBase*, i),
+                    ptr_vec_get(info2.field_types, i) as Type*);
+                if (payload_init == null) {
+                    return null;
+                }
+                vs_push(payload_inits, payload_init as string);
             }
             return cem_emit_variant_static_initializer_for_type(expected_type, variant_name, payload_inits);
         }
     }
 
-    return be_ice_string("[ICE-1034] call expression is not a supported constant constructor");
+    return null;
+}
+
+/**
+ * Emit a constant constructor initializer for a top-level `let`.
+ *
+ * @param self Backend state to inspect.
+ * @param expr_id Call expression id.
+ * @param expected_type Expected constructed type.
+ * @return Constant initializer expression.
+ */
+func be_emit_const_constructor(self: Backend*, expr_id: ExprId, expected_type: Type*) -> string {
+    let c_init = be_try_emit_const_constructor(self, expr_id, expected_type);
+    if (c_init == null) {
+        return be_ice_string("[ICE-1034] call expression is not a supported constant constructor");
+    }
+    return c_init as string;
 }
 
 /**
@@ -1575,9 +1614,223 @@ func be_emit_let_declarations(self: Backend*) {
             if (let_type == null) {
                 be_ice(concat4_s("[ICE-1151] missing Let type for ", root.name, ".", decl.name));
             }
-            let c_init = be_emit_let_initializer(self, decl.value, let_type as Type*);
-            cem_emit_let_declaration(self.emitter, root.name, decl, let_type as Type*, c_init);
+            let c_init = be_try_emit_let_initializer(self, decl.value, let_type as Type*);
+            if (c_init != null) {
+                cem_emit_let_declaration(self.emitter, root.name, decl, let_type as Type*, c_init as string);
+            } else {
+                if (decl.is_const) {
+                    be_ice("[ICE-1181] unsupported top-level let initializer");
+                }
+                cem_emit_zero_initialized_let_declaration(self.emitter, root.name, decl, let_type as Type*);
+            }
         }
+    }
+}
+
+/**
+ * Return whether one module needs a deferred top-level init function.
+ *
+ * @param self Backend state to inspect.
+ * @param root Parsed module to inspect.
+ * @return `true` if at least one top-level `let` needs runtime initialization.
+ */
+func be_module_has_deferred_let_initializers(self: Backend*, root: Module*) -> bool {
+    let prev_module = self.current_module;
+    let prev_unit = self.current_unit;
+    let prev_env = self.current_env;
+    self.current_module = root.name;
+    self.current_unit = be_find_unit(self, root.name);
+    self.current_env = be_find_env(self, root.name);
+    if (self.current_unit == null) {
+        be_ice(concat3_s("[ICE-1362] missing unit for deferred-init scan: ", root.name, ""));
+    }
+
+    for (let i = 0; i < vec_size(root.decls); i = i + 1) {
+        let top = ptr_vec_get(root.decls, i) as TopLevelDecl*;
+        if (ord(top.kind) != ord(TD_LET)) {
+            continue;
+        }
+        let decl = top.data as LetDecl*;
+        if (decl.is_const) {
+            continue;
+        }
+        let let_type = sig_lookup_let_type(self.result.signatures as SignatureTables*, root.name, decl.name);
+        if (let_type == null) {
+            be_ice(concat4_s("[ICE-1151] missing Let type for ", root.name, ".", decl.name));
+        }
+        let c_init = be_try_emit_let_initializer(self, decl.value, let_type as Type*);
+        if (c_init == null) {
+            self.current_module = prev_module;
+            self.current_unit = prev_unit;
+            self.current_env = prev_env;
+            return true;
+        }
+    }
+    self.current_module = prev_module;
+    self.current_unit = prev_unit;
+    self.current_env = prev_env;
+    return false;
+}
+
+/**
+ * Emit one deferred top-level `let` assignment inside a module init function.
+ *
+ * @param self Backend state to update.
+ * @param module_name Defining module name.
+ * @param decl Binding declaration node.
+ * @param let_type Resolved binding type.
+ */
+func be_emit_deferred_top_level_let_assignment(self: Backend*, module_name: string, decl: LetDecl*, let_type: Type*) {
+    let c_name = cem_mangle_let_name(module_name, decl.name);
+    be_emit_line_directive(self, decl.span);
+    let c_value = be_emit_owned_expr_with_expected_type(self, decl.value, let_type);
+    if (analysis_has_arc_data(self.result, let_type)) {
+        let temp = cem_fresh_tmp(self.emitter, "tmp");
+        cem_emit_temp_decl(self.emitter, cem_emit_type(let_type), temp, c_value);
+        be_emit_value_cleanup(self, c_name, let_type);
+        cem_emit_assignment(self.emitter, c_name, temp);
+    } else {
+        cem_emit_assignment(self.emitter, c_name, c_value);
+    }
+}
+
+/**
+ * Emit a post-order dependency walk for module init sequencing.
+ *
+ * @param self Backend state to inspect.
+ * @param module_name Module to visit.
+ * @param visited Set of already visited module names.
+ * @param ordered Destination vector in init-call order.
+ */
+func be_collect_module_init_order_visit(self: Backend*, module_name: string, visited: VectorString*, ordered: VectorString*) {
+    if (dr_vs_has(visited, module_name)) {
+        return;
+    }
+    vs_push(visited, module_name);
+    let unit = be_find_unit(self, module_name);
+    if (unit == null || (unit as DriverUnit*).parse_result.root_module == null) {
+        return;
+    }
+    let root = ((unit as DriverUnit*).parse_result.root_module as Module*);
+    for (let i = 0; i < vec_size(root.imports); i = i + 1) {
+        let imp = ptr_vec_get(root.imports, i) as Import*;
+        be_collect_module_init_order_visit(self, imp.name, visited, ordered);
+    }
+    vs_push(ordered, module_name);
+}
+
+/**
+ * Collect module names in deterministic top-level init order.
+ *
+ * @param self Backend state to inspect.
+ * @return New vector of module names in dependency/source order.
+ */
+func be_collect_module_init_order(self: Backend*) -> VectorString* {
+    let ordered = vs_create(driver_unit_count(self.result.driver_state));
+    with (let visited = vs_create(driver_unit_count(self.result.driver_state)) => vs_free(visited)) {
+        if (!is_empty_s(self.result.driver_state.entry_module)) {
+            be_collect_module_init_order_visit(self, self.result.driver_state.entry_module, visited, ordered);
+        } else {
+            for (let i = 0; i < driver_unit_count(self.result.driver_state); i = i + 1) {
+                let unit = driver_unit_get(self.result.driver_state, i);
+                if (unit.parse_result.root_module == null) {
+                    continue;
+                }
+                be_collect_module_init_order_visit(self, (unit.parse_result.root_module as Module*).name, visited, ordered);
+            }
+        }
+    }
+    return ordered;
+}
+
+/**
+ * Emit one hidden module init function when a module has deferred top-level lets.
+ *
+ * @param self Backend state to update.
+ * @param root Parsed module to inspect.
+ * @return `true` if a function was emitted.
+ */
+func be_emit_module_init_function(self: Backend*, root: Module*) -> bool {
+    if (!be_module_has_deferred_let_initializers(self, root)) {
+        return false;
+    }
+
+    self.current_module = root.name;
+    self.current_unit = be_find_unit(self, root.name);
+    self.current_env = be_find_env(self, root.name);
+    cem_emit_module_comment(self.emitter, root.name);
+    cem_emit_hidden_void_function_header(self.emitter, cem_mangle_module_init_name(root.name));
+    for (let i = 0; i < vec_size(root.decls); i = i + 1) {
+        let top = ptr_vec_get(root.decls, i) as TopLevelDecl*;
+        if (ord(top.kind) != ord(TD_LET)) {
+            continue;
+        }
+        let decl = top.data as LetDecl*;
+        if (decl.is_const) {
+            continue;
+        }
+        let let_type = sig_lookup_let_type(self.result.signatures as SignatureTables*, root.name, decl.name);
+        if (let_type == null) {
+            be_ice(concat4_s("[ICE-1151] missing Let type for ", root.name, ".", decl.name));
+        }
+        let c_init = be_try_emit_let_initializer(self, decl.value, let_type as Type*);
+        if (c_init != null) {
+            continue;
+        }
+        be_emit_deferred_top_level_let_assignment(self, root.name, decl, let_type as Type*);
+    }
+    cem_emit_function_definition_footer(self.emitter);
+    return true;
+}
+
+/**
+ * Emit hidden module/global init functions for deferred top-level `let` initializers.
+ *
+ * @param self Backend state to update.
+ * @return `true` if a global init chain was emitted.
+ */
+func be_emit_top_level_init_functions(self: Backend*) -> bool {
+    if (self.result.signatures == null) {
+        return false;
+    }
+
+    with (let ordered = be_collect_module_init_order(self) => vs_free(ordered),
+          let deferred = vs_create(vs_size(ordered)) => vs_free(deferred)) {
+        for (let i = 0; i < vs_size(ordered); i = i + 1) {
+            let module_name = vs_get(ordered, i);
+            let unit = be_find_unit(self, module_name);
+            if (unit == null || (unit as DriverUnit*).parse_result.root_module == null) {
+                continue;
+            }
+            let root = ((unit as DriverUnit*).parse_result.root_module as Module*);
+            if (be_module_has_deferred_let_initializers(self, root)) {
+                vs_push(deferred, module_name);
+            }
+        }
+
+        if (vs_size(deferred) == 0) {
+            return false;
+        }
+
+        cem_emit_section_comment(self.emitter, "Top-level init functions");
+        for (let deferred_i = 0; deferred_i < vs_size(deferred); deferred_i = deferred_i + 1) {
+            let module_name = vs_get(deferred, deferred_i);
+            let unit = be_find_unit(self, module_name);
+            if (unit == null || (unit as DriverUnit*).parse_result.root_module == null) {
+                continue;
+            }
+            let root = ((unit as DriverUnit*).parse_result.root_module as Module*);
+            if (!be_emit_module_init_function(self, root)) {
+                be_ice(concat3_s("[ICE-1361] deferred init module disappeared: ", module_name, ""));
+            }
+        }
+
+        cem_emit_hidden_void_function_header(self.emitter, cem_global_init_name());
+        for (let call_i = 0; call_i < vs_size(deferred); call_i = call_i + 1) {
+            ccb_emit(self.emitter.out, concat3_s(cem_mangle_module_init_name(vs_get(deferred, call_i)), "(", ");"));
+        }
+        cem_emit_function_definition_footer(self.emitter);
+        return true;
     }
 }
 
@@ -3199,8 +3452,9 @@ func be_emit_function_definitions(self: Backend*) {
  * Emit the C `main()` wrapper when the entry module defines `main`.
  *
  * @param self Backend state to update.
+ * @param has_global_init Whether to call the hidden init chain before user `main`.
  */
-func be_emit_main_wrapper_if_needed(self: Backend*) {
+func be_emit_main_wrapper_if_needed(self: Backend*, has_global_init: bool) {
     if (is_empty_s(self.result.driver_state.entry_module) || self.result.signatures == null) {
         return;
     }
@@ -3210,7 +3464,8 @@ func be_emit_main_wrapper_if_needed(self: Backend*) {
     if (func_type == null) {
         return;
     }
-    cem_emit_main_wrapper(self.emitter, self.result.driver_state.entry_module, func_type as Type*);
+    cem_emit_main_wrapper(self.emitter, self.result.driver_state.entry_module, func_type as Type*, has_global_init,
+        cem_global_init_name());
 }
 
 /**
@@ -3240,8 +3495,9 @@ func backend_generate(result: AnalysisResult*, opts: CodegenOptions*, cfg: LogCo
         cem_emit_optional_wrappers(self.emitter, false);
         be_emit_let_declarations(self);
         be_emit_function_declarations(self);
+        let has_global_init = be_emit_top_level_init_functions(self);
         be_emit_function_definitions(self);
-        be_emit_main_wrapper_if_needed(self);
+        be_emit_main_wrapper_if_needed(self, has_global_init);
         return cem_get_output(self.emitter);
     }
 }

@@ -1,6 +1,6 @@
 # L1 Project Status
 
-Version: 2026-04-17
+Version: 2026-04-19
 
 This document summarizes what is implemented in the Dea/L1 subtree today.
 
@@ -54,7 +54,8 @@ This gives the subtree a complete bootstrap environment without claiming a self-
 The current implemented language surface matches the bootstrap subset exercised by the compiler, tests, and example
 checks, including:
 
-- functions, structs, enums, type aliases, and top-level `let`
+- functions, structs, enums, type aliases, top-level `let`, and deferred module-init lowering for non-constant top-level
+  `let` initializers before user `main`
 - modules/imports with qualified-name disambiguation
 - structured control flow including `if`, `while`, `for`, `match`, `case`, and `with` / `cleanup`
 - fixed-width integer builtins `tiny`, `short`, `ushort`, `int`, `uint`, `long`, and `ulong`, with contextual wide
@@ -67,8 +68,9 @@ checks, including:
 The stdlib currently includes the core bootstrap modules for I/O, strings, text, paths, filesystem access, time,
 randomness, assertions, optionals, the current container set, the shared `int` helper surface in `std.math`, L1-only
 `_ui` / `_l` / `_ul` `std.math` families for `uint`, `long`, and `ulong`, wide integer string conversions in `std.text`,
-`std.real` for floating-point classification and basic math functions, and `std.io` numeric print plus integer
-token-read helpers for the implemented fixed-width integer family.
+`std.real` for floating-point classification, module-level real constants (`PI`, `E`, `NAN`, `INFINITY`, and `_F`
+variants), and basic math functions, and `std.io` numeric print plus integer token-read helpers for the implemented
+fixed-width integer family.
 
 ## Delivery and Validation
 

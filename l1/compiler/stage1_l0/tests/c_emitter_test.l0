@@ -639,14 +639,14 @@ func test_emitter_top_level_forms_match_stage1_shape() {
 
     cem_emit_struct(emitter, "demo.main", point_decl, point_info);
     cem_emit_enum(emitter, "demo.main", color_decl, color_info);
-    cem_emit_let_declaration(emitter, "demo.main", let_decl, let_type, "42");
+    cem_emit_zero_initialized_let_declaration(emitter, "demo.main", let_decl, let_type);
     cem_emit_let_declaration(emitter, "demo.main", const_decl, let_type, "7");
     cem_emit_function_declaration(emitter, "demo.main", sum_decl, sum_type);
     cem_emit_function_declaration(emitter, "demo.main", extern_decl, extern_type);
     cem_emit_function_definition_header(emitter, "demo.main", sum_decl, sum_type);
     ccb_emit(emitter.out, "return a + b;");
     cem_emit_function_definition_footer(emitter);
-    cem_emit_main_wrapper(emitter, "demo.main", sum_type);
+    cem_emit_main_wrapper(emitter, "demo.main", sum_type, true, cem_global_init_name());
 
     let text = cem_get_output(emitter);
     assert(contains_s(text, "#ifndef DEA_DEFINED_dea_demo_main_Point"), "struct guard missing");
@@ -657,14 +657,14 @@ func test_emitter_top_level_forms_match_stage1_shape() {
     assert(contains_s(text,
         "struct { char __dummy__; } None;\n        struct { dea_byte r; dea_byte g; dea_byte b; } Rgb;\n    } data;\n};\n#endif\n"),
         "enum payload layout mismatch");
-    assert(contains_s(text, "static dea_int dea_demo_main_answer = 42;"), "top-level let mismatch");
+    assert(contains_s(text, "static dea_int dea_demo_main_answer = 0;"), "top-level let mismatch");
     assert(contains_s(text, "static const dea_int dea_demo_main_limit = 7;"), "top-level const mismatch");
     assert(contains_s(text, "dea_int dea_demo_main_sum(dea_int a, dea_int b);"), "function declaration mismatch");
     assert(contains_s(text, "void (puts)(void);"), "extern declaration mismatch");
     assert(contains_s(text, "dea_int dea_demo_main_sum(dea_int a, dea_int b)\n{\n    return a + b;\n}\n"),
         "function definition mismatch");
     assert(contains_s(text,
-        "/* C entry point wrapper */\nint main(int argc, char **argv)\n{\n    _rt_init_args(argc, argv);\n    return (int) dea_demo_main_main();\n}\n"),
+        "/* C entry point wrapper */\nint main(int argc, char **argv)\n{\n    _rt_init_args(argc, argv);\n    _dea_init_modules();\n    return (int) dea_demo_main_main();\n}\n"),
         "main wrapper mismatch");
 
     type_free(let_type);

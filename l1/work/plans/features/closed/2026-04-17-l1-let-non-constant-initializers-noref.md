@@ -3,7 +3,7 @@
 ## Support non-constant initializers for top-level let declarations
 
 - Date: 2026-04-17
-- Status: Draft
+- Status: Completed
 - Title: Support non-constant initializers for top-level let declarations
 - Kind: Feature
 - Severity: Medium
@@ -18,7 +18,7 @@
   - `l1/compiler/stage1_l0/tests/l0c_lib_test.l0`
 - Related:
   - `l1/work/plans/features/closed/2026-04-14-l1-std-real-module-noref.md`
-- Repro: `make -C l1 test-stage1 TESTS="l0c_lib_test"`
+- Repro: `make -C l1 test-stage1 TESTS="c_emitter_test backend_test l0c_lib_test" && make -C l1 test-stage1`
 
 ## Summary
 
@@ -30,6 +30,17 @@ function calls or complex expressions, forcing workarounds such as exposing valu
 This plan extends the compiler to support non-constant initializers for top-level `let` declarations. This involves
 emitting a module-level initialization step that runs before the program's `main` function to execute these complex
 initializers.
+
+## Completion Notes
+
+1. `backend.l0` and `c_emitter.l0` now split top-level bindings between direct C storage initializers and deferred
+   module-init assignments, using hidden `_dea_init_<module>()` helpers plus a global `_dea_init_modules()` chain.
+2. Deferred initialization order now follows the module dependency graph and import source order, and the generated C
+   `main` wrapper runs the init chain before dispatching to user `main`.
+3. `std.real` now exposes `NAN_F`, `NAN`, `INFINITY_F`, and `INFINITY` as module-level `let` constants backed by the
+   existing `sys.real` runtime helpers.
+4. Regression coverage now includes backend/emitter expectations and kept-C/runtime fixtures proving deferred top-level
+   initialization works across imported modules, including imported floating-point runtime calls.
 
 ## Current State
 

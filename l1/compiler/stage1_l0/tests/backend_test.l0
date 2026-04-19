@@ -320,6 +320,59 @@ func test_backend_generate_top_level_consts() {
 }
 
 /**
+ * Tests deferred top-level `let` initializers lower through hidden module init functions.
+ */
+func test_backend_generate_nonconstant_top_level_lets() {
+    with (let filenames = vs_create(2) => vs_free(filenames),
+          let sources = vs_create(2) => vs_free(sources),
+          let dep_lines = vs_create(8) => vs_free(dep_lines),
+          let main_lines = vs_create(8) => vs_free(main_lines),
+          let cfg = log_config_create(LL_ERROR, false) => drop cfg,
+          let opts = cg_options_create() => cg_options_free(opts)) {
+        opts.emit_line_directives = false;
+        vs_push(filenames, "demo/dep.l1");
+        vs_push(dep_lines, "module demo.dep;");
+        vs_push(dep_lines, "let base: int = seed();");
+        vs_push(dep_lines, "func seed() -> int { return 20; }");
+        vs_push(dep_lines, "func get_base() -> int { return base; }");
+        vs_push(sources, bt_source(dep_lines));
+
+        vs_push(filenames, "demo/main.l1");
+        vs_push(main_lines, "module demo.main;");
+        vs_push(main_lines, "import demo.dep;");
+        vs_push(main_lines, "let answer: int = bump(demo.dep::get_base());");
+        vs_push(main_lines, "func bump(x: int) -> int { return x + 3; }");
+        vs_push(main_lines, "func main() -> int { return answer; }");
+        vs_push(sources, bt_source(main_lines));
+
+        let result = bt_analyze_sources("demo.main", filenames, sources);
+        assert(!analysis_has_errors(result), "analysis should succeed for deferred top-level lets");
+
+        let generated = backend_generate(result, opts, cfg);
+        assert(contains_s(generated, "static dea_int dea_demo_dep_base = 0;"),
+            "deferred dep binding should be zero-initialized");
+        assert(contains_s(generated, "static dea_int dea_demo_main_answer = 0;"),
+            "deferred main binding should be zero-initialized");
+        assert(contains_s(generated, "static void _dea_init_demo_dep(void)"),
+            "dep init function missing");
+        assert(contains_s(generated, "dea_demo_dep_base = dea_demo_dep_seed();"),
+            "dep init assignment mismatch");
+        assert(contains_s(generated, "static void _dea_init_demo_main(void)"),
+            "main init function missing");
+        assert(contains_s(generated, "dea_demo_main_answer = _rt_iadd(dea_demo_main_bump(dea_demo_dep_get_base()), 0);") ||
+            contains_s(generated, "dea_demo_main_answer = dea_demo_main_bump(dea_demo_dep_get_base());"),
+            "main init assignment mismatch");
+        assert(contains_s(generated,
+            "static void _dea_init_modules(void)\n{\n    _dea_init_demo_dep();\n    _dea_init_demo_main();\n}\n"),
+            "global init chain order mismatch");
+        assert(contains_s(generated, "_rt_init_args(argc, argv);\n    _dea_init_modules();\n    return (int) dea_demo_main_main();"),
+            "main wrapper should call global init chain");
+
+        analysis_result_free(result);
+    }
+}
+
+/**
  * Tests test_backend_generate_basic_control_flow.
  */
 func test_backend_generate_basic_control_flow() {
