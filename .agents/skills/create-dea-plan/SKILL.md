@@ -105,15 +105,22 @@ Rules:
 - Keep the final `-noref.md` suffix.
 - Make the slug specific enough to identify the work from the filename alone.
 - Do not use generic slugs such as `plan`, `new-feature`, or `compiler-fix`.
+- For new level-local plans, do not repeat the owning level in the slug. If the file lives under `l0/work/...`,
+  `l1/work/...`, or a future `lN/work/...` tree, do not add `l0-`, `l1-`, `ln-`, or similar level markers to the slug.
+- Legacy level-local plans may already contain level prefixes; do not treat those older filenames as the rule for new
+  files.
 - Match nearby local naming idioms in the target tree.
 
 Current repo conventions to follow:
 
 - root shared plans often use a `shared-...` slug when the shared scope should be explicit
-- level-local plans may use an explicit level or stage prefix such as `l1-...`, `stage1-...`, or `stage2-...` when that
-  is already the clearest established local precedent
+- level-local plans may still use a stage-oriented prefix such as `stage1-...` or `stage2-...` when that conveys real
+  scope that is not already obvious from the directory path
 
-Use the clearest current local precedent rather than forcing a new naming style.
+For example, under `l1/work/plans/features/`, `2026-04-19-pointer-identity-equality-noref.md` is correct and
+`2026-04-19-l1-pointer-identity-equality-noref.md` is not.
+
+Use the clearest current local precedent subject to the no-level-prefix rule for new level-local plans.
 
 ## Metadata block
 
@@ -193,6 +200,35 @@ Use the closest local precedent:
 Do not write an `Outcome`, `Results`, or completed verification section in a brand-new draft plan unless the user is
 actually documenting already landed work.
 
+## Diagnostic-code planning rules
+
+If the planned work may introduce or reassign compiler diagnostic codes, inspect
+`docs/specs/compiler/diagnostic-code-catalog.md` and carry explicit diagnostic-code planning in the draft.
+
+Use these rules:
+
+- For new features and, more generally, for any new diagnostic category/slice introduced by the work, provisionally
+  reserve one unused block of 20 codes per impacted family/category.
+- Typical examples include a new language construct, a new driver option family, or another new area expected to add
+  several related diagnostics.
+- Write the proposed reservation explicitly in the plan, for example `SIG-0340` to `SIG-0359` or `PAR-1580` to
+  `PAR-1599`.
+- When the work only needs a few new diagnostics inside an already established area, first suggest using unused codes in
+  the pre-existing nearby range instead of reserving a fresh block. Older ranges often exist in blocks of 10.
+- If that pre-existing range is full or clearly too small for the planned work, suggest a new currently unreserved block
+  of 20 codes instead.
+- Treat every code reservation written in a plan as provisional rather than final.
+- State explicitly in the plan that the suggested block must be re-checked against the live catalog at implementation
+  time because the proposed numbers may have been used in the elapsed time between planning and implementation; if so,
+  the block must be changed then.
+
+When diagnostic-code planning is relevant, include enough detail in the body to make the reservation actionable:
+
+- which families/categories are impacted
+- whether the plan expects reuse of unused numbers in an existing range or a fresh 20-code reservation
+- the specific provisional range(s) being suggested
+- the implementation-time re-check note
+
 ## Explicit subtree link and update rules
 
 Only apply subtree-specific link/update work when the subtree docs explicitly require it.
@@ -256,5 +292,6 @@ Use the next available zero-padded number, carry the initiative metadata block, 
 - filename follows `YYYY-MM-DD-<slug>-noref.md`
 - metadata block matches current repo rules
 - shared-plan metadata included when needed
+- diagnostic-code reservation guidance included when the work may add new diagnostics
 - explicit subtree link/update steps followed where required, for example the current `l1/docs/roadmap.md` rule
 - no lifecycle plan written under `docs/`

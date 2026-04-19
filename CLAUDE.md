@@ -54,6 +54,12 @@ level directory first.
   `docs/specs/compiler/diagnostic-code-catalog.md`.
 - For shared diagnostic-code documentation, treat L0 Python Stage 1 as the current oracle for registered code
   inventory/meaning unless a broader Dea-wide policy supersedes it.
+- When planning work that may introduce or reassign compiler diagnostic codes, inspect
+  `docs/specs/compiler/diagnostic-code-catalog.md` and carry explicit diagnostic-code planning in the draft.
+- For a genuinely new diagnostic area/category, provisionally reserve one unused block of 20 codes per impacted
+  family/category; when only a few new diagnostics are needed in an established area, prefer nearby unused codes first.
+- Treat any diagnostic-code reservation written in a plan as provisional and re-check it against the live catalog at
+  implementation time before assigning final numbers.
 - Non-trivial shared work should be tracked under `work/plans/`.
 - Active plans stay at `work/plans/<kind>/`. Closed plans move into `work/plans/<kind>/closed/`.
 - Shared parity or seeded-port work defaults to one root-owned shared plan with explicit target implementations and
