@@ -1,6 +1,6 @@
 # L0 Language and Runtime Design Decisions
 
-Version: 2026-04-14
+Version: 2026-04-19
 
 This document records rationale and policy decisions.
 
@@ -149,6 +149,31 @@ Planned direction:
 1. Keep Stage 1 minimal and stable.
 2. Expand language features in Dea/L1 when semantics are decision-complete.
 3. Continue keeping unsafe/platform-specific details behind explicit runtime boundaries.
+
+## 10. Comparison Operator Scope
+
+The grammar admits `==`, `!=`, `<`, `<=`, `>`, `>=` between any operand types. The type checker intentionally restricts
+which operand types each operator accepts; this section records the deliberate rejections.
+
+Ordered comparison on `bool` is not accepted:
+
+- `bool < bool`, `bool <= bool`, `bool > bool`, and `bool >= bool` are rejected as non-integer operands
+- the rejection is a design choice, not a deferred feature: booleans are two labels, not a scalar ordering, and a
+  defined `true > false` meaning would add a footgun without a corresponding use case
+- the rejection diagnostic is `TYP-0170`, consistent with other noninteger operand rejections on the relational
+  operators
+- callers who want to route on a boolean value should use `if` / `case (b) { true => ...; false => ...; }` or compare
+  equality (`b == true`, `b != false`, or the simpler `b` / `!b` expressions)
+
+Equality on `bool` remains accepted, unchanged:
+
+- `bool == bool` and `bool != bool` return `bool`
+- this matches `case (b) { true => ...; }` dispatch and the general policy of treating `bool` as a scalar tag for
+  equality but not for ordering
+
+Rationale:
+
+- The Dea policy prefers a compile-time rejection over a defined-but-misleading ordering
 
 ______________________________________________________________________
 

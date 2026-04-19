@@ -107,6 +107,14 @@ L1 carries post-L0 language growth and bootstrap compiler work.
 - Feature
   [2026-04-18-l1-function-pointer-types-noref](../work/plans/features/2026-04-18-l1-function-pointer-types-noref.md)
   adds first-class `func(...) -> T` function pointer types, indirect calls, and C ABI typedef emission.
+- Feature
+  [2026-04-19-pointer-identity-equality-noref](../work/plans/features/2026-04-19-pointer-identity-equality-noref.md)
+  adds `==` and `!=` over same-type non-nullable `T*` operands using reference identity, narrowing `TYP-0173`
+  accordingly.
+- Feature
+  [2026-04-19-nullable-identity-equality-noref](../work/plans/features/2026-04-19-nullable-identity-equality-noref.md)
+  adds strict `T? == T?` equality with same-inner-type payload comparison and explicit-cast requirement for cross-form
+  `T? vs T` compares.
 
 ## Backlog
 
