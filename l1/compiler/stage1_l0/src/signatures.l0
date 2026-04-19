@@ -168,7 +168,7 @@ func sig_lookup_enum_info(self: SignatureTables*, module_name: string, name: str
 }
 
 /**
- * Look up a resolved top-level `let` type.
+ * Look up a resolved top-level binding type.
  *
  * @param self Signature tables to inspect.
  * @param module_name Defining module name.
@@ -418,6 +418,80 @@ func sig_infer_literal_type(tables: SignatureTables*, nr: NameResolution*, env: 
 }
 
 /**
+ * Check whether every constructor argument in a top-level binding initializer is constant.
+ *
+ * @param tables Signature tables available during signature resolution.
+ * @param nr Name-resolution data for symbol lookups.
+ * @param env Module environment owning the initializer.
+ * @param arena Expression arena that owns the arguments.
+ * @param args Optional vector of argument ids.
+ * @return `true` if every argument is constant.
+ */
+func sig_const_args_are_constant(tables: SignatureTables*, nr: NameResolution*, env: ModuleEnv*, arena: ExprArena*,
+                                 args: VectorBase*?) -> bool {
+    if (args == null) {
+        return true;
+    }
+    let ids = args as VectorBase*;
+    for (let i = 0; i < vec_size(ids); i = i + 1) {
+        if (!sig_expr_is_const_initializer(tables, nr, env, arena, id_vec_get(ids, i))) {
+            return false;
+        }
+    }
+    return true;
+}
+
+/**
+ * Check whether one top-level binding initializer stays inside the static-initializer subset.
+ *
+ * @param tables Signature tables available during signature resolution.
+ * @param nr Name-resolution data for symbol lookups.
+ * @param env Module environment owning the initializer.
+ * @param arena Expression arena that owns the expression.
+ * @param expr_id Expression id to inspect.
+ * @return `true` if the initializer is compile-time constant.
+ */
+func sig_expr_is_const_initializer(tables: SignatureTables*, nr: NameResolution*, env: ModuleEnv*, arena: ExprArena*,
+                                   expr_id: ExprId) -> bool {
+    if (expr_id < 0) {
+        return false;
+    }
+    let expr = expr_arena_get(arena, expr_id);
+    match (expr.kind) {
+        EX_INT => { return true; }
+        EX_BIGINT => { return true; }
+        EX_FLOAT => { return true; }
+        EX_DOUBLE => { return true; }
+        EX_BYTE => { return true; }
+        EX_STRING => { return true; }
+        EX_BOOL => { return true; }
+        EX_NULL => { return true; }
+        EX_CALL => {
+            let callee = expr_arena_get(arena, expr.expr_a);
+            if (ord(callee.kind) != ord(EX_VAR_REF)) {
+                return false;
+            }
+
+            let sym = tr_symbol_lookup(nr, env, callee.text_value, callee.module_path, callee.name_qualifier);
+            if (sym == null) {
+                return false;
+            }
+
+            let target = sym as Symbol*;
+            if (ord(target.kind) == ord(SYM_STRUCT) || ord(target.kind) == ord(SYM_ENUM_VARIANT)) {
+                return sig_const_args_are_constant(tables, nr, env, arena, expr.ids);
+            }
+            if (ord(target.kind) == ord(SYM_TYPE_ALIAS) && target.resolved_type != null &&
+                ord((target.resolved_type as Type*).kind) == ord(TY_STRUCT)) {
+                return sig_const_args_are_constant(tables, nr, env, arena, expr.ids);
+            }
+            return false;
+        }
+        _ => { return false; }
+    }
+}
+
+/**
  * Resolve or infer the type of one top-level `let` binding.
  *
  * @param tables Signature tables receiving resolved `let` types.
@@ -465,6 +539,23 @@ func sig_resolve_let(tables: SignatureTables*, nr: NameResolution*, env: ModuleE
 
     if (let_type == null) {
         return;
+    }
+
+    if (decl.is_const) {
+        let unit = driver_find_unit(driver_state, env.module_name);
+        if (unit == null ||
+            !sig_expr_is_const_initializer(tables, nr, env, (unit as DriverUnit*).parse_result.expr_arena, decl.value))
+        {
+            type_free(let_type as Type*);
+            sig_diag_error(
+                diags,
+                "SIG-0200",
+                concat3_s("initializer for const '", decl.name, "' must be compile-time constant"),
+                env.module_ptr.filename,
+                decl.span
+            );
+            return;
+        }
     }
 
     let key = sig_key(env.module_name, decl.name);

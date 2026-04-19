@@ -633,12 +633,14 @@ func test_emitter_top_level_forms_match_stage1_shape() {
     let extern_decl = new FuncDecl("puts", extern_params, cet_builtin_type_ref("void"), invalid_stmt_id(), true, span_here(1,
         1));
     let extern_type = type_new_func(extern_param_types, type_builtin_void());
-    let let_decl = new LetDecl("answer", cet_builtin_type_ref("int"), invalid_expr_id(), span_here(1, 1));
+    let let_decl = new LetDecl("answer", cet_builtin_type_ref("int"), invalid_expr_id(), false, span_here(1, 1));
+    let const_decl = new LetDecl("limit", cet_builtin_type_ref("int"), invalid_expr_id(), true, span_here(1, 1));
     let let_type = type_builtin_int();
 
     cem_emit_struct(emitter, "demo.main", point_decl, point_info);
     cem_emit_enum(emitter, "demo.main", color_decl, color_info);
     cem_emit_let_declaration(emitter, "demo.main", let_decl, let_type, "42");
+    cem_emit_let_declaration(emitter, "demo.main", const_decl, let_type, "7");
     cem_emit_function_declaration(emitter, "demo.main", sum_decl, sum_type);
     cem_emit_function_declaration(emitter, "demo.main", extern_decl, extern_type);
     cem_emit_function_definition_header(emitter, "demo.main", sum_decl, sum_type);
@@ -656,6 +658,7 @@ func test_emitter_top_level_forms_match_stage1_shape() {
         "struct { char __dummy__; } None;\n        struct { dea_byte r; dea_byte g; dea_byte b; } Rgb;\n    } data;\n};\n#endif\n"),
         "enum payload layout mismatch");
     assert(contains_s(text, "static dea_int dea_demo_main_answer = 42;"), "top-level let mismatch");
+    assert(contains_s(text, "static const dea_int dea_demo_main_limit = 7;"), "top-level const mismatch");
     assert(contains_s(text, "dea_int dea_demo_main_sum(dea_int a, dea_int b);"), "function declaration mismatch");
     assert(contains_s(text, "void (puts)(void);"), "extern declaration mismatch");
     assert(contains_s(text, "dea_int dea_demo_main_sum(dea_int a, dea_int b)\n{\n    return a + b;\n}\n"),
@@ -691,6 +694,7 @@ func test_emitter_top_level_forms_match_stage1_shape() {
     struct_decl_free(point_decl);
     enum_decl_free(color_decl);
     let_decl_free(let_decl);
+    let_decl_free(const_decl);
     func_decl_free(sum_decl);
     func_decl_free(extern_decl);
 

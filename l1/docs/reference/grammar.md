@@ -1,6 +1,6 @@
 # Dea/L<sub>1</sub> Grammar
 
-Version: 2026-04-18
+Version: 2026-04-19
 
 The following is the formal grammar for the Dea/L<sub>1</sub> programming language in EBNF-style. This describes the
 concrete syntax that lexers and parsers should accept.
@@ -64,7 +64,7 @@ byte tiny short int long ushort uint ulong float double
 
 Builtin type names such as `void`, `bool`, `string`, `byte`, `tiny`, `short`, `int`, `long`, `ushort`, `uint`, `ulong`,
 `float`, and `double` are reserved. The grammar is prescriptive here and may intentionally lead the current bootstrap
-implementation. In addition, `in` and `const` are reserved for future extensions.
+implementation. In addition, `in` remains reserved for a future extension.
 
 ### 1.4 Symbols / operators
 
@@ -118,6 +118,8 @@ TopLevelDecl        ::=     FunctionDecl
                       |     EnumDecl
                       |     TypeAliasDecl
                       |     ExternFuncDecl
+                      |     LetDecl
+                      |     ConstDecl
 ```
 
 ### 3.1 Functions
@@ -167,6 +169,17 @@ TypeAliasDecl ::= "type" Ident "=" Type ";"
 ```
 
 Used for things like `type RawPtr = void*;`.
+
+### 3.6 Top-level bindings
+
+```ebnf
+LetDecl             ::=     "let" Ident ( ":" Type )? "=" Expr ";"
+
+ConstDecl           ::=     "const" Ident ":" Type "=" Expr ";"
+```
+
+`const` is currently top-level only. Block-local `let` exists; block-local `const` is not part of the current accepted
+syntax.
 
 ## 4. Types
 

@@ -682,6 +682,57 @@ func etc_lookup_symbol(self: ExpressionTypeChecker*, name: string, module_path: 
 }
 
 /**
+ * Return the referenced `const` binding name for an assignment target, if any.
+ *
+ * @param self Expression checker state.
+ * @param expr_id Assignment target expression id.
+ * @return Binding name when `expr_id` targets a top-level `const`, otherwise `null`.
+ */
+func etc_assignment_const_target_name(self: ExpressionTypeChecker*, expr_id: ExprId) -> string? {
+    if (expr_id < 0 || self.current_unit == null) {
+        return null;
+    }
+    let expr = expr_arena_get((self.current_unit as DriverUnit*).parse_result.expr_arena, expr_id);
+    if (ord(expr.kind) == ord(EX_PAREN)) {
+        return etc_assignment_const_target_name(self, expr.expr_a);
+    }
+    if (ord(expr.kind) == ord(EX_FIELD)) {
+        let base_ty = etc_infer_expr(self, expr.expr_a);
+        if (base_ty == null) {
+            return null;
+        }
+        let ty = base_ty as Type*;
+        let is_ptr_base = ord(ty.kind) == ord(TY_POINTER) ||
+            (ord(ty.kind) == ord(TY_NULLABLE) && ty.inner != null && ord((ty.inner as Type*).kind) == ord(TY_POINTER));
+        type_free(ty);
+        if (is_ptr_base) {
+            return null;
+        }
+        return etc_assignment_const_target_name(self, expr.expr_a);
+    }
+    if (ord(expr.kind) != ord(EX_VAR_REF)) {
+        return null;
+    }
+
+    let local_ty = etc_lookup_local(self, expr.text_value);
+    if (local_ty != null) {
+        type_free(local_ty as Type*);
+        return null;
+    }
+
+    let sym = etc_lookup_symbol(self, expr.text_value, expr.module_path, expr.name_qualifier);
+    if (sym == null || ord((sym as Symbol*).kind) != ord(SYM_LET) || (sym as Symbol*).decl_ptr == null) {
+        return null;
+    }
+
+    let decl = (sym as Symbol*).decl_ptr as LetDecl*;
+    if (decl.is_const) {
+        return decl.name;
+    }
+    return null;
+}
+
+/**
  * Check whether a type is `void`.
  *
  * @param ty Type to inspect.
@@ -1314,9 +1365,13 @@ func etc_check_stmt(self: ExpressionTypeChecker*, stmt_id: StmtId) -> StmtFlowKi
         }
         ST_ASSIGN => {
             etc_alive_revive_assignment_target(self, stmt.expr_a);
+            let const_target_name = etc_assignment_const_target_name(self, stmt.expr_a);
             let left_ty = etc_infer_expr(self, stmt.expr_a);
             let right_ty = etc_infer_expr(self, stmt.expr_b);
-            if (left_ty != null && right_ty != null) {
+            if (const_target_name != null) {
+                etc_diag_error(self, "TYP-0360",
+                    concat3_s("cannot assign to const '", const_target_name as string, "'"), unit.path, stmt.span);
+            } else if (left_ty != null && right_ty != null) {
                 if (ord(etc_check_assign_expr(self, left_ty as Type*, right_ty as Type*, stmt.expr_b,
                     unit.path, stmt.span)) == ord(ASSIGN_REJECT)) {
                     etc_diag_error(self, "TYP-0311", concat_s("assignment type mismatch", ""), unit.path, stmt.span);

@@ -625,6 +625,11 @@ func ps_parse_simple_stmt(self: ParserState*) -> StmtId? {
     if (ps_check(self, ord(TT_LET))) {
         return ps_parse_let_stmt(self);
     }
+    if (ps_check(self, ord(TT_CONST))) {
+        let tok = ps_advance(self);
+        ps_emit_error(self, "PAR-0263", "[PAR-0263] const declarations are only supported at top level", tok);
+        return null;
+    }
     if (ps_check(self, ord(TT_BREAK))) {
         return ps_parse_break_stmt(self);
     }

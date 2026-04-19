@@ -1,6 +1,6 @@
 # Dea/L1 Roadmap
 
-Version: 2026-04-18
+Version: 2026-04-19
 
 This is the live direction document for the Dea/L1 subtree. It records the current L1 position, the assumptions that
 constrain future work, completed milestones that shape the baseline, active work, and backlog items that have not yet
@@ -80,6 +80,10 @@ L1 carries post-L0 language growth and bootstrap compiler work.
 - Feature
   [2026-04-18-string-relational-operators-noref](../work/plans/features/closed/2026-04-18-string-relational-operators-noref.md)
   wired `<`, `<=`, `>`, and `>=` over `string` operands through typing and the C backend via `rt_string_compare`.
+- Feature
+  [2026-04-18-l1-const-declarations-noref](../work/plans/features/closed/2026-04-18-l1-const-declarations-noref.md)
+  added top-level `const` declarations with explicit types, compile-time-constant initializers, and `static const` C
+  emission.
 - Bugfix
   [2026-04-17-l1-diagnostic-tab-caret-alignment-noref](../work/plans/bug-fixes/closed/2026-04-17-l1-diagnostic-tab-caret-alignment-noref.md)
   aligned stored diagnostic spans and printed carets for source lines that contain ASCII tabs under a logical-source
@@ -100,8 +104,6 @@ L1 carries post-L0 language growth and bootstrap compiler work.
 - Feature
   [2026-04-17-l1-let-non-constant-initializers-noref](../work/plans/features/2026-04-17-l1-let-non-constant-initializers-noref.md)
   supports non-constant initializers for top-level `let` declarations via module-level init functions.
-- Feature [2026-04-18-l1-const-declarations-noref](../work/plans/features/2026-04-18-l1-const-declarations-noref.md)
-  adds `const` declarations with compile-time-evaluable initializers, non-assignability, and static C emission.
 - Feature
   [2026-04-18-l1-function-pointer-types-noref](../work/plans/features/2026-04-18-l1-function-pointer-types-noref.md)
   adds first-class `func(...) -> T` function pointer types, indirect calls, and C ABI typedef emission.
@@ -119,6 +121,9 @@ surface.
 - String operators: `==`, `!=`, `<`, `<=`, `>`, and `>=` now compare `string` values by content bytes through
   `rt_string_equals` and `rt_string_compare`, consistent with `case`-over-string lowering, `std.string::eq_s`, and
   `std.string::cmp_s`. String concatenation via `+` remains backlog-only pending ARC result-ownership design.
+- Top-level bindings are now split between compile-time `const` and ordinary `let`. `const` already requires an explicit
+  type, a compile-time-constant initializer, and lowers to `static const` C. The remaining active binding work is
+  non-constant top-level `let` initialization via module-init functions.
 - Varargs, with an explicit split between L1 variadic functions and C variadic FFI support.
 - Lambdas/closures, including capture, ownership, and lowering rules.
 - Generics and generic modules.

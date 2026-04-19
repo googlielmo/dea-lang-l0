@@ -234,7 +234,30 @@ func ps_parse_top_level_let(self: ParserState*) -> LetDecl*? {
         let value = ps_parse_expr(self)?;
         ps_expect(self, ord(TT_SEMI), "PAR-0083", "[PAR-0083] expected ';' after let declaration")?;
 
-        let result = new LetDecl(token_ident_text(name_tok) as string, type_ref, value, ps_extend_span(self, start));
+        let result = new LetDecl(token_ident_text(name_tok) as string, type_ref, value, false, ps_extend_span(self, start));
+        type_ref = null;
+        return result;
+    }
+}
+
+/**
+ * Parse a top-level `const` declaration.
+ *
+ * @param self Parser state to advance.
+ * @return Parsed top-level `const`, or `null` on error.
+ */
+func ps_parse_top_level_const(self: ParserState*) -> LetDecl*? {
+    let start = ps_span_start(self);
+    ps_expect(self, ord(TT_CONST), "PAR-0080", "[PAR-0080] expected 'const'")?;
+    let name_tok = ps_expect_variable_name(self, "PAR-0081", "[PAR-0081] expected variable name")?;
+    ps_expect(self, ord(TT_COLON), "PAR-0260", "[PAR-0260] const declarations require an explicit type annotation")?;
+
+    with (let type_ref: TypeRef*? = ps_parse_type(self)? => type_ref_free(type_ref)) {
+        ps_expect(self, ord(TT_EQ), "PAR-0261", "[PAR-0261] expected '=' in const binding")?;
+        let value = ps_parse_expr(self)?;
+        ps_expect(self, ord(TT_SEMI), "PAR-0262", "[PAR-0262] expected ';' after const declaration")?;
+
+        let result = new LetDecl(token_ident_text(name_tok) as string, type_ref, value, true, ps_extend_span(self, start));
         type_ref = null;
         return result;
     }
@@ -266,6 +289,10 @@ func ps_parse_top_level_decl(self: ParserState*) -> TopLevelDecl*? {
     if (ps_check(self, ord(TT_TYPE))) {
         let decl = ps_parse_type_alias(self)?;
         return new TopLevelDecl(TD_TYPE_ALIAS, decl as void*);
+    }
+    if (ps_check(self, ord(TT_CONST))) {
+        let decl = ps_parse_top_level_const(self)?;
+        return new TopLevelDecl(TD_LET, decl as void*);
     }
     if (ps_check(self, ord(TT_LET))) {
         let decl = ps_parse_top_level_let(self)?;

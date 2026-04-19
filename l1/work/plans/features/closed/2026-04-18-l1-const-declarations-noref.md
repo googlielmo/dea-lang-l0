@@ -3,7 +3,7 @@
 ## Add L1 const declarations
 
 - Date: 2026-04-18
-- Status: Draft
+- Status: Completed
 - Title: Add L1 const declarations
 - Kind: Feature
 - Severity: Medium
@@ -11,23 +11,29 @@
 - Subsystem: Lexer / parser / expression typing / constant evaluator / C emitter
 - Modules:
   - `l1/compiler/stage1_l0/src/tokens.l0`
-  - `l1/compiler/stage1_l0/src/lexer.l0`
+  - `l1/compiler/stage1_l0/src/ast.l0`
+  - `l1/compiler/stage1_l0/src/ast_printer.l0`
   - `l1/compiler/stage1_l0/src/parser/decl.l0`
-  - `l1/compiler/stage1_l0/src/parser/shared.l0`
+  - `l1/compiler/stage1_l0/src/parser/stmt.l0`
   - `l1/compiler/stage1_l0/src/expr_types.l0`
+  - `l1/compiler/stage1_l0/src/signatures.l0`
   - `l1/compiler/stage1_l0/src/backend.l0`
   - `l1/compiler/stage1_l0/src/c_emitter.l0`
+  - `l1/compiler/stage1_l0/src/analysis.l0`
 - Test modules:
   - `l1/compiler/stage1_l0/tests/lexer_test.l0`
   - `l1/compiler/stage1_l0/tests/parser_test.l0`
   - `l1/compiler/stage1_l0/tests/expr_types_test.l0`
+  - `l1/compiler/stage1_l0/tests/backend_test.l0`
+  - `l1/compiler/stage1_l0/tests/c_emitter_test.l0`
   - `l1/compiler/stage1_l0/tests/l0c_lib_test.l0`
 - Related:
   - `l1/docs/roadmap.md`
   - `l1/docs/reference/design-decisions.md`
   - `l1/work/plans/features/2026-04-17-l1-let-non-constant-initializers-noref.md`
   - `docs/specs/compiler/diagnostic-code-catalog.md`
-- Repro: `make -C l1 test-stage1 TESTS="parser_test expr_types_test"`
+- Repro:
+  `make -C l1 test-stage1 TESTS="lexer_test parser_test expr_types_test backend_test c_emitter_test l0c_lib_test" && make -C l1 test-stage1 && make -C l1 check-examples`
 
 ## Summary
 
@@ -36,6 +42,23 @@ This plan introduces a dedicated `const` declaration form whose contract is that
 compile time and whose binding is statically known and non-assignable. `const` coexists with the non-constant-`let` work
 (see the related active plan) by splitting the two intents: `let` for run-time-initialized bindings, `const` for
 compile-time-known bindings exposed in typing, folding, and the generated C ABI as true compile-time constants.
+
+## Completion Notes
+
+1. `const` is now a real lexer keyword (`TT_CONST`) and parses as `const NAME: T = EXPR;` at top level with dedicated
+   parser diagnostics for missing type annotations, missing initializers, and attempted block-local use.
+2. Top-level `const` bindings reuse the existing top-level binding pipeline via a binding-level `is_const` flag, while
+   signature resolution now emits `SIG-0200` when a `const` initializer falls outside the existing static-initializer
+   subset.
+3. The type checker now emits `TYP-0360` for assignment to top-level `const` bindings, including field assignment
+   through value-typed `const` bases, and generated C now lowers `const` bindings as `static const` declarations.
+4. Regression coverage now includes lexer, parser, typing, backend, emitter, and kept-C runtime tests plus dedicated
+   typing and driver fixtures for successful `const` use, non-constant initializers, and assignment rejection.
+5. `l1/docs/reference/grammar.md`, `l1/docs/reference/design-decisions.md`, `l1/docs/roadmap.md`, and
+   `docs/specs/compiler/diagnostic-code-catalog.md` now describe shipped top-level `const` behavior. Block-local `const`
+   remains deferred and is explicitly rejected with `PAR-0263`.
+6. Shipped `const`-specific diagnostics now live in dedicated reserved blocks for future follow-up work: `PAR-0260` to
+   `PAR-0279`, `SIG-0200` to `SIG-0219`, and `TYP-0360` to `TYP-0379`.
 
 ## Current State
 

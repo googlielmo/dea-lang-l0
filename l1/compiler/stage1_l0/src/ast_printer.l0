@@ -779,7 +779,15 @@ func ap_print_type_alias_decl(ta: TypeAliasDecl*, indent: int) {
  * @param indent Indent level.
  */
 func ap_print_let_decl(ld: LetDecl*, pr: ParseResult*, indent: int) {
-    ap_print_line(indent, concat3_s("LetDecl(name=", ap_quote_string(ld.name), concat_s(")", ap_span_suffix(ld.span))));
+    with (let sb = sb_create() => sb_free(sb)) {
+        sb_append(sb, "LetDecl(name=");
+        sb_append(sb, ap_quote_string(ld.name));
+        sb_append(sb, ", is_const=");
+        sb_append(sb, ap_bool_str(ld.is_const));
+        sb_append(sb, ")");
+        sb_append(sb, ap_span_suffix(ld.span));
+        ap_print_line(indent, sb_to_string(sb));
+    }
     if (ld.type_ref != null) {
         ap_print_label(indent, "type");
         ap_print_type_ref(ld.type_ref as TypeRef*, indent + 2);

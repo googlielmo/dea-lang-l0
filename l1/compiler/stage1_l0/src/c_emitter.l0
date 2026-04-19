@@ -971,18 +971,22 @@ func cem_emit_enum(self: CEmitter*, module_name: string, decl: EnumDecl*, enum_i
 }
 
 /**
- * Emit one top-level `let` declaration as a static C variable.
+ * Emit one top-level binding declaration as a static C variable.
  *
  * @param self Emitter to update.
  * @param module_name Name of the defining module.
- * @param decl Let declaration node.
- * @param let_type Resolved let type.
+ * @param decl Binding declaration node.
+ * @param let_type Resolved binding type.
  * @param c_init C initializer expression.
  */
 func cem_emit_let_declaration(self: CEmitter*, module_name: string, decl: LetDecl*, let_type: Type*, c_init: string) {
     let c_type = cem_emit_type(let_type);
     let c_name = cem_mangle_let_name(module_name, decl.name);
-    ccb_emit(self.out, concat4_s("static ", c_type, " ", concat3_s(c_name, " = ", concat_s(c_init, ";"))));
+    if (decl.is_const) {
+        ccb_emit(self.out, concat4_s("static const ", c_type, " ", concat3_s(c_name, " = ", concat_s(c_init, ";"))));
+    } else {
+        ccb_emit(self.out, concat4_s("static ", c_type, " ", concat3_s(c_name, " = ", concat_s(c_init, ";"))));
+    }
 }
 
 /**

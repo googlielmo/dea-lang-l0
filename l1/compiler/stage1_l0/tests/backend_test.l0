@@ -286,6 +286,40 @@ func test_backend_generate_types_and_top_level_lets() {
 }
 
 /**
+ * Tests `const` top-level bindings lower to `static const` C declarations.
+ */
+func test_backend_generate_top_level_consts() {
+    with (let filenames = vs_create(1) => vs_free(filenames),
+          let sources = vs_create(1) => vs_free(sources),
+          let lines = vs_create(10) => vs_free(lines),
+          let cfg = log_config_create(LL_ERROR, false) => drop cfg,
+          let opts = cg_options_create() => cg_options_free(opts)) {
+        opts.emit_line_directives = false;
+        vs_push(filenames, "demo/main.l1");
+        vs_push(lines, "module demo.main;");
+        vs_push(lines, "struct Point {");
+        vs_push(lines, "    x: int;");
+        vs_push(lines, "    y: int;");
+        vs_push(lines, "}");
+        vs_push(lines, "const origin: Point = Point(0, 0);");
+        vs_push(lines, "const answer: int = 42;");
+        vs_push(lines, "func main() -> int { return answer + origin.x + origin.y; }");
+        vs_push(sources, bt_source(lines));
+
+        let result = bt_analyze_sources("demo.main", filenames, sources);
+        assert(!analysis_has_errors(result), "analysis should succeed for top-level const fixture");
+
+        let generated = backend_generate(result, opts, cfg);
+        assert(contains_s(generated, "static const struct dea_demo_main_Point dea_demo_main_origin = { .x = 0, .y = 0 };"),
+            "top-level const struct lowering mismatch");
+        assert(contains_s(generated, "static const dea_int dea_demo_main_answer = 42;"),
+            "top-level const scalar lowering mismatch");
+
+        analysis_result_free(result);
+    }
+}
+
+/**
  * Tests test_backend_generate_basic_control_flow.
  */
 func test_backend_generate_basic_control_flow() {
@@ -1011,6 +1045,7 @@ func main() {
     test_analysis_expr_lookup_helpers();
     test_analysis_has_arc_data_for_struct_and_nullable_pointer();
     test_backend_generate_types_and_top_level_lets();
+    test_backend_generate_top_level_consts();
     test_backend_generate_basic_control_flow();
     test_backend_generate_loop_exit_case_lowering();
     test_backend_generate_match_and_with_cleanup_block();

@@ -49,7 +49,7 @@ func analysis_signature_summary(sigs: SignatureTables*) -> string {
         sb_append(sb, int_to_string(spm_size(sigs.enum_infos)));
         sb_append(sb, " enum(s), ");
         sb_append(sb, int_to_string(spm_size(sigs.let_types)));
-        sb_append(sb, " let(s)");
+        sb_append(sb, " top-level binding(s)");
         return sb_to_string(sb);
     }
 }

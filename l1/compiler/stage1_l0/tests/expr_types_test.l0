@@ -141,6 +141,47 @@ func test_typing_let_diag_tail_err() {
 }
 
 /**
+ * Tests successful typing for top-level `const` bindings.
+ */
+func test_typing_const_ok() {
+    let sp = make_paths();
+    with (let cfg = log_config_create(LL_SILENT, false) => drop cfg) {
+        let result = analysis_analyze_entry(sp, "typing_const_ok", cfg);
+        assert(!analysis_has_errors(result), "expected no typing errors for typing_const_ok");
+        analysis_result_free(result);
+    }
+    sp_free(sp);
+}
+
+/**
+ * Tests compile-time-constant initializer enforcement for `const`.
+ */
+func test_typing_const_initializer_err() {
+    let sp = make_paths();
+    with (let cfg = log_config_create(LL_SILENT, false) => drop cfg) {
+        let result = analysis_analyze_entry(sp, "typing_const_initializer_err", cfg);
+        assert(analysis_has_errors(result), "expected typing errors for typing_const_initializer_err");
+        assert(has_diag_code(result, "SIG-0200"), "expected dedicated const-initializer diagnostic");
+        analysis_result_free(result);
+    }
+    sp_free(sp);
+}
+
+/**
+ * Tests assignment rejection for top-level `const` bindings.
+ */
+func test_typing_const_assign_err() {
+    let sp = make_paths();
+    with (let cfg = log_config_create(LL_SILENT, false) => drop cfg) {
+        let result = analysis_analyze_entry(sp, "typing_const_assign_err", cfg);
+        assert(analysis_has_errors(result), "expected typing errors for typing_const_assign_err");
+        assert(count_diag_code(result, "TYP-0360") == 2, "expected two const-assignment diagnostics");
+        analysis_result_free(result);
+    }
+    sp_free(sp);
+}
+
+/**
  * Tests loop-condition diagnostic code parity cases.
  */
 func test_typing_loop_cond_err() {
@@ -851,6 +892,9 @@ func main() {
     test_typing_err();
     test_typing_let_diag_err();
     test_typing_let_diag_tail_err();
+    test_typing_const_ok();
+    test_typing_const_initializer_err();
+    test_typing_const_assign_err();
     test_typing_loop_cond_err();
     test_typing_match_diag_err();
     test_typing_match_qualified_pattern_err();

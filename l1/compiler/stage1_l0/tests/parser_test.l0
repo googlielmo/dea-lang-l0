@@ -104,6 +104,55 @@ func test_reserved_variable_name_error() {
 }
 
 /**
+ * Tests successful parsing for top-level `const` declarations.
+ */
+func test_top_level_const_ok() {
+    let src = "module main; struct Point { x: int; y: int; } const origin: Point = Point(0, 0); const answer: int = 42;";
+    let result = parse_module_source(src, "<test>");
+    assert(!parse_has_errors(result), "Expected parse to succeed");
+    assert(result.root_module != null, "Expected parsed module");
+
+    let root = result.root_module as Module*;
+    assert(vec_size(root.decls) == 3, "Expected struct plus two top-level bindings");
+
+    let origin_top = ptr_vec_get(root.decls, 1) as TopLevelDecl*;
+    assert(ord(origin_top.kind) == ord(TD_LET), "Expected const to reuse top-level binding node");
+    let origin_decl = origin_top.data as LetDecl*;
+    assert(origin_decl.is_const, "Expected const binding flag");
+    assert(origin_decl.type_ref != null, "Expected explicit const type");
+
+    let answer_top = ptr_vec_get(root.decls, 2) as TopLevelDecl*;
+    let answer_decl = answer_top.data as LetDecl*;
+    assert(answer_decl.is_const, "Expected const scalar binding flag");
+
+    parse_result_free(result);
+}
+
+/**
+ * Tests missing explicit type annotations for top-level `const`.
+ */
+func test_top_level_const_missing_type_err() {
+    let src = "module main; const answer = 42;";
+    expect_error_code(src, "PAR-0260");
+}
+
+/**
+ * Tests missing initializers for top-level `const`.
+ */
+func test_top_level_const_missing_initializer_err() {
+    let src = "module main; const answer: int;";
+    expect_error_code(src, "PAR-0261");
+}
+
+/**
+ * Tests that block-local `const` remains rejected.
+ */
+func test_local_const_rejected_err() {
+    let src = "module main; func main() -> int { const answer: int = 42; return answer; }";
+    expect_error_code(src, "PAR-0263");
+}
+
+/**
  * Tests unary-bitwise precedence shape.
  */
 func test_bitwise_unary_precedence_shape() {
@@ -394,6 +443,10 @@ func main() {
     test_valid_module();
     test_module_decl_error();
     test_reserved_variable_name_error();
+    test_top_level_const_ok();
+    test_top_level_const_missing_type_err();
+    test_top_level_const_missing_initializer_err();
+    test_local_const_rejected_err();
     test_bitwise_unary_precedence_shape();
     test_with_mixed_forms_error();
     test_case_empty_error();

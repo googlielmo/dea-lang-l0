@@ -1528,7 +1528,7 @@ func be_emit_let_declarations(self: Backend*) {
         return;
     }
 
-    let any_lets = false;
+    let any_bindings = false;
     for (let unit_i = 0; unit_i < driver_unit_count(self.result.driver_state); unit_i = unit_i + 1) {
         let unit = driver_unit_get(self.result.driver_state, unit_i);
         if (unit.parse_result.root_module == null) {
@@ -1538,16 +1538,16 @@ func be_emit_let_declarations(self: Backend*) {
         for (let j = 0; j < vec_size(root.decls); j = j + 1) {
             let top = ptr_vec_get(root.decls, j) as TopLevelDecl*;
             if (ord(top.kind) == ord(TD_LET)) {
-                any_lets = true;
+                any_bindings = true;
                 break;
             }
         }
     }
-    if (!any_lets) {
+    if (!any_bindings) {
         return;
     }
 
-    cem_emit_section_comment(self.emitter, "Top-level let declarations");
+    cem_emit_section_comment(self.emitter, "Top-level bindings");
     for (let i = 0; i < driver_unit_count(self.result.driver_state); i = i + 1) {
         let unit = driver_unit_get(self.result.driver_state, i);
         if (unit.parse_result.root_module == null) {
@@ -1559,15 +1559,15 @@ func be_emit_let_declarations(self: Backend*) {
         self.current_unit = unit;
         self.current_env = be_find_env(self, root.name);
 
-        let module_has_lets = false;
+        let module_has_bindings = false;
         for (let j = 0; j < vec_size(root.decls); j = j + 1) {
             let top = ptr_vec_get(root.decls, j) as TopLevelDecl*;
             if (ord(top.kind) != ord(TD_LET)) {
                 continue;
             }
-            if (!module_has_lets) {
+            if (!module_has_bindings) {
                 cem_emit_module_comment(self.emitter, root.name);
-                module_has_lets = true;
+                module_has_bindings = true;
             }
 
             let decl = top.data as LetDecl*;

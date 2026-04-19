@@ -1,6 +1,6 @@
 # L1 Language and Runtime Design Decisions
 
-Version: 2026-04-18
+Version: 2026-04-19
 
 This document records current design rationale and policy decisions for Dea/L1 as implemented by the bootstrap compiler.
 
@@ -385,3 +385,27 @@ Rationale:
 
 The top-level `==`, `!=`, `<`, `<=`, `>`, and `>=` operators are now wired for `string` operands in the current
 bootstrap compiler. String concatenation via `+` remains deferred in the roadmap.
+
+## 16. Top-level `const` versus `let`
+
+L1 now distinguishes between two top-level binding forms:
+
+- `const NAME: T = EXPR;` for compile-time-known bindings whose initializer must stay inside the existing static
+  initializer subset
+- `let NAME [: T] = EXPR;` for ordinary top-level bindings, which remain the path that the active non-constant-`let`
+  plan is widening toward module-init lowering
+
+Current policy:
+
+- top-level `const` requires an explicit type annotation
+- top-level `const` initializers must be literals, `null`, or constructor calls whose arguments are themselves constant
+- top-level `const` lowers to `static const` generated C declarations under the existing `dea_*` ABI naming scheme
+- assignment to a top-level `const` binding, including field assignment through a value-typed `const`, is rejected
+- block-local `const` is still deferred; only top-level `const` is accepted today
+
+Rationale:
+
+- this keeps the current compile-time-known path explicit while the separate non-constant-`let` work lifts top-level
+  runtime initialization into module-init functions
+- requiring an explicit type keeps the accepted constant subset deterministic during bootstrap and avoids depending on a
+  broader compile-time evaluator before that design is ready

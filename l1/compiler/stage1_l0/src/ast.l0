@@ -224,6 +224,7 @@ struct LetDecl {
     name: string;
     type_ref: TypeRef*?;
     value: ExprId;
+    is_const: bool;
     span: Span;
 }
 

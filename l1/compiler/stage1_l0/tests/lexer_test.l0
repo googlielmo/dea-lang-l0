@@ -277,6 +277,13 @@ func test_real_literals_err() {
 }
 
 /**
+ * Tests keyword tokenization for `const`.
+ */
+func test_const_keyword_tokenization() {
+    expect_two_tokens("const answer", "const", "ident(answer)");
+}
+
+/**
  * Tests boundary forms that are not currently recognized as real literals.
  */
 func test_real_literal_boundaries() {
@@ -329,6 +336,7 @@ func main() {
     test_prefixed_int_literals_overflow();
     test_real_literals_ok();
     test_real_literals_err();
+    test_const_keyword_tokenization();
     test_real_literal_boundaries();
     test_small_integer_builtin_words();
     test_tab_advances_one_column();

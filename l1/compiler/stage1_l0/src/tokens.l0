@@ -38,6 +38,7 @@ enum TokenType {
     TT_TYPE;
     TT_EXTERN;
     TT_LET;
+    TT_CONST;
     TT_RETURN;
     TT_MATCH;
     TT_CASE;
@@ -135,6 +136,7 @@ func token_to_string(token: Token) -> string {
         TT_TYPE => { return "type"; }
         TT_EXTERN => { return "extern"; }
         TT_LET => { return "let"; }
+        TT_CONST => { return "const"; }
         TT_RETURN => { return "return"; }
         TT_MATCH => { return "match"; }
         TT_CASE => { return "case"; }
@@ -226,6 +228,7 @@ func is_reserved_keyword(token: Token) -> bool {
         TT_TYPE => { return true; }
         TT_EXTERN => { return true; }
         TT_LET => { return true; }
+        TT_CONST => { return true; }
         TT_RETURN => { return true; }
         TT_MATCH => { return true; }
         TT_CASE => { return true; }
@@ -268,6 +271,7 @@ func ident_to_token(ident: string, index: int, line: int, col: int) -> Token {
          "type" => return Token(TT_TYPE, index, line, col);
          "extern" => return Token(TT_EXTERN, index, line, col);
          "let" => return Token(TT_LET, index, line, col);
+         "const" => return Token(TT_CONST, index, line, col);
          "return" => return Token(TT_RETURN, index, line, col);
          "match" => return Token(TT_MATCH, index, line, col);
          "case" => return Token(TT_CASE, index, line, col);
@@ -287,8 +291,7 @@ func ident_to_token(ident: string, index: int, line: int, col: int) -> Token {
          "cleanup" => return Token(TT_CLEANUP, index, line, col);
          "_" => return Token(TT_UNDERSCORE, index, line, col);
     }
-    if (eq_s(ident, "__dea__future__keyword__") || eq_s(ident, "in") ||
-        eq_s(ident, "const")) {
+    if (eq_s(ident, "__dea__future__keyword__") || eq_s(ident, "in")) {
         return Token(TT_FUTURE_EXTENSION, index, line, col);
     }
     return Token(TT_IDENT(ident), index, line, col);
