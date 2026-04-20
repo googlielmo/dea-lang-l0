@@ -1,6 +1,6 @@
 # L0 Language and Runtime Design Decisions
 
-Version: 2026-04-19
+Version: 2026-04-20
 
 This document records rationale and policy decisions.
 
@@ -175,3 +175,26 @@ Equality on `bool` remains accepted, unchanged:
 Rationale:
 
 - The Dea policy prefers a compile-time rejection over a defined-but-misleading ordering.
+
+## 11. String Equality and Ordering
+
+Values of type `string` are ARC-managed immutable byte sequences. Programs compare them for sameness of content, not for
+identity of the underlying runtime instance, so their runtime representation (static versus heap, deduplicated or not)
+is not observable through operators.
+
+Current policy:
+
+- equality (`==`, `!=`) on `string` compares by content bytes, backed by the runtime helper `rt_string_equals`.
+- ordered comparisons (`<`, `<=`, `>`, `>=`) on `string` compare by byte-wise lexicographic order, backed by the runtime
+  helper `rt_string_compare`.
+- equality and ordering are consistent across the top-level operators, `case` arms over `string`, and the
+  `std.string::eq_s` / `std.string::cmp_s` wrappers.
+- string identity, meaning whether two values refer to the same runtime instance, is intentionally not exposed through
+  any operator, cast, or intrinsic.
+
+Rationale:
+
+- value-based comparison is the only semantic consistent with `case`-over-string dispatch and with the backend's freedom
+  to evolve dedup and arena strategies.
+- the runtime helpers are shared with the stdlib wrappers, so the operator surface and the library wrappers agree by
+  construction.

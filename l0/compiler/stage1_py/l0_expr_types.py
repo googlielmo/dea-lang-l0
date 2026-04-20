@@ -1053,8 +1053,10 @@ class ExpressionTypeChecker:
         if op in {"+", "-", "*", "/", "%"}:
             return self._binary_expect_both_int(expr, left_ty, right_ty, result=self.int_type)
 
-        # Comparison int ops -> bool
+        # Comparison ops -> bool. Accept ints (existing) or two strings (lexicographic).
         if op in {"<", "<=", ">", ">="}:
+            if self._is_string(left_ty) and self._is_string(right_ty):
+                return self.bool_type
             return self._binary_expect_both_int(expr, left_ty, right_ty, result=self.bool_type)
 
         # Equality: same-type operands OR null check -> bool
@@ -1119,9 +1121,9 @@ class ExpressionTypeChecker:
             )
             return None
 
-        # Restrict what types can be compared for equality (e.g. only int and bool for now)
+        # Restrict what types can be compared for equality (int, bool, string).
         if not is_null_check and not (
-                self._is_int_assignable(left) or self._is_bool(left)
+                self._is_int_assignable(left) or self._is_bool(left) or self._is_string(left)
         ):
             self._error(
                 expr,

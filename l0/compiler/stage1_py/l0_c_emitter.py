@@ -1392,6 +1392,10 @@ class CEmitter:
         """Emit the runtime string-equality helper call."""
         return f"rt_string_equals({lhs}, {rhs})"
 
+    def emit_string_compare_call(self, op: str, lhs: str, rhs: str) -> str:
+        """Emit the runtime string-compare helper call wrapped in a relational check."""
+        return f"(rt_string_compare({lhs}, {rhs}) {op} 0)"
+
     def emit_discard_expr(self, c_expr: str) -> str:
         """Emit a statement-context discard wrapper for an expression."""
         return f"(void)({c_expr})"

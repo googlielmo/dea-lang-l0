@@ -1879,7 +1879,8 @@ func etc_infer_binary(self: ExpressionTypeChecker*, expr_id: ExprId, expr: ExprN
                     concat_s(" and ", type_format(r_ty))), (self.current_unit as DriverUnit*).path, expr.span);
             }
         }
-        if (!is_null_check && etc_types_equal(l_ty, r_ty) && !etc_is_int(l_ty) && !etc_is_bool(l_ty)) {
+        if (!is_null_check && etc_types_equal(l_ty, r_ty) &&
+            !etc_is_int(l_ty) && !etc_is_bool(l_ty) && !etc_is_string(l_ty)) {
             etc_diag_error(self, "TYP-0173",
                 concat4_s("equality not supported for type '", type_format(l_ty), "' in this stage", ""),
                 (self.current_unit as DriverUnit*).path, expr.span);
@@ -1888,7 +1889,8 @@ func etc_infer_binary(self: ExpressionTypeChecker*, expr_id: ExprId, expr: ExprN
         type_free(r_ty);
         return type_builtin_bool();
     } else if (eq_s(op, "<") || eq_s(op, "<=") || eq_s(op, ">") || eq_s(op, ">=")) {
-        if (!etc_is_int(l_ty) || !etc_is_int(r_ty)) {
+        let string_cmp = etc_is_string(l_ty) && etc_is_string(r_ty);
+        if (!string_cmp && (!etc_is_int(l_ty) || !etc_is_int(r_ty))) {
             etc_diag_error(self, "TYP-0170", concat4_s("binary '", op, "' expects int, got ", type_format(l_ty)),
                 (self.current_unit as DriverUnit*).path, expr.span);
         }

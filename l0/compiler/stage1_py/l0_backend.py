@@ -3070,6 +3070,19 @@ class Backend:
         if left_ty is None or right_ty is None:
             self.ice("[ICE-1013] missing inferred type for binary operation", node=expr_node)
 
+        # String equality/relational lowering via runtime helpers.
+        if (
+                isinstance(left_ty, BuiltinType) and left_ty.name == "string"
+                and isinstance(right_ty, BuiltinType) and right_ty.name == "string"
+        ):
+            if expr_op in ("==", "!="):
+                c_cmp = self.emitter.emit_string_equals_call(c_left, c_right)
+                if expr_op == "!=":
+                    return self.emitter.emit_unary_op("!", c_cmp)
+                return c_cmp
+            if expr_op in ("<", "<=", ">", ">="):
+                return self.emitter.emit_string_compare_call(expr_op, c_left, c_right)
+
         # Typechecker allows mixed int/byte for numeric comparisons and equality.
         # Lower those directly instead of tripping the strict same-type ICE guard.
         if (

@@ -1545,6 +1545,24 @@ func be_emit_binary_op(self: Backend*, expr_id: ExprId) -> string {
     if (eq_s(expr.text_value, "-")) {
         return cem_emit_checked_int_sub(c_left, c_right);
     }
+    with (let left_ty = be_expr_type(self, expr.expr_a) => type_free_opt(left_ty)) {
+        with (let right_ty = be_expr_type(self, expr.expr_b) => type_free_opt(right_ty)) {
+            if (left_ty != null && right_ty != null &&
+                type_is_builtin(left_ty as Type*, "string") && type_is_builtin(right_ty as Type*, "string")) {
+                if (eq_s(expr.text_value, "==") || eq_s(expr.text_value, "!=")) {
+                    let c_cmp = cem_emit_string_equals_call(c_left, c_right);
+                    if (eq_s(expr.text_value, "!=")) {
+                        return cem_emit_unary_op("!", c_cmp);
+                    }
+                    return c_cmp;
+                }
+                if (eq_s(expr.text_value, "<") || eq_s(expr.text_value, "<=") ||
+                    eq_s(expr.text_value, ">") || eq_s(expr.text_value, ">=")) {
+                    return cem_emit_string_compare_call(expr.text_value, c_left, c_right);
+                }
+            }
+        }
+    }
     return cem_emit_binary_op(expr.text_value, c_left, c_right);
 }
 
