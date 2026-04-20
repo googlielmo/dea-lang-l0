@@ -1194,6 +1194,40 @@ def test_codegen_loop_break_cleans_only_acquired_arc_locals(codegen_single):
     )
 
 
+def test_codegen_identity_cast_place_copy_retains(codegen_single):
+    """Identity casts of owned string places must still retain before owner copies."""
+    c_code, diags = codegen_single(
+        "main",
+        """
+        module main;
+        import std.vector;
+
+        func maybe(flag: bool) -> string? {
+            if (flag) {
+                return "hi" as string?;
+            }
+            return null;
+        }
+
+        func helper() -> int? {
+            with (let items = vs_create(1) => vs_free(items)) {
+                let first = maybe(true)?;
+                vs_push(items, first as string);
+                return 0 as int?;
+            }
+        }
+
+        func main() -> int {
+            return 0;
+        }
+        """,
+    )
+    assert c_code is not None, [d.message for d in diags]
+    assert "l0_std_vector_vs_push(items, ((l0_string)(first)));" in c_code
+    assert "l0_string l0_arc_" not in c_code
+    assert "rt_string_release(l0_arc_" not in c_code
+
+
 def test_codegen_loop_return_cleans_only_acquired_arc_locals(codegen_single):
     c_code, _ = codegen_single(
         "main",

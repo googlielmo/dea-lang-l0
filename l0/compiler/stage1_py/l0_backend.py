@@ -199,22 +199,15 @@ class Backend:
         return False
 
     def _is_unwrap_cast_from_place(self, expr: Expr) -> bool:
-        """Check if an expression is a `T? as T` cast from a place.
+        """Check if a cast expression still refers to an existing owner.
 
         Args:
             expr: The expression to check.
 
         Returns:
-            True for `T? as T` casts where the optional source is a place.
+            True for casts whose source is a place.
         """
         if not isinstance(expr, CastExpr):
-            return False
-
-        src_ty = self.analysis.expr_types.get(id(expr.expr))
-        dst_ty = self.analysis.expr_types.get(id(expr))
-        if not isinstance(src_ty, NullableType) or dst_ty is None:
-            return False
-        if not self._types_equal(dst_ty, src_ty.inner):
             return False
         return self._is_place_expr(expr.expr)
 

@@ -1790,11 +1790,7 @@ func etc_bigint_expr_text(self: ExpressionTypeChecker*, expr_id: ExprId) -> stri
         return etc_bigint_expr_text(self, expr.expr_a);
     }
     if (ord(expr.kind) == ord(EX_UNARY) && eq_s(expr.text_value, "-")) {
-        let inner = etc_bigint_expr_text(self, expr.expr_a);
-        if (inner == null) {
-            return null;
-        }
-        let text = inner as string;
+        let text = etc_bigint_expr_text(self, expr.expr_a)?;
         if (len_s(text) > 0 && char_at_s(text, 0) == '-') {
             return slice_s(text, 1, len_s(text));
         }
@@ -2282,15 +2278,12 @@ func etc_cast_const_int(self: ExpressionTypeChecker*, expr_id: ExprId) -> int? {
         return etc_cast_const_int(self, expr.expr_a);
     }
     if (ord(expr.kind) == ord(EX_UNARY)) {
-        let inner = etc_cast_const_int(self, expr.expr_a);
-        if (inner == null) {
-            return null;
-        }
+        let inner = etc_cast_const_int(self, expr.expr_a)?;
         if (eq_s(expr.text_value, "-")) {
-            return -(inner as int);
+            return -inner;
         }
         if (eq_s(expr.text_value, "~")) {
-            return -((inner as int) + 1);
+            return -(inner + 1);
         }
         return null;
     }

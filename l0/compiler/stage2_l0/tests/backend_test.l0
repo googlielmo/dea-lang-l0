@@ -633,6 +633,41 @@ func test_backend_generate_string_copy_retains() {
 }
 
 /**
+ * Tests casted-place string copies still retain before entering a new owner.
+ */
+func test_backend_generate_identity_cast_string_copy_retains() {
+    with (let filenames = vs_create(1) => vs_free(filenames),
+          let sources = vs_create(1) => vs_free(sources),
+          let lines = vs_create(8) => vs_free(lines),
+          let cfg = log_config_create(LL_ERROR, false) => drop cfg,
+          let opts = cg_options_create() => cg_options_free(opts)) {
+        opts.emit_line_directives = false;
+        vs_push(filenames, "demo/main.l0");
+        vs_push(lines, "module demo.main;");
+        vs_push(lines, "func sink(x: string) {}");
+        vs_push(lines, "func main() -> int {");
+        vs_push(lines, "    let first = \"hi\";");
+        vs_push(lines, "    sink(first as string);");
+        vs_push(lines, "    return 0;");
+        vs_push(lines, "}");
+        vs_push(sources, bt_source(lines));
+
+        let result = bt_analyze_sources("demo.main", filenames, sources);
+        assert(!analysis_has_errors(result), "analysis should succeed for identity-cast ARC copy fixture");
+
+        let generated = backend_generate(result, opts, cfg);
+        assert(contains_s(generated, "l0_demo_main_sink(((l0_string)(first)));"),
+            "identity cast should pass the borrowed place directly to the callee");
+        assert(!contains_s(generated, "l0_string l0_arc_"),
+            "identity cast should not materialize a scope-owned ARC temp");
+        assert(!contains_s(generated, "rt_string_release(l0_arc_"),
+            "identity cast should not release a temporary ARC alias after the call");
+
+        analysis_result_free(result);
+    }
+}
+
+/**
  * Main entry point for the module.
  */
 func main() {
@@ -651,5 +686,6 @@ func main() {
     test_backend_generate_new_and_try_lowering();
     test_backend_generate_intrinsics_use_analyzed_target_types();
     test_backend_generate_string_copy_retains();
+    test_backend_generate_identity_cast_string_copy_retains();
     printl_s("backend_test: all tests passed");
 }

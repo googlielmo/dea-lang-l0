@@ -307,11 +307,7 @@ func be_bigint_expr_text(self: Backend*, expr_id: ExprId) -> string? {
         return be_bigint_expr_text(self, expr.expr_a);
     }
     if (ord(expr.kind) == ord(EX_UNARY) && eq_s(expr.text_value, "-")) {
-        let inner = be_bigint_expr_text(self, expr.expr_a);
-        if (inner == null) {
-            return null;
-        }
-        let text = inner as string;
+        let text = be_bigint_expr_text(self, expr.expr_a)?;
         if (len_s(text) > 0 && char_at_s(text, 0) == '-') {
             return slice_s(text, 1, len_s(text));
         }
@@ -1495,11 +1491,8 @@ func be_try_emit_const_constructor(self: Backend*, expr_id: ExprId, expected_typ
             for (let i = 0; i < vec_size(struct_info.fields); i = i + 1) {
                 let field = ptr_vec_get(struct_info.fields, i) as StructFieldInfo*;
                 vs_push(field_inits, field.name);
-                let field_init = be_try_emit_let_initializer(self, id_vec_get(call.ids as VectorBase*, i), field.field_type);
-                if (field_init == null) {
-                    return null;
-                }
-                vs_push(field_inits, field_init as string);
+                let field_init = be_try_emit_let_initializer(self, id_vec_get(call.ids as VectorBase*, i), field.field_type)?;
+                vs_push(field_inits, field_init);
             }
             return cem_emit_struct_static_initializer_for_type(expected_type, field_inits);
         }
@@ -1528,11 +1521,8 @@ func be_try_emit_const_constructor(self: Backend*, expr_id: ExprId, expected_typ
                 let field_decl = ptr_vec_get((variant_decl as EnumVariant*).fields, i) as FieldDecl*;
                 vs_push(payload_inits, field_decl.name);
                 let payload_init = be_try_emit_let_initializer(self, id_vec_get(call.ids as VectorBase*, i),
-                    ptr_vec_get(info2.field_types, i) as Type*);
-                if (payload_init == null) {
-                    return null;
-                }
-                vs_push(payload_inits, payload_init as string);
+                    ptr_vec_get(info2.field_types, i) as Type*)?;
+                vs_push(payload_inits, payload_init);
             }
             return cem_emit_variant_static_initializer_for_type(expected_type, variant_name, payload_inits);
         }
