@@ -1127,7 +1127,7 @@ class ExpressionTypeChecker:
         ):
             self._error(
                 expr,
-                f"[TYP-0173] equality not supported for type '{format_type(left)}' in this stage",
+                f"[TYP-0173] equality not supported for type '{format_type(left)}'",
             )
             return None
 

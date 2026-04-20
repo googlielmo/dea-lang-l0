@@ -103,6 +103,10 @@ Current bootstrap policy includes:
 - explicit `new` / `drop` for heap object lifetime
 - ARC-managed `string`
 
+Equality operators (`==` and `!=`) on same-type pointer operands compare by reference identity. This contrasts with
+§15's explicit refusal of `string` identity equality, as heap pointers do not share string's potential for deduplication
+or re-homing. Ordered pointer comparisons remain rejected, as address ordering is not defined in L1.
+
 No design decision has been finalized yet on:
 
 - whether address-of (`&`) will become part of the L1 language surface

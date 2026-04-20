@@ -1882,7 +1882,7 @@ func etc_infer_binary(self: ExpressionTypeChecker*, expr_id: ExprId, expr: ExprN
         if (!is_null_check && etc_types_equal(l_ty, r_ty) &&
             !etc_is_int(l_ty) && !etc_is_bool(l_ty) && !etc_is_string(l_ty)) {
             etc_diag_error(self, "TYP-0173",
-                concat4_s("equality not supported for type '", type_format(l_ty), "' in this stage", ""),
+                concat3_s("equality not supported for type '", type_format(l_ty), "'"),
                 (self.current_unit as DriverUnit*).path, expr.span);
         }
         type_free(l_ty);

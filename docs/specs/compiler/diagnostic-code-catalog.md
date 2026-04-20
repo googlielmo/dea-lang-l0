@@ -315,7 +315,7 @@ and reuse supplement for applying this registry within L0.
 | `TYP-0170` | All   | Operator requires integer operands                                                                     |
 | `TYP-0171` | All   | Operator requires boolean operands                                                                     |
 | `TYP-0172` | All   | Equality operator requires compatible operand types                                                    |
-| `TYP-0173` | All   | Equality not supported for this type in this stage                                                     |
+| `TYP-0173` | All   | Equality not supported for the type in question                                                        |
 | `TYP-0180` | All   | Callee must be a function name                                                                         |
 | `TYP-0181` | All   | Symbol is not callable                                                                                 |
 | `TYP-0182` | All   | Callee is not a function                                                                               |

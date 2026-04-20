@@ -1103,6 +1103,47 @@ func test_backend_generate_float_zero_division_plain_c() {
 }
 
 /**
+ * Tests pointer identity backend lowering.
+ */
+func test_backend_pointer_identity() {
+    with (let filenames = vs_create(1) => vs_free(filenames),
+          let sources = vs_create(1) => vs_free(sources),
+          let lines = vs_create(16) => vs_free(lines),
+          let cfg = log_config_create(LL_ERROR, false) => drop cfg,
+          let opts = cg_options_create() => cg_options_free(opts)) {
+        opts.emit_line_directives = false;
+
+        vs_push(filenames, "demo/main.l1");
+        vs_push(lines, "module demo.main;");
+        vs_push(lines, "struct T { val: int; }");
+        vs_push(lines, "func main() -> int {");
+        vs_push(lines, "    let p1: T* = new T(1);");
+        vs_push(lines, "    let p2: T* = new T(2);");
+        vs_push(lines, "    let alias: T* = p1;");
+        vs_push(lines, "    if (p1 == p1) { }");
+        vs_push(lines, "    if (p1 != p2) { }");
+        vs_push(lines, "    if (p1 == p2) { }");
+        vs_push(lines, "    if (alias == p1) { }");
+        vs_push(lines, "    if (alias != p1) { }");
+        vs_push(lines, "    return 0;");
+        vs_push(lines, "}");
+        vs_push(sources, bt_source(lines));
+
+        let result = bt_analyze_sources("demo.main", filenames, sources);
+        assert(!analysis_has_errors(result), "pointer identity test should analyze without errors");
+
+        let generated = backend_generate(result, opts, cfg);
+        assert(contains_s(generated, "(p1 == p1)"), "pointer self-identity equality lowering mismatch");
+        assert(contains_s(generated, "(p1 != p2)"), "pointer non-identity inequality lowering mismatch");
+        assert(contains_s(generated, "(p1 == p2)"), "pointer non-identity equality lowering mismatch");
+        assert(contains_s(generated, "(alias == p1)"), "pointer alias equality lowering mismatch");
+        assert(contains_s(generated, "(alias != p1)"), "pointer alias inequality lowering mismatch");
+
+        analysis_result_free(result);
+    }
+}
+
+/**
  * Main entry point for the module.
  */
 func main() {
@@ -1129,5 +1170,6 @@ func main() {
     test_backend_generate_float_double_builtins();
     test_backend_generate_float_double_ops();
     test_backend_generate_float_zero_division_plain_c();
+    test_backend_pointer_identity();
     printl_s("backend_test: all tests passed");
 }

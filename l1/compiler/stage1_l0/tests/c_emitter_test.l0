@@ -374,6 +374,8 @@ func test_emitter_expression_and_statement_helpers() {
         assert(cem_emit_bool_literal(true) == "1", "expression bool literal mismatch");
         assert(cem_emit_const_bool_literal(false) == "false", "const bool literal mismatch");
         assert(cem_emit_binary_op("+", "a", "b") == "(a + b)", "binary-op helper mismatch");
+        assert(cem_emit_binary_op("==", "p1", "p2") == "(p1 == p2)", "pointer equality binary-op mismatch");
+        assert(cem_emit_binary_op("!=", "p1", "p2") == "(p1 != p2)", "pointer inequality binary-op mismatch");
         assert(cem_emit_checked_int_add("a", "b") == "(_rt_iadd(a, b))", "checked add helper mismatch");
         assert(cem_emit_function_call("fn", "x, y") == "fn(x, y)", "function call helper mismatch");
         assert(cem_emit_field_access("obj", "x", false) == "(obj).x", "field access helper mismatch");

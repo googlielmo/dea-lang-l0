@@ -2520,7 +2520,7 @@ func etc_infer_binary(self: ExpressionTypeChecker*, expr_id: ExprId, expr: ExprN
         let is_null_check = false;
         let comparable = false;
         if (etc_types_equal(l_ty, r_ty)) {
-            comparable = etc_is_int(l_ty) || etc_is_bool(l_ty) || etc_is_real(l_ty) || etc_is_string(l_ty);
+            comparable = etc_is_int(l_ty) || etc_is_bool(l_ty) || etc_is_real(l_ty) || etc_is_string(l_ty) || ord(l_ty.kind) == ord(TY_POINTER);
         } else if (etc_is_real(l_ty) && etc_is_real(r_ty)) {
             comparable = true;
         }
@@ -2538,7 +2538,7 @@ func etc_infer_binary(self: ExpressionTypeChecker*, expr_id: ExprId, expr: ExprN
             if (!is_null_check) {
                 if (etc_types_equal(l_ty, r_ty)) {
                     etc_diag_error(self, "TYP-0173",
-                        concat4_s("equality not supported for type '", type_format(l_ty), "' in this stage", ""),
+                        concat3_s("equality not supported for type '", type_format(l_ty), "'"),
                         (self.current_unit as DriverUnit*).path, expr.span);
                 } else {
                     etc_diag_error(self, "TYP-0172",

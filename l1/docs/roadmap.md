@@ -1,6 +1,6 @@
 # Dea/L1 Roadmap
 
-Version: 2026-04-20
+Version: 2026-04-19
 
 This is the live direction document for the Dea/L1 subtree. It records the current L1 position, the assumptions that
 constrain future work, completed milestones that shape the baseline, active work, and backlog items that have not yet
@@ -138,7 +138,8 @@ surface.
 - Typed arrays, buffers, shared buffers, and slices as general language features. The current `std.array` / `std.vector`
   surface is library-level storage, not typed language-level arrays or slices.
 - Unsafe module boundaries and raw pointer operations, including address-of (`&`) semantics and pointer indexing /
-  addressing gates. Current `sys.unsafe` is a low-level runtime binding only.
+  addressing gates. Current `sys.unsafe` is a low-level runtime binding only. Pointer identity equality is covered by
+  [2026-04-19-pointer-identity-equality-noref](../work/plans/features/2026-04-19-pointer-identity-equality-noref.md).
 - `_` struct-member semantics: whether placeholder/discard fields are allowed and how they affect construction, field
   access, layout, and ABI.
 - Named arguments for functions and constructors.

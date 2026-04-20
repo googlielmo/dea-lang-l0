@@ -3,7 +3,7 @@
 ## Implement pointer identity equality operators
 
 - Date: 2026-04-19
-- Status: Draft
+- Status: Completed
 - Title: Implement pointer identity equality operators
 - Kind: Feature
 - Severity: Medium
