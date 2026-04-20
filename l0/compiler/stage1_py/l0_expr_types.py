@@ -438,6 +438,15 @@ class ExpressionTypeChecker:
         if isinstance(stmt, DropStmt):
             var_ty = self._lookup_local(stmt.name)
             if var_ty is None:
+                assert self._current_func_env is not None
+                sym_result = resolve_symbol(
+                    self.module_envs,
+                    self._current_func_env.module_name,
+                    stmt.name,
+                )
+                if sym_result.symbol is not None and sym_result.symbol.kind is SymbolKind.LET:
+                    self._error(stmt, f"[TYP-0063] cannot drop module-level let '{stmt.name}'")
+                    return None
                 self._error(stmt, f"[TYP-0060] unknown variable '{stmt.name}'")
                 return None
 

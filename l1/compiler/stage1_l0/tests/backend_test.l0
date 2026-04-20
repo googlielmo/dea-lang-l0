@@ -365,7 +365,8 @@ func test_backend_generate_nonconstant_top_level_lets() {
         assert(contains_s(generated,
             "static void _dea_init_modules(void)\n{\n    _dea_init_demo_dep();\n    _dea_init_demo_main();\n}\n"),
             "global init chain order mismatch");
-        assert(contains_s(generated, "_rt_init_args(argc, argv);\n    _dea_init_modules();\n    return (int) dea_demo_main_main();"),
+        assert(contains_s(generated,
+            "_rt_init_args(argc, argv);\n    _dea_init_modules();\n    int dea_exit_code = (int) dea_demo_main_main();\n    return dea_exit_code;"),
             "main wrapper should call global init chain");
 
         analysis_result_free(result);

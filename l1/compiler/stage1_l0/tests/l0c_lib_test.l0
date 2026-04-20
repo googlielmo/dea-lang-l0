@@ -526,7 +526,8 @@ func test_run_nonconstant_top_level_let_build_and_keep_c() {
     assert(contains_s(c_text as string,
         "static void _dea_init_modules(void)\n{\n    _dea_init_toplet_init_dep();\n    _dea_init_toplet_init_main();\n}\n"),
         "toplet_init_main global init order mismatch");
-    assert(contains_s(c_text as string, "_rt_init_args(argc, argv);\n    _dea_init_modules();\n    return (int) dea_toplet_init_main_main();"),
+    assert(contains_s(c_text as string,
+        "_rt_init_args(argc, argv);\n    _dea_init_modules();\n    int dea_exit_code = (int) dea_toplet_init_main_main();\n    return dea_exit_code;"),
         "toplet_init_main wrapper init call mismatch");
 
     rt_delete_file(out_path);

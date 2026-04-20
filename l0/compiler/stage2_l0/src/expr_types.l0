@@ -1581,8 +1581,14 @@ func etc_check_stmt(self: ExpressionTypeChecker*, stmt_id: StmtId) -> StmtFlowKi
         ST_DROP => {
             let drop_ty = etc_lookup_local(self, stmt.name);
             if (drop_ty == null) {
-                etc_diag_error(self, "TYP-0060", concat3_s("unknown variable '", stmt.name, "'"),
-                    unit.path, stmt.span);
+                let sym = etc_lookup_symbol(self, stmt.name, null, null);
+                if (sym != null && ord((sym as Symbol*).kind) == ord(SYM_LET)) {
+                    etc_diag_error(self, "TYP-0063", concat3_s("cannot drop module-level let '", stmt.name, "'"),
+                        unit.path, stmt.span);
+                } else {
+                    etc_diag_error(self, "TYP-0060", concat3_s("unknown variable '", stmt.name, "'"),
+                        unit.path, stmt.span);
+                }
             } else {
                 let var_ty = drop_ty as Type*;
                 let is_ptr = ord(var_ty.kind) == ord(TY_POINTER);

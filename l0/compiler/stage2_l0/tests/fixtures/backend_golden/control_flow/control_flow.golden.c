@@ -114,5 +114,6 @@ __lbrk_9:;
 int main(int argc, char **argv)
 {
     _rt_init_args(argc, argv);
-    return (int) l0_main_main();
+    int l0_exit_code = (int) l0_main_main();
+    return l0_exit_code;
 }

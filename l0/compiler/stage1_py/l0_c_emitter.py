@@ -703,6 +703,19 @@ class CEmitter:
         c_init = let_initializer_callback(decl.value, let_type)
         self.out.emit(f"static {c_type} {c_name} = {c_init};")
 
+    def emit_top_level_let_cleanup(self) -> None:
+        """Emit final cleanup for ARC-managed top-level lets before process exit."""
+        if self.analysis is None or self.analysis.cu is None:
+            return
+        for module in self.analysis.cu.modules.values():
+            for decl in module.decls:
+                if not isinstance(decl, LetDecl):
+                    continue
+                let_type = self.analysis.let_types.get((module.name, decl.name))
+                if let_type is None or not self.analysis.has_arc_data(let_type):
+                    continue
+                self.emit_value_cleanup(self.mangle_let_name(module.name, decl.name), let_type)
+
     def emit_function_declaration(self, module_name: str, decl: FuncDecl, func_type: FuncType) -> None:
         """Emit a single function declaration signature.
 
@@ -787,17 +800,16 @@ class CEmitter:
         c_return_type = self.emit_type(func_type.result)
 
         if c_return_type == "l0_int":
-            # Regular int return
-            self.out.emit(f"return (int) {mangled_name}();")
+            self.out.emit(f"int l0_exit_code = (int) {mangled_name}();")
         elif c_return_type == "bool":
-            # Bool return: convert to int
             self.out.emit(f"bool result = {mangled_name}();")
-            self.out.emit("return result ? 0 : 1;")
+            self.out.emit("int l0_exit_code = result ? 0 : 1;")
         else:
-            # 'void' or other return type (ignore return value)
             self.out.emit(f"{mangled_name}();")
-            self.out.emit("return 0;")
+            self.out.emit("int l0_exit_code = 0;")
 
+        self.emit_top_level_let_cleanup()
+        self.out.emit("return l0_exit_code;")
         self.out.dedent()
         self.out.emit("}")
         self.out.emit()

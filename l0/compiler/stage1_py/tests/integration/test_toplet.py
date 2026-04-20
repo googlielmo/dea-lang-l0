@@ -22,6 +22,7 @@ from l0_parser import Parser
 
 STAGE1_ROOT = Path(__file__).resolve().parents[2]
 RUNTIME_PATH = STAGE1_ROOT.parent / "shared" / "runtime"
+STDLIB_PATH = STAGE1_ROOT.parent / "shared" / "l0" / "stdlib"
 
 
 def write_tmp(tmp_path, name: str, src: str):
@@ -124,6 +125,7 @@ def test_typecheck_toplet_primitives(tmp_path):
 
     driver = L0Driver()
     driver.search_paths.add_project_root(tmp_path)
+    driver.search_paths.add_system_root(STDLIB_PATH)
     result = driver.analyze("test")
 
     assert not result.has_errors()
@@ -149,6 +151,7 @@ def test_typecheck_toplet_type_inference(tmp_path):
 
     driver = L0Driver()
     driver.search_paths.add_project_root(tmp_path)
+    driver.search_paths.add_system_root(STDLIB_PATH)
     result = driver.analyze("test")
 
     assert not result.has_errors()
@@ -179,6 +182,7 @@ def test_typecheck_toplet_struct(tmp_path):
 
     driver = L0Driver()
     driver.search_paths.add_project_root(tmp_path)
+    driver.search_paths.add_system_root(STDLIB_PATH)
     result = driver.analyze("test")
 
     assert not result.has_errors()
@@ -209,6 +213,7 @@ def test_typecheck_toplet_enum(tmp_path):
 
     driver = L0Driver()
     driver.search_paths.add_project_root(tmp_path)
+    driver.search_paths.add_system_root(STDLIB_PATH)
     result = driver.analyze("test")
 
     assert not result.has_errors()
@@ -231,6 +236,7 @@ def test_typecheck_toplet_duplicate_error(tmp_path):
 
     driver = L0Driver()
     driver.search_paths.add_project_root(tmp_path)
+    driver.search_paths.add_system_root(STDLIB_PATH)
     result = driver.analyze("test")
 
     assert result.has_errors()
@@ -260,6 +266,7 @@ def test_codegen_toplet_primitives(tmp_path):
 
     driver = L0Driver()
     driver.search_paths.add_project_root(tmp_path)
+    driver.search_paths.add_system_root(STDLIB_PATH)
     result = driver.analyze("test")
 
     assert not result.has_errors()
@@ -272,6 +279,35 @@ def test_codegen_toplet_primitives(tmp_path):
     assert "static l0_bool l0_test_b = true;" in c_code
     assert "static l0_string l0_test_s" in c_code
     assert 'L0_STRING_CONST("hello", 5)' in c_code
+
+
+def test_codegen_toplet_string_mutation_releases_previous_value(tmp_path):
+    """Top-level string reassignment must release the previous value."""
+    write_tmp(tmp_path, "test.l0", """
+        module test;
+        import std.string;
+
+        let greeting: string = "hi";
+
+        func main() -> int {
+            greeting = concat_s("a", "b");
+            greeting = concat_s(greeting, "c");
+            return len_s(greeting);
+        }
+    """)
+
+    driver = L0Driver()
+    driver.search_paths.add_project_root(tmp_path)
+    driver.search_paths.add_system_root(STDLIB_PATH)
+    result = driver.analyze("test")
+
+    assert not result.has_errors()
+
+    backend = Backend(result)
+    c_code = backend.generate()
+
+    assert "static l0_string l0_test_greeting" in c_code
+    assert c_code.count("rt_string_release(l0_test_greeting);") >= 2
 
 
 def test_codegen_toplet_struct(tmp_path):
@@ -293,6 +329,7 @@ def test_codegen_toplet_struct(tmp_path):
 
     driver = L0Driver()
     driver.search_paths.add_project_root(tmp_path)
+    driver.search_paths.add_system_root(STDLIB_PATH)
     result = driver.analyze("test")
 
     assert not result.has_errors()
@@ -329,6 +366,7 @@ def test_codegen_toplet_enum(tmp_path):
 
     driver = L0Driver()
     driver.search_paths.add_project_root(tmp_path)
+    driver.search_paths.add_system_root(STDLIB_PATH)
     result = driver.analyze("test")
 
     assert not result.has_errors()
@@ -418,6 +456,49 @@ def test_execute_toplet_mutation(tmp_path):
     c_code = backend.generate()
 
     # Compile and run
+    c_file = tmp_path / "test.c"
+    c_file.write_text(c_code)
+
+    exe_path = tmp_path / "test_exe"
+
+    compile_result = subprocess.run(
+        ["gcc", "-std=c99", "-I", str(RUNTIME_PATH), str(c_file), "-o", str(exe_path)],
+        capture_output=True,
+        text=True
+    )
+
+    assert compile_result.returncode == 0
+
+    run_result = subprocess.run([str(exe_path)], capture_output=True, text=True)
+    assert run_result.returncode == 3
+
+
+@pytest.mark.skipif(not _check_c_compiler_available(), reason="C compiler not available")
+def test_execute_toplet_string_mutation(tmp_path):
+    """Test ARC-safe mutation of a top-level string."""
+    write_tmp(tmp_path, "test.l0", """
+        module test;
+        import std.string;
+
+        let greeting: string = "hi";
+
+        func main() -> int {
+            greeting = concat_s("a", "b");
+            greeting = concat_s(greeting, "c");
+            return len_s(greeting);
+        }
+    """)
+
+    driver = L0Driver()
+    driver.search_paths.add_project_root(tmp_path)
+    driver.search_paths.add_system_root(STDLIB_PATH)
+    result = driver.analyze("test")
+
+    assert not result.has_errors()
+
+    backend = Backend(result)
+    c_code = backend.generate()
+
     c_file = tmp_path / "test.c"
     c_file.write_text(c_code)
 

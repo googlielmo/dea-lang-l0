@@ -877,6 +877,38 @@ func cem_emit_let_declaration(self: CEmitter*, module_name: string, decl: LetDec
 }
 
 /**
+ * Emit final cleanup for ARC-managed top-level lets before process exit.
+ *
+ * @param self Emitter to update.
+ */
+func cem_emit_top_level_let_cleanup(self: CEmitter*) {
+    let analysis = cem_analysis(self);
+    if (analysis.signatures == null) {
+        return;
+    }
+    let state = analysis.driver_state;
+    for (let i = 0; i < vec_size(state.units); i = i + 1) {
+        let unit = ptr_vec_get(state.units, i) as DriverUnit*;
+        if (unit.parse_result.root_module == null) {
+            continue;
+        }
+        let root = unit.parse_result.root_module as Module*;
+        for (let j = 0; j < vec_size(root.decls); j = j + 1) {
+            let decl = ptr_vec_get(root.decls, j) as TopLevelDecl*;
+            if (ord(decl.kind) != ord(TD_LET)) {
+                continue;
+            }
+            let let_decl = decl.data as LetDecl*;
+            let let_type = sig_lookup_let_type(analysis.signatures as SignatureTables*, root.name, let_decl.name);
+            if (let_type == null || !analysis_has_arc_data(analysis, let_type as Type*)) {
+                continue;
+            }
+            cem_emit_value_cleanup(self, cem_mangle_let_name(root.name, let_decl.name), let_type as Type*);
+        }
+    }
+}
+
+/**
  * Build a function parameter list.
  *
  * @param decl Function declaration node.
@@ -971,15 +1003,17 @@ func cem_emit_main_wrapper(self: CEmitter*, entry_module: string, func_type: Typ
     ccb_emit(self.out, "_rt_init_args(argc, argv);");
 
     if (eq_s(c_return_type, "l0_int")) {
-        ccb_emit(self.out, concat3_s("return (int) ", mangled_name, "();"));
+        ccb_emit(self.out, concat3_s("int l0_exit_code = (int) ", mangled_name, "();"));
     } else if (eq_s(c_return_type, "bool")) {
         ccb_emit(self.out, concat4_s("bool result = ", mangled_name, "(", ");"));
-        ccb_emit(self.out, "return result ? 0 : 1;");
+        ccb_emit(self.out, "int l0_exit_code = result ? 0 : 1;");
     } else {
         ccb_emit(self.out, concat3_s(mangled_name, "(", ");"));
-        ccb_emit(self.out, "return 0;");
+        ccb_emit(self.out, "int l0_exit_code = 0;");
     }
 
+    cem_emit_top_level_let_cleanup(self);
+    ccb_emit(self.out, "return l0_exit_code;");
     ccb_dedent(self.out);
     ccb_emit(self.out, "}");
     ccb_emit(self.out, "");

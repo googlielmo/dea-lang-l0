@@ -231,7 +231,8 @@ class TestCodeGen:
 
         # Verify C main wrapper exists
         assert "int main(" in c_code
-        assert "return (int) l0_mangling_main()" in c_code
+        assert "int l0_exit_code = (int) l0_mangling_main();" in c_code
+        assert "return l0_exit_code;" in c_code
 
         # Compile and run
         success, stdout, stderr = self.compile_and_run(c_code)

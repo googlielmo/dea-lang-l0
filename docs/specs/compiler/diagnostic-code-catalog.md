@@ -1,6 +1,6 @@
 # Compiler Diagnostic Code Catalog
 
-Version: 2026-04-19
+Version: 2026-04-20
 
 Normative catalog of Dea compiler diagnostic codes.
 
@@ -282,6 +282,7 @@ and reuse supplement for applying this registry within L0.
 | `TYP-0060` | All   | Unknown variable                                                                                       |
 | `TYP-0061` | All   | Cannot drop non-pointer type                                                                           |
 | `TYP-0062` | All   | Use of dropped variable                                                                                |
+| `TYP-0063` | All   | Cannot drop module-level let                                                                           |
 | `TYP-0070` | All   | If condition must have type 'bool'                                                                     |
 | `TYP-0080` | All   | While condition must have type 'bool'                                                                  |
 | `TYP-0090` | All   | For loop condition must have type 'bool'                                                               |

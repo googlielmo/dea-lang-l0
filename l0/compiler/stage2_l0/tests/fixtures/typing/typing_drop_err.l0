@@ -9,6 +9,8 @@ struct Box {
     value: int;
 }
 
+let gp: Box*? = null;
+
 /**
  * Triggers an unknown-variable drop error.
  */
@@ -22,6 +24,13 @@ func err_drop_unknown() {
 func err_drop_non_pointer() {
     let value: int = 1;
     drop value; // TYP-0061
+}
+
+/**
+ * Triggers a module-let drop error.
+ */
+func err_drop_module_let() {
+    drop gp; // TYP-0063
 }
 
 /**

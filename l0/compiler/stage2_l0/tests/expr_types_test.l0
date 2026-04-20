@@ -521,6 +521,7 @@ func test_typing_drop_err() {
         assert(analysis_has_errors(result), "expected typing errors for typing_drop_err");
         assert(has_diag_code(result, "TYP-0060"), "expected unknown-variable drop error");
         assert(has_diag_code(result, "TYP-0061"), "expected non-pointer drop error");
+        assert(has_diag_code(result, "TYP-0063"), "expected module-let drop error");
         analysis_result_free(result);
     }
     sp_free(sp);

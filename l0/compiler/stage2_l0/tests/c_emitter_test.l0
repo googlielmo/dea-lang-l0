@@ -491,7 +491,9 @@ func test_emitter_top_level_forms_match_stage1_shape() {
     let extern_type = type_new_func(extern_param_types, type_builtin_void());
     let let_decl = new LetDecl("answer", cet_builtin_type_ref("int"), invalid_expr_id(), span_here(1, 1));
     let let_type = type_builtin_int();
+    let result = cet_empty_analysis_result();
 
+    cem_set_analysis(emitter, result);
     cem_emit_struct(emitter, "demo.main", point_decl, point_info);
     cem_emit_enum(emitter, "demo.main", color_decl, color_info);
     cem_emit_let_declaration(emitter, "demo.main", let_decl, let_type, "42");
@@ -517,7 +519,7 @@ func test_emitter_top_level_forms_match_stage1_shape() {
     assert(contains_s(text, "l0_int l0_demo_main_sum(l0_int a, l0_int b)\n{\n    return a + b;\n}\n"),
         "function definition mismatch");
     assert(contains_s(text,
-        "/* C entry point wrapper */\nint main(int argc, char **argv)\n{\n    _rt_init_args(argc, argv);\n    return (int) l0_demo_main_main();\n}\n"),
+        "/* C entry point wrapper */\nint main(int argc, char **argv)\n{\n    _rt_init_args(argc, argv);\n    int l0_exit_code = (int) l0_demo_main_main();\n    return l0_exit_code;\n}\n"),
         "main wrapper mismatch");
 
     type_free(let_type);
@@ -550,6 +552,7 @@ func test_emitter_top_level_forms_match_stage1_shape() {
     func_decl_free(sum_decl);
     func_decl_free(extern_decl);
 
+    analysis_result_free(result);
     cem_free(emitter);
 }
 
