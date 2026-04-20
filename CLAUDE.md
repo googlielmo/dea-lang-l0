@@ -82,6 +82,9 @@ level directory first.
 
 ## Quality Standards
 
+- When operating in autopilot or agentic mode, do not send an extra follow-up request after the task is already complete
+  (for example asking whether the user wants a summary). End after delivering the result unless the user explicitly asks
+  for more.
 - Python uses Google Style docstrings with `Args`, `Returns`, and `Raises` sections.
 - C and Dea source files use Doxygen/Javadoc-style block comments.
 - Keep code names and comments in English.
