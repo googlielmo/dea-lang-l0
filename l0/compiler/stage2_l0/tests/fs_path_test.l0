@@ -21,10 +21,10 @@ func test_std_path_helpers() {
     assert(is_absolute("C:\\tmp\\demo.l0"), "drive-rooted path should be recognized");
     assert(!is_absolute("demo.l0"), "relative path should not be absolute");
     assert(has_parent("src/demo.l0"), "path with slash should have parent");
-    assert(eq_s(basename("src/demo.l0"), "demo.l0"), "basename mismatch");
-    assert(eq_s(parent("src/demo.l0"), "src"), "parent mismatch");
-    assert(eq_s(stem("src/demo.name.l0"), "demo.name"), "stem should strip the last extension");
-    assert(eq_s(join("src", "demo.l0"), "src/demo.l0"), "join should add one separator");
+    assert(basename("src/demo.l0") == "demo.l0", "basename mismatch");
+    assert(parent("src/demo.l0") == "src", "parent mismatch");
+    assert(stem("src/demo.name.l0") == "demo.name", "stem should strip the last extension");
+    assert(join("src", "demo.l0") == "src/demo.l0", "join should add one separator");
     assert(has_extension("src/demo.l0", ".l0"), "extension match with dot should succeed");
     assert(has_extension("src/demo.l0", "l0"), "extension match without dot should succeed");
     assert(!has_extension(".gitignore", "gitignore"), "dotfile should not report a normal extension");

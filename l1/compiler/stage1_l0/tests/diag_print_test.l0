@@ -28,7 +28,7 @@ func test_format_header_full_location() {
     with (let dc = diag_create() => diag_free(dc)) {
         diag_error(dc, "Parser", "PAR-0010", "message", "path", 10, 5, 0, 0);
         let header = dp_format_header(diag_get(dc, 0));
-        assert(eq_s(header, "path:10:5: error: [PAR-0010] message"),
+        assert(header == "path:10:5: error: [PAR-0010] message",
             "full location header mismatch");
     }
 }
@@ -40,7 +40,7 @@ func test_format_header_no_file() {
     with (let dc = diag_create() => diag_free(dc)) {
         diag_error(dc, "Parser", "PAR-0010", "message", "", 0, 0, 0, 0);
         let header = dp_format_header(diag_get(dc, 0));
-        assert(eq_s(header, "error: [PAR-0010] message"),
+        assert(header == "error: [PAR-0010] message",
             "no-file header mismatch");
     }
 }
@@ -52,7 +52,7 @@ func test_format_header_no_column() {
     with (let dc = diag_create() => diag_free(dc)) {
         diag_error(dc, "Parser", "PAR-0010", "message", "path", 10, 0, 0, 0);
         let header = dp_format_header(diag_get(dc, 0));
-        assert(eq_s(header, "path:10: error: [PAR-0010] message"),
+        assert(header == "path:10: error: [PAR-0010] message",
             "no-column header mismatch");
     }
 }
@@ -64,7 +64,7 @@ func test_format_header_no_code() {
     with (let dc = diag_create() => diag_free(dc)) {
         diag_error(dc, "", "", "message", "path", 10, 5, 0, 0);
         let header = dp_format_header(diag_get(dc, 0));
-        assert(eq_s(header, "path:10:5: error: message"),
+        assert(header == "path:10:5: error: message",
             "no-code header mismatch");
     }
 }
@@ -84,13 +84,13 @@ func test_prints_snippet_for_located_diag() {
  * Tests that tab normalization replaces each horizontal tab with a single space.
  */
 func test_normalize_line_tabs() {
-    assert(eq_s(dp_normalize_line_for_display("\tlet x = 1;"), " let x = 1;"),
+    assert(dp_normalize_line_for_display("\tlet x = 1;") == " let x = 1;",
         "single leading tab should become one space");
-    assert(eq_s(dp_normalize_line_for_display("\t\tlet y = 2;"), "  let y = 2;"),
+    assert(dp_normalize_line_for_display("\t\tlet y = 2;") == "  let y = 2;",
         "two leading tabs should become two spaces");
-    assert(eq_s(dp_normalize_line_for_display("a\tb\tc"), "a b c"),
+    assert(dp_normalize_line_for_display("a\tb\tc") == "a b c",
         "tabs inside line should each become one space");
-    assert(eq_s(dp_normalize_line_for_display("no tabs here"), "no tabs here"),
+    assert(dp_normalize_line_for_display("no tabs here") == "no tabs here",
         "non-tab lines should be unchanged");
 }
 
@@ -110,7 +110,7 @@ func test_format_snippet_tab_before_token() {
         let expected = concat_s(
             "    1 |  let x = 1;\n",
             "             ^");
-        assert(eq_s(out, expected), "caret should line up under 'x' on tab-indented line");
+        assert(out == expected, "caret should line up under 'x' on tab-indented line");
     }
 }
 
@@ -128,7 +128,7 @@ func test_format_snippet_tab_inside_span() {
         let expected = concat_s(
             "    1 | let y = 2;\n",
             "        ^^^^^");
-        assert(eq_s(out, expected), "caret span should cover 5 normalized columns");
+        assert(out == expected, "caret span should cover 5 normalized columns");
     }
 }
 
@@ -145,7 +145,7 @@ func test_format_snippet_mixed_tabs_spaces() {
         let expected = concat_s(
             "    1 |   let y = x + 2;\n",
             "                  ^");
-        assert(eq_s(out, expected), "caret should line up under 'x' with mixed tabs/spaces");
+        assert(out == expected, "caret should line up under 'x' with mixed tabs/spaces");
     }
 }
 
@@ -160,7 +160,7 @@ func test_format_snippet_no_tab_unchanged() {
         let expected = concat_s(
             "    1 | let x = 1;\n",
             "            ^");
-        assert(eq_s(out, expected), "non-tab snippet should match legacy layout");
+        assert(out == expected, "non-tab snippet should match legacy layout");
     }
 }
 

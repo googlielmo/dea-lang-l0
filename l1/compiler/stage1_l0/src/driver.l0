@@ -147,7 +147,7 @@ func driver_unit_get(self: DriverState*, index: int) -> DriverUnit* {
 func driver_find_unit(self: DriverState*, module_name: string) -> DriverUnit*? {
     for (let i = 0; i < vec_size(self.units); i = i + 1) {
         let unit = ptr_vec_get(self.units, i) as DriverUnit*;
-        if (eq_s(unit.module_name, module_name)) {
+        if (unit.module_name == module_name) {
             return unit;
         }
     }
@@ -203,7 +203,7 @@ func dr_emit_error(diags: DiagCollector*, code: string, message: string, filenam
  */
 func dr_vs_has(items: VectorString*, module_name: string) -> bool {
     for (let i = 0; i < vs_size(items); i = i + 1) {
-        if (eq_s(vs_get(items, i), module_name)) {
+        if (vs_get(items, i) == module_name) {
             return true;
         }
     }
@@ -354,7 +354,7 @@ func dr_load_module(state: DriverState*, search_paths: SourceSearchPaths*, loadi
                     ok = false;
                 } else {
                     let mod = pr.root_module as Module*;
-                    if (!eq_s(mod.name, module_name)) {
+                    if (mod.name != module_name) {
                         let msg = concat4_s("module name mismatch: file ", path, " declares '", mod.name);
                         dr_emit_error(state.diags, "DRV-0020", concat4_s(msg, "' but was loaded as '", module_name, "'"), path);
                         ok = false;

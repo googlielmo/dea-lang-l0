@@ -18,7 +18,7 @@ import std.text;
  */
 func realnum_to_string(sig: string, exp_text: string, is_float: bool) -> string {
     let exp_part = "";
-    if (!eq_s(exp_text, "")) {
+    if (exp_text != "") {
         exp_part = concat_s("e", exp_text);
     }
     let suffix = "";

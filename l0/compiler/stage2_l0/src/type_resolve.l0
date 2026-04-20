@@ -202,14 +202,14 @@ func tr_symbol_lookup(nr: NameResolution*, env: ModuleEnv*, name: string, module
         if (ord(s.kind) != ord(SYM_ENUM_VARIANT)) {
             return null;
         }
-        if (!eq_s(s.owner_name, vs_get(name_qualifier as VectorString*, 0))) {
+        if (s.owner_name != vs_get(name_qualifier as VectorString*, 0)) {
             return null;
         }
         return s;
     }
 
     let target_module = tr_module_from_path(module_path as VectorString*);
-    if (!eq_s(target_module, env.module_name) && !nr_module_env_imports_module(env, target_module)) {
+    if (target_module != env.module_name && !nr_module_env_imports_module(env, target_module)) {
         return null;
     }
     let target_env = nr_env_find(nr, target_module);
@@ -233,7 +233,7 @@ func tr_symbol_lookup(nr: NameResolution*, env: ModuleEnv*, name: string, module
     if (ord(s2.kind) != ord(SYM_ENUM_VARIANT)) {
         return null;
     }
-    if (!eq_s(s2.owner_name, vs_get(name_qualifier as VectorString*, 0))) {
+    if (s2.owner_name != vs_get(name_qualifier as VectorString*, 0)) {
         return null;
     }
     return s2;
@@ -304,7 +304,7 @@ func tr_apply_suffix(base: Type*, tref: TypeRef*, diags: DiagCollector*, filenam
         return current;
     }
 
-    if (ord(current.kind) == ord(TY_BUILTIN) && eq_s(current.name, "void")) {
+    if (ord(current.kind) == ord(TY_BUILTIN) && current.name == "void") {
         type_free(current);
         tr_diag_error(diags, "SIG-0011", "type 'void' cannot be nullable", filename, tref.span);
         return null;
@@ -342,13 +342,13 @@ func tr_resolve_type_ref(tables: SignatureTables*, nr: NameResolution*, env: Mod
 
     let base: Type*? = null;
     if (tref.module_path == null && type_is_builtin_name(tref.name)) {
-        if (eq_s(tref.name, "bool")) {
+        if (tref.name == "bool") {
             base = type_builtin_bool();
-        } else if (eq_s(tref.name, "byte")) {
+        } else if (tref.name == "byte") {
             base = type_builtin_byte();
-        } else if (eq_s(tref.name, "int")) {
+        } else if (tref.name == "int") {
             base = type_builtin_int();
-        } else if (eq_s(tref.name, "string")) {
+        } else if (tref.name == "string") {
             base = type_builtin_string();
         } else {
             base = type_builtin_void();

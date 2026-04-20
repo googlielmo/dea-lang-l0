@@ -672,10 +672,10 @@ func test_build_float_rejects_invalid_math_mode_option() {
 func test_merge_c_option_words_cli_last() {
     with (let words = l0c_merge_c_option_words("-DENV_ONE   -DENV_TWO", "-DCLI_ONE -DCLI_TWO") => vs_free(words)) {
         assert(vs_size(words) == 4, "expected 4 merged C option words");
-        assert(eq_s(vs_get(words, 0), "-DENV_ONE"), "env option #1 should come first");
-        assert(eq_s(vs_get(words, 1), "-DENV_TWO"), "env option #2 should come before CLI options");
-        assert(eq_s(vs_get(words, 2), "-DCLI_ONE"), "cli option #1 should come after env options");
-        assert(eq_s(vs_get(words, 3), "-DCLI_TWO"), "cli option #2 should come last");
+        assert(vs_get(words, 0) == "-DENV_ONE", "env option #1 should come first");
+        assert(vs_get(words, 1) == "-DENV_TWO", "env option #2 should come before CLI options");
+        assert(vs_get(words, 2) == "-DCLI_ONE", "cli option #1 should come after env options");
+        assert(vs_get(words, 3) == "-DCLI_TWO", "cli option #2 should come last");
     }
 }
 
@@ -689,7 +689,7 @@ func test_merge_c_option_words_ignores_empty_inputs() {
 
     with (let cli_words = l0c_merge_c_option_words(null, "  -DCLI_ONLY\t") => vs_free(cli_words)) {
         assert(vs_size(cli_words) == 1, "single CLI option should be preserved");
-        assert(eq_s(vs_get(cli_words, 0), "-DCLI_ONLY"), "CLI option text mismatch");
+        assert(vs_get(cli_words, 0) == "-DCLI_ONLY", "CLI option text mismatch");
     }
 }
 

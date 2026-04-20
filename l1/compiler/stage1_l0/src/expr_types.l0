@@ -344,7 +344,7 @@ func etc_check_local_declaration(self: ExpressionTypeChecker*, name: string, spa
             if (sym != null) {
                 let s = sym as Symbol*;
                 if (ord(s.kind) == ord(SYM_ENUM_VARIANT)) {
-                    if (eq_s(s.module_name, self.current_module)) {
+                    if (s.module_name == self.current_module) {
                         etc_diag_warn(self, "TYP-0022", concat3_s("local variable '", name,
                             "' shadows an enum variant"), unit.path, span);
                     } else {
@@ -769,7 +769,7 @@ func etc_symbol_as_type(self: ExpressionTypeChecker*, sym: Symbol*) -> Type*? {
 
 func etc_diag_type_ref_failure(self: ExpressionTypeChecker*, tref: TypeRef*, fallback_code: string, span: Span) {
     let unit = self.current_unit as DriverUnit*;
-    if (tref.is_nullable && tref.pointer_depth == 0 && tref.module_path == null && eq_s(tref.name, "void")) {
+    if (tref.is_nullable && tref.pointer_depth == 0 && tref.module_path == null && tref.name == "void") {
         etc_diag_error(self, "TYP-0278", "type 'void' cannot be nullable", unit.path, span);
         return;
     }
@@ -802,16 +802,16 @@ func etc_diag_type_ref_failure(self: ExpressionTypeChecker*, tref: TypeRef*, fal
  */
 func etc_try_resolve_type_name(self: ExpressionTypeChecker*, expr: ExprNode*) -> Type*? {
     if (expr.module_path == null) {
-        if (eq_s(expr.text_value, "tiny")) return type_builtin_tiny();
-        if (eq_s(expr.text_value, "int")) return type_builtin_int();
-        if (eq_s(expr.text_value, "byte")) return type_builtin_byte();
-        if (eq_s(expr.text_value, "short")) return type_builtin_short();
-        if (eq_s(expr.text_value, "ushort")) return type_builtin_ushort();
-        if (eq_s(expr.text_value, "float")) return type_builtin_float();
-        if (eq_s(expr.text_value, "double")) return type_builtin_double();
-        if (eq_s(expr.text_value, "bool")) return type_builtin_bool();
-        if (eq_s(expr.text_value, "string")) return type_builtin_string();
-        if (eq_s(expr.text_value, "void")) return type_builtin_void();
+        if (expr.text_value == "tiny") return type_builtin_tiny();
+        if (expr.text_value == "int") return type_builtin_int();
+        if (expr.text_value == "byte") return type_builtin_byte();
+        if (expr.text_value == "short") return type_builtin_short();
+        if (expr.text_value == "ushort") return type_builtin_ushort();
+        if (expr.text_value == "float") return type_builtin_float();
+        if (expr.text_value == "double") return type_builtin_double();
+        if (expr.text_value == "bool") return type_builtin_bool();
+        if (expr.text_value == "string") return type_builtin_string();
+        if (expr.text_value == "void") return type_builtin_void();
 
         if (nr_module_env_is_ambiguous(self.current_env as ModuleEnv*, expr.text_value)) {
             etc_diag_error(self, "TYP-0303",
@@ -828,7 +828,7 @@ func etc_try_resolve_type_name(self: ExpressionTypeChecker*, expr: ExprNode*) ->
     }
 
     let target_module = tr_module_from_path(expr.module_path as VectorString*);
-    if (!eq_s(target_module, (self.current_env as ModuleEnv*).module_name) &&
+    if (target_module != (self.current_env as ModuleEnv*).module_name &&
         !nr_module_env_imports_module(self.current_env as ModuleEnv*, target_module)) {
         etc_diag_error(self, "TYP-0301",
             concat4_s("unknown type '", concat3_s(target_module, "::", expr.text_value),
@@ -967,7 +967,7 @@ func etc_bind_pattern_types(self: ExpressionTypeChecker*, match_ty: Type*, patte
     let variants = (info as EnumInfo*).variants;
     for (let i = 0; i < vec_size(variants); i = i + 1) {
         let v_info = ptr_vec_get(variants, i) as EnumVariantInfo*;
-        if (eq_s(v_info.name, pattern.name)) {
+        if (v_info.name == pattern.name) {
             if (pattern.vars != null) {
                 let vars = pattern.vars as VectorString*;
                 for (let j = 0; j < vs_size(vars); j = j + 1) {
@@ -991,7 +991,7 @@ func etc_bind_pattern_types(self: ExpressionTypeChecker*, match_ty: Type*, patte
 func etc_find_enum_variant_info(info: EnumInfo*, name: string) -> EnumVariantInfo*? {
     for (let i = 0; i < vec_size(info.variants); i = i + 1) {
         let variant = ptr_vec_get(info.variants, i) as EnumVariantInfo*;
-        if (eq_s(variant.name, name)) {
+        if (variant.name == name) {
             return variant;
         }
     }
@@ -1037,7 +1037,7 @@ func etc_check_match_pattern(self: ExpressionTypeChecker*, match_ty: Type*, patt
     if (pattern.module_path != null) {
         let target_module = tr_module_from_path(pattern.module_path as VectorString*);
         let qualified = etc_pattern_symbol_name(pattern);
-        if (!eq_s(target_module, (self.current_env as ModuleEnv*).module_name) &&
+        if (target_module != (self.current_env as ModuleEnv*).module_name &&
             !nr_module_env_imports_module(self.current_env as ModuleEnv*, target_module)) {
             etc_diag_error(
                 self,
@@ -1064,8 +1064,8 @@ func etc_check_match_pattern(self: ExpressionTypeChecker*, match_ty: Type*, patt
             pattern.module_path, pattern.name_qualifier);
         if (sym == null ||
             ord((sym as Symbol*).kind) != ord(SYM_ENUM_VARIANT) ||
-            !eq_s((sym as Symbol*).module_name, match_ty.module_name) ||
-            !eq_s((sym as Symbol*).owner_name, match_ty.name)) {
+            (sym as Symbol*).module_name != match_ty.module_name ||
+            (sym as Symbol*).owner_name != match_ty.name) {
             etc_diag_error(
                 self,
                 "TYP-0102",
@@ -1795,7 +1795,7 @@ func etc_bigint_expr_text(self: ExpressionTypeChecker*, expr_id: ExprId) -> stri
     if (ord(expr.kind) == ord(EX_PAREN)) {
         return etc_bigint_expr_text(self, expr.expr_a);
     }
-    if (ord(expr.kind) == ord(EX_UNARY) && eq_s(expr.text_value, "-")) {
+    if (ord(expr.kind) == ord(EX_UNARY) && expr.text_value == "-") {
         let text = etc_bigint_expr_text(self, expr.expr_a)?;
         if (len_s(text) > 0 && char_at_s(text, 0) == '-') {
             return slice_s(text, 1, len_s(text));
@@ -1813,7 +1813,7 @@ func etc_bigint_expr_base(self: ExpressionTypeChecker*, expr_id: ExprId) -> int?
     if (ord(expr.kind) == ord(EX_BIGINT)) {
         return expr.base_value;
     }
-    if (ord(expr.kind) == ord(EX_PAREN) || (ord(expr.kind) == ord(EX_UNARY) && eq_s(expr.text_value, "-"))) {
+    if (ord(expr.kind) == ord(EX_PAREN) || (ord(expr.kind) == ord(EX_UNARY) && expr.text_value == "-")) {
         return etc_bigint_expr_base(self, expr.expr_a);
     }
     return null;
@@ -1825,7 +1825,7 @@ func etc_set_bigint_expr_type(self: ExpressionTypeChecker*, expr_id: ExprId, ty:
     }
     let expr = expr_arena_get((self.current_unit as DriverUnit*).parse_result.expr_arena, expr_id);
     etc_set_expr_type(self, expr_id, ty);
-    if (ord(expr.kind) == ord(EX_PAREN) || (ord(expr.kind) == ord(EX_UNARY) && eq_s(expr.text_value, "-"))) {
+    if (ord(expr.kind) == ord(EX_PAREN) || (ord(expr.kind) == ord(EX_UNARY) && expr.text_value == "-")) {
         etc_set_bigint_expr_type(self, expr.expr_a, ty);
     }
 }
@@ -2285,10 +2285,10 @@ func etc_cast_const_int(self: ExpressionTypeChecker*, expr_id: ExprId) -> int? {
     }
     if (ord(expr.kind) == ord(EX_UNARY)) {
         let inner = etc_cast_const_int(self, expr.expr_a)?;
-        if (eq_s(expr.text_value, "-")) {
+        if (expr.text_value == "-") {
             return -inner;
         }
-        if (eq_s(expr.text_value, "~")) {
+        if (expr.text_value == "~") {
             return -(inner + 1);
         }
         return null;
@@ -2302,22 +2302,22 @@ func etc_cast_const_int(self: ExpressionTypeChecker*, expr_id: ExprId) -> int? {
 
         let lhs = left as int;
         let rhs = right as int;
-        if (eq_s(expr.text_value, "+")) {
+        if (expr.text_value == "+") {
             return lhs + rhs;
         }
-        if (eq_s(expr.text_value, "-")) {
+        if (expr.text_value == "-") {
             return lhs - rhs;
         }
-        if (eq_s(expr.text_value, "*")) {
+        if (expr.text_value == "*") {
             return lhs * rhs;
         }
-        if (eq_s(expr.text_value, "/")) {
+        if (expr.text_value == "/") {
             if (rhs == 0) {
                 return null;
             }
             return lhs / rhs;
         }
-        if (eq_s(expr.text_value, "%")) {
+        if (expr.text_value == "%") {
             if (rhs == 0) {
                 return null;
             }
@@ -2362,7 +2362,7 @@ func etc_infer_unary(self: ExpressionTypeChecker*, expr_id: ExprId, expr: ExprNo
     if (sub_ty == null) return null;
     let s_ty = sub_ty as Type*;
 
-    if (eq_s(expr.text_value, "-")) {
+    if (expr.text_value == "-") {
         if (etc_is_bigint_literal_type(s_ty)) {
             return s_ty;
         }
@@ -2371,19 +2371,19 @@ func etc_infer_unary(self: ExpressionTypeChecker*, expr_id: ExprId, expr: ExprNo
                 (self.current_unit as DriverUnit*).path, expr.span);
         }
         return s_ty;
-    } else if (eq_s(expr.text_value, "!")) {
+    } else if (expr.text_value == "!") {
         if (!etc_is_bool(s_ty)) {
             etc_diag_error(self, "TYP-0161", concat_s("unary '!' expects bool, got ", type_format(s_ty)),
                 (self.current_unit as DriverUnit*).path, expr.span);
         }
         return s_ty;
-    } else if (eq_s(expr.text_value, "~")) {
+    } else if (expr.text_value == "~") {
         if (!etc_is_int(s_ty)) {
             etc_diag_error(self, "TYP-0170", concat_s("unary '~' expects int, got ", type_format(s_ty)),
                 (self.current_unit as DriverUnit*).path, expr.span);
         }
         return s_ty;
-    } else if (eq_s(expr.text_value, "*")) {
+    } else if (expr.text_value == "*") {
         if (ord(s_ty.kind) != ord(TY_POINTER)) {
             etc_diag_error(self, "TYP-0162", concat_s("dereference '*' expects pointer, got ", type_format(s_ty)),
                 (self.current_unit as DriverUnit*).path, expr.span);
@@ -2392,7 +2392,7 @@ func etc_infer_unary(self: ExpressionTypeChecker*, expr_id: ExprId, expr: ExprNo
         let res = type_clone(s_ty.inner as Type*);
         type_free(s_ty);
         return res;
-    } else if (eq_s(expr.text_value, "&")) {
+    } else if (expr.text_value == "&") {
         let res2 = type_new_pointer(type_clone(s_ty));
         type_free(s_ty);
         return res2;
@@ -2458,7 +2458,7 @@ func etc_infer_binary(self: ExpressionTypeChecker*, expr_id: ExprId, expr: ExprN
     }
 
     let op = expr.text_value;
-    if (eq_s(op, "+") || eq_s(op, "-") || eq_s(op, "*") || eq_s(op, "/")) {
+    if (op == "+" || op == "-" || op == "*" || op == "/") {
         if (etc_is_int(l_ty) && etc_is_int(r_ty)) {
             if (common_int_ty == null) {
                 etc_diag_error(self, "TYP-0170", concat3_s("binary '", op,
@@ -2500,7 +2500,7 @@ func etc_infer_binary(self: ExpressionTypeChecker*, expr_id: ExprId, expr: ExprN
         type_free(r_ty);
         if (common_int_ty != null) type_free(common_int_ty as Type*);
         return recovery;
-    } else if (eq_s(op, "%") || eq_s(op, "&") || eq_s(op, "|") || eq_s(op, "^") || eq_s(op, "<<") || eq_s(op, ">>")) {
+    } else if (op == "%" || op == "&" || op == "|" || op == "^" || op == "<<" || op == ">>") {
         if (!etc_is_int(l_ty) || !etc_is_int(r_ty)) {
             etc_diag_error(self, "TYP-0170", concat4_s("binary '", op, "' expects int, got ", type_format(l_ty)),
                 (self.current_unit as DriverUnit*).path, expr.span);
@@ -2516,7 +2516,7 @@ func etc_infer_binary(self: ExpressionTypeChecker*, expr_id: ExprId, expr: ExprN
             return common_int_ty;
         }
         return type_builtin_int();
-    } else if (eq_s(op, "==") || eq_s(op, "!=")) {
+    } else if (op == "==" || op == "!=") {
         let is_null_check = false;
         let comparable = false;
         if (etc_types_equal(l_ty, r_ty)) {
@@ -2552,7 +2552,7 @@ func etc_infer_binary(self: ExpressionTypeChecker*, expr_id: ExprId, expr: ExprN
         type_free(r_ty);
         if (common_int_ty != null) type_free(common_int_ty as Type*);
         return type_builtin_bool();
-    } else if (eq_s(op, "<") || eq_s(op, "<=") || eq_s(op, ">") || eq_s(op, ">=")) {
+    } else if (op == "<" || op == "<=" || op == ">" || op == ">=") {
         let real_cmp = etc_real_binary_result_type(l_ty, r_ty);
         let string_cmp = etc_is_string(l_ty) && etc_is_string(r_ty);
         if (!string_cmp && ((!etc_is_int(l_ty) || !etc_is_int(r_ty)) && real_cmp == null)) {
@@ -2571,7 +2571,7 @@ func etc_infer_binary(self: ExpressionTypeChecker*, expr_id: ExprId, expr: ExprN
         type_free(r_ty);
         if (common_int_ty != null) type_free(common_int_ty as Type*);
         return type_builtin_bool();
-    } else if (eq_s(op, "&&") || eq_s(op, "||")) {
+    } else if (op == "&&" || op == "||") {
         if (!etc_is_bool(l_ty) || !etc_is_bool(r_ty)) {
             etc_diag_error(self, "TYP-0171", concat4_s("binary '", op, "' expects bool, got ", type_format(l_ty)),
                 (self.current_unit as DriverUnit*).path, expr.span);
@@ -2715,7 +2715,7 @@ func etc_infer_call(self: ExpressionTypeChecker*, expr_id: ExprId, expr: ExprNod
                     let variants = (info2 as EnumInfo*).variants;
                     for (let i = 0; i < vec_size(variants); i = i + 1) {
                         let v_info = ptr_vec_get(variants, i) as EnumVariantInfo*;
-                        if (eq_s(v_info.name, s.name)) {
+                        if (v_info.name == s.name) {
                             let fields2 = v_info.field_types;
                             let args3 = expr.ids as VectorBase*;
                             let arg_count3 = 0;
@@ -2795,7 +2795,7 @@ func etc_infer_field(self: ExpressionTypeChecker*, expr_id: ExprId, expr: ExprNo
             let fields = (info as StructInfo*).fields;
             for (let i = 0; i < vec_size(fields); i = i + 1) {
                 let f_info = ptr_vec_get(fields, i) as StructFieldInfo*;
-                if (eq_s(f_info.name, expr.text_value)) {
+                if (f_info.name == expr.text_value) {
                     type_free(l_ty);
                     return type_clone(f_info.field_type);
                 }
@@ -2937,7 +2937,7 @@ func etc_infer_expr(self: ExpressionTypeChecker*, expr_id: ExprId) -> Type*? {
                             let variants = (enum_info as EnumInfo*).variants;
                             for (let i = 0; i < vec_size(variants); i = i + 1) {
                                 let variant = ptr_vec_get(variants, i) as EnumVariantInfo*;
-                                if (eq_s(variant.name, s.name) && vec_size(variant.field_types) > 0) {
+                                if (variant.name == s.name && vec_size(variant.field_types) > 0) {
                                     variant_has_fields = true;
                                 }
                             }
@@ -3086,7 +3086,7 @@ func etc_infer_expr(self: ExpressionTypeChecker*, expr_id: ExprId) -> Type*? {
                         let variants = (enum_info as EnumInfo*).variants;
                         for (let i = 0; i < vec_size(variants); i = i + 1) {
                             let variant = ptr_vec_get(variants, i) as EnumVariantInfo*;
-                            if (!eq_s(variant.name, s.name)) {
+                            if (variant.name != s.name) {
                                 continue;
                             }
 
@@ -3295,7 +3295,7 @@ func expr_types_check(result: AnalysisResult*) {
         let locals = result.locals_result as LocalsResult*;
         for (let j = 0; j < locals_env_count(locals); j = j + 1) {
             let env = locals_env_get(locals, j);
-            if (eq_s(env.module_name, checker.current_module)) {
+            if (env.module_name == checker.current_module) {
                 etc_check_function(checker, env);
             }
         }

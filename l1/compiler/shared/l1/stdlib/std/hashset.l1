@@ -202,7 +202,7 @@ func _ss_find(self: StringSet*, key: string, h: int) -> int {
         }
         if (state == HS_OCCUPIED) {
             if (_ss_get_hash(self, idx) == h) {
-                if (eq_s(_ss_get_key(self, idx), key)) {
+                if (_ss_get_key(self, idx) == key) {
                     return idx;
                 }
             }

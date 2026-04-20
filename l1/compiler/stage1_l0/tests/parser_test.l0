@@ -30,7 +30,7 @@ func expect_error_code(source: string, expected: string) {
     }
 
     let diag = parse_diag_get(result, 0);
-    if (!eq_s(diag.code, expected)) {
+    if (diag.code != expected) {
         printl_ss("actual error code:", diag.code);
         assert(false, concat_s("Expected parse error code ", expected));
     }
@@ -175,11 +175,11 @@ func test_bitwise_unary_precedence_shape() {
     let return_stmt = stmt_arena_get(result.stmt_arena, id_vec_get(stmts, 0));
     let return_expr = expr_arena_get(result.expr_arena, return_stmt.expr_a);
     assert(ord(return_expr.kind) == ord(EX_BINARY), "Expected binary top-level expression");
-    assert(eq_s(return_expr.text_value, "+"), "Expected '+' at the root");
+    assert(return_expr.text_value == "+", "Expected '+' at the root");
 
     let left = expr_arena_get(result.expr_arena, return_expr.expr_a);
     assert(ord(left.kind) == ord(EX_UNARY), "Expected unary left operand");
-    assert(eq_s(left.text_value, "~"), "Expected unary '~' operand");
+    assert(left.text_value == "~", "Expected unary '~' operand");
 
     parse_result_free(result);
 }
@@ -288,13 +288,13 @@ func test_bigint_literal_expr_shape() {
     let let_stmt = stmt_arena_get(result.stmt_arena, id_vec_get(stmts, 0));
     let let_expr = expr_arena_get(result.expr_arena, let_stmt.expr_a);
     assert(ord(let_expr.kind) == ord(EX_BIGINT), "Expected bigint let initializer");
-    assert(eq_s(let_expr.text_value, "2147483648"), "Unexpected decimal bigint payload");
+    assert(let_expr.text_value == "2147483648", "Unexpected decimal bigint payload");
     assert(let_expr.base_value == 10, "Unexpected decimal bigint base");
 
     let return_stmt = stmt_arena_get(result.stmt_arena, id_vec_get(stmts, 1));
     let return_expr = expr_arena_get(result.expr_arena, return_stmt.expr_a);
     assert(ord(return_expr.kind) == ord(EX_BIGINT), "Expected bigint return expression");
-    assert(eq_s(return_expr.text_value, "80000000"), "Unexpected hexadecimal bigint payload");
+    assert(return_expr.text_value == "80000000", "Unexpected hexadecimal bigint payload");
     assert(return_expr.base_value == 16, "Unexpected hexadecimal bigint base");
 
     parse_result_free(result);
@@ -339,35 +339,35 @@ func test_bitwise_precedence_shape() {
     let return_stmt = stmt_arena_get(result.stmt_arena, id_vec_get(stmts, 0));
     let root_expr = expr_arena_get(result.expr_arena, return_stmt.expr_a);
     assert(ord(root_expr.kind) == ord(EX_BINARY), "Expected binary root expression");
-    assert(eq_s(root_expr.text_value, "|"), "Expected '|' at the root");
+    assert(root_expr.text_value == "|", "Expected '|' at the root");
 
     let xor_expr = expr_arena_get(result.expr_arena, root_expr.expr_b);
     assert(ord(xor_expr.kind) == ord(EX_BINARY), "Expected '^' expression");
-    assert(eq_s(xor_expr.text_value, "^"), "Expected '^' below '|'");
+    assert(xor_expr.text_value == "^", "Expected '^' below '|'");
 
     let and_expr = expr_arena_get(result.expr_arena, xor_expr.expr_b);
     assert(ord(and_expr.kind) == ord(EX_BINARY), "Expected '&' expression");
-    assert(eq_s(and_expr.text_value, "&"), "Expected '&' below '^'");
+    assert(and_expr.text_value == "&", "Expected '&' below '^'");
 
     let eq_expr = expr_arena_get(result.expr_arena, and_expr.expr_b);
     assert(ord(eq_expr.kind) == ord(EX_BINARY), "Expected equality expression");
-    assert(eq_s(eq_expr.text_value, "=="), "Expected '==' below '&'");
+    assert(eq_expr.text_value == "==", "Expected '==' below '&'");
 
     let rel_expr = expr_arena_get(result.expr_arena, eq_expr.expr_b);
     assert(ord(rel_expr.kind) == ord(EX_BINARY), "Expected relational expression");
-    assert(eq_s(rel_expr.text_value, "<"), "Expected '<' below '=='");
+    assert(rel_expr.text_value == "<", "Expected '<' below '=='");
 
     let shift_expr = expr_arena_get(result.expr_arena, rel_expr.expr_b);
     assert(ord(shift_expr.kind) == ord(EX_BINARY), "Expected shift expression");
-    assert(eq_s(shift_expr.text_value, "<<"), "Expected '<<' below '<'");
+    assert(shift_expr.text_value == "<<", "Expected '<<' below '<'");
 
     let add_expr = expr_arena_get(result.expr_arena, shift_expr.expr_b);
     assert(ord(add_expr.kind) == ord(EX_BINARY), "Expected additive expression");
-    assert(eq_s(add_expr.text_value, "+"), "Expected '+' below '<<'");
+    assert(add_expr.text_value == "+", "Expected '+' below '<<'");
 
     let mul_expr = expr_arena_get(result.expr_arena, add_expr.expr_b);
     assert(ord(mul_expr.kind) == ord(EX_BINARY), "Expected multiplicative expression");
-    assert(eq_s(mul_expr.text_value, "*"), "Expected '*' below '+'");
+    assert(mul_expr.text_value == "*", "Expected '*' below '+'");
 
     parse_result_free(result);
 }

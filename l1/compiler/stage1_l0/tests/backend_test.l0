@@ -168,7 +168,7 @@ func test_backend_scope_helpers_manage_cleanup_state() {
         assert(be_scope_chain_has_cleanup(self), "owned ARC local should trigger cleanup detection");
 
         let temp = be_materialize_arc_temp(self, "((dea_string)DEA_STRING_CONST(\"x\", 1))", temp_ty);
-        assert(eq_s(temp, "dea_arc_1"), "ARC temp naming mismatch");
+        assert(temp == "dea_arc_1", "ARC temp naming mismatch");
         assert(vec_size(root.owned_vars) == 2, "materialized ARC temp should become owned");
 
         let child = be_push_scope(self);
@@ -188,7 +188,7 @@ func test_backend_scope_helpers_manage_cleanup_state() {
 func test_analysis_expr_lookup_helpers() {
     let result = bt_empty_analysis_result();
     let expr_key = analysis_expr_key("demo.main", 7);
-    assert(eq_s(expr_key, "demo.main::7"), "expression key mismatch");
+    assert(expr_key == "demo.main::7", "expression key mismatch");
 
     spm_put(result.expr_types, analysis_expr_key("demo.main", 7), type_builtin_bool() as void*);
     spm_put(result.intrinsic_targets, analysis_expr_key("demo.main", 8), type_builtin_int() as void*);

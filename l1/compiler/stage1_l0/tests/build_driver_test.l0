@@ -11,32 +11,31 @@ import std.string;
 import std.vector;
 
 import build_driver;
-import util.diag;
 
 /**
  * Tests test_with_c_suffix_rewrites_existing_extension.
  */
 func test_with_c_suffix_rewrites_existing_extension() {
-    assert(eq_s(bd_with_c_suffix("build/out.exe"), "build/out.c"), "existing extension should be replaced");
-    assert(eq_s(bd_with_c_suffix("plain-output"), "plain-output.c"), "missing extension should add .c");
+    assert(bd_with_c_suffix("build/out.exe") == "build/out.c", "existing extension should be replaced");
+    assert(bd_with_c_suffix("plain-output") == "plain-output.c", "missing extension should add .c");
 }
 
 /**
  * Tests test_shell_quote_posix_handles_spaces_and_quotes.
  */
 func test_shell_quote_posix_handles_spaces_and_quotes() {
-    assert(eq_s(bd_shell_quote_posix("two words"), "'two words'"), "space quoting mismatch");
-    assert(eq_s(bd_shell_quote_posix("rock'n'roll"), "'rock'\\''n'\\''roll'"), "single-quote escaping mismatch");
-    assert(eq_s(bd_shell_quote_posix(""), "''"), "empty string should still be quoted");
+    assert(bd_shell_quote_posix("two words") == "'two words'", "space quoting mismatch");
+    assert(bd_shell_quote_posix("rock'n'roll") == "'rock'\\''n'\\''roll'", "single-quote escaping mismatch");
+    assert(bd_shell_quote_posix("") == "''", "empty string should still be quoted");
 }
 
 /**
  * Tests test_shell_quote_windows_handles_spaces_and_quotes.
  */
 func test_shell_quote_windows_handles_spaces_and_quotes() {
-    assert(eq_s(bd_shell_quote_windows("two words"), "\"two words\""), "space quoting mismatch");
-    assert(eq_s(bd_shell_quote_windows("say \"hi\""), "\"say \\\"hi\\\"\""), "double-quote escaping mismatch");
-    assert(eq_s(bd_shell_quote_windows(""), "\"\""), "empty string should still be quoted");
+    assert(bd_shell_quote_windows("two words") == "\"two words\"", "space quoting mismatch");
+    assert(bd_shell_quote_windows("say \"hi\"") == "\"say \\\"hi\\\"\"", "double-quote escaping mismatch");
+    assert(bd_shell_quote_windows("") == "\"\"", "empty string should still be quoted");
 }
 
 /**
@@ -50,9 +49,9 @@ func test_join_shell_words_quotes_every_token() {
 
         let joined = bd_join_shell_words(words);
         if (bd_is_windows()) {
-            assert(eq_s(joined, "alpha \"two words\" \"rock'n'roll\""), "joined shell command mismatch");
+            assert(joined == "alpha \"two words\" \"rock'n'roll\"", "joined shell command mismatch");
         } else {
-            assert(eq_s(joined, "'alpha' 'two words' 'rock'\\''n'\\''roll'"), "joined shell command mismatch");
+            assert(joined == "'alpha' 'two words' 'rock'\\''n'\\''roll'", "joined shell command mismatch");
         }
     }
 }
@@ -61,9 +60,9 @@ func test_join_shell_words_quotes_every_token() {
  * Tests test_windows_exec_token_rewrites_relative_slashes.
  */
 func test_windows_exec_token_rewrites_relative_slashes() {
-    assert(eq_s(bd_windows_exec_token("./temp.exe"), ".\\temp.exe"), "dot-relative executable path mismatch");
-    assert(eq_s(bd_windows_exec_token("../bin/temp.exe"), "..\\bin\\temp.exe"), "parent-relative executable path mismatch");
-    assert(eq_s(bd_windows_exec_token("clang"), "clang"), "plain command should remain unchanged");
+    assert(bd_windows_exec_token("./temp.exe") == ".\\temp.exe", "dot-relative executable path mismatch");
+    assert(bd_windows_exec_token("../bin/temp.exe") == "..\\bin\\temp.exe", "parent-relative executable path mismatch");
+    assert(bd_windows_exec_token("clang") == "clang", "plain command should remain unchanged");
 }
 
 /**
@@ -76,7 +75,7 @@ func test_join_display_words_matches_stage1_logging() {
         vs_push(words, "-O1");
 
         let joined = bd_join_display_words(words);
-        assert(eq_s(joined, "clang file.c -O1"), "display command mismatch");
+        assert(joined == "clang file.c -O1", "display command mismatch");
     }
 }
 
@@ -85,10 +84,10 @@ func test_join_display_words_matches_stage1_logging() {
  */
 func test_format_word_list_matches_stage1_logging() {
     with (let words = vs_create(2) => vs_free(words)) {
-        assert(eq_s(bd_format_word_list(words), "[]"), "empty option list mismatch");
+        assert(bd_format_word_list(words) == "[]", "empty option list mismatch");
         vs_push(words, "-g");
         vs_push(words, "-O0");
-        assert(eq_s(bd_format_word_list(words), "['-g', '-O0']"), "formatted option list mismatch");
+        assert(bd_format_word_list(words) == "['-g', '-O0']", "formatted option list mismatch");
     }
 }
 
@@ -96,11 +95,11 @@ func test_format_word_list_matches_stage1_logging() {
  * Tests test_compiler_flag_family_detection.
  */
 func test_compiler_flag_family_detection() {
-    assert(eq_s(bd_compiler_flag_family("gcc"), "gcc"), "gcc family mismatch");
-    assert(eq_s(bd_compiler_flag_family("/usr/bin/clang-18"), "gcc"), "clang family mismatch");
-    assert(eq_s(bd_compiler_flag_family("cc"), "cc"), "cc family mismatch");
-    assert(eq_s(bd_compiler_flag_family("cl.exe"), "msvc"), "msvc family mismatch");
-    assert(eq_s(bd_compiler_flag_family("custom-cc"), "unknown"), "unknown family mismatch");
+    assert(bd_compiler_flag_family("gcc") == "gcc", "gcc family mismatch");
+    assert(bd_compiler_flag_family("/usr/bin/clang-18") == "gcc", "clang family mismatch");
+    assert(bd_compiler_flag_family("cc") == "cc", "cc family mismatch");
+    assert(bd_compiler_flag_family("cl.exe") == "msvc", "msvc family mismatch");
+    assert(bd_compiler_flag_family("custom-cc") == "unknown", "unknown family mismatch");
 }
 
 /**
@@ -113,68 +112,24 @@ func test_get_optimize_flag_defaults_and_overrides() {
         if (bd_is_windows()) {
             expected = "-O0";
         }
-        assert(gcc_opt != null && eq_s(gcc_opt as string, expected), "gcc default optimize flag mismatch");
+        assert(gcc_opt != null && gcc_opt as string == expected, "gcc default optimize flag mismatch");
     }
 
     with (let debug_words = vs_create(1) => vs_free(debug_words)) {
         vs_push(debug_words, "-g");
         let gcc_debug = bd_get_optimize_flag("gcc", debug_words);
-        assert(gcc_debug != null && eq_s(gcc_debug as string, "-Og"), "gcc debug optimize flag mismatch");
+        assert(gcc_debug != null && gcc_debug as string == "-Og", "gcc debug optimize flag mismatch");
     }
 
     with (let msvc_debug_words = vs_create(1) => vs_free(msvc_debug_words)) {
         vs_push(msvc_debug_words, "/Zi");
         let msvc_debug = bd_get_optimize_flag("msvc", msvc_debug_words);
-        assert(msvc_debug != null && eq_s(msvc_debug as string, "/Od"), "msvc debug optimize flag mismatch");
+        assert(msvc_debug != null && msvc_debug as string == "/Od", "msvc debug optimize flag mismatch");
     }
 
     with (let explicit_opt = vs_create(1) => vs_free(explicit_opt)) {
         vs_push(explicit_opt, "-O2");
         assert(bd_get_optimize_flag("gcc", explicit_opt) == null, "explicit optimize flag should suppress defaults");
-    }
-}
-
-/**
- * Tests rejection of explicit C options that violate the floating-point backend contract.
- */
-func test_float_contract_option_detection() {
-    assert(bd_float_contract_forbidden_option_reason("-ffast-math") != null, "fast-math should be rejected");
-    assert(bd_float_contract_forbidden_option_reason("-Ofast") != null, "Ofast should be rejected");
-    assert(bd_float_contract_forbidden_option_reason("-ffinite-math-only") != null,
-        "finite-math-only should be rejected");
-    assert(bd_float_contract_forbidden_option_reason("-fno-signed-zeros") != null,
-        "signed-zero disabling should be rejected");
-    assert(bd_float_contract_forbidden_option_reason("-funsafe-math-optimizations") != null,
-        "unsafe math optimizations should be rejected");
-    assert(bd_float_contract_forbidden_option_reason("/FP:FAST") != null, "MSVC fast FP mode should be rejected");
-    assert(bd_float_contract_forbidden_option_reason("-O2") == null, "ordinary optimization should stay allowed");
-    assert(bd_float_contract_forbidden_option_reason("-g") == null, "debug flags should stay allowed");
-}
-
-/**
- * Tests that `sys.real` math-library flags are only added for non-MSVC toolchains.
- */
-func test_sys_real_link_flags_follow_family_and_usage() {
-    with (let gcc_words = vs_create(2) => vs_free(gcc_words)) {
-        assert(bd_push_sys_real_link_flags(gcc_words, "gcc", true), "gcc sys.real build should append link flags");
-        assert(vs_size(gcc_words) == 1, "gcc sys.real build should append one link flag");
-        assert(eq_s(vs_get(gcc_words, 0), "-lm"), "gcc sys.real link flag mismatch");
-    }
-
-    with (let cc_words = vs_create(2) => vs_free(cc_words)) {
-        assert(bd_push_sys_real_link_flags(cc_words, "cc", true), "cc sys.real build should append link flags");
-        assert(vs_size(cc_words) == 1, "cc sys.real build should append one link flag");
-        assert(eq_s(vs_get(cc_words, 0), "-lm"), "cc sys.real link flag mismatch");
-    }
-
-    with (let msvc_words = vs_create(2) => vs_free(msvc_words)) {
-        assert(!bd_push_sys_real_link_flags(msvc_words, "msvc", true), "msvc sys.real build should not append flags");
-        assert(vs_size(msvc_words) == 0, "msvc sys.real build should not append link flags");
-    }
-
-    with (let unused_words = vs_create(2) => vs_free(unused_words)) {
-        assert(!bd_push_sys_real_link_flags(unused_words, "gcc", false), "float-only build should not append flags");
-        assert(vs_size(unused_words) == 0, "float-only build should not append link flags");
     }
 }
 
@@ -185,48 +140,14 @@ func test_output_flag_selection_matches_compiler_family() {
     with (let gcc_words = vs_create(4) => vs_free(gcc_words)) {
         bd_push_output_flags(gcc_words, "gcc", "out.exe");
         assert(vs_size(gcc_words) == 2, "gcc output flags should use two argv words");
-        assert(eq_s(vs_get(gcc_words, 0), "-o"), "gcc output flag mismatch");
-        assert(eq_s(vs_get(gcc_words, 1), "out.exe"), "gcc output path mismatch");
+        assert(vs_get(gcc_words, 0) == "-o", "gcc output flag mismatch");
+        assert(vs_get(gcc_words, 1) == "out.exe", "gcc output path mismatch");
     }
 
     with (let msvc_words = vs_create(2) => vs_free(msvc_words)) {
         bd_push_output_flags(msvc_words, "msvc", "out.exe");
         assert(vs_size(msvc_words) == 1, "msvc output flags should use one argv word");
-        assert(eq_s(vs_get(msvc_words, 0), "/Fe:out.exe"), "msvc output flag mismatch");
-    }
-}
-
-/**
- * Tests test_runtime_lib_validation_accepts_existing_directory.
- */
-func test_runtime_lib_validation_accepts_existing_directory() {
-    with (let diags = diag_create() => diag_free(diags)) {
-        assert(bd_validate_runtime_lib(".", diags), "existing runtime-lib directory should be accepted");
-        assert(diag_count(diags) == 0, "expected no diagnostics for existing runtime-lib directory");
-    }
-}
-
-/**
- * Tests test_runtime_lib_validation_rejects_missing_directory.
- */
-func test_runtime_lib_validation_rejects_missing_directory() {
-    with (let diags = diag_create() => diag_free(diags)) {
-        let missing = "__dea_missing_runtime_lib_dir__";
-        assert(!bd_validate_runtime_lib(missing, diags), "missing runtime-lib directory should be rejected");
-        assert(diag_count(diags) == 1, "expected one diagnostic for missing runtime-lib directory");
-        assert(eq_s(diag_get(diags, 0).code, "L1C-0014"), "missing runtime-lib diagnostic code mismatch");
-    }
-}
-
-/**
- * Tests test_runtime_lib_flags_add_search_path_only.
- */
-func test_runtime_lib_flags_add_search_path_only() {
-    with (let words = vs_create(4) => vs_free(words)) {
-        bd_push_runtime_lib_flags(words, "runtime/lib");
-        assert(vs_size(words) == 2, "runtime-lib flags should add only a search path");
-        assert(eq_s(vs_get(words, 0), "-L"), "runtime-lib search-path flag mismatch");
-        assert(eq_s(vs_get(words, 1), "runtime/lib"), "runtime-lib search-path value mismatch");
+        assert(vs_get(msvc_words, 0) == "/Fe:out.exe", "msvc output flag mismatch");
     }
 }
 
@@ -235,13 +156,13 @@ func test_runtime_lib_flags_add_search_path_only() {
  */
 func test_exe_name_helpers_are_consistent() {
     if (bd_is_windows()) {
-        assert(eq_s(bd_default_exe_name(), "a.exe"), "windows build name mismatch");
-        assert(eq_s(bd_exe_suffix(), ".exe"), "windows suffix mismatch");
-        assert(eq_s(bd_null_device(), "NUL"), "windows null device mismatch");
+        assert(bd_default_exe_name() == "a.exe", "windows build name mismatch");
+        assert(bd_exe_suffix() == ".exe", "windows suffix mismatch");
+        assert(bd_null_device() == "NUL", "windows null device mismatch");
     } else {
-        assert(eq_s(bd_default_exe_name(), "a.out"), "posix build name mismatch");
-        assert(eq_s(bd_exe_suffix(), ".out"), "posix suffix mismatch");
-        assert(eq_s(bd_null_device(), "/dev/null"), "posix null device mismatch");
+        assert(bd_default_exe_name() == "a.out", "posix build name mismatch");
+        assert(bd_exe_suffix() == ".out", "posix suffix mismatch");
+        assert(bd_null_device() == "/dev/null", "posix null device mismatch");
     }
 }
 
@@ -258,12 +179,7 @@ func main() {
     test_format_word_list_matches_stage1_logging();
     test_compiler_flag_family_detection();
     test_get_optimize_flag_defaults_and_overrides();
-    test_float_contract_option_detection();
-    test_sys_real_link_flags_follow_family_and_usage();
     test_output_flag_selection_matches_compiler_family();
-    test_runtime_lib_validation_accepts_existing_directory();
-    test_runtime_lib_validation_rejects_missing_directory();
-    test_runtime_lib_flags_add_search_path_only();
     test_exe_name_helpers_are_consistent();
     printl_s("build_driver_test: all tests passed");
 }

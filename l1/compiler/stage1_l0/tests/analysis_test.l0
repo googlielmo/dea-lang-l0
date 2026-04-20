@@ -45,7 +45,7 @@ func make_paths() -> SourceSearchPaths* {
 func has_diag_code(result: AnalysisResult*, code: string) -> bool {
     for (let i = 0; i < analysis_diag_count(result); i = i + 1) {
         let d = analysis_diag_get(result, i);
-        if (eq_s(d.code, code)) {
+        if (d.code == code) {
             return true;
         }
     }

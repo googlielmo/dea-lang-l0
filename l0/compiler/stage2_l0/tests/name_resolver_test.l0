@@ -46,7 +46,7 @@ func make_paths() -> SourceSearchPaths* {
 func has_diag_code(diags: DiagCollector*, code: string) -> bool {
     for (let i = 0; i < diag_count(diags); i = i + 1) {
         let d = diag_get(diags, i);
-        if (eq_s(d.code, code)) {
+        if (d.code == code) {
             return true;
         }
     }
@@ -64,7 +64,7 @@ func count_diag_code(diags: DiagCollector*, code: string) -> int {
     let count = 0;
     for (let i = 0; i < diag_count(diags); i = i + 1) {
         let d = diag_get(diags, i);
-        if (eq_s(d.code, code)) {
+        if (d.code == code) {
             count = count + 1;
         }
     }
@@ -101,7 +101,7 @@ func test_name_resolution_ok() {
         assert(some_sym != null, "expected enum variant symbol");
         let sym = some_sym as Symbol*;
         assert(ord(sym.kind) == ord(SYM_ENUM_VARIANT), "expected enum variant symbol kind");
-        assert(eq_s(sym.owner_name, "OptionInt"), "expected parent enum owner name");
+        assert(sym.owner_name == "OptionInt", "expected parent enum owner name");
 
         nr_free(names);
         driver_state_free(state);
@@ -169,7 +169,7 @@ func test_import_shadow_warning_keeps_qualified_variant_lookup_available() {
         let saw_due = false;
         for (let i = 0; i < diag_count(diags); i = i + 1) {
             let d = diag_get(diags, i);
-            if (!eq_s(d.code, "RES-0021")) {
+            if (d.code != "RES-0021") {
                 continue;
             }
             if (contains_s(d.message, "shadow_warn_uno::Red")) {

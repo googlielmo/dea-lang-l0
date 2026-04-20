@@ -158,7 +158,7 @@ func dp_print_snippet(diag: Diagnostic*) {
  */
 func dp_source_cached(cache_names: VectorString*, cache_texts: VectorString*, filename: string) -> string {
     for (let i = 0; i < vs_size(cache_names); i = i + 1) {
-        if (eq_s(vs_get(cache_names, i), filename)) {
+        if (vs_get(cache_names, i) == filename) {
             return vs_get(cache_texts, i);
         }
     }

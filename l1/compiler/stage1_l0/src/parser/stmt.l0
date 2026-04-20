@@ -389,7 +389,7 @@ func ps_parse_match_stmt(self: ParserState*) -> StmtId? {
                     return null;
                 }
 
-                if (ord(pi.kind) == ord(PT_VARIANT) && ord(pj.kind) == ord(PT_VARIANT) && eq_s(pi.name, pj.name)) {
+                if (ord(pi.kind) == ord(PT_VARIANT) && ord(pj.kind) == ord(PT_VARIANT) && pi.name == pj.name) {
                     ps_emit_error(self, "PAR-0176", "[PAR-0176] duplicate variant patterns in match statement", ps_peek(self));
                     return null;
                 }

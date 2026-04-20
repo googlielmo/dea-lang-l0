@@ -111,7 +111,7 @@ func cet_empty_enum_decl(name: string) -> EnumDecl* {
  */
 func test_string_escape_encodes_control_and_quote_bytes() {
     let escaped = se_encode_c_string_bytes("A\n\"\\B");
-    assert(eq_s(escaped, "A\\n\\\"\\\\B"), "escaped string mismatch");
+    assert(escaped == "A\\n\\\"\\\\B", "escaped string mismatch");
 }
 
 /**
@@ -126,7 +126,7 @@ func test_code_builder_tracks_indentation() {
     ccb_emit(out, "}");
 
     let text = ccb_to_string(out);
-    assert(eq_s(text, "if (true) {\n    return 0;\n}\n"), "builder output mismatch");
+    assert(text == "if (true) {\n    return 0;\n}\n", "builder output mismatch");
     ccb_free(out);
 }
 
@@ -136,26 +136,26 @@ func test_code_builder_tracks_indentation() {
 func test_emitter_name_mangling() {
     let emitter = cem_create();
 
-    assert(eq_s(cem_mangle_struct_name("demo.main", "Point"), "dea_demo_main_Point"), "struct name mismatch");
-    assert(eq_s(cem_mangle_function_name("demo.main", "main"), "dea_demo_main_main"), "function name mismatch");
-    assert(eq_s(cem_mangle_let_name("demo.main", "static"), "dea_demo_main_dea_kw_static"), "let name mismatch");
-    assert(eq_s(cem_mangle_struct_name("demo.main", "l0_conflict"), "dea_demo_main_l0_conflict__v"),
+    assert(cem_mangle_struct_name("demo.main", "Point") == "dea_demo_main_Point", "struct name mismatch");
+    assert(cem_mangle_function_name("demo.main", "main") == "dea_demo_main_main", "function name mismatch");
+    assert(cem_mangle_let_name("demo.main", "static") == "dea_demo_main_dea_kw_static", "let name mismatch");
+    assert(cem_mangle_struct_name("demo.main", "l0_conflict") == "dea_demo_main_l0_conflict__v",
         "legacy public prefix should be mangled");
-    assert(eq_s(cem_mangle_function_name("demo.main", "rt_helper"), "dea_demo_main_rt_helper__v"),
+    assert(cem_mangle_function_name("demo.main", "rt_helper") == "dea_demo_main_rt_helper__v",
         "runtime prefix should be mangled");
-    assert(eq_s(cem_mangle_enum_name("demo.main", "dea_Value"), "dea_demo_main_dea_Value__v"),
+    assert(cem_mangle_enum_name("demo.main", "dea_Value") == "dea_demo_main_dea_Value__v",
         "new public prefix should be mangled");
-    assert(eq_s(cem_mangle_identifier("return"), "return__v"), "identifier keyword mangling mismatch");
-    assert(eq_s(cem_mangle_identifier("l0_tmp"), "l0_tmp__v"), "legacy local prefix should be mangled");
-    assert(eq_s(cem_mangle_identifier("_l0_hidden"), "_l0_hidden__v"), "legacy private prefix should be mangled");
-    assert(eq_s(cem_mangle_identifier("rt_print"), "rt_print__v"), "runtime local prefix should be mangled");
-    assert(eq_s(cem_mangle_identifier("_rt_state"), "_rt_state__v"), "private runtime prefix should be mangled");
-    assert(eq_s(cem_mangle_identifier("dea_name"), "dea_name__v"), "dea local prefix should be mangled");
-    assert(eq_s(cem_mangle_identifier("_dea_name"), "_dea_name__v"), "private dea local prefix should be mangled");
-    assert(eq_s(cem_mangle_identifier("DEA_MACRO"), "DEA_MACRO__v"), "DEA local prefix should be mangled");
-    assert(eq_s(cem_mangle_identifier("_DEA_MACRO"), "_DEA_MACRO__v"), "private DEA local prefix should be mangled");
-    assert(eq_s(cem_mangle_identifier("tmp__v"), "tmp__v__v"), "identifier suffix mangling mismatch");
-    assert(eq_s(cem_fresh_tmp(emitter, "tmp"), "dea_tmp_1"), "fresh temp name mismatch");
+    assert(cem_mangle_identifier("return") == "return__v", "identifier keyword mangling mismatch");
+    assert(cem_mangle_identifier("l0_tmp") == "l0_tmp__v", "legacy local prefix should be mangled");
+    assert(cem_mangle_identifier("_l0_hidden") == "_l0_hidden__v", "legacy private prefix should be mangled");
+    assert(cem_mangle_identifier("rt_print") == "rt_print__v", "runtime local prefix should be mangled");
+    assert(cem_mangle_identifier("_rt_state") == "_rt_state__v", "private runtime prefix should be mangled");
+    assert(cem_mangle_identifier("dea_name") == "dea_name__v", "dea local prefix should be mangled");
+    assert(cem_mangle_identifier("_dea_name") == "_dea_name__v", "private dea local prefix should be mangled");
+    assert(cem_mangle_identifier("DEA_MACRO") == "DEA_MACRO__v", "DEA local prefix should be mangled");
+    assert(cem_mangle_identifier("_DEA_MACRO") == "_DEA_MACRO__v", "private DEA local prefix should be mangled");
+    assert(cem_mangle_identifier("tmp__v") == "tmp__v__v", "identifier suffix mangling mismatch");
+    assert(cem_fresh_tmp(emitter, "tmp") == "dea_tmp_1", "fresh temp name mismatch");
 
     cem_free(emitter);
 }
@@ -180,27 +180,27 @@ func test_emitter_type_lowering_and_null_forms() {
     let long_opt_ty = type_new_nullable(type_builtin_long());
     let ulong_opt_ty = type_new_nullable(type_builtin_ulong());
 
-    assert(eq_s(cem_emit_type(builtin_int_ty), "dea_int"), "builtin int type mismatch");
-    assert(eq_s(cem_emit_type(tiny_ty), "dea_tiny"), "builtin tiny type mismatch");
-    assert(eq_s(cem_emit_type(short_ty), "dea_short"), "builtin short type mismatch");
-    assert(eq_s(cem_emit_type(ushort_ty), "dea_ushort"), "builtin ushort type mismatch");
-    assert(eq_s(cem_emit_type(uint_ty), "dea_uint"), "builtin uint type mismatch");
-    assert(eq_s(cem_emit_type(long_ty), "dea_long"), "builtin long type mismatch");
-    assert(eq_s(cem_emit_type(ulong_ty), "dea_ulong"), "builtin ulong type mismatch");
-    assert(eq_s(cem_emit_type(float_ty), "float"), "builtin float type mismatch");
-    assert(eq_s(cem_emit_type(double_ty), "double"), "builtin double type mismatch");
-    assert(eq_s(cem_emit_type(point_ty), "struct dea_demo_main_Point"), "struct type mismatch");
-    assert(eq_s(cem_emit_type(point_ptr_ty), "struct dea_demo_main_Point*"), "pointer type mismatch");
-    assert(eq_s(cem_emit_type(point_opt_ty), "dea_opt_s_dea_demo_main_Point"), "nullable struct type mismatch");
-    assert(eq_s(cem_emit_type(uint_opt_ty), "dea_opt_uint"), "nullable uint type mismatch");
-    assert(eq_s(cem_emit_type(long_opt_ty), "dea_opt_long"), "nullable long type mismatch");
-    assert(eq_s(cem_emit_type(ulong_opt_ty), "dea_opt_ulong"), "nullable ulong type mismatch");
-    assert(eq_s(cem_emit_none_value_for_nullable(point_opt_ty), "((dea_opt_s_dea_demo_main_Point){.has_value = 0})"),
+    assert(cem_emit_type(builtin_int_ty) == "dea_int", "builtin int type mismatch");
+    assert(cem_emit_type(tiny_ty) == "dea_tiny", "builtin tiny type mismatch");
+    assert(cem_emit_type(short_ty) == "dea_short", "builtin short type mismatch");
+    assert(cem_emit_type(ushort_ty) == "dea_ushort", "builtin ushort type mismatch");
+    assert(cem_emit_type(uint_ty) == "dea_uint", "builtin uint type mismatch");
+    assert(cem_emit_type(long_ty) == "dea_long", "builtin long type mismatch");
+    assert(cem_emit_type(ulong_ty) == "dea_ulong", "builtin ulong type mismatch");
+    assert(cem_emit_type(float_ty) == "float", "builtin float type mismatch");
+    assert(cem_emit_type(double_ty) == "double", "builtin double type mismatch");
+    assert(cem_emit_type(point_ty) == "struct dea_demo_main_Point", "struct type mismatch");
+    assert(cem_emit_type(point_ptr_ty) == "struct dea_demo_main_Point*", "pointer type mismatch");
+    assert(cem_emit_type(point_opt_ty) == "dea_opt_s_dea_demo_main_Point", "nullable struct type mismatch");
+    assert(cem_emit_type(uint_opt_ty) == "dea_opt_uint", "nullable uint type mismatch");
+    assert(cem_emit_type(long_opt_ty) == "dea_opt_long", "nullable long type mismatch");
+    assert(cem_emit_type(ulong_opt_ty) == "dea_opt_ulong", "nullable ulong type mismatch");
+    assert(cem_emit_none_value_for_nullable(point_opt_ty) == "((dea_opt_s_dea_demo_main_Point){.has_value = 0})",
         "nullable none mismatch");
-    assert(eq_s(cem_emit_null_literal(point_opt_ty, false), "((dea_opt_s_dea_demo_main_Point){.has_value = 0})"),
+    assert(cem_emit_null_literal(point_opt_ty, false) == "((dea_opt_s_dea_demo_main_Point){.has_value = 0})",
         "nullable expression null mismatch");
-    assert(eq_s(cem_emit_null_literal(point_opt_ty, true), "{0}"), "nullable initializer null mismatch");
-    assert(eq_s(cem_emit_null_literal(point_ptr_ty, false), "NULL"), "pointer null mismatch");
+    assert(cem_emit_null_literal(point_opt_ty, true) == "{0}", "nullable initializer null mismatch");
+    assert(cem_emit_null_literal(point_ptr_ty, false) == "NULL", "pointer null mismatch");
 
     type_free(builtin_int_ty);
     type_free(tiny_ty);
@@ -227,25 +227,23 @@ func test_emitter_large_integer_helpers() {
     let long_ty = type_builtin_long();
     let ulong_ty = type_builtin_ulong();
 
-    assert(eq_s(cem_emit_typed_bigint_literal("4294967295", 10, uint_ty), "4294967295U"),
+    assert(cem_emit_typed_bigint_literal("4294967295", 10, uint_ty) == "4294967295U",
         "typed uint bigint literal mismatch");
-    assert(eq_s(cem_emit_typed_bigint_literal("-8000000000000000", 16, long_ty), "INT64_MIN"),
+    assert(cem_emit_typed_bigint_literal("-8000000000000000", 16, long_ty) == "INT64_MIN",
         "typed long bigint literal mismatch");
-    assert(eq_s(cem_emit_typed_bigint_literal("ffffffffffffffff", 16, ulong_ty), "0xffffffffffffffffULL"),
+    assert(cem_emit_typed_bigint_literal("ffffffffffffffff", 16, ulong_ty) == "0xffffffffffffffffULL",
         "typed ulong bigint literal mismatch");
-    assert(eq_s(cem_emit_typed_bigint_literal("11111111", 2, uint_ty), "0xffU"),
+    assert(cem_emit_typed_bigint_literal("11111111", 2, uint_ty) == "0xffU",
         "binary bigint literal should lower through a C99-safe spelling");
-    assert(eq_s(cem_emit_widen_int("x", uint_ty, ulong_ty), "((dea_ulong)(x))"),
+    assert(cem_emit_widen_int("x", uint_ty, ulong_ty) == "((dea_ulong)(x))",
         "uint-to-ulong widening mismatch");
-    assert(eq_s(cem_emit_checked_int_add_for_type(long_ty, "a", "b"), "(_rt_ladd(a, b))"),
+    assert(cem_emit_checked_int_add_for_type(long_ty, "a", "b") == "(_rt_ladd(a, b))",
         "long addition helper mismatch");
-    assert(eq_s(cem_emit_checked_int_div_for_type(ulong_ty, "a", "b"), "(_rt_uldiv(a, b))"),
+    assert(cem_emit_checked_int_div_for_type(ulong_ty, "a", "b") == "(_rt_uldiv(a, b))",
         "ulong division helper mismatch");
-    assert(eq_s(cem_emit_checked_signed_cast("dea_short", "value"),
-        "(_rt_cast_dea_short_from_signed((dea_long)(value)))"),
+    assert(cem_emit_checked_signed_cast("dea_short", "value") == "(_rt_cast_dea_short_from_signed((dea_long)(value)))",
         "signed checked cast mismatch");
-    assert(eq_s(cem_emit_checked_unsigned_cast("dea_long", "value"),
-        "(_rt_cast_dea_long_from_unsigned((dea_ulong)(value)))"),
+    assert(cem_emit_checked_unsigned_cast("dea_long", "value") == "(_rt_cast_dea_long_from_unsigned((dea_ulong)(value)))",
         "unsigned checked cast mismatch");
 
     type_free(uint_ty);
@@ -338,7 +336,7 @@ func test_emitter_line_directives_normalize_windows_paths() {
 
     cem_emit_line_directive(emitter, 7, "demo.main", opts);
     let text = cem_get_output(emitter);
-    assert(eq_s(text, "#line 7 \"D:/tmp/project/demo.l1\"\n"), "line directive path normalization mismatch");
+    assert(text == "#line 7 \"D:/tmp/project/demo.l1\"\n", "line directive path normalization mismatch");
 
     cg_options_free(opts);
     cem_free(emitter);
@@ -352,8 +350,8 @@ func test_emitter_string_literals_use_dea_string_const() {
     let expr_literal = cem_emit_string_literal("A\nB");
     let const_literal = cem_emit_const_string_literal("A\nB");
 
-    assert(eq_s(expr_literal, "((dea_string)DEA_STRING_CONST(\"A\\nB\", 3))"), "expression literal mismatch");
-    assert(eq_s(const_literal, "DEA_STRING_CONST(\"A\\nB\", 3)"), "const literal mismatch");
+    assert(expr_literal == "((dea_string)DEA_STRING_CONST(\"A\\nB\", 3))", "expression literal mismatch");
+    assert(const_literal == "DEA_STRING_CONST(\"A\\nB\", 3)", "const literal mismatch");
 }
 
 /**
@@ -373,31 +371,28 @@ func test_emitter_expression_and_statement_helpers() {
         vs_push(payload_inits, "value");
         vs_push(payload_inits, "pt");
 
-        assert(eq_s(cem_emit_bool_literal(true), "1"), "expression bool literal mismatch");
-        assert(eq_s(cem_emit_const_bool_literal(false), "false"), "const bool literal mismatch");
-        assert(eq_s(cem_emit_binary_op("+", "a", "b"), "(a + b)"), "binary-op helper mismatch");
-        assert(eq_s(cem_emit_checked_int_add("a", "b"), "(_rt_iadd(a, b))"), "checked add helper mismatch");
-        assert(eq_s(cem_emit_function_call("fn", "x, y"), "fn(x, y)"), "function call helper mismatch");
-        assert(eq_s(cem_emit_field_access("obj", "x", false), "(obj).x"), "field access helper mismatch");
-        assert(eq_s(cem_emit_cast("dea_int", "b"), "((dea_int)(b))"), "cast helper mismatch");
-        assert(eq_s(cem_emit_checked_narrow_cast("dea_tiny", "x"), "(_rt_narrow_dea_tiny(x))"),
+        assert(cem_emit_bool_literal(true) == "1", "expression bool literal mismatch");
+        assert(cem_emit_const_bool_literal(false) == "false", "const bool literal mismatch");
+        assert(cem_emit_binary_op("+", "a", "b") == "(a + b)", "binary-op helper mismatch");
+        assert(cem_emit_checked_int_add("a", "b") == "(_rt_iadd(a, b))", "checked add helper mismatch");
+        assert(cem_emit_function_call("fn", "x, y") == "fn(x, y)", "function call helper mismatch");
+        assert(cem_emit_field_access("obj", "x", false) == "(obj).x", "field access helper mismatch");
+        assert(cem_emit_cast("dea_int", "b") == "((dea_int)(b))", "cast helper mismatch");
+        assert(cem_emit_checked_narrow_cast("dea_tiny", "x") == "(_rt_narrow_dea_tiny(x))",
             "tiny narrow helper mismatch");
-        assert(eq_s(cem_emit_optional_has_value("opt"), "(opt).has_value"), "optional has-value helper mismatch");
-        assert(eq_s(cem_emit_optional_value("opt"), "(opt).value"), "optional value helper mismatch");
-        assert(eq_s(cem_emit_enum_tag_access("value"), "(value).tag"), "enum tag helper mismatch");
-        assert(eq_s(cem_emit_enum_payload_field_access("value", "Some", "inner"),
-            "(value).data.Some.inner"), "enum payload helper mismatch");
-        assert(eq_s(cem_emit_string_equals_call("lhs", "rhs"), "rt_string_equals(lhs, rhs)"),
+        assert(cem_emit_optional_has_value("opt") == "(opt).has_value", "optional has-value helper mismatch");
+        assert(cem_emit_optional_value("opt") == "(opt).value", "optional value helper mismatch");
+        assert(cem_emit_enum_tag_access("value") == "(value).tag", "enum tag helper mismatch");
+        assert(cem_emit_enum_payload_field_access("value", "Some", "inner") == "(value).data.Some.inner", "enum payload helper mismatch");
+        assert(cem_emit_string_equals_call("lhs", "rhs") == "rt_string_equals(lhs, rhs)",
             "string-equals helper mismatch");
-        assert(eq_s(cem_emit_string_compare_call("<=", "lhs", "rhs"), "(rt_string_compare(lhs, rhs) <= 0)"),
+        assert(cem_emit_string_compare_call("<=", "lhs", "rhs") == "(rt_string_compare(lhs, rhs) <= 0)",
             "string-compare helper mismatch");
-        assert(eq_s(cem_emit_unary_op("!", cem_emit_string_equals_call("lhs", "rhs")), "(!rt_string_equals(lhs, rhs))"),
+        assert(cem_emit_unary_op("!", cem_emit_string_equals_call("lhs", "rhs")) == "(!rt_string_equals(lhs, rhs))",
             "string-not-equals helper mismatch");
-        assert(eq_s(cem_emit_discard_expr("tmp"), "(void)(tmp)"), "discard helper mismatch");
-        assert(eq_s(cem_emit_struct_constructor_for_type(point_ty, field_inits),
-            "(struct dea_demo_main_Point){ .x = 1, .y = 2 }"), "struct constructor helper mismatch");
-        assert(eq_s(cem_emit_variant_constructor_for_type(maybe_point_ty, "Some", payload_inits),
-            "(struct dea_demo_main_MaybePoint){ .tag = dea_demo_main_MaybePoint_Some, .data = { .Some = { .value = pt } } }"),
+        assert(cem_emit_discard_expr("tmp") == "(void)(tmp)", "discard helper mismatch");
+        assert(cem_emit_struct_constructor_for_type(point_ty, field_inits) == "(struct dea_demo_main_Point){ .x = 1, .y = 2 }", "struct constructor helper mismatch");
+        assert(cem_emit_variant_constructor_for_type(maybe_point_ty, "Some", payload_inits) == "(struct dea_demo_main_MaybePoint){ .tag = dea_demo_main_MaybePoint_Some, .data = { .Some = { .value = pt } } }",
             "variant constructor helper mismatch");
     }
 
@@ -409,7 +404,7 @@ func test_emitter_expression_and_statement_helpers() {
     cem_emit_block_end(emitter);
 
     let text = cem_get_output(emitter);
-    assert(eq_s(text, "dea_int tmp = 1;\ntmp = 2;\nif (cond)\n{\n    return tmp;\n}\n"), "statement helper output mismatch");
+    assert(text == "dea_int tmp = 1;\ntmp = 2;\nif (cond)\n{\n    return tmp;\n}\n", "statement helper output mismatch");
 
     type_free(point_ty);
     type_free(maybe_point_ty);
@@ -511,7 +506,7 @@ func test_emitter_forward_decls_follow_loaded_module_order() {
         sb_append(expected, "struct dea_demo_main_Color;\n");
         sb_append(expected, "struct dea_demo_math_Box;\n");
         sb_append(expected, "\n");
-        assert(eq_s(cem_get_output(emitter), sb_to_string(expected)), "forward declarations output mismatch");
+        assert(cem_get_output(emitter) == sb_to_string(expected), "forward declarations output mismatch");
     }
 
     cem_free(emitter);
@@ -561,7 +556,7 @@ func test_emitter_optional_wrappers_emit_early_then_late() {
             "typedef struct { dea_bool has_value; struct dea_demo_main_Point value; } dea_opt_s_dea_demo_main_Point;\n");
         sb_append(expected, "#endif /* DEA_OPT_S_DEA_DEMO_MAIN_POINT_DEFINED */\n");
         sb_append(expected, "\n");
-        assert(eq_s(cem_get_output(emitter), sb_to_string(expected)), "optional wrapper emission mismatch");
+        assert(cem_get_output(emitter) == sb_to_string(expected), "optional wrapper emission mismatch");
     }
 
     cem_free(emitter);

@@ -27,7 +27,7 @@ func test_default_mode_build() {
         let opts = parsed.options as CliOptions*;
         assert(ord(opts.mode) == ord(CM_BUILD), "default mode must be build");
         assert(opts.entry_target != null, "expected entry target");
-        assert(eq_s(opts.entry_target as string, "app.main"), "expected app.main target");
+        assert(opts.entry_target as string == "app.main", "expected app.main target");
 
         cli_parse_result_free(parsed);
     }
@@ -49,10 +49,10 @@ func test_run_accepts_program_args_after_separator() {
         let opts = parsed.options as CliOptions*;
 
         assert(ord(opts.mode) == ord(CM_RUN), "expected run mode");
-        assert(eq_s(opts.entry_target as string, "app.main"), "expected run target");
+        assert(opts.entry_target as string == "app.main", "expected run target");
         assert(vs_size(opts.program_args) == 2, "expected 2 program args");
-        assert(eq_s(vs_get(opts.program_args, 0), "alpha"), "expected alpha arg");
-        assert(eq_s(vs_get(opts.program_args, 1), "--beta"), "expected --beta arg");
+        assert(vs_get(opts.program_args, 0) == "alpha", "expected alpha arg");
+        assert(vs_get(opts.program_args, 1) == "--beta", "expected --beta arg");
 
         cli_parse_result_free(parsed);
     }
@@ -160,7 +160,7 @@ func test_ast_mode_accepted() {
         let opts = parsed.options as CliOptions*;
         assert(ord(opts.mode) == ord(CM_AST), "expected CM_AST mode");
         assert(opts.entry_target != null, "expected entry target");
-        assert(eq_s(opts.entry_target as string, "app.main"), "expected app.main target");
+        assert(opts.entry_target as string == "app.main", "expected app.main target");
         assert(!opts.all_modules, "all_modules should default to false");
 
         cli_parse_result_free(parsed);

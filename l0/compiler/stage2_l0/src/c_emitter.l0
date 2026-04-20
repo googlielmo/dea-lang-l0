@@ -270,18 +270,18 @@ func cem_get_output(self: CEmitter*) -> string {
  * @return `true` if the name must be mangled.
  */
 func cem_is_c_keyword(name: string) -> bool {
-    return eq_s(name, "auto") || eq_s(name, "break") || eq_s(name, "case") || eq_s(name, "char") ||
-           eq_s(name, "const") || eq_s(name, "continue") || eq_s(name, "default") || eq_s(name, "do") ||
-           eq_s(name, "double") || eq_s(name, "else") || eq_s(name, "enum") || eq_s(name, "extern") ||
-           eq_s(name, "float") || eq_s(name, "for") || eq_s(name, "goto") || eq_s(name, "if") ||
-           eq_s(name, "inline") || eq_s(name, "int") || eq_s(name, "long") || eq_s(name, "register") ||
-           eq_s(name, "restrict") || eq_s(name, "return") || eq_s(name, "short") || eq_s(name, "signed") ||
-           eq_s(name, "sizeof") || eq_s(name, "static") || eq_s(name, "struct") || eq_s(name, "switch") ||
-           eq_s(name, "typedef") || eq_s(name, "union") || eq_s(name, "unsigned") || eq_s(name, "void") ||
-           eq_s(name, "volatile") || eq_s(name, "while") || eq_s(name, "alignas") || eq_s(name, "alignof") ||
-           eq_s(name, "atomic") || eq_s(name, "bool") || eq_s(name, "complex") || eq_s(name, "imaginary") ||
-           eq_s(name, "NULL") || eq_s(name, "null") || eq_s(name, "true") || eq_s(name, "false") ||
-           eq_s(name, "asm") || eq_s(name, "offsetof") || eq_s(name, "typeof");
+    return name == "auto" || name == "break" || name == "case" || name == "char" ||
+           name == "const" || name == "continue" || name == "default" || name == "do" ||
+           name == "double" || name == "else" || name == "enum" || name == "extern" ||
+           name == "float" || name == "for" || name == "goto" || name == "if" ||
+           name == "inline" || name == "int" || name == "long" || name == "register" ||
+           name == "restrict" || name == "return" || name == "short" || name == "signed" ||
+           name == "sizeof" || name == "static" || name == "struct" || name == "switch" ||
+           name == "typedef" || name == "union" || name == "unsigned" || name == "void" ||
+           name == "volatile" || name == "while" || name == "alignas" || name == "alignof" ||
+           name == "atomic" || name == "bool" || name == "complex" || name == "imaginary" ||
+           name == "NULL" || name == "null" || name == "true" || name == "false" ||
+           name == "asm" || name == "offsetof" || name == "typeof";
 }
 
 /**
@@ -579,7 +579,7 @@ func cem_emit_null_literal(expected_type: Type*, for_initializer: bool) -> strin
  * @return Widened C expression.
  */
 func cem_emit_widen_int(c_expr: string, src_type: Type*, dst_type: Type*) -> string {
-    if (eq_s(src_type.name, dst_type.name)) {
+    if (src_type.name == dst_type.name) {
         return c_expr;
     }
     if (type_is_builtin(src_type, "byte") && type_is_builtin(dst_type, "int")) {
@@ -751,7 +751,7 @@ func cem_emit_forward_decls(self: CEmitter*) {
 func cem_find_enum_variant_info(enum_info: EnumInfo*, variant_name: string) -> EnumVariantInfo*? {
     for (let i = 0; i < vec_size(enum_info.variants); i = i + 1) {
         let info = ptr_vec_get(enum_info.variants, i) as EnumVariantInfo*;
-        if (eq_s(info.name, variant_name)) {
+        if (info.name == variant_name) {
             return info;
         }
     }
@@ -1002,9 +1002,9 @@ func cem_emit_main_wrapper(self: CEmitter*, entry_module: string, func_type: Typ
     ccb_indent(self.out);
     ccb_emit(self.out, "_rt_init_args(argc, argv);");
 
-    if (eq_s(c_return_type, "l0_int")) {
+    if (c_return_type == "l0_int") {
         ccb_emit(self.out, concat3_s("int l0_exit_code = (int) ", mangled_name, "();"));
-    } else if (eq_s(c_return_type, "bool")) {
+    } else if (c_return_type == "bool") {
         ccb_emit(self.out, concat4_s("bool result = ", mangled_name, "(", ");"));
         ccb_emit(self.out, "int l0_exit_code = result ? 0 : 1;");
     } else {
@@ -2233,7 +2233,7 @@ func cem_find_enum_decl(self: CEmitter*, module_name: string, enum_name: string)
         let decl = ptr_vec_get(root.decls, i) as TopLevelDecl*;
         if (ord(decl.kind) == ord(TD_ENUM)) {
             let ed = decl.data as EnumDecl*;
-            if (eq_s(ed.name, enum_name)) {
+            if (ed.name == enum_name) {
                 return ed;
             }
         }

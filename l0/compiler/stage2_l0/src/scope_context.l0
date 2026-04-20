@@ -114,7 +114,7 @@ func sc_remove_owned(self: ScopeContext*, name: string) {
     let kept = ptr_vec_create(vec_size(self.owned_vars));
     for (let i = 0; i < vec_size(self.owned_vars); i = i + 1) {
         let item = ptr_vec_get(self.owned_vars, i) as ScopeVar*;
-        if (eq_s(item.name, name)) {
+        if (item.name == name) {
             sc_var_free(item);
             continue;
         }
@@ -137,7 +137,7 @@ func sc_lookup_declared_type(self: ScopeContext*?, name: string) -> Type*? {
         let scope = cur as ScopeContext*;
         for (let i = vec_size(scope.declared_vars) - 1; i >= 0; i = i - 1) {
             let item = ptr_vec_get(scope.declared_vars, i) as ScopeVar*;
-            if (eq_s(item.name, name)) {
+            if (item.name == name) {
                 return item.var_type;
             }
         }

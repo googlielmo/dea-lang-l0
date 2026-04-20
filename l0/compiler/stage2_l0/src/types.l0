@@ -248,7 +248,7 @@ func type_new_func(params: VectorBase*, result: Type*) -> Type* {
  * @return `true` if `self` is the named builtin type.
  */
 func type_is_builtin(self: Type*, name: string) -> bool {
-    return ord(self.kind) == ord(TY_BUILTIN) && eq_s(self.name, name);
+    return ord(self.kind) == ord(TY_BUILTIN) && self.name == name;
 }
 
 /**
@@ -258,7 +258,7 @@ func type_is_builtin(self: Type*, name: string) -> bool {
  * @return `true` if `name` names a builtin type.
  */
 func type_is_builtin_name(name: string) -> bool {
-    return eq_s(name, "bool") || eq_s(name, "byte") || eq_s(name, "int") || eq_s(name, "string") || eq_s(name, "void");
+    return name == "bool" || name == "byte" || name == "int" || name == "string" || name == "void";
 }
 
 /**
@@ -315,11 +315,11 @@ func type_equals(a: Type*?, b: Type*?) -> bool {
     }
 
     if (ord(left.kind) == ord(TY_BUILTIN) || ord(left.kind) == ord(TY_NULL)) {
-        return eq_s(left.name, right.name);
+        return left.name == right.name;
     }
 
     if (ord(left.kind) == ord(TY_STRUCT) || ord(left.kind) == ord(TY_ENUM)) {
-        return eq_s(left.module_name, right.module_name) && eq_s(left.name, right.name);
+        return left.module_name == right.module_name && left.name == right.name;
     }
 
     if (ord(left.kind) == ord(TY_POINTER) || ord(left.kind) == ord(TY_NULLABLE)) {

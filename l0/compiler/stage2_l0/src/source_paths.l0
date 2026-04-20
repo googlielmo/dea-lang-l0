@@ -323,7 +323,7 @@ func sp_normalize_entry_target(target: string, project_roots: VectorString*, dia
         }
 
         let parent_dir = parent(target);
-        if (!eq_s(parent_dir, ".")) {
+        if (parent_dir != ".") {
             vs_push(project_roots, parent_dir);
         }
 

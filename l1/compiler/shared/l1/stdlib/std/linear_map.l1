@@ -347,7 +347,7 @@ func _lmss_entry_by_index(self: LinearMapStringString*, index: int) -> LinearMap
 func _lmss_find_by_key(self: LinearMapStringString*, key: string) -> int {
     for (let i: int = 0; i < self.base.entries.length; i = i + 1) {
         let entry_ptr = _lmss_entry_by_index(self, i);
-        if (eq_s(entry_ptr.key, key)) {
+        if (entry_ptr.key == key) {
             return i;
         }
     }

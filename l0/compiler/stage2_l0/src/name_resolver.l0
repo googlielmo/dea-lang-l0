@@ -108,7 +108,7 @@ func nr_path_is_same_signature(left: TypeRef*?, right: TypeRef*?) -> bool {
 
     let lt = left as TypeRef*;
     let rt = right as TypeRef*;
-    if (!eq_s(lt.name, rt.name) || lt.pointer_depth != rt.pointer_depth || lt.is_nullable != rt.is_nullable) {
+    if (lt.name != rt.name || lt.pointer_depth != rt.pointer_depth || lt.is_nullable != rt.is_nullable) {
         return false;
     }
 
@@ -124,7 +124,7 @@ func nr_path_is_same_signature(left: TypeRef*?, right: TypeRef*?) -> bool {
             return false;
         }
         for (let i = 0; i < vs_size(lv); i = i + 1) {
-            if (!eq_s(vs_get(lv, i), vs_get(rv, i))) {
+            if (vs_get(lv, i) != vs_get(rv, i)) {
                 return false;
             }
         }
@@ -142,7 +142,7 @@ func nr_path_is_same_signature(left: TypeRef*?, right: TypeRef*?) -> bool {
             return false;
         }
         for (let i = 0; i < vs_size(lv2); i = i + 1) {
-            if (!eq_s(vs_get(lv2, i), vs_get(rv2, i))) {
+            if (vs_get(lv2, i) != vs_get(rv2, i)) {
                 return false;
             }
         }

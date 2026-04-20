@@ -45,7 +45,7 @@ func make_paths() -> SourceSearchPaths* {
 func has_diag_code(result: AnalysisResult*, code: string) -> bool {
     for (let i = 0; i < analysis_diag_count(result); i = i + 1) {
         let d = analysis_diag_get(result, i);
-        if (eq_s(d.code, code)) {
+        if (d.code == code) {
             return true;
         }
     }
@@ -63,7 +63,7 @@ func count_diag_code(result: AnalysisResult*, code: string) -> int {
     let count = 0;
     for (let i = 0; i < analysis_diag_count(result); i = i + 1) {
         let d = analysis_diag_get(result, i);
-        if (eq_s(d.code, code)) {
+        if (d.code == code) {
             count = count + 1;
         }
     }
@@ -888,7 +888,7 @@ func test_typing_dea_import_shadow_ok() {
             "expected RES-0021 warnings for helper-local and main imported shadowing");
         for (let i = 0; i < analysis_diag_count(result); i = i + 1) {
             let d = analysis_diag_get(result, i);
-            if (eq_s(d.code, "RES-0021") && contains_s(d.message, "typing_dea_import_shadow_helper::sizeof")) {
+            if (d.code == "RES-0021" && contains_s(d.message, "typing_dea_import_shadow_helper::sizeof")) {
                 saw_import_shadow = true;
             }
         }

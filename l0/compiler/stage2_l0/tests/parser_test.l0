@@ -28,7 +28,7 @@ func expect_error_code(source: string, expected: string) {
     }
 
     let diag = parse_diag_get(result, 0);
-    if (!eq_s(diag.code, expected)) {
+    if (diag.code != expected) {
         printl_ss("actual error code:", diag.code);
         assert(false, concat_s("Expected parse error code ", expected));
     }

@@ -46,11 +46,11 @@ func test_level_from_verbosity_three() {
  * Tests test_level_names.
  */
 func test_level_names() {
-    assert(eq_s(log_level_name(LL_SILENT), "SILENT"), "LL_SILENT name");
-    assert(eq_s(log_level_name(LL_ERROR), "ERROR"), "LL_ERROR name");
-    assert(eq_s(log_level_name(LL_WARNING), "WARNING"), "LL_WARNING name");
-    assert(eq_s(log_level_name(LL_INFO), "INFO"), "LL_INFO name");
-    assert(eq_s(log_level_name(LL_DEBUG), "DEBUG"), "LL_DEBUG name");
+    assert(log_level_name(LL_SILENT) == "SILENT", "LL_SILENT name");
+    assert(log_level_name(LL_ERROR) == "ERROR", "LL_ERROR name");
+    assert(log_level_name(LL_WARNING) == "WARNING", "LL_WARNING name");
+    assert(log_level_name(LL_INFO) == "INFO", "LL_INFO name");
+    assert(log_level_name(LL_DEBUG) == "DEBUG", "LL_DEBUG name");
 }
 
 /**
@@ -58,7 +58,7 @@ func test_level_names() {
  */
 func test_format_stage_with_module() {
     let msg = log_format_stage("Loading", "hello");
-    assert(eq_s(msg, "Loading module 'hello'"), "stage format with module");
+    assert(msg == "Loading module 'hello'", "stage format with module");
 }
 
 /**
@@ -66,7 +66,7 @@ func test_format_stage_with_module() {
  */
 func test_format_stage_without_module() {
     let msg = log_format_stage("Resolving names", "");
-    assert(eq_s(msg, "Resolving names..."), "stage format without module");
+    assert(msg == "Resolving names...", "stage format without module");
 }
 
 /**

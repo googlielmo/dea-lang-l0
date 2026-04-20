@@ -241,7 +241,7 @@ func _spm_find(self: StringPtrMap*, key: string, h: int) -> int {
         }
         if (state == HM_OCCUPIED) {
             if (_spm_get_hash(self, idx) == h) {
-                if (eq_s(_spm_get_key(self, idx), key)) {
+                if (_spm_get_key(self, idx) == key) {
                     return idx;
                 }
             }
@@ -739,7 +739,7 @@ func _sim_find(self: StringIntMap*, key: string, h: int) -> int {
         }
         if (state == HM_OCCUPIED) {
             if (_sim_get_hash(self, idx) == h) {
-                if (eq_s(_sim_get_key(self, idx), key)) {
+                if (_sim_get_key(self, idx) == key) {
                     return idx;
                 }
             }

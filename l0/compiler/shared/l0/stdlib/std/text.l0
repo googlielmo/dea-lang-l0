@@ -595,10 +595,10 @@ func bool_to_string(value: bool) -> string {
  * @return The boolean value, or null if invalid.
  */
 func string_to_bool(s: string) -> bool? {
-    if (eq_s(s, "true")) {
+    if (s == "true") {
         return true;
     }
-    if (eq_s(s, "false")) {
+    if (s == "false") {
         return false;
     }
     return null;

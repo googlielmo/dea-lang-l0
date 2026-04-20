@@ -32,7 +32,7 @@ func expect_single_int(source: string, expected_text: string, expected_value: in
     let tok = tv_get(tv, 0);
     match (tok.token_type) {
         TT_INT(text, value) => {
-            assert(eq_s(text, expected_text), "Unexpected integer literal text");
+            assert(text == expected_text, "Unexpected integer literal text");
             assert(value == expected_value, "Unexpected integer literal value");
         }
         _ => {
@@ -64,7 +64,7 @@ func expect_single_bigint(source: string, expected_text: string, expected_base: 
     let tok = tv_get(tv, 0);
     match (tok.token_type) {
         TT_BIGINT(text, base) => {
-            assert(eq_s(text, expected_text), "Unexpected bigint literal text");
+            assert(text == expected_text, "Unexpected bigint literal text");
             assert(base == expected_base, "Unexpected bigint base");
         }
         _ => {
@@ -97,8 +97,8 @@ func expect_single_real(source: string, expected_sig: string, expected_exp_text:
     let tok = tv_get(tv, 0);
     match (tok.token_type) {
         TT_REALNUM(sig, exp_text, is_float) => {
-            assert(eq_s(sig, expected_sig), "Unexpected real literal significand");
-            assert(eq_s(exp_text, expected_exp_text), "Unexpected real literal exponent text");
+            assert(sig == expected_sig, "Unexpected real literal significand");
+            assert(exp_text == expected_exp_text, "Unexpected real literal exponent text");
             assert(is_float == expected_is_float, "Unexpected real literal float suffix flag");
         }
         _ => {
@@ -125,7 +125,7 @@ func expect_lex_error(source: string, expected: string) {
     assert(diag_count(ls.diags) > 0, "Expected at least one diagnostic");
 
     let diag = diag_get(ls.diags, 0);
-    if (!eq_s(diag.code, expected)) {
+    if (diag.code != expected) {
         printl_ss("actual error code:", diag.code);
         printl_ss("actual error message:", diag.message);
         assert(false, "Unexpected lexer diagnostic code");
@@ -154,11 +154,11 @@ func expect_two_tokens(source: string, expected_first: string, expected_second: 
     let tok1 = tv_get(tv, 1);
     let actual0 = token_to_string(tok0);
     let actual1 = token_to_string(tok1);
-    if (!eq_s(actual0, expected_first)) {
+    if (actual0 != expected_first) {
         printl_ss("actual token 0:", actual0);
         assert(false, "Unexpected first token");
     }
-    if (!eq_s(actual1, expected_second)) {
+    if (actual1 != expected_second) {
         printl_ss("actual token 1:", actual1);
         assert(false, "Unexpected second token");
     }

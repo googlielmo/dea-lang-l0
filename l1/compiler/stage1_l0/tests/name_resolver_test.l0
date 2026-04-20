@@ -46,7 +46,7 @@ func make_paths() -> SourceSearchPaths* {
 func has_diag_code(diags: DiagCollector*, code: string) -> bool {
     for (let i = 0; i < diag_count(diags); i = i + 1) {
         let d = diag_get(diags, i);
-        if (eq_s(d.code, code)) {
+        if (d.code == code) {
             return true;
         }
     }
@@ -64,7 +64,7 @@ func count_diag_code(diags: DiagCollector*, code: string) -> int {
     let count = 0;
     for (let i = 0; i < diag_count(diags); i = i + 1) {
         let d = diag_get(diags, i);
-        if (eq_s(d.code, code)) {
+        if (d.code == code) {
             count = count + 1;
         }
     }
@@ -94,7 +94,7 @@ func test_name_resolution_ok() {
         assert(nr_module_env_imports_module(env, "shared_more"), "expected shared_more import");
         let sizeof_sym = nr_module_env_imported(env, "sizeof");
         assert(sizeof_sym != null, "expected imported sizeof intrinsic");
-        assert(eq_s((sizeof_sym as Symbol*).module_name, "dea"), "sizeof should come from dea by default");
+        assert((sizeof_sym as Symbol*).module_name == "dea", "sizeof should come from dea by default");
         assert(nr_module_env_imported(env, "Point") != null, "expected imported struct symbol");
         assert(nr_module_env_imported(env, "helper_value") != null, "expected imported helper function");
         assert(nr_module_env_imported(env, "Some") != null, "expected imported enum variant");
@@ -110,7 +110,7 @@ func test_name_resolution_ok() {
         assert(some_sym != null, "expected enum variant symbol");
         let sym = some_sym as Symbol*;
         assert(ord(sym.kind) == ord(SYM_ENUM_VARIANT), "expected enum variant symbol kind");
-        assert(eq_s(sym.owner_name, "OptionInt"), "expected parent enum owner name");
+        assert(sym.owner_name == "OptionInt", "expected parent enum owner name");
 
         nr_free(names);
         driver_state_free(state);
@@ -134,7 +134,7 @@ func test_import_shadow_warning_replaces_dea_binding() {
             "expected RES-0021 warnings for helper-local and main imported shadowing");
         for (let i = 0; i < diag_count(diags); i = i + 1) {
             let d = diag_get(diags, i);
-            if (eq_s(d.code, "RES-0021") && contains_s(d.message, "prelude_shadow_helper::sizeof")) {
+            if (d.code == "RES-0021" && contains_s(d.message, "prelude_shadow_helper::sizeof")) {
                 saw_main_import_shadow = true;
             }
         }
@@ -148,7 +148,7 @@ func test_import_shadow_warning_replaces_dea_binding() {
 
         let sizeof_sym = nr_module_env_imported(env as ModuleEnv*, "sizeof");
         assert(sizeof_sym != null, "expected imported sizeof symbol");
-        assert(eq_s((sizeof_sym as Symbol*).module_name, "prelude_shadow_helper"),
+        assert((sizeof_sym as Symbol*).module_name == "prelude_shadow_helper",
             "unqualified sizeof should resolve to imported helper");
 
         let dea_env = nr_env_find(names, "dea");
@@ -221,7 +221,7 @@ func test_import_shadow_warning_keeps_qualified_variant_lookup_available() {
         let saw_due = false;
         for (let i = 0; i < diag_count(diags); i = i + 1) {
             let d = diag_get(diags, i);
-            if (!eq_s(d.code, "RES-0021")) {
+            if (d.code != "RES-0021") {
                 continue;
             }
             if (contains_s(d.message, "shadow_warn_uno::Red")) {

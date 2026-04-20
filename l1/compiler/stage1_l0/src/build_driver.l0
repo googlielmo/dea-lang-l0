@@ -298,16 +298,16 @@ func bd_is_windows() -> bool {
     let platform_override = env_get("L1_PLATFORM");
     if (platform_override != null) {
         let lowered = to_lower_s(platform_override as string);
-        if (eq_s(lowered, "windows") || eq_s(lowered, "win32")) {
+        if (lowered == "windows" || lowered == "win32") {
             return true;
         }
-        if (eq_s(lowered, "posix") || eq_s(lowered, "unix")) {
+        if (lowered == "posix" || lowered == "unix") {
             return false;
         }
     }
 
     let os_name = env_get("OS");
-    if (os_name != null && eq_s(os_name as string, "Windows_NT")) {
+    if (os_name != null && os_name as string == "Windows_NT") {
         return true;
     }
 
@@ -506,18 +506,18 @@ func bd_join_display_words(words: VectorString*) -> string {
  */
 func bd_compiler_flag_family(compiler: string) -> string {
     let base = basename(compiler);
-    if (eq_s(base, "tcc") || eq_s(base, "tcc.exe") || starts_with_s(base, "tcc-")) {
+    if (base == "tcc" || base == "tcc.exe" || starts_with_s(base, "tcc-")) {
         return "tcc";
     }
-    if (eq_s(base, "gcc") || eq_s(base, "gcc.exe") || starts_with_s(base, "gcc-") ||
-        eq_s(base, "clang") || eq_s(base, "clang.exe") || starts_with_s(base, "clang-"))
+    if (base == "gcc" || base == "gcc.exe" || starts_with_s(base, "gcc-") ||
+        base == "clang" || base == "clang.exe" || starts_with_s(base, "clang-"))
     {
         return "gcc";
     }
-    if (eq_s(base, "cc") || eq_s(base, "cc.exe")) {
+    if (base == "cc" || base == "cc.exe") {
         return "cc";
     }
-    if (eq_s(base, "cl") || eq_s(base, "cl.exe")) {
+    if (base == "cl" || base == "cl.exe") {
         return "msvc";
     }
     return "unknown";
@@ -548,7 +548,7 @@ func bd_has_explicit_opt_flag(extra_opts: VectorString*) -> bool {
 func bd_has_debug_flag(extra_opts: VectorString*) -> bool {
     for (let i = 0; i < vs_size(extra_opts); i = i + 1) {
         let opt = vs_get(extra_opts, i);
-        if (eq_s(opt, "-g") || eq_s(opt, "/Zi") || eq_s(opt, "/Z7")) {
+        if (opt == "-g" || opt == "/Zi" || opt == "/Z7") {
             return true;
         }
     }
@@ -568,13 +568,13 @@ func bd_get_optimize_flag(family: string, extra_opts: VectorString*) -> string? 
     }
 
     if (bd_has_debug_flag(extra_opts)) {
-        if (eq_s(family, "tcc")) {
+        if (family == "tcc") {
             return "-O0";
         }
-        if (eq_s(family, "gcc")) {
+        if (family == "gcc") {
             return "-Og";
         }
-        if (eq_s(family, "msvc")) {
+        if (family == "msvc") {
             return "/Od";
         }
         return null;
@@ -583,14 +583,14 @@ func bd_get_optimize_flag(family: string, extra_opts: VectorString*) -> string? 
     // MinGW/GCC on Windows has shown optimizer-sensitive miscompiles in
     // teardown-heavy traces. Keep the automatic default conservative there;
     // users can still opt in explicitly with -O*.
-    if (bd_is_windows() && eq_s(family, "gcc")) {
+    if (bd_is_windows() && family == "gcc") {
         return "-O0";
     }
 
-    if (eq_s(family, "gcc") || eq_s(family, "tcc")) {
+    if (family == "gcc" || family == "tcc") {
         return "-O1";
     }
-    if (eq_s(family, "msvc")) {
+    if (family == "msvc") {
         return "/O1";
     }
     return null;
@@ -604,18 +604,18 @@ func bd_get_optimize_flag(family: string, extra_opts: VectorString*) -> string? 
  */
 func bd_float_contract_forbidden_option_reason(opt: string) -> string? {
     let lowered = to_lower_s(opt);
-    if (eq_s(lowered, "-ofast") || eq_s(lowered, "-ffast-math")) {
+    if (lowered == "-ofast" || lowered == "-ffast-math") {
         return "fast-math disables NaN, infinity, or signed-zero semantics required by L1";
     }
-    if (eq_s(lowered, "-ffinite-math-only")) {
+    if (lowered == "-ffinite-math-only") {
         return "finite-math-only removes NaN and infinity semantics required by L1";
     }
-    if (eq_s(lowered, "-fno-signed-zeros")) {
+    if (lowered == "-fno-signed-zeros") {
         return "signed zero is part of the L1 floating-point contract";
     }
-    if (eq_s(lowered, "-funsafe-math-optimizations") ||
-        eq_s(lowered, "-fassociative-math") ||
-        eq_s(lowered, "-freciprocal-math"))
+    if (lowered == "-funsafe-math-optimizations" ||
+        lowered == "-fassociative-math" ||
+        lowered == "-freciprocal-math")
     {
         return "the option allows floating-point rewrites that violate the L1 contract";
     }
@@ -832,7 +832,7 @@ func bd_validate_entry_main(result: AnalysisResult*, entry_module: string, diags
     }
 
     let ret_name = type_format((main_type as Type*).result as Type*);
-    if (!eq_s(ret_name, "void") && !eq_s(ret_name, "int") && !eq_s(ret_name, "bool")) {
+    if (ret_name != "void" && ret_name != "int" && ret_name != "bool") {
         diag_warn(
             diags,
             "l1c",
@@ -860,13 +860,13 @@ func bd_validate_entry_main(result: AnalysisResult*, entry_module: string, diags
  * @param family Compiler flag-family name.
  */
 func bd_push_standard_flags(words: VectorString*, family: string) {
-    if (eq_s(family, "tcc")) {
+    if (family == "tcc") {
         vs_push(words, "-std=c99");
         vs_push(words, "-Wall");
         vs_push(words, "-pedantic");
         return;
     }
-    if (eq_s(family, "gcc")) {
+    if (family == "gcc") {
         vs_push(words, "-std=c99");
         vs_push(words, "-Wall");
         vs_push(words, "-Wextra");
@@ -876,7 +876,7 @@ func bd_push_standard_flags(words: VectorString*, family: string) {
         vs_push(words, "-pedantic-errors");
         return;
     }
-    if (eq_s(family, "msvc")) {
+    if (family == "msvc") {
         vs_push(words, "/std:c11");
         vs_push(words, "/W4");
     }
@@ -890,7 +890,7 @@ func bd_push_standard_flags(words: VectorString*, family: string) {
  * @param exe_path Output executable path.
  */
 func bd_push_output_flags(words: VectorString*, family: string, exe_path: string) {
-    if (eq_s(family, "msvc")) {
+    if (family == "msvc") {
         vs_push(words, concat_s("/Fe:", exe_path));
         return;
     }
@@ -918,7 +918,7 @@ func bd_push_runtime_lib_flags(words: VectorString*, runtime_lib: string) {
  * @return `true` when one or more flags were appended.
  */
 func bd_push_sys_real_link_flags(words: VectorString*, family: string, uses_sys_real: bool) -> bool {
-    if (!uses_sys_real || eq_s(family, "msvc")) {
+    if (!uses_sys_real || family == "msvc") {
         return false;
     }
     vs_push(words, "-lm");
@@ -1107,7 +1107,7 @@ func bd_build_to_exe(opts: CliOptions*, cfg: LogConfig*, exe_path: string, keep_
             for (let extra_i = 0; extra_i < vs_size(extra_opts); extra_i = extra_i + 1) {
                 vs_push(command_words, vs_get(extra_opts, extra_i));
             }
-            if (eq_s(family, "unknown")) {
+            if (family == "unknown") {
                 log_warning(cfg, concat4_s("Unsupported compiler '", compiler as string,
                     "' (flag family '", concat_s(family, "'): not adding standard flags")));
             }

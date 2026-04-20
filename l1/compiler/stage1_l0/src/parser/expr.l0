@@ -29,12 +29,12 @@ func ps_is_builtin_type_name(self: ParserState*) -> bool {
         return false;
     }
     let t = token_ident_text(ps_peek(self)) as string;
-    return eq_s(t, "tiny") || eq_s(t, "short") || eq_s(t, "int") ||
-           eq_s(t, "byte") || eq_s(t, "ushort") || eq_s(t, "uint") ||
-           eq_s(t, "byte") || eq_s(t, "ushort") || eq_s(t, "uint") ||
-           eq_s(t, "long") || eq_s(t, "ulong") || eq_s(t, "float") ||
-           eq_s(t, "double") || eq_s(t, "bool") ||
-           eq_s(t, "string") || eq_s(t, "void");
+    return t == "tiny" || t == "short" || t == "int" ||
+           t == "byte" || t == "ushort" || t == "uint" ||
+           t == "byte" || t == "ushort" || t == "uint" ||
+           t == "long" || t == "ulong" || t == "float" ||
+           t == "double" || t == "bool" ||
+           t == "string" || t == "void";
 }
 
 /**

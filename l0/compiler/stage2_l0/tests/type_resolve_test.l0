@@ -59,7 +59,7 @@ func test_tr_symbol_lookup() {
         // Lookup imported func
         let sym2 = tr_symbol_lookup(nr, env, "make_point", null, null);
         assert(sym2 != null, "make_point should be found via import");
-        assert(eq_s((sym2 as Symbol*).module_name, "shared_types"), "make_point should be in shared_types");
+        assert((sym2 as Symbol*).module_name == "shared_types", "make_point should be in shared_types");
         
         // Lookup qualified variant (Status::Active)
         let env_ok = nr_env_find(nr, "shared_types") as ModuleEnv*;
@@ -100,7 +100,7 @@ func test_tr_resolve_type_ref() {
             let ty2 = tr_resolve_type_ref(tables, nr, env, tref2, result.diags, seen);
             assert(ty2 != null, "Point should resolve");
             assert(ord((ty2 as Type*).kind) == ord(TY_STRUCT), "should be struct");
-            assert(eq_s((ty2 as Type*).name, "Point"), "name should be Point");
+            assert((ty2 as Type*).name == "Point", "name should be Point");
             type_free(ty2 as Type*);
             drop tref2;
             
@@ -133,14 +133,14 @@ func test_tr_module_qualified_variant_lookup_survives_shadow_warning() {
 
         let local = tr_symbol_lookup(nr, env, "Red", null, null);
         assert(local != null, "local Red should resolve without qualification");
-        assert(eq_s((local as Symbol*).module_name, "shadow_warn_main"), "unqualified Red should resolve locally");
+        assert((local as Symbol*).module_name == "shadow_warn_main", "unqualified Red should resolve locally");
 
         with (let module_path = vs_create(1) => vs_free(module_path)) {
             vs_push(module_path, "shadow_warn_uno");
             let qualified = tr_symbol_lookup(nr, env, "Red", module_path, null);
             assert(qualified != null, "shadow_warn_uno::Red should resolve");
             assert(ord((qualified as Symbol*).kind) == ord(SYM_ENUM_VARIANT), "qualified Red should be a variant");
-            assert(eq_s((qualified as Symbol*).module_name, "shadow_warn_uno"),
+            assert((qualified as Symbol*).module_name == "shadow_warn_uno",
                 "qualified Red should resolve from shadow_warn_uno");
         }
 

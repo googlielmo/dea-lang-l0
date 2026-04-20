@@ -192,7 +192,7 @@ func test_string_buffer() {
     let result = sb_to_string(sb);
     printl_ss("  sb_to_string:", result);
 
-    assert(eq_s(result, "Hello, World!"), "Expected sb_to_string() to be 'Hello, World!'");
+    assert(result == "Hello, World!", "Expected sb_to_string() to be 'Hello, World!'");
 
     sb_free(sb);
     printl_s("StringBuffer tests passed!\n");
@@ -211,7 +211,7 @@ func test_string_buffer_empty() {
     printl_si("  result length:", len_s(result));
 
     assert(sb_size(sb) == 0, "Expected empty sb_size() to be 0");
-    assert(eq_s(result, ""), "Expected empty sb_to_string() to be ''");
+    assert(result == "", "Expected empty sb_to_string() to be ''");
 
     sb_free(sb);
     printl_s("Empty StringBuffer tests passed!\n");
@@ -238,7 +238,7 @@ func test_char_buffer() {
     let result = cb_to_string(cb);
     printl_ss("  cb_to_string:", result);
 
-    assert(eq_s(result, "Hello"), "Expected cb_to_string() to be 'Hello'");
+    assert(result == "Hello", "Expected cb_to_string() to be 'Hello'");
 
     cb_free(cb);
     printl_s("CharBuffer tests passed!\n");
@@ -268,7 +268,7 @@ func test_char_buffer_clear() {
     let result = cb_to_string(cb);
     printl_ss("  cb_to_string:", result);
 
-    assert(eq_s(result, "XY"), "Expected cb_to_string() to be 'XY' after clear and append");
+    assert(result == "XY", "Expected cb_to_string() to be 'XY' after clear and append");
 
     cb_free(cb);
     printl_s("CharBuffer clear tests passed!\n");
@@ -289,9 +289,9 @@ func test_concat3_s() {
     let result3 = concat3_s("a", "b", "c");
     printl_ss("  concat3_s('a', 'b', 'c'):", result3);
 
-    assert(eq_s(result, "one-two"), "Expected concat3_s to be 'one-two'");
-    assert(eq_s(result2, "middle"), "Expected concat3_s to be 'middle'");
-    assert(eq_s(result3, "abc"), "Expected concat3_s to be 'abc'");
+    assert(result == "one-two", "Expected concat3_s to be 'one-two'");
+    assert(result2 == "middle", "Expected concat3_s to be 'middle'");
+    assert(result3 == "abc", "Expected concat3_s to be 'abc'");
 
     printl_s("concat3_s tests passed!\n");
 }
@@ -315,10 +315,10 @@ func test_repeat_s() {
     let r4 = repeat_s("!", 1);
     printl_ss("  repeat_s('!', 1):", r4);
 
-    assert(eq_s(r1, "ababab"), "Expected repeat_s('ab', 3) to be 'ababab'");
-    assert(eq_s(r2, "xxxxx"), "Expected repeat_s('x', 5) to be 'xxxxx'");
-    assert(eq_s(r3, ""), "Expected repeat_s('hello', 0) to be ''");
-    assert(eq_s(r4, "!"), "Expected repeat_s('!', 1) to be '!'");
+    assert(r1 == "ababab", "Expected repeat_s('ab', 3) to be 'ababab'");
+    assert(r2 == "xxxxx", "Expected repeat_s('x', 5) to be 'xxxxx'");
+    assert(r3 == "", "Expected repeat_s('hello', 0) to be ''");
+    assert(r4 == "!", "Expected repeat_s('!', 1) to be '!'");
 
     printl_s("repeat_s tests passed!\n");
 }
@@ -346,11 +346,11 @@ func test_trim_s() {
     printl_s(concat3_s("  trim_s(''): '", t5, "'"));
     printl_si("    (length):", len_s(t5));
 
-    assert(eq_s(t1, "hello"), "Expected trim_s('  hello  ') to be 'hello'");
-    assert(eq_s(t2, "no spaces"), "Expected trim_s('no spaces') to be 'no spaces'");
-    assert(eq_s(t3, ""), "Expected trim_s('   ') to be ''");
-    assert(eq_s(t4, "spaced"), "Expected trim_s('\\t\\n  spaced \\n\\t') to be 'spaced'");
-    assert(eq_s(t5, ""), "Expected trim_s('') to be ''");
+    assert(t1 == "hello", "Expected trim_s('  hello  ') to be 'hello'");
+    assert(t2 == "no spaces", "Expected trim_s('no spaces') to be 'no spaces'");
+    assert(t3 == "", "Expected trim_s('   ') to be ''");
+    assert(t4 == "spaced", "Expected trim_s('\\t\\n  spaced \\n\\t') to be 'spaced'");
+    assert(t5 == "", "Expected trim_s('') to be ''");
 
     printl_s("trim_s tests passed!\n");
 }
@@ -376,36 +376,36 @@ func test_split_s() {
 
     with (let p1 = split_s("a,b,c", ",") => vs_free(p1)) {
         assert(vs_size(p1) == 3, "Expected split_s('a,b,c', ',') to return 3 parts");
-        assert(eq_s(vs_get(p1, 0), "a"), "Expected first part to be 'a'");
-        assert(eq_s(vs_get(p1, 1), "b"), "Expected second part to be 'b'");
-        assert(eq_s(vs_get(p1, 2), "c"), "Expected third part to be 'c'");
+        assert(vs_get(p1, 0) == "a", "Expected first part to be 'a'");
+        assert(vs_get(p1, 1) == "b", "Expected second part to be 'b'");
+        assert(vs_get(p1, 2) == "c", "Expected third part to be 'c'");
     }
 
     with (let p2 = split_s("a,,b", ",") => vs_free(p2)) {
         assert(vs_size(p2) == 3, "Expected split_s('a,,b', ',') to keep empty middle item");
-        assert(eq_s(vs_get(p2, 0), "a"), "Expected first part to be 'a'");
-        assert(eq_s(vs_get(p2, 1), ""), "Expected second part to be empty");
-        assert(eq_s(vs_get(p2, 2), "b"), "Expected third part to be 'b'");
+        assert(vs_get(p2, 0) == "a", "Expected first part to be 'a'");
+        assert(vs_get(p2, 1) == "", "Expected second part to be empty");
+        assert(vs_get(p2, 2) == "b", "Expected third part to be 'b'");
     }
 
     with (let p3 = split_s(",a,", ",") => vs_free(p3)) {
         assert(vs_size(p3) == 3, "Expected split_s(',a,', ',') to keep edge empties");
-        assert(eq_s(vs_get(p3, 0), ""), "Expected first part to be empty");
-        assert(eq_s(vs_get(p3, 1), "a"), "Expected middle part to be 'a'");
-        assert(eq_s(vs_get(p3, 2), ""), "Expected last part to be empty");
+        assert(vs_get(p3, 0) == "", "Expected first part to be empty");
+        assert(vs_get(p3, 1) == "a", "Expected middle part to be 'a'");
+        assert(vs_get(p3, 2) == "", "Expected last part to be empty");
     }
 
     with (let p4 = split_s("", ",") => vs_free(p4)) {
         assert(vs_size(p4) == 1, "Expected split_s('', ',') to return one empty part");
-        assert(eq_s(vs_get(p4, 0), ""), "Expected only part to be empty");
+        assert(vs_get(p4, 0) == "", "Expected only part to be empty");
     }
 
     with (let p5 = split_s("a--b----c", "--") => vs_free(p5)) {
         assert(vs_size(p5) == 4, "Expected split_s('a--b----c', '--') to return 4 parts");
-        assert(eq_s(vs_get(p5, 0), "a"), "Expected first part to be 'a'");
-        assert(eq_s(vs_get(p5, 1), "b"), "Expected second part to be 'b'");
-        assert(eq_s(vs_get(p5, 2), ""), "Expected third part to be empty");
-        assert(eq_s(vs_get(p5, 3), "c"), "Expected fourth part to be 'c'");
+        assert(vs_get(p5, 0) == "a", "Expected first part to be 'a'");
+        assert(vs_get(p5, 1) == "b", "Expected second part to be 'b'");
+        assert(vs_get(p5, 2) == "", "Expected third part to be empty");
+        assert(vs_get(p5, 3) == "c", "Expected fourth part to be 'c'");
     }
 
     printl_s("split_s tests passed!\n");
@@ -438,25 +438,25 @@ func test_lines_s() {
 
     with (let l2 = lines_s("a\n") => vs_free(l2)) {
         assert(vs_size(l2) == 1, "Expected lines_s('a\\n') to return one line");
-        assert(eq_s(vs_get(l2, 0), "a"), "Expected first line to be 'a'");
+        assert(vs_get(l2, 0) == "a", "Expected first line to be 'a'");
     }
 
     with (let l3 = lines_s("a\n\nb") => vs_free(l3)) {
         assert(vs_size(l3) == 3, "Expected lines_s('a\\n\\nb') to keep middle empty line");
-        assert(eq_s(vs_get(l3, 0), "a"), "Expected first line to be 'a'");
-        assert(eq_s(vs_get(l3, 1), ""), "Expected second line to be empty");
-        assert(eq_s(vs_get(l3, 2), "b"), "Expected third line to be 'b'");
+        assert(vs_get(l3, 0) == "a", "Expected first line to be 'a'");
+        assert(vs_get(l3, 1) == "", "Expected second line to be empty");
+        assert(vs_get(l3, 2) == "b", "Expected third line to be 'b'");
     }
 
     with (let l4 = lines_s("a\r\nb\r\n") => vs_free(l4)) {
         assert(vs_size(l4) == 2, "Expected lines_s('a\\r\\nb\\r\\n') to return two lines");
-        assert(eq_s(vs_get(l4, 0), "a"), "Expected first CRLF line to be 'a'");
-        assert(eq_s(vs_get(l4, 1), "b"), "Expected second CRLF line to be 'b'");
+        assert(vs_get(l4, 0) == "a", "Expected first CRLF line to be 'a'");
+        assert(vs_get(l4, 1) == "b", "Expected second CRLF line to be 'b'");
     }
 
     with (let l5 = lines_s("x\r") => vs_free(l5)) {
         assert(vs_size(l5) == 1, "Expected lines_s('x\\r') to return one line");
-        assert(eq_s(vs_get(l5, 0), "x"), "Expected trailing CR to be stripped");
+        assert(vs_get(l5, 0) == "x", "Expected trailing CR to be stripped");
     }
 
     printl_s("lines_s tests passed!\n");
@@ -469,26 +469,26 @@ func test_join_s() {
     printl_s("=== Test join_s ===");
 
     with (let empty = vs_create(0) => vs_free(empty)) {
-        assert(eq_s(join_s(empty, ","), ""), "Expected join_s(empty, ',') to be empty");
+        assert(join_s(empty, ",") == "", "Expected join_s(empty, ',') to be empty");
     }
 
     with (let one = vs_create(1) => vs_free(one)) {
         vs_push(one, "one");
-        assert(eq_s(join_s(one, ","), "one"), "Expected join_s(singleton, ',') to return the item");
+        assert(join_s(one, ",") == "one", "Expected join_s(singleton, ',') to return the item");
     }
 
     with (let many = vs_create(3) => vs_free(many)) {
         vs_push(many, "a");
         vs_push(many, "b");
         vs_push(many, "c");
-        assert(eq_s(join_s(many, "--"), "a--b--c"), "Expected join_s(['a','b','c'], '--') to be 'a--b--c'");
+        assert(join_s(many, "--") == "a--b--c", "Expected join_s(['a','b','c'], '--') to be 'a--b--c'");
     }
 
     with (let with_empty = vs_create(3) => vs_free(with_empty)) {
         vs_push(with_empty, "a");
         vs_push(with_empty, "");
         vs_push(with_empty, "b");
-        assert(eq_s(join_s(with_empty, ","), "a,,b"), "Expected join_s(['a','','b'], ',') to be 'a,,b'");
+        assert(join_s(with_empty, ",") == "a,,b", "Expected join_s(['a','','b'], ',') to be 'a,,b'");
     }
 
     printl_s("join_s tests passed!\n");
@@ -500,11 +500,11 @@ func test_join_s() {
 func test_replace_s() {
     printl_s("=== Test replace_s ===");
 
-    assert(eq_s(replace_s("banana", "na", "X"), "baXX"), "Expected replace_s('banana', 'na', 'X') to be 'baXX'");
-    assert(eq_s(replace_s("aaaa", "aa", "b"), "bb"), "Expected non-overlapping replace in 'aaaa'");
-    assert(eq_s(replace_s("abc", "z", "q"), "abc"), "Expected replace_s with missing pattern to return original");
-    assert(eq_s(replace_s("foo", "o", "oo"), "foooo"), "Expected replace_s('foo', 'o', 'oo') to expand");
-    assert(eq_s(replace_s("abcabc", "abc", ""), ""), "Expected replace_s('abcabc', 'abc', '') to be empty");
+    assert(replace_s("banana", "na", "X") == "baXX", "Expected replace_s('banana', 'na', 'X') to be 'baXX'");
+    assert(replace_s("aaaa", "aa", "b") == "bb", "Expected non-overlapping replace in 'aaaa'");
+    assert(replace_s("abc", "z", "q") == "abc", "Expected replace_s with missing pattern to return original");
+    assert(replace_s("foo", "o", "oo") == "foooo", "Expected replace_s('foo', 'o', 'oo') to expand");
+    assert(replace_s("abcabc", "abc", "") == "", "Expected replace_s('abcabc', 'abc', '') to be empty");
 
     printl_s("replace_s tests passed!\n");
 }
@@ -531,11 +531,11 @@ func test_to_upper_s() {
     printl_ss("  to_upper_s(''):", u5);
     printl_si("    (length):", len_s(u5));
 
-    assert(eq_s(u1, "HELLO"), "Expected to_upper_s('hello') to be 'HELLO'");
-    assert(eq_s(u2, "HELLO WORLD"), "Expected to_upper_s('Hello World') to be 'HELLO WORLD'");
-    assert(eq_s(u3, "ALREADY UPPER"), "Expected to_upper_s('ALREADY UPPER') to be 'ALREADY UPPER'");
-    assert(eq_s(u4, "123ABC"), "Expected to_upper_s('123abc') to be '123ABC'");
-    assert(eq_s(u5, ""), "Expected to_upper_s('') to be ''");
+    assert(u1 == "HELLO", "Expected to_upper_s('hello') to be 'HELLO'");
+    assert(u2 == "HELLO WORLD", "Expected to_upper_s('Hello World') to be 'HELLO WORLD'");
+    assert(u3 == "ALREADY UPPER", "Expected to_upper_s('ALREADY UPPER') to be 'ALREADY UPPER'");
+    assert(u4 == "123ABC", "Expected to_upper_s('123abc') to be '123ABC'");
+    assert(u5 == "", "Expected to_upper_s('') to be ''");
 
     printl_s("to_upper_s tests passed!\n");
 }
@@ -562,11 +562,11 @@ func test_to_lower_s() {
     printl_ss("  to_lower_s(''):", l5);
     printl_si("    (length):", len_s(l5));
 
-    assert(eq_s(l1, "hello"), "Expected to_lower_s('HELLO') to be 'hello'");
-    assert(eq_s(l2, "hello world"), "Expected to_lower_s('Hello World') to be 'hello world'");
-    assert(eq_s(l3, "already lower"), "Expected to_lower_s('already lower') to be 'already lower'");
-    assert(eq_s(l4, "123abc"), "Expected to_lower_s('123ABC') to be '123abc'");
-    assert(eq_s(l5, ""), "Expected to_lower_s('') to be ''");
+    assert(l1 == "hello", "Expected to_lower_s('HELLO') to be 'hello'");
+    assert(l2 == "hello world", "Expected to_lower_s('Hello World') to be 'hello world'");
+    assert(l3 == "already lower", "Expected to_lower_s('already lower') to be 'already lower'");
+    assert(l4 == "123abc", "Expected to_lower_s('123ABC') to be '123abc'");
+    assert(l5 == "", "Expected to_lower_s('') to be ''");
 
     printl_s("to_lower_s tests passed!\n");
 }
@@ -706,8 +706,8 @@ func test_bool_string_conversions() -> Unit? {
 
     let s_true = bool_to_string(true);
     let s_false = bool_to_string(false);
-    assert(eq_s(s_true, "true"), "Expected bool_to_string(true) to be 'true'");
-    assert(eq_s(s_false, "false"), "Expected bool_to_string(false) to be 'false'");
+    assert(s_true == "true", "Expected bool_to_string(true) to be 'true'");
+    assert(s_false == "false", "Expected bool_to_string(false) to be 'false'");
 
     let b_true = string_to_bool("true")?;
     let b_false = string_to_bool("false")?;
@@ -737,10 +737,10 @@ func test_byte_string_conversions() -> Unit? {
     let shex = byte_to_string_base(b255, 16);
     let sbin = byte_to_string_base(b255, 2);
 
-    assert(eq_s(s0, "0"), "Expected byte_to_string(0) to be '0'");
-    assert(eq_s(s255, "255"), "Expected byte_to_string(255) to be '255'");
-    assert(eq_s(shex, "ff"), "Expected byte_to_string_base(255, 16) to be 'ff'");
-    assert(eq_s(sbin, "11111111"), "Expected byte_to_string_base(255, 2) to be '11111111'");
+    assert(s0 == "0", "Expected byte_to_string(0) to be '0'");
+    assert(s255 == "255", "Expected byte_to_string(255) to be '255'");
+    assert(shex == "ff", "Expected byte_to_string_base(255, 16) to be 'ff'");
+    assert(sbin == "11111111", "Expected byte_to_string_base(255, 2) to be '11111111'");
 
     let p0 = string_to_byte("0")?;
     let p255 = string_to_byte("255")?;
@@ -862,11 +862,11 @@ func test_int_to_string() {
     print_si("  int_to_string(", i5);
     printl_ss("):", int_to_string(i5));
 
-    assert(eq_s(s1, "12345"), "Expected int_to_string(12345) to be '12345'");
-    assert(eq_s(s2, "-6789"), "Expected int_to_string(-6789) to be '-6789'");
-    assert(eq_s(s3, "0"), "Expected int_to_string(0) to be '0'");
-    assert(eq_s(s4, "-2147483648"), "Expected int_to_string(-2147483648) to be '-2147483648'");
-    assert(eq_s(s5, "2147483647"), "Expected int_to_string(2147483647) to be '2147483647'");
+    assert(s1 == "12345", "Expected int_to_string(12345) to be '12345'");
+    assert(s2 == "-6789", "Expected int_to_string(-6789) to be '-6789'");
+    assert(s3 == "0", "Expected int_to_string(0) to be '0'");
+    assert(s4 == "-2147483648", "Expected int_to_string(-2147483648) to be '-2147483648'");
+    assert(s5 == "2147483647", "Expected int_to_string(2147483647) to be '2147483647'");
 
     printl_s("int_to_string tests passed!\n");
 }
@@ -908,12 +908,12 @@ func test_int_to_hex_string() {
     print_si("  int_to_hex_string(", i6);
     printl_ss("):", s6);
 
-    assert(eq_s(s1, "ff"), "Expected int_to_hex_string(255) to be 'ff'");
-    assert(eq_s(s2, "fff"), "Expected int_to_hex_string(4095) to be 'fff'");
-    assert(eq_s(s3, "0"), "Expected int_to_hex_string(0) to be '0'");
-    assert(eq_s(s4, "12345678"), "Expected int_to_hex_string(305419896) to be '12345678'");
-    assert(eq_s(s5, "-1"), "Expected int_to_hex_string(-1) to be '-1'");
-    assert(eq_s(s6, "-80000000"), "Expected int_to_hex_string(-2147483648) to be '-80000000'");
+    assert(s1 == "ff", "Expected int_to_hex_string(255) to be 'ff'");
+    assert(s2 == "fff", "Expected int_to_hex_string(4095) to be 'fff'");
+    assert(s3 == "0", "Expected int_to_hex_string(0) to be '0'");
+    assert(s4 == "12345678", "Expected int_to_hex_string(305419896) to be '12345678'");
+    assert(s5 == "-1", "Expected int_to_hex_string(-1) to be '-1'");
+    assert(s6 == "-80000000", "Expected int_to_hex_string(-2147483648) to be '-80000000'");
 
     printl_s("int_to_hex_string tests passed!\n");
 }
@@ -949,11 +949,11 @@ func test_int_to_bin_string() {
     print_si("  int_to_bin_string(", i5);
     printl_ss("):", s5);
 
-    assert(eq_s(s1, "101"), "Expected int_to_bin_string(5) to be '101'");
-    assert(eq_s(s2, "1010"), "Expected int_to_bin_string(10) to be '1010'");
-    assert(eq_s(s3, "0"), "Expected int_to_bin_string(0) to be '0'");
-    assert(eq_s(s4, "-1"), "Expected int_to_bin_string(-1) to be '-1'");
-    assert(eq_s(s5, "-10000000000000000000000000000000"), "Expected int_to_bin_string(-2147483648) to be '-10000000000000000000000000000000'");
+    assert(s1 == "101", "Expected int_to_bin_string(5) to be '101'");
+    assert(s2 == "1010", "Expected int_to_bin_string(10) to be '1010'");
+    assert(s3 == "0", "Expected int_to_bin_string(0) to be '0'");
+    assert(s4 == "-1", "Expected int_to_bin_string(-1) to be '-1'");
+    assert(s5 == "-10000000000000000000000000000000", "Expected int_to_bin_string(-2147483648) to be '-10000000000000000000000000000000'");
 
     printl_s("int_to_bin_string tests passed!\n");
 }

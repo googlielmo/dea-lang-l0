@@ -102,16 +102,16 @@ func main() -> int {
         return 2;
     }
     let mode = argv(1);
-    if (eq_s(mode, "delim")) {
+    if (mode == "delim") {
         return mode_delim();
     }
-    if (eq_s(mode, "reads")) {
+    if (mode == "reads") {
         return mode_reads();
     }
-    if (eq_s(mode, "prints")) {
+    if (mode == "prints") {
         return mode_prints();
     }
-    if (eq_s(mode, "text")) {
+    if (mode == "text") {
         return mode_text();
     }
     return 3;

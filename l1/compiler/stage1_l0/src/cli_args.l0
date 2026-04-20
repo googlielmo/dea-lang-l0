@@ -241,7 +241,7 @@ func cli_try_set_mode(opts: CliOptions*, diags: DiagCollector*, mode: CliMode) {
  */
 func cli_split_index(argv: VectorString*) -> int {
     for (let i = 0; i < vs_size(argv); i = i + 1) {
-        if (eq_s(vs_get(argv, i), "--")) {
+        if (vs_get(argv, i) == "--") {
             return i;
         }
     }
@@ -260,7 +260,7 @@ func cli_split_index(argv: VectorString*) -> int {
 func cli_has_help_flag(argv: VectorString*, cli_end: int) -> bool {
     for (let i = 0; i < cli_end; i = i + 1) {
         let token = vs_get(argv, i);
-        if (eq_s(token, "-h") || eq_s(token, "--help")) {
+        if (token == "-h" || token == "--help") {
             return true;
         }
     }
@@ -278,7 +278,7 @@ func cli_has_help_flag(argv: VectorString*, cli_end: int) -> bool {
  */
 func cli_has_version_flag(argv: VectorString*, cli_end: int) -> bool {
     for (let i = 0; i < cli_end; i = i + 1) {
-        if (eq_s(vs_get(argv, i), "--version")) {
+        if (vs_get(argv, i) == "--version") {
             return true;
         }
     }
@@ -574,48 +574,48 @@ func cli_parse(argv: VectorString*) -> CliParseResult* {
         while (i < cli_end) {
             let token = vs_get(argv, i);
 
-            if (eq_s(token, "--run") || eq_s(token, "-r")) {
+            if (token == "--run" || token == "-r") {
                 cli_try_set_mode(opts as CliOptions*, diags as DiagCollector*, CM_RUN);
                 i = i + 1;
                 continue;
             }
-            if (eq_s(token, "--build")) {
+            if (token == "--build") {
                 cli_try_set_mode(opts as CliOptions*, diags as DiagCollector*, CM_BUILD);
                 i = i + 1;
                 continue;
             }
-            if (eq_s(token, "--gen") || eq_s(token, "--codegen") || eq_s(token, "-g")) {
+            if (token == "--gen" || token == "--codegen" || token == "-g") {
                 cli_try_set_mode(opts as CliOptions*, diags as DiagCollector*, CM_GEN);
                 i = i + 1;
                 continue;
             }
-            if (eq_s(token, "--check") || eq_s(token, "--analyze")) {
+            if (token == "--check" || token == "--analyze") {
                 cli_try_set_mode(opts as CliOptions*, diags as DiagCollector*, CM_CHECK);
                 i = i + 1;
                 continue;
             }
-            if (eq_s(token, "--tok") || eq_s(token, "--tokens")) {
+            if (token == "--tok" || token == "--tokens") {
                 cli_try_set_mode(opts as CliOptions*, diags as DiagCollector*, CM_TOK);
                 i = i + 1;
                 continue;
             }
-            if (eq_s(token, "--ast")) {
+            if (token == "--ast") {
                 cli_try_set_mode(opts as CliOptions*, diags as DiagCollector*, CM_AST);
                 i = i + 1;
                 continue;
             }
-            if (eq_s(token, "--sym") || eq_s(token, "--symbols")) {
+            if (token == "--sym" || token == "--symbols") {
                 cli_try_set_mode(opts as CliOptions*, diags as DiagCollector*, CM_SYM);
                 i = i + 1;
                 continue;
             }
-            if (eq_s(token, "--type") || eq_s(token, "--types")) {
+            if (token == "--type" || token == "--types") {
                 cli_try_set_mode(opts as CliOptions*, diags as DiagCollector*, CM_TYPE);
                 i = i + 1;
                 continue;
             }
 
-            if (eq_s(token, "--verbose")) {
+            if (token == "--verbose") {
                 (opts as CliOptions*).verbosity = (opts as CliOptions*).verbosity + 1;
                 i = i + 1;
                 continue;
@@ -628,49 +628,49 @@ func cli_parse(argv: VectorString*) -> CliParseResult* {
                 continue;
             }
 
-            if (eq_s(token, "-l") || eq_s(token, "--log")) {
+            if (token == "-l" || token == "--log") {
                 (opts as CliOptions*).log = true;
                 i = i + 1;
                 continue;
             }
 
-            if (eq_s(token, "-NLD") || eq_s(token, "--no-line-directives")) {
+            if (token == "-NLD" || token == "--no-line-directives") {
                 (opts as CliOptions*).no_line_directives = true;
                 i = i + 1;
                 continue;
             }
 
-            if (eq_s(token, "--trace-arc")) {
+            if (token == "--trace-arc") {
                 (opts as CliOptions*).trace_arc = true;
                 i = i + 1;
                 continue;
             }
 
-            if (eq_s(token, "--trace-memory")) {
+            if (token == "--trace-memory") {
                 (opts as CliOptions*).trace_memory = true;
                 i = i + 1;
                 continue;
             }
 
-            if (eq_s(token, "--keep-c")) {
+            if (token == "--keep-c") {
                 (opts as CliOptions*).keep_c = true;
                 i = i + 1;
                 continue;
             }
 
-            if (eq_s(token, "-a") || eq_s(token, "--all-modules")) {
+            if (token == "-a" || token == "--all-modules") {
                 (opts as CliOptions*).all_modules = true;
                 i = i + 1;
                 continue;
             }
 
-            if (eq_s(token, "--include-eof")) {
+            if (token == "--include-eof") {
                 (opts as CliOptions*).include_eof = true;
                 i = i + 1;
                 continue;
             }
 
-            if (eq_s(token, "-P") || eq_s(token, "--project-root")) {
+            if (token == "-P" || token == "--project-root") {
                 let value = cli_require_next_value(argv, i, "--project-root", diags as DiagCollector*);
                 if (value == null) {
                     i = i + 1;
@@ -688,7 +688,7 @@ func cli_parse(argv: VectorString*) -> CliParseResult* {
                 continue;
             }
 
-            if (eq_s(token, "-S") || eq_s(token, "--sys-root")) {
+            if (token == "-S" || token == "--sys-root") {
                 let value = cli_require_next_value(argv, i, "--sys-root", diags as DiagCollector*);
                 if (value == null) {
                     i = i + 1;
@@ -706,7 +706,7 @@ func cli_parse(argv: VectorString*) -> CliParseResult* {
                 continue;
             }
 
-            if (eq_s(token, "-o") || eq_s(token, "--output")) {
+            if (token == "-o" || token == "--output") {
                 let value = cli_require_next_value(argv, i, "--output", diags as DiagCollector*);
                 if (value == null) {
                     i = i + 1;
@@ -723,7 +723,7 @@ func cli_parse(argv: VectorString*) -> CliParseResult* {
                 continue;
             }
 
-            if (eq_s(token, "-c") || eq_s(token, "--c-compiler")) {
+            if (token == "-c" || token == "--c-compiler") {
                 let value = cli_require_next_value(argv, i, "--c-compiler", diags as DiagCollector*);
                 if (value == null) {
                     i = i + 1;
@@ -740,7 +740,7 @@ func cli_parse(argv: VectorString*) -> CliParseResult* {
                 continue;
             }
 
-            if (eq_s(token, "-C") || eq_s(token, "--c-options")) {
+            if (token == "-C" || token == "--c-options") {
                 let value = cli_require_next_value(argv, i, "--c-options", diags as DiagCollector*);
                 if (value == null) {
                     i = i + 1;
@@ -757,7 +757,7 @@ func cli_parse(argv: VectorString*) -> CliParseResult* {
                 continue;
             }
 
-            if (eq_s(token, "-I") || eq_s(token, "--runtime-include")) {
+            if (token == "-I" || token == "--runtime-include") {
                 let value = cli_require_next_value(argv, i, "--runtime-include", diags as DiagCollector*);
                 if (value == null) {
                     i = i + 1;
@@ -774,7 +774,7 @@ func cli_parse(argv: VectorString*) -> CliParseResult* {
                 continue;
             }
 
-            if (eq_s(token, "-L") || eq_s(token, "--runtime-lib")) {
+            if (token == "-L" || token == "--runtime-lib") {
                 let value = cli_require_next_value(argv, i, "--runtime-lib", diags as DiagCollector*);
                 if (value == null) {
                     i = i + 1;

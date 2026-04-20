@@ -516,7 +516,7 @@ func be_lookup_owned_local_name(self: Backend*, expr_id: ExprId) -> string? {
         let cur = scope as ScopeContext*;
         for (let i = 0; i < vec_size(cur.owned_vars); i = i + 1) {
             let item = ptr_vec_get(cur.owned_vars, i) as ScopeVar*;
-            if (eq_s(item.name, mangled_name)) {
+            if (item.name == mangled_name) {
                 return mangled_name;
             }
         }
@@ -537,7 +537,7 @@ func be_is_place_expr(self: Backend*, expr_id: ExprId) -> bool {
     if (ord(expr.kind) == ord(EX_VAR_REF) || ord(expr.kind) == ord(EX_INDEX) || ord(expr.kind) == ord(EX_FIELD)) {
         return true;
     }
-    if (ord(expr.kind) == ord(EX_UNARY) && eq_s(expr.text_value, "*")) {
+    if (ord(expr.kind) == ord(EX_UNARY) && expr.text_value == "*") {
         return true;
     }
     if (ord(expr.kind) == ord(EX_PAREN)) {
@@ -888,7 +888,7 @@ func be_find_struct_decl(self: Backend*, module_name: string, struct_name: strin
         let top = ptr_vec_get(root.decls, i) as TopLevelDecl*;
         if (ord(top.kind) == ord(TD_STRUCT)) {
             let decl = top.data as StructDecl*;
-            if (eq_s(decl.name, struct_name)) {
+            if (decl.name == struct_name) {
                 return decl;
             }
         }
@@ -915,7 +915,7 @@ func be_find_enum_decl(self: Backend*, module_name: string, enum_name: string) -
         let top = ptr_vec_get(root.decls, i) as TopLevelDecl*;
         if (ord(top.kind) == ord(TD_ENUM)) {
             let decl = top.data as EnumDecl*;
-            if (eq_s(decl.name, enum_name)) {
+            if (decl.name == enum_name) {
                 return decl;
             }
         }
@@ -941,7 +941,7 @@ func be_find_variant_decl(self: Backend*, module_name: string, enum_name: string
     let decl = enum_decl as EnumDecl*;
     for (let i = 0; i < vec_size(decl.variants); i = i + 1) {
         let variant = ptr_vec_get(decl.variants, i) as EnumVariant*;
-        if (eq_s(variant.name, variant_name)) {
+        if (variant.name == variant_name) {
             return variant;
         }
     }
@@ -1204,7 +1204,7 @@ func be_emit_bare_variant_static_initializer(self: Backend*, expr_id: ExprId, ex
     }
 
     let target = sym as Symbol*;
-    if (!eq_s(target.module_name, expected_type.module_name) || !eq_s(target.owner_name, expected_type.name)) {
+    if (target.module_name != expected_type.module_name || target.owner_name != expected_type.name) {
         return be_ice_string("[ICE-1033] bare enum variant does not belong to expected enum type");
     }
 
@@ -1431,7 +1431,7 @@ func be_emit_lvalue(self: Backend*, expr_id: ExprId) -> string {
     let expr = expr_arena_get(be_current_expr_arena(self), expr_id);
     match (expr.kind) {
         EX_UNARY => {
-            if (eq_s(expr.text_value, "*") && be_has_side_effects(self, expr.expr_a)) {
+            if (expr.text_value == "*" && be_has_side_effects(self, expr.expr_a)) {
                 with (let ptr_ty = be_expr_type(self, expr.expr_a) => type_free_opt(ptr_ty)) {
                     if (ptr_ty == null) {
                         return be_ice_string("[ICE-1242] missing type for dereference operand");
@@ -1504,11 +1504,11 @@ func be_emit_binary_op(self: Backend*, expr_id: ExprId) -> string {
     let left = expr_arena_get(be_current_expr_arena(self), expr.expr_a);
     let right = expr_arena_get(be_current_expr_arena(self), expr.expr_b);
 
-    if (eq_s(expr.text_value, "&&") || eq_s(expr.text_value, "||")) {
+    if (expr.text_value == "&&" || expr.text_value == "||") {
         return be_emit_condition_value(self, expr_id);
     }
 
-    if ((eq_s(expr.text_value, "==") || eq_s(expr.text_value, "!=")) &&
+    if ((expr.text_value == "==" || expr.text_value == "!=") &&
         (ord(left.kind) == ord(EX_NULL) || ord(right.kind) == ord(EX_NULL))) {
         let other_id = expr.expr_a;
         if (ord(left.kind) == ord(EX_NULL)) {
@@ -1519,7 +1519,7 @@ func be_emit_binary_op(self: Backend*, expr_id: ExprId) -> string {
             let c_other = be_emit_expr(self, other_id);
             if (other_ty != null && ord((other_ty as Type*).kind) == ord(TY_NULLABLE) &&
                 !cem_is_niche_nullable(other_ty as Type*)) {
-                if (eq_s(expr.text_value, "==")) {
+                if (expr.text_value == "==") {
                     return cem_emit_null_check_eq(c_other);
                 }
                 return cem_emit_null_check_ne(c_other);
@@ -1530,34 +1530,40 @@ func be_emit_binary_op(self: Backend*, expr_id: ExprId) -> string {
 
     let c_left = be_emit_expr(self, expr.expr_a);
     let c_right = be_emit_expr(self, expr.expr_b);
-    if (eq_s(expr.text_value, "/")) {
+    if (expr.text_value == "/") {
         return cem_emit_checked_int_div(c_left, c_right);
     }
-    if (eq_s(expr.text_value, "%")) {
+    if (expr.text_value == "%") {
         return cem_emit_checked_int_mod(c_left, c_right);
     }
-    if (eq_s(expr.text_value, "*")) {
+    if (expr.text_value == "*") {
         return cem_emit_checked_int_mul(c_left, c_right);
     }
-    if (eq_s(expr.text_value, "+")) {
+    if (expr.text_value == "+") {
         return cem_emit_checked_int_add(c_left, c_right);
     }
-    if (eq_s(expr.text_value, "-")) {
+    if (expr.text_value == "-") {
         return cem_emit_checked_int_sub(c_left, c_right);
     }
     with (let left_ty = be_expr_type(self, expr.expr_a) => type_free_opt(left_ty)) {
         with (let right_ty = be_expr_type(self, expr.expr_b) => type_free_opt(right_ty)) {
             if (left_ty != null && right_ty != null &&
                 type_is_builtin(left_ty as Type*, "string") && type_is_builtin(right_ty as Type*, "string")) {
-                if (eq_s(expr.text_value, "==") || eq_s(expr.text_value, "!=")) {
+                if (be_should_materialize_arc_temp(self, expr.expr_a, left_ty as Type*)) {
+                    c_left = be_materialize_arc_temp(self, c_left, left_ty as Type*);
+                }
+                if (be_should_materialize_arc_temp(self, expr.expr_b, right_ty as Type*)) {
+                    c_right = be_materialize_arc_temp(self, c_right, right_ty as Type*);
+                }
+                if (expr.text_value == "==" || expr.text_value == "!=") {
                     let c_cmp = cem_emit_string_equals_call(c_left, c_right);
-                    if (eq_s(expr.text_value, "!=")) {
+                    if (expr.text_value == "!=") {
                         return cem_emit_unary_op("!", c_cmp);
                     }
                     return c_cmp;
                 }
-                if (eq_s(expr.text_value, "<") || eq_s(expr.text_value, "<=") ||
-                    eq_s(expr.text_value, ">") || eq_s(expr.text_value, ">=")) {
+                if (expr.text_value == "<" || expr.text_value == "<=" ||
+                    expr.text_value == ">" || expr.text_value == ">=") {
                     return cem_emit_string_compare_call(expr.text_value, c_left, c_right);
                 }
             }
@@ -1637,7 +1643,7 @@ func be_emit_call(self: Backend*, expr_id: ExprId) -> string {
     let callee = expr_arena_get(be_current_expr_arena(self), expr.expr_a);
 
     if (ord(callee.kind) == ord(EX_VAR_REF)) {
-        if (eq_s(callee.text_value, "sizeof") && expr.ids != null && vec_size(expr.ids as VectorBase*) == 1) {
+        if (callee.text_value == "sizeof" && expr.ids != null && vec_size(expr.ids as VectorBase*) == 1) {
             let arg = expr_arena_get(be_current_expr_arena(self), id_vec_get(expr.ids as VectorBase*, 0));
             if (ord(arg.kind) == ord(EX_TYPE) && arg.type_ref != null) {
                 with (let target_ty = be_resolve_type_ref(self, arg.type_ref as TypeRef*) => type_free_opt(target_ty)) {
@@ -1656,7 +1662,7 @@ func be_emit_call(self: Backend*, expr_id: ExprId) -> string {
             }
         }
 
-        if (eq_s(callee.text_value, "ord") && expr.ids != null && vec_size(expr.ids as VectorBase*) == 1) {
+        if (callee.text_value == "ord" && expr.ids != null && vec_size(expr.ids as VectorBase*) == 1) {
             return cem_emit_ord(be_emit_expr(self, id_vec_get(expr.ids as VectorBase*, 0)));
         }
 
@@ -2076,7 +2082,7 @@ func be_emit_cleanup_for_return(self: Backend*, returned_var: string?) {
         }
         for (let i = vec_size(cur.owned_vars) - 1; i >= 0; i = i - 1) {
             let item = ptr_vec_get(cur.owned_vars, i) as ScopeVar*;
-            if (returned_var != null && eq_s(item.name, returned_var as string)) {
+            if (returned_var != null && item.name == returned_var as string) {
                 continue;
             }
             if (analysis_has_arc_data(self.result, item.var_type)) {
@@ -2520,7 +2526,7 @@ func be_emit_condition_branch(self: Backend*, expr_id: ExprId, true_label: strin
         return;
     }
 
-    if (ord(expr.kind) == ord(EX_BINARY) && eq_s(expr.text_value, "&&")) {
+    if (ord(expr.kind) == ord(EX_BINARY) && expr.text_value == "&&") {
         let rhs_label = be_fresh_label(self, "cond_rhs");
         be_emit_condition_branch(self, expr.expr_a, rhs_label, false_label);
         cem_emit_label(self.emitter, rhs_label);
@@ -2528,7 +2534,7 @@ func be_emit_condition_branch(self: Backend*, expr_id: ExprId, true_label: strin
         return;
     }
 
-    if (ord(expr.kind) == ord(EX_BINARY) && eq_s(expr.text_value, "||")) {
+    if (ord(expr.kind) == ord(EX_BINARY) && expr.text_value == "||") {
         let rhs_label2 = be_fresh_label(self, "cond_rhs");
         be_emit_condition_branch(self, expr.expr_a, true_label, rhs_label2);
         cem_emit_label(self.emitter, rhs_label2);

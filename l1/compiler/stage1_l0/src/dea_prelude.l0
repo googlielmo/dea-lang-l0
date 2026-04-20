@@ -48,7 +48,7 @@ func dea_zero_span() -> Span {
  * @return `true` when `module_name` is `dea`.
  */
 func dea_is_virtual_module_name(module_name: string) -> bool {
-    return eq_s(module_name, dea_module_name());
+    return module_name == dea_module_name();
 }
 
 /**
@@ -58,7 +58,7 @@ func dea_is_virtual_module_name(module_name: string) -> bool {
  * @return `true` when `sym` belongs to `dea`.
  */
 func dea_is_symbol(sym: Symbol*?) -> bool {
-    return sym != null && eq_s((sym as Symbol*).module_name, dea_module_name());
+    return sym != null && (sym as Symbol*).module_name == dea_module_name();
 }
 
 /**
@@ -69,7 +69,7 @@ func dea_is_symbol(sym: Symbol*?) -> bool {
  * @return `true` when `sym` is `dea::<name>`.
  */
 func dea_is_intrinsic_symbol(sym: Symbol*?, name: string) -> bool {
-    return dea_is_symbol(sym) && eq_s((sym as Symbol*).name, name);
+    return dea_is_symbol(sym) && (sym as Symbol*).name == name;
 }
 
 /**

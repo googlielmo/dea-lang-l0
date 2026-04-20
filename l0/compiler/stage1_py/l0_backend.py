@@ -3075,6 +3075,10 @@ class Backend:
                 isinstance(left_ty, BuiltinType) and left_ty.name == "string"
                 and isinstance(right_ty, BuiltinType) and right_ty.name == "string"
         ):
+            if self._should_materialize_arc_temp(expr_left, left_ty):
+                c_left = self._materialize_arc_temp(c_left, left_ty)
+            if self._should_materialize_arc_temp(expr_right, right_ty):
+                c_right = self._materialize_arc_temp(c_right, right_ty)
             if expr_op in ("==", "!="):
                 c_cmp = self.emitter.emit_string_equals_call(c_left, c_right)
                 if expr_op == "!=":

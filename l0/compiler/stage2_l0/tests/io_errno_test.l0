@@ -27,7 +27,7 @@ func test_stale_errno_does_not_break_std_fs_file_io() {
 
     let rd = read_file(target_path);
     assert(rd != null, "read_file should not fail due to stale errno");
-    assert(eq_s(rd as string, "ok"), "read_file content mismatch");
+    assert(rd as string == "ok", "read_file content mismatch");
 
     let deleted = rt_delete_file(target_path);
     assert(deleted, "cleanup delete failed");

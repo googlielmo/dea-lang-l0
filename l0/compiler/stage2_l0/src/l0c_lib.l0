@@ -373,7 +373,7 @@ func l0c_cmd_sym(opts: CliOptions*, cfg: LogConfig*) -> int {
             for (let i = 0; i < vs_size(module_names); i = i + 1) {
                 let mod_name = vs_get(module_names, i);
                 let entry_unit = driver_find_unit(result.driver_state, result.driver_state.entry_module) as DriverUnit*;
-                if (!opts.all_modules && !eq_s(mod_name, entry_unit.module_name)) {
+                if (!opts.all_modules && mod_name != entry_unit.module_name) {
                     continue;
                 }
 
@@ -504,7 +504,7 @@ func l0c_cmd_type(opts: CliOptions*, cfg: LogConfig*) -> int {
             for (let i = 0; i < vs_size(module_names); i = i + 1) {
                 let mod_name = vs_get(module_names, i);
                 let entry_unit = driver_find_unit(result.driver_state, result.driver_state.entry_module) as DriverUnit*;
-                if (!opts.all_modules && !eq_s(mod_name, entry_unit.module_name)) {
+                if (!opts.all_modules && mod_name != entry_unit.module_name) {
                     continue;
                 }
 
