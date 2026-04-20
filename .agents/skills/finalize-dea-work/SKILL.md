@@ -29,12 +29,8 @@ work.
    - update relevant `Version: YYYY-MM-DD` metadata when editing reference/status docs
    - do not document draft-only future behavior as shipped
 4. Run relevant validation before the commit:
-   - L0 normal finalization: from `l0/`, prefer `make test-all`; for narrower safe changes use the relevant targeted
-     tests from `l0/CLAUDE.md`
-   - L1 normal finalization: from `l1/`, run `make test-stage1`; add `make test-stage1-trace TESTS="..."` for
-     trace-sensitive paths; use `make test-stage1-trace-all` only when intentionally validating slow trace cases
-   - docs-only changes still need `git diff --check`; run docs tooling when the edited docs have a generator/check
-     target
+   - For code changes: run repo-root `make clean test-all` before any commit (executes in all `lN` directories).
+   - For docs-only changes: run `git diff --check`; run docs tooling when the edited docs have a generator/check target
 5. Stage explicitly. Use `git add -u <scope>` plus explicit new files. Re-check `git status --short`.
 6. Run staged whitespace check:
 
