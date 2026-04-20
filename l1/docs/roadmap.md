@@ -1,6 +1,6 @@
 # Dea/L1 Roadmap
 
-Version: 2026-04-19
+Version: 2026-04-20
 
 This is the live direction document for the Dea/L1 subtree. It records the current L1 position, the assumptions that
 constrain future work, completed milestones that shape the baseline, active work, and backlog items that have not yet
@@ -116,6 +116,8 @@ L1 carries post-L0 language growth and bootstrap compiler work.
   [2026-04-19-nullable-identity-equality-noref](../work/plans/features/2026-04-19-nullable-identity-equality-noref.md)
   adds strict `T? == T?` equality with same-inner-type payload comparison and explicit-cast requirement for cross-form
   `T? vs T` compares.
+- Feature [2026-04-20-is-intrinsic-noref](../work/plans/features/2026-04-20-is-intrinsic-noref.md) introduces the
+  `is(x, Variant)` intrinsic for payload-ignoring enum tag comparison.
 
 ## Backlog
 
@@ -139,8 +141,6 @@ surface.
   addressing gates. Current `sys.unsafe` is a low-level runtime binding only.
 - `_` struct-member semantics: whether placeholder/discard fields are allowed and how they affect construction, field
   access, layout, and ABI.
-- `is` predicate/intrinsic over enum or type ordinals, including whether it stays a narrow `ord`-comparison helper or
-  becomes the first RTTI-facing surface.
 - Named arguments for functions and constructors.
 - Literal struct/enum syntax using `{}` and named fields. Constructor-call syntax exists today; literal syntax does not.
 - Compiler-generated `hash(T)` for struct and enum values, including its relationship to `sys.hash`, `std.hashmap`, and
