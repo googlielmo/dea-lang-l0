@@ -9,6 +9,7 @@ Canonical ownership boundaries:
 - Compiler architecture and pass flow: [reference/architecture.md](architecture.md)
 - C backend implementation/lowering details: [reference/c-backend-design.md](c-backend-design.md)
 - Stage 1 contract/index: [specs/compiler/stage1-contract.md](../specs/compiler/stage1-contract.md)
+- Stage 2 contract/index: [specs/compiler/stage2-contract.md](../specs/compiler/stage2-contract.md)
 
 ## 1. Scope and Goals
 
@@ -41,15 +42,15 @@ Design intent:
 
 ### 3.1 Current pointer model
 
-Current Stage 1/2 model includes:
+Current L0 model includes:
 
 - pointer types (`T*`, nullable `T*?`),
 - dereference (`*expr`),
 - field access with pointer auto-deref behavior (`ptr.field`).
 
-### 3.2 No address-of operator in Stage 1
+### 3.2 No address-of operator
 
-`&` is intentionally excluded in Stage 1.
+`&` is intentionally excluded in L0.
 
 Rationale:
 
@@ -59,10 +60,10 @@ Rationale:
 
 ### 3.3 No raw pointer arithmetic contract
 
-Pointer arithmetic is not part of Stage 1 surface semantics.
+Pointer arithmetic is not part of L0 surface semantics.
 
-Index syntax exists in the frontend AST/checker, but array/slice types are not yet implemented in Stage 1; indexing is
-therefore currently rejected for unsupported targets.
+Index syntax exists in the frontend AST/checker, but array/slice types are not implemented in L0; indexing is therefore
+currently rejected for unsupported targets.
 
 ## 4. Nullability, Casts, and Introspection
 
@@ -89,8 +90,8 @@ short-circuiting behavior with explicit type semantics.
 
 ### 4.4 Language intrinsics and type introspection
 
-- `sizeof` exists as a language intrinsic and returns `int` in Stage 1.
-- `ord` is a language intrinsic for enum tag introspection and returns `int` in Stage 1.
+- `sizeof` exists as a language intrinsic and returns `int`.
+- `ord` is a language intrinsic for enum tag introspection and returns `int`.
 
 ## 5. Early I/O Model
 
@@ -118,7 +119,7 @@ Rationale:
 
 ## 7. Integer Model Rationale
 
-Stage 1 semantics intentionally avoid inheriting host-C integer vagueness.
+L0 semantics intentionally avoid inheriting host-C integer vagueness.
 
 Policy:
 
@@ -146,7 +147,7 @@ Operational backend rules belong in [reference/c-backend-design.md](c-backend-de
 
 Planned direction:
 
-1. Keep Stage 1 minimal and stable.
+1. Keep L0 minimal and stable.
 2. Expand language features in Dea/L1 when semantics are decision-complete.
 3. Continue keeping unsafe/platform-specific details behind explicit runtime boundaries.
 
@@ -157,51 +158,20 @@ which operand types each operator accepts; this section records the deliberate r
 
 Ordered comparison on `bool` is not accepted:
 
-- `bool < bool`, `bool <= bool`, `bool > bool`, and `bool >= bool` are rejected as non-integer operands
+- `bool < bool`, `bool <= bool`, `bool > bool`, and `bool >= bool` are rejected as noninteger operands,
 - the rejection is a design choice, not a deferred feature: booleans are two labels, not a scalar ordering, and a
-  defined `true > false` meaning would add a footgun without a corresponding use case
+  defined `true > false` meaning would add a footgun without a corresponding use case,
 - the rejection diagnostic is `TYP-0170`, consistent with other noninteger operand rejections on the relational
-  operators
+  operators,
 - callers who want to route on a boolean value should use `if` / `case (b) { true => ...; false => ...; }` or compare
-  equality (`b == true`, `b != false`, or the simpler `b` / `!b` expressions)
+  equality (`b == true`, `b != false`, or the simpler `b` / `!b` expressions).
 
 Equality on `bool` remains accepted, unchanged:
 
-- `bool == bool` and `bool != bool` return `bool`
+- `bool == bool` and `bool != bool` return `bool`,
 - this matches `case (b) { true => ...; }` dispatch and the general policy of treating `bool` as a scalar tag for
-  equality but not for ordering
+  equality but not for ordering.
 
 Rationale:
 
-- The Dea policy prefers a compile-time rejection over a defined-but-misleading ordering
-
-______________________________________________________________________
-
-# Addendum: Planned Dea/L1 Language Extensions
-
-These are design intentions for Dea/L1, not guaranteed implementation commitments.
-
-## A. Bitwise operators for `int`
-
-Planned scope:
-
-- unary `~`
-- binary `&`, `|`, `^`, `<<`, `>>`
-
-Planned semantic policy:
-
-- defined behavior for valid shift ranges,
-- panic (defined failure) for invalid shift counts,
-- no UB exposure through shift edge cases.
-
-## B. Top-level `const`
-
-Planned scope:
-
-- immutable top-level compile-time declarations.
-
-Planned semantic policy:
-
-- restricted constant-expression subset,
-- compile-time errors for invalid constant evaluation,
-- clear initialization/order rules before enabling cross-module complexity.
+- The Dea policy prefers a compile-time rejection over a defined-but-misleading ordering.

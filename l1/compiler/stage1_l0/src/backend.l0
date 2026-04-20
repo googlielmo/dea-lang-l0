@@ -1409,6 +1409,51 @@ func be_emit_line_directive(self: Backend*, span: Span) {
 }
 
 /**
+ * Try to emit a bare zero-field enum variant as a static initializer.
+ *
+ * @param self Backend state to inspect.
+ * @param expr_id Var-ref expression id.
+ * @param expected_type Resolved binding type.
+ * @return Static enum initializer, or `null` when the expression is not eligible.
+ */
+func be_try_emit_bare_variant_static_initializer(self: Backend*, expr_id: ExprId, expected_type: Type*) -> string? {
+    let expr = expr_arena_get(be_current_expr_arena(self), expr_id);
+    if (ord(expr.kind) != ord(EX_VAR_REF)) {
+        return null;
+    }
+    if (ord(expected_type.kind) != ord(TY_ENUM)) {
+        return null;
+    }
+
+    let sym = be_lookup_symbol(self, expr.text_value, expr.module_path, expr.name_qualifier);
+    if (sym == null || ord((sym as Symbol*).kind) != ord(SYM_ENUM_VARIANT)) {
+        return null;
+    }
+
+    let target = sym as Symbol*;
+    if (!eq_s(target.module_name, expected_type.module_name) || !eq_s(target.owner_name, expected_type.name)) {
+        return null;
+    }
+
+    let enum_info = sig_lookup_enum_info(self.result.signatures as SignatureTables*, expected_type.module_name, expected_type.name);
+    if (enum_info == null) {
+        return be_ice_string("[ICE-1050] missing EnumInfo for bare variant static initializer");
+    }
+
+    let variant_info = cem_find_enum_variant_info(enum_info as EnumInfo*, target.name);
+    if (variant_info == null) {
+        return be_ice_string("[ICE-1051] missing VariantInfo for bare variant static initializer");
+    }
+    if (vec_size((variant_info as EnumVariantInfo*).field_types) != 0) {
+        return null;
+    }
+
+    with (let payload_inits = vs_create(0) => vs_free(payload_inits)) {
+        return cem_emit_variant_static_initializer_for_type(expected_type, target.name, payload_inits);
+    }
+}
+
+/**
  * Try to emit a constant initializer for a top-level `let`.
  *
  * @param self Backend state to inspect.
@@ -1431,6 +1476,7 @@ func be_try_emit_let_initializer(self: Backend*, expr_id: ExprId, expected_type:
         EX_BOOL => { return cem_emit_const_bool_literal(expr.bool_value); }
         EX_STRING => { return cem_emit_const_string_literal(expr.text_value); }
         EX_NULL => { return cem_emit_null_literal(expected_type, true); }
+        EX_VAR_REF => { return be_try_emit_bare_variant_static_initializer(self, expr_id, expected_type); }
         EX_CALL => { return be_try_emit_const_constructor(self, expr_id, expected_type); }
         _ => {
             return null;

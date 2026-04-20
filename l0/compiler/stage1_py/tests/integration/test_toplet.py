@@ -200,6 +200,7 @@ def test_typecheck_toplet_enum(tmp_path):
             Running(progress: int);
         }
 
+        let status0 = Ready;
         let status1 = Ready();
         let status2: Status = Running(50);
 
@@ -217,8 +218,64 @@ def test_typecheck_toplet_enum(tmp_path):
     result = driver.analyze("test")
 
     assert not result.has_errors()
+    assert ("test", "status0") in result.let_types
     assert ("test", "status1") in result.let_types
     assert ("test", "status2") in result.let_types
+
+
+def test_typecheck_toplet_bare_payload_variant_error(tmp_path):
+    """Bare payload variants still require constructor arguments."""
+    write_tmp(tmp_path, "test.l0", """
+        module test;
+
+        enum Status {
+            Ready;
+            Running(progress: int);
+        }
+
+        let status = Running;
+
+        func main() -> int {
+            return 0;
+        }
+    """)
+
+    driver = L0Driver()
+    driver.search_paths.add_project_root(tmp_path)
+    driver.search_paths.add_system_root(STDLIB_PATH)
+    result = driver.analyze("test")
+
+    assert result.has_errors()
+    assert any("[SIG-0030]" in str(diag) for diag in result.diagnostics)
+
+
+def test_typecheck_toplet_qualified_bare_variant(tmp_path):
+    """Top-level let inference supports imported bare zero-arg variants."""
+    write_tmp(tmp_path, "colors.l0", """
+        module colors;
+
+        enum Color {
+            Red;
+        }
+    """)
+    write_tmp(tmp_path, "test.l0", """
+        module test;
+        import colors;
+
+        let status = colors::Red;
+
+        func main() -> int {
+            return ord(status);
+        }
+    """)
+
+    driver = L0Driver()
+    driver.search_paths.add_project_root(tmp_path)
+    driver.search_paths.add_system_root(STDLIB_PATH)
+    result = driver.analyze("test")
+
+    assert not result.has_errors()
+    assert ("test", "status") in result.let_types
 
 
 def test_typecheck_toplet_duplicate_error(tmp_path):
@@ -353,6 +410,7 @@ def test_codegen_toplet_enum(tmp_path):
             Running(progress: int);
         }
 
+        let status0 = Ready;
         let status1 = Ready();
         let status2 = Running(75);
 
@@ -375,6 +433,7 @@ def test_codegen_toplet_enum(tmp_path):
     c_code = backend.generate()
 
     # Check for static enum initialization
+    assert "static struct l0_test_Status l0_test_status0" in c_code
     assert "static struct l0_test_Status l0_test_status1" in c_code
     assert "static struct l0_test_Status l0_test_status2" in c_code
     assert ".tag = l0_test_Status_Ready" in c_code

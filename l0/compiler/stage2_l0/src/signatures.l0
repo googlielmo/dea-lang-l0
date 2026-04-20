@@ -377,6 +377,14 @@ func sig_infer_literal_type(tables: SignatureTables*, nr: NameResolution*, env: 
     if (ord(expr.kind) == ord(EX_NULL)) {
         return null;
     }
+    if (ord(expr.kind) == ord(EX_VAR_REF)) {
+        let sym = tr_symbol_lookup(nr, env, expr.text_value, expr.module_path, expr.name_qualifier);
+        if (sym != null && sig_symbol_is_zero_field_enum_variant(sym as Symbol*)) {
+            let target = sym as Symbol*;
+            return type_new_enum(target.module_name, target.owner_name);
+        }
+        return null;
+    }
     if (ord(expr.kind) != ord(EX_CALL)) {
         return null;
     }
@@ -405,6 +413,20 @@ func sig_infer_literal_type(tables: SignatureTables*, nr: NameResolution*, env: 
         }
     }
     return null;
+}
+
+/**
+ * Report whether one symbol names a zero-field enum variant.
+ *
+ * @param sym Symbol to inspect.
+ * @return `true` when `sym` is a zero-field enum variant.
+ */
+func sig_symbol_is_zero_field_enum_variant(sym: Symbol*) -> bool {
+    if (ord(sym.kind) != ord(SYM_ENUM_VARIANT)) {
+        return false;
+    }
+    let variant = sym.decl_ptr as EnumVariant*;
+    return vec_size(variant.fields) == 0;
 }
 
 /**

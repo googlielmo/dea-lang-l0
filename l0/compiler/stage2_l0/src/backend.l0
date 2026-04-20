@@ -1179,6 +1179,53 @@ func be_emit_line_directive(self: Backend*, span: Span) {
 }
 
 /**
+ * Emit a bare zero-field enum variant as a static initializer.
+ *
+ * @param self Backend state to inspect.
+ * @param expr_id Var-ref expression id.
+ * @param expected_type Resolved binding type.
+ * @return Static enum initializer, or an ICE string when invariants are broken.
+ */
+func be_emit_bare_variant_static_initializer(self: Backend*, expr_id: ExprId, expected_type: Type*) -> string {
+    let expr = expr_arena_get(be_current_expr_arena(self), expr_id);
+    if (ord(expr.kind) != ord(EX_VAR_REF)) {
+        return be_ice_string("[ICE-1034] bare variant helper requires var ref expression");
+    }
+    if (ord(expected_type.kind) != ord(TY_ENUM)) {
+        return be_ice_string("[ICE-1033] bare enum variant initializer expected enum type");
+    }
+
+    let sym = be_lookup_symbol(self, expr.text_value, expr.module_path, expr.name_qualifier);
+    if (sym == null) {
+        return be_ice_string("[ICE-1031] unknown bare variant name");
+    }
+    if (ord((sym as Symbol*).kind) != ord(SYM_ENUM_VARIANT)) {
+        return be_ice_string("[ICE-1034] var ref is not an enum variant constructor");
+    }
+
+    let target = sym as Symbol*;
+    if (!eq_s(target.module_name, expected_type.module_name) || !eq_s(target.owner_name, expected_type.name)) {
+        return be_ice_string("[ICE-1033] bare enum variant does not belong to expected enum type");
+    }
+
+    let enum_info = sig_lookup_enum_info(self.result.signatures as SignatureTables*, expected_type.module_name, expected_type.name);
+    if (enum_info == null) {
+        return be_ice_string("[ICE-1050] missing EnumInfo for bare variant static initializer");
+    }
+    let variant_info = cem_find_enum_variant_info(enum_info as EnumInfo*, target.name);
+    if (variant_info == null) {
+        return be_ice_string("[ICE-1051] missing VariantInfo for bare variant static initializer");
+    }
+    if (vec_size((variant_info as EnumVariantInfo*).field_types) != 0) {
+        return be_ice_string("[ICE-1053] bare enum variant initializer requires zero payload fields");
+    }
+
+    with (let payload_inits = vs_create(0) => vs_free(payload_inits)) {
+        return cem_emit_variant_static_initializer_for_type(expected_type, target.name, payload_inits);
+    }
+}
+
+/**
  * Emit a constant initializer for a top-level `let`.
  *
  * @param self Backend state to inspect.
@@ -1194,6 +1241,7 @@ func be_emit_let_initializer(self: Backend*, expr_id: ExprId, expected_type: Typ
         EX_BOOL => { return cem_emit_const_bool_literal(expr.bool_value); }
         EX_STRING => { return cem_emit_const_string_literal(expr.text_value); }
         EX_NULL => { return cem_emit_null_literal(expected_type, true); }
+        EX_VAR_REF => { return be_emit_bare_variant_static_initializer(self, expr_id, expected_type); }
         EX_CALL => { return be_emit_const_constructor(self, expr_id, expected_type); }
         _ => {
             return be_ice_string("[ICE-1181] unsupported top-level let initializer");

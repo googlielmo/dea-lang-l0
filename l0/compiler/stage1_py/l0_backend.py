@@ -733,6 +733,8 @@ class Backend:
             return self.emitter.emit_const_string_literal(expr.value)
         elif isinstance(expr, NullLiteral):
             return self.emitter.emit_null_literal(expected_type, for_initializer=True)
+        elif isinstance(expr, VarRef):
+            return self._emit_bare_variant_static_initializer(expr, expected_type)
         elif isinstance(expr, CallExpr) and isinstance(expr.callee, VarRef):
             # Struct or enum variant construction: Point(1, 2) or Color.Red
             return self._emit_const_constructor(expr, expected_type)
@@ -744,6 +746,30 @@ class Backend:
         else:
             # Unsupported initializer
             self.ice(f"[ICE-1181] unsupported top-level let initializer: {type(expr).__name__}", node=expr)
+
+    def _emit_bare_variant_static_initializer(self, expr: VarRef, expected_type: Type) -> str:
+        """Emit a bare zero-argument enum variant for static initialization."""
+        if not self.current_module:
+            self.ice("[ICE-1030] current_module not set during bare variant let initialization", node=expr)
+        if not isinstance(expected_type, EnumType):
+            self.ice("[ICE-1033] bare enum variant initializer expected enum type", node=expr)
+
+        sym = self._lookup_symbol(expr.name, self.current_module, module_path=expr.module_path)
+        if sym is None:
+            self.ice(f"[ICE-1031] unknown bare variant name: {expr.name}", node=expr)
+        if sym.kind != SymbolKind.ENUM_VARIANT:
+            self.ice(f"[ICE-1034] VarRef is not an enum variant constructor", node=expr)
+
+        variant_decl = self.find_variant_decl(expected_type.module, expected_type.name, sym.name)
+        if variant_decl is None:
+            self.ice(f"[ICE-1052] missing variant decl for {expected_type.module}.{expected_type.name}.{sym.name}",
+                     node=expr)
+        if variant_decl is not sym.node:
+            self.ice(f"[ICE-1033] bare enum variant does not belong to expected enum type", node=expr)
+        if len(variant_decl.fields) != 0:
+            self.ice(f"[ICE-1053] bare enum variant initializer requires zero payload fields", node=expr)
+
+        return self.emitter.emit_variant_static_initializer_for_type(expected_type, sym.name, [])
 
     def _emit_const_constructor(self, expr: CallExpr, expected_type: Type) -> str:
         """Emit a constant struct or enum constructor for static initialization.
@@ -848,7 +874,7 @@ class Backend:
 
         # Empty variant (no payload)
         if len(variant_info.field_types) == 0:
-            return self.emitter.emit_variant_constructor_for_type(enum_type, variant_name, [])
+            return self.emitter.emit_variant_static_initializer_for_type(enum_type, variant_name, [])
 
         # Get field names from AST
         variant_decl = self.find_variant_decl(enum_type.module, enum_type.name, variant_name)

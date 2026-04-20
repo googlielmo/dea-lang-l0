@@ -7,9 +7,10 @@ Stage 2 is expected to emit the same C and reuse the same diagnostic/ICE codes f
 
 Related docs:
 
-- Stage 1 architecture and pass flow: [reference/architecture.md](architecture.md)
+- Architecture and pass flow: [reference/architecture.md](architecture.md)
 - Language/runtime rationale and future evolution: [reference/design-decisions.md](design-decisions.md)
 - Stage 1 contract/index: [specs/compiler/stage1-contract.md](../specs/compiler/stage1-contract.md)
+- Stage 2 contract/index: [specs/compiler/stage2-contract.md](../specs/compiler/stage2-contract.md)
 
 ## Overview
 

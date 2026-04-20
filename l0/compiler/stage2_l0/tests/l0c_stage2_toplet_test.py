@@ -273,6 +273,57 @@ def test_execute_toplet_nested_struct(artifact_dir: Path) -> None:
     )
 
 
+def test_toplet_bare_variant_static_initializer(artifact_dir: Path) -> None:
+    """Bare zero-argument enum variants infer top-level let type and lower statically."""
+
+    source = """
+        module main;
+
+        enum Color {
+            Red;
+            Green(value: int);
+        }
+
+        let favorite = Red;
+
+        func main() -> int {
+            return ord(favorite);
+        }
+    """
+
+    c_code = run_gen("toplet_bare_variant_gen", source, artifact_dir)
+    assert_true(
+        "static struct l0_main_Color l0_main_favorite = { .tag = l0_main_Color_Red };" in c_code,
+        "missing bare variant static initializer",
+        artifact_dir,
+    )
+    run_ok("toplet_bare_variant_run", 0, source, artifact_dir)
+
+
+def test_toplet_bare_payload_variant_diagnostic(artifact_dir: Path) -> None:
+    """Bare payload variants still require constructor arguments."""
+
+    run_check_error(
+        "toplet_bare_payload_variant_diagnostic",
+        "[SIG-0030]",
+        """
+        module main;
+
+        enum Color {
+            Red;
+            Green(value: int);
+        }
+
+        let favorite = Green;
+
+        func main() -> int {
+            return 0;
+        }
+        """,
+        artifact_dir,
+    )
+
+
 def test_toplet_string_reassignment_arc(artifact_dir: Path) -> None:
     """Top-level string reassignment must release old values and stay leak-free."""
 
@@ -340,6 +391,8 @@ def main() -> int:
         test_execute_toplet_mutation,
         test_execute_toplet_struct,
         test_execute_toplet_nested_struct,
+        test_toplet_bare_variant_static_initializer,
+        test_toplet_bare_payload_variant_diagnostic,
         test_toplet_string_reassignment_arc,
         test_drop_toplet_pointer_diagnostic,
     ]

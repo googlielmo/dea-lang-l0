@@ -468,6 +468,12 @@ class SignatureResolver:
         elif isinstance(expr, NullLiteral):
             # Cannot infer type from null - need annotation
             return None
+        elif isinstance(expr, VarRef):
+            sym_result = resolve_symbol(self.module_envs, env.name, expr.name, module_path=expr.module_path)
+            sym = sym_result.symbol
+            if sym is not None and self._symbol_is_zero_arg_enum_variant(sym):
+                return self._enum_type_for_variant_symbol(sym)
+            return None
         elif isinstance(expr, CallExpr) and isinstance(expr.callee, VarRef):
             # Struct or enum variant construction: Point(1, 2) or Color.Red
             name = expr.callee.name
@@ -494,6 +500,23 @@ class SignatureResolver:
         else:
             # Non-literal expressions need type annotation
             return None
+
+    def _symbol_is_zero_arg_enum_variant(self, sym: Symbol) -> bool:
+        """Return whether a symbol names a zero-argument enum variant."""
+        return (
+            sym.kind is SymbolKind.ENUM_VARIANT
+            and isinstance(sym.node, EnumVariant)
+            and len(sym.node.fields) == 0
+        )
+
+    def _enum_type_for_variant_symbol(self, sym: Symbol) -> Optional[EnumType]:
+        """Return the owning enum type for an enum variant symbol."""
+        for decl in sym.module.decls:
+            if isinstance(decl, EnumDecl):
+                for variant in decl.variants:
+                    if variant is sym.node:
+                        return EnumType(sym.module.name, decl.name)
+        return None
 
     def _extract_value_type_dependencies(self, typ: Type) -> Set[Tuple[str, str]]:
         """Extract type dependencies for value fields only (pointer-free)."""

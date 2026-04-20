@@ -5,11 +5,17 @@
 
 module typing_const_initializer_err;
 
+enum Color {
+    Red;
+    Green(value: int);
+}
+
 func helper() -> int {
     return 41;
 }
 
 const answer: int = helper();
+const favorite: Color = Green;
 
 func err() -> int {
     return answer;

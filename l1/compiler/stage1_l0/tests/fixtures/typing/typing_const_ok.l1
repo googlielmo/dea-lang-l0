@@ -5,6 +5,8 @@
 
 module typing_const_ok;
 
+import typing_const_ok_dep;
+
 struct Point {
     x: int;
     y: int;
@@ -12,9 +14,18 @@ struct Point {
 
 type Alias = Point;
 
+enum Color {
+    Red;
+    Green(value: int);
+}
+
 const origin: Alias = Alias(3, 4);
 const answer: int = 16;
+const favorite: Color = Red;
+let fallback = Red;
+const imported: typing_const_ok_dep::RemoteColor = typing_const_ok_dep::Blue;
+let imported_fallback = typing_const_ok_dep::Blue;
 
 func ok() -> int {
-    return answer + origin.x + origin.y;
+    return answer + origin.x + origin.y + ord(favorite) + ord(fallback) + ord(imported) + ord(imported_fallback);
 }

@@ -247,7 +247,7 @@ func test_analysis_has_arc_data_for_struct_and_nullable_pointer() {
 func test_backend_generate_types_and_top_level_lets() {
     with (let filenames = vs_create(1) => vs_free(filenames),
           let sources = vs_create(1) => vs_free(sources),
-          let lines = vs_create(14) => vs_free(lines),
+          let lines = vs_create(16) => vs_free(lines),
           let cfg = log_config_create(LL_ERROR, false) => drop cfg,
           let opts = cg_options_create() => cg_options_free(opts)) {
         opts.emit_line_directives = false;
@@ -263,9 +263,10 @@ func test_backend_generate_types_and_top_level_lets() {
         vs_push(lines, "}");
         vs_push(lines, "type Alias = Point;");
         vs_push(lines, "let origin: Alias = Alias(0, 0);");
+        vs_push(lines, "let empty = None;");
         vs_push(lines, "func main() -> int {");
         vs_push(lines, "    let p: Alias = Alias(origin.x, origin.y);");
-        vs_push(lines, "    return p.x;");
+        vs_push(lines, "    return p.x + ord(empty);");
         vs_push(lines, "}");
         vs_push(sources, bt_source(lines));
 
@@ -282,7 +283,9 @@ func test_backend_generate_types_and_top_level_lets() {
             "top-level alias-backed struct constructor let mismatch");
         assert(contains_s(generated, "struct l0_demo_main_Point p = (struct l0_demo_main_Point){ .x = (l0_demo_main_origin).x, .y = (l0_demo_main_origin).y };"),
             "local alias-backed struct constructor lowering mismatch");
-        assert(contains_s(generated, "return (p).x;"), "field access lowering mismatch");
+        assert(contains_s(generated, "static struct l0_demo_main_MaybePoint l0_demo_main_empty = { .tag = l0_demo_main_MaybePoint_None };"),
+            "top-level bare variant let mismatch");
+        assert(contains_s(generated, "(p).x"), "field access lowering mismatch");
 
         analysis_result_free(result);
     }
