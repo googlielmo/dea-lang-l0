@@ -3,26 +3,26 @@
 ## Port Shell Scripts to Python
 
 - Date: 2026-03-23
-- Status: Draft
+- Status: Closed (implemented)
 - Title: Port build and test shell scripts to Python; keep thin launcher/env pairs
 - Kind: Tooling
 - Severity: Medium
 - Stage: Shared
 - Subsystem: Build workflow / test harness
 - Modules:
-  - `scripts/build-stage2-l0c.sh`
-  - `scripts/gen-docs.sh`
-  - `compiler/stage2_l0/tests/l0c_stage2_help_output_test.sh`
-  - `compiler/stage2_l0/tests/l0c_stage2_test_env_isolation_test.sh`
-  - `compiler/stage2_l0/tests/l0c_codegen_test.sh`
-  - `compiler/stage2_l0/tests/l0c_stage2_verbose_output_test.sh`
-  - `compiler/stage2_l0/tests/l0c_ast_test.sh`
-  - `compiler/stage2_l0/tests/l0c_build_run_test.sh`
-  - `compiler/stage2_l0/tests/l0c_stage2_bootstrap_test.sh`
-  - `compiler/stage2_l0/tests/l0c_stage2_default_dea_build_test.sh`
-  - `compiler/stage2_l0/tests/l0c_stage2_install_prefix_test.sh`
+  - `scripts/build_stage2_l0c.py`
+  - `scripts/gen_docs.py`
+  - `compiler/stage2_l0/tests/l0c_stage2_help_output_test.py`
+  - `compiler/stage2_l0/tests/l0c_stage2_test_env_isolation_test.py`
+  - `compiler/stage2_l0/tests/l0c_codegen_test.py`
+  - `compiler/stage2_l0/tests/l0c_stage2_verbose_output_test.py`
+  - `compiler/stage2_l0/tests/l0c_ast_test.py`
+  - `compiler/stage2_l0/tests/l0c_build_run_test.py`
+  - `compiler/stage2_l0/tests/l0c_stage2_bootstrap_test.py`
+  - `compiler/stage2_l0/tests/l0c_stage2_default_dea_build_test.py`
+  - `compiler/stage2_l0/tests/l0c_stage2_install_prefix_test.py`
 - Test modules:
-  - `compiler/stage2_l0/tests/` (all shell-based tests become pytest cases)
+  - `compiler/stage2_l0/tests/` (all shell-based tests become Python runner cases)
 
 ## Summary
 
@@ -74,7 +74,7 @@ remains the tooling language until Dea can self-serve. This is a medium-term hor
 
 ### Phase 1: Stage 2 test scripts (lowest risk, highest value)
 
-1. For each `.sh` test script under `compiler/stage2_l0/tests/`, create an equivalent pytest `.py` file using
+1. For each `.sh` test script under `compiler/stage2_l0/tests/`, create an equivalent Python `.py` runner case using
    `subprocess.run` to invoke `l0c` and assert on output/exit codes.
 2. Validate that the new pytest tests pass on all CI platforms (Linux, macOS, Windows/MSYS2).
 3. Remove the `.sh` originals once the pytest replacements are green.
@@ -117,3 +117,10 @@ remains the tooling language until Dea can self-serve. This is a medium-term hor
 2. All CI platforms (Linux, macOS, Windows) pass with the Python replacements.
 3. `make test-stage2`, `make triple-test`, and docs generation work unchanged from the user's perspective.
 4. Compiler-detection logic for supported C compilers is consolidated in one Python module.
+
+## Closure Notes
+
+- Ported the Stage 2 shell regression scripts to Python runner cases and removed shell-test discovery.
+- Replaced `scripts/gen-docs.sh` with `scripts/gen_docs.py`.
+- Replaced direct `build-stage2-l0c.sh` call sites with `scripts/build_stage2_l0c.py`.
+- Updated L0 workflow docs and dry-run workflow assertions to reference the Python tools.

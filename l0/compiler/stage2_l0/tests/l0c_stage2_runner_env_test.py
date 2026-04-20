@@ -35,21 +35,11 @@ def main() -> int:
         return fail(str(exc))
 
     python_case = TestCase(index=0, name="python_case", path=SCRIPT_DIR / "demo_trace_test.py", kind="python")
-    shell_case = TestCase(
-        index=1,
-        name="shell_case",
-        path=SCRIPT_DIR / "l0c_stage2_default_dea_build_test.sh",
-        kind="shell",
-    )
-    l0_case = TestCase(index=2, name="l0_case", path=SCRIPT_DIR / "smoke.l0", kind="l0")
+    l0_case = TestCase(index=1, name="l0_case", path=SCRIPT_DIR / "smoke.l0", kind="l0")
 
     python_env = build_normal_test_env(python_case, repo_env)
     if python_env.get("DEA_BUILD_DIR") != dea_build_dir_text:
         return fail("python cases must preserve DEA_BUILD_DIR for nested Stage 2 helpers")
-
-    shell_env = build_normal_test_env(shell_case, repo_env)
-    if "DEA_BUILD_DIR" in shell_env:
-        return fail("shell cases must not inherit DEA_BUILD_DIR")
 
     l0_env = build_normal_test_env(l0_case, repo_env)
     if "DEA_BUILD_DIR" in l0_env:

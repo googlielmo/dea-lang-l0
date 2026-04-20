@@ -101,9 +101,9 @@ tooling, and Stage 1-focused testing:
 ./scripts/l0c -P examples --ast hello     # pretty-print AST
 ./scripts/l0c -P examples --sym hello     # dump symbols
 ./scripts/l0c -P examples --type hello    # dump resolved top-level types
-./scripts/gen-docs.sh --strict    # generate docs; fail on warnings and synthetic __padN__ regressions
-./scripts/gen-docs.sh --pdf       # also build/copy build/docs/pdf/refman.pdf
-./scripts/gen-docs.sh --pdf-fast  # faster preview PDF build (single pdflatex pass)
+python scripts/gen_docs.py --strict    # generate docs; fail on warnings and synthetic __padN__ regressions
+python scripts/gen_docs.py --pdf       # also build/copy build/docs/pdf/dea_l0_api_reference.pdf
+python scripts/gen_docs.py --pdf-fast  # faster preview PDF build (single pdflatex pass)
 make help                         # show the repo-local developer workflow targets
 make venv                         # create or reuse the shared ../.venv
 make check-examples               # run latest-stage --check across `examples/*.l0`; fail on warnings or errors
@@ -121,7 +121,7 @@ Trace toggles (codegen/build/run): `--trace-arc`, `--trace-memory`.
 For direct Stage 2 artifact usage, use:
 
 ```bash
-./scripts/build-stage2-l0c.sh # build the stage 2 compiler and place it under build/dea/bin/l0c-stage2
+python scripts/build_stage2_l0c.py # build the stage 2 compiler and place it under build/dea/bin/l0c-stage2
 ./build/dea/bin/l0c-stage2 --check -P examples hello # run the stage 2 compiler directly
 ./build/dea/bin/l0c-stage2 --build -P examples hello # build directly with the stage 2 compiler
 ./build/dea/bin/l0c-stage2 --run -P examples hello # build and run directly with the stage 2 compiler
@@ -135,13 +135,13 @@ make triple-test # run the strict triple-bootstrap regression
 Stage 2 currently implements analysis/dump modes plus `--gen`, `--build`, and `--run`.
 
 Generated API documentation is written under `build/docs/` and is not part of the hand-authored `docs/` tree. Native
-Doxygen LaTeX output is generated under `build/docs/doxygen/latex/`; use `./scripts/gen-docs.sh --pdf` to build
-`refman.pdf` and copy it into `build/docs/pdf/` if a local TeX toolchain is installed. For faster local previews,
-`./scripts/gen-docs.sh --pdf-fast --latex-only` performs a single-pass PDF build. After each successful docs run,
-generated artifacts are mirrored to a stable preview tree under `build/preview/` (`html/`, `markdown/`, `pdf/`), which
-is overwritten by the next successful run. Use `-v` / `--verbose` with `scripts/gen-docs.sh` to show m.css warnings and
-LaTeX build output directly. Release/manual publishing is handled by `.github/workflows/l0-docs-publish.yml`; PR
-validation is handled by `.github/workflows/l0-docs-validate.yml`.
+Doxygen LaTeX output is generated under `build/docs/doxygen/latex/`; use `python scripts/gen_docs.py --pdf` to build
+`refman.pdf` and copy it into `build/docs/pdf/dea_l0_api_reference.pdf` if a local TeX toolchain is installed. For
+faster local previews, `python scripts/gen_docs.py --pdf-fast --latex-only` performs a single-pass PDF build. After each
+successful docs run, generated artifacts are mirrored to a stable preview tree under `build/preview/` (`html/`,
+`markdown/`, `pdf/`), which is overwritten by the next successful run. Use `-v` / `--verbose` with `scripts/gen_docs.py`
+to show m.css warnings and LaTeX build output directly. Release/manual publishing is handled by
+`.github/workflows/l0-docs-publish.yml`; PR validation is handled by `.github/workflows/l0-docs-validate.yml`.
 
 ### Testing
 

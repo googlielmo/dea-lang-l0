@@ -1,6 +1,6 @@
 # L0 C Backend Design
 
-Version: 2026-04-19
+Version: 2026-04-20
 
 This is the canonical backend implementation document for the current C backend. Stage 1 remains the behavioral oracle;
 Stage 2 is expected to emit the same C and reuse the same diagnostic/ICE codes for equivalent backend conditions.
@@ -193,7 +193,7 @@ Primary Stage 2 backend/codegen parity checks live under `compiler/stage2_l0/tes
 - `backend_test.l0`
 - `c_emitter_test.l0`
 - `l0c_lib_test.l0`
-- `l0c_codegen_test.sh`
+- `l0c_codegen_test.py`
 
 Committed Stage 2 backend goldens are in `compiler/stage2_l0/tests/fixtures/backend_golden/` and are refreshed from
 Stage 1 via `scripts/refresh_stage2_backend_goldens.py`.

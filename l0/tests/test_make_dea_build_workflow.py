@@ -111,9 +111,7 @@ def launcher_path(base: Path) -> str:
 
 
 def stage2_bootstrap_build_command() -> list[str]:
-    if is_windows_host():
-        return [sys.executable, "./scripts/build_stage2_l0c.py"]
-    return ["./scripts/build-stage2-l0c.sh"]
+    return [sys.executable, "./scripts/build_stage2_l0c.py"]
 
 
 def make_command(dea_build_rel: str, *targets: str, dry_run: bool = False) -> list[str]:
@@ -499,14 +497,14 @@ def main() -> int:
             "test-dist": "./tests/test_make_dist_workflow.py",
             "triple-test": "./compiler/stage2_l0/tests/l0c_triple_bootstrap_test.py",
             "test-all": "./compiler/stage2_l0/scripts/run_trace_tests.py",
-            "docs": "./scripts/gen-docs.sh",
-            "docs-pdf": "./scripts/gen-docs.sh --strict --pdf",
+            "docs": "./scripts/gen_docs.py",
+            "docs-pdf": "./scripts/gen_docs.py --strict --pdf",
         }
         for target, expected in dry_run_expectations.items():
             output = run_checked(make_command(dea_build_rel, target, dry_run=True))
             assert_output_contains(output, expected)
             if target in {"test-stage2", "test-stage2-trace", "triple-test", "check-examples"}:
-                assert_output_contains(output, "./scripts/build-stage2-l0c.sh")
+                assert_output_contains(output, "./scripts/build_stage2_l0c.py")
             if target == "test-all":
                 assert_output_contains(output, "../scripts/check_examples.py")
                 assert_output_contains(output, "./tests/test_make_dea_build_workflow.py")

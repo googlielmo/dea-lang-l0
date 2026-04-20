@@ -67,7 +67,8 @@ def test_parse_args_help_mentions_wrapper_for_pdf_flags(capsys: pytest.CaptureFi
 
     captured = capsys.readouterr()
     assert "For wrapper-only options such as --pdf, --pdf-fast, and --verbose" in captured.out
-    assert "./scripts/gen-docs.sh --help" in captured.out
+    assert "python" in captured.out
+    assert "scripts/gen_docs.py --help" in captured.out
 
 
 def test_project_number_for_latex_uses_source_date_epoch(monkeypatch: pytest.MonkeyPatch) -> None:

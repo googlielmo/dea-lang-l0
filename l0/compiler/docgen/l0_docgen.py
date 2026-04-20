@@ -133,7 +133,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         description=__doc__,
         epilog=(
             "For wrapper-only options such as --pdf, --pdf-fast, and --verbose, "
-            "use ./scripts/gen-docs.sh --help."
+            "use python scripts/gen_docs.py --help."
         ),
     )
     parser.add_argument("--html-only", action="store_true", help="Generate only HTML output.")

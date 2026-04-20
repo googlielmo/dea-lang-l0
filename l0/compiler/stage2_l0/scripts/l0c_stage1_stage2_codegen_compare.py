@@ -71,9 +71,7 @@ def stage2_wrapper_command(wrapper_path: Path) -> list[str]:
 def stage2_bootstrap_build_command() -> list[str]:
     """Return the command used to build one repo-local Stage 2 bootstrap artifact."""
 
-    if os.name == "nt":
-        return [sys.executable, str(REPO_ROOT / "scripts" / "build_stage2_l0c.py")]
-    return ["./scripts/build-stage2-l0c.sh"]
+    return [sys.executable, str(REPO_ROOT / "scripts" / "build_stage2_l0c.py")]
 
 
 def first_lines(text: str, limit: int) -> str:

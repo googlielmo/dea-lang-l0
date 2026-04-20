@@ -32,7 +32,7 @@ def test_select_cases_supports_optional_extensions() -> str | None:
 
     cases = [
         TestCase(index=0, name="driver_test", path=SCRIPT_DIR / "driver_test.l0", kind="l0"),
-        TestCase(index=1, name="l0c_build_run_test.sh", path=SCRIPT_DIR / "l0c_build_run_test.sh", kind="shell"),
+        TestCase(index=1, name="l0c_build_run_test.py", path=SCRIPT_DIR / "l0c_build_run_test.py", kind="python"),
         TestCase(index=2, name="demo_trace_test.py", path=SCRIPT_DIR / "demo_trace_test.py", kind="python"),
     ]
 
@@ -40,7 +40,7 @@ def test_select_cases_supports_optional_extensions() -> str | None:
         cases,
         ["driver_test", "l0c_build_run_test", "demo_trace_test.py"],
     )
-    expected = ["driver_test.l0", "l0c_build_run_test.sh", "demo_trace_test.py"]
+    expected = ["driver_test.l0", "l0c_build_run_test.py", "demo_trace_test.py"]
     actual = [case.path.name for case in selected]
     if actual != expected:
         return f"expected optional-extension selection to preserve discovery order, got {actual!r}"
@@ -68,7 +68,7 @@ def test_select_cases_reports_ambiguous_stems() -> str | None:
     """Return one failure message, or `None` when ambiguous stem errors are descriptive."""
 
     cases = [
-        TestCase(index=0, name="dup_test.sh", path=SCRIPT_DIR / "dup_test.sh", kind="shell"),
+        TestCase(index=0, name="dup_test.l0", path=SCRIPT_DIR / "dup_test.l0", kind="l0"),
         TestCase(index=1, name="dup_test.py", path=SCRIPT_DIR / "dup_test.py", kind="python"),
     ]
 
@@ -76,7 +76,7 @@ def test_select_cases_reports_ambiguous_stems() -> str | None:
         run_tests.select_cases(cases, ["dup_test"])
     except ValueError as exc:
         text = str(exc)
-        if "ambiguous Stage 2 test name(s): dup_test: dup_test.sh, dup_test.py" not in text:
+        if "ambiguous Stage 2 test name(s): dup_test: dup_test.l0, dup_test.py" not in text:
             return f"unexpected ambiguous-selector error text: {exc}"
         return None
     return "expected ambiguous selector to raise ValueError"

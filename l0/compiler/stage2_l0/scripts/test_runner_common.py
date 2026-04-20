@@ -9,7 +9,6 @@
 from __future__ import annotations
 
 import os
-import shutil
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -76,42 +75,6 @@ def is_windows_host() -> bool:
     if os.environ.get("OS") == "Windows_NT":
         return True
     return bool(os.environ.get("MSYSTEM", "").strip())
-
-
-def is_windows_wsl_bash_path(path: Path) -> bool:
-    """Return whether `path` is the legacy Windows WSL bash shim."""
-
-    if os.name != "nt":
-        return False
-    normalized = str(path).replace("/", "\\").lower()
-    return normalized.endswith("\\system32\\bash.exe") or normalized.endswith("\\sysnative\\bash.exe")
-
-
-def resolve_shell_bash_path() -> Path | None:
-    """Return one usable bash executable for shell tests, if available."""
-
-    bash_text = shutil.which("bash")
-    if bash_text is None:
-        return None
-
-    bash_path = Path(bash_text)
-    if is_windows_wsl_bash_path(bash_path):
-        return None
-
-    completed = subprocess.run(
-        [str(bash_path), "--version"],
-        cwd=REPO_ROOT,
-        stdin=subprocess.DEVNULL,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        check=False,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-    )
-    if completed.returncode != 0:
-        return None
-    return bash_path
 
 
 @dataclass(frozen=True)
@@ -275,23 +238,6 @@ def discover_stage2_tests() -> list[TestCase]:
         cases.append(TestCase(index=index, name=path.stem, path=path, kind="l0"))
         index += 1
 
-    bash_path = resolve_shell_bash_path()
-    skipped_shell: list[Path] = []
-    for path in sorted(TESTS_DIR.glob("*_test.sh")):
-        if bash_path is None:
-            skipped_shell.append(path)
-            continue
-        cases.append(TestCase(index=index, name=path.name, path=path, kind="shell"))
-        index += 1
-
-    if skipped_shell:
-        skipped_names = " ".join(path.name for path in skipped_shell)
-        print(
-            f"Skipping Stage 2 shell tests because a usable `bash` is unavailable: {skipped_names}",
-            file=sys.stderr,
-            flush=True,
-        )
-
     for path in sorted(TESTS_DIR.glob("*_test.py")):
         cases.append(TestCase(index=index, name=path.name, path=path, kind="python"))
         index += 1
@@ -356,11 +302,6 @@ def build_normal_test_command(case: TestCase, python_path: Path) -> list[str]:
 
     if case.kind == "l0":
         return [*source_tree_l0c_command(), "-P", "compiler/stage2_l0/src", "--run", str(case.path)]
-    if case.kind == "shell":
-        bash_path = resolve_shell_bash_path()
-        if bash_path is None:
-            raise RuntimeError("shell test requested without a usable `bash` executable")
-        return [str(bash_path), str(case.path)]
     if case.kind == "python":
         return [str(python_path), str(case.path)]
     raise ValueError(f"Unsupported test kind: {case.kind}")

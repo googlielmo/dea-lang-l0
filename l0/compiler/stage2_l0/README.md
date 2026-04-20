@@ -11,7 +11,7 @@ full current public CLI surface: `--check`, `--tok`, `--sym`, `--type`, `--ast`,
 Build a repo-local Stage 2 compiler artifact:
 
 ```bash
-./scripts/build-stage2-l0c.sh
+python scripts/build_stage2_l0c.py
 ./build/dea/bin/l0c-stage2 --check -P examples hello
 ./build/dea/bin/l0c-stage2 --gen -P examples hello
 ./build/dea/bin/l0c-stage2 --build -P examples hello
@@ -134,10 +134,10 @@ make DEA_BUILD_DIR=build/dev-dea install-dev-stage2
 ../.venv/bin/python ./compiler/stage2_l0/scripts/run_tests.py driver_test l0c_build_run_test
 ```
 
-`run_tests.py` executes `*.l0` test modules plus `*_test.sh` and `*_test.py` regression scripts under
-`compiler/stage2_l0/tests/`. Pass optional positional test names to run only those cases; match either the exact file
-name or omit the extension (for example `driver_test` or `l0c_build_run_test.sh`). It uses a bounded auto-detected
-worker count by default; override with `L0_TEST_JOBS=<n>`.
+`run_tests.py` executes `*.l0` test modules plus `*_test.py` regression scripts under `compiler/stage2_l0/tests/`. Pass
+optional positional test names to run only those cases; match either the exact file name or omit the extension (for
+example `driver_test` or `l0c_build_run_test.py`). It uses a bounded auto-detected worker count by default; override
+with `L0_TEST_JOBS=<n>`.
 
 `run_trace_tests.py` executes the trace-eligible `*.l0` Stage 2 cases under `compiler/stage2_l0/tests/`. It accepts the
 same optional positional test-name filters as `run_tests.py`, but only for trace-compatible `.l0` cases.
@@ -202,7 +202,7 @@ export L0_CC=clang
 export L0_CFLAGS="-Wl,-no_uuid -Wl,-no_adhoc_codesign"  # macOS
 # export L0_CFLAGS="-Wl,--build-id=none"  # Linux
 
-DEA_BUILD_DIR=build/tests/triple-manual KEEP_C=1 ./scripts/build-stage2-l0c.sh
+DEA_BUILD_DIR=build/tests/triple-manual KEEP_C=1 python scripts/build_stage2_l0c.py
 L0_HOME="$PWD/compiler" ./build/tests/triple-manual/bin/l0c-stage2 --build --keep-c -P compiler/stage2_l0/src -o build/tests/triple-manual/l0c-stage2-second.native l0c
 L0_HOME="$PWD/compiler" ./build/tests/triple-manual/l0c-stage2-second.native --build --keep-c -P compiler/stage2_l0/src -o build/tests/triple-manual/l0c-stage2-third.native l0c
 cmp build/tests/triple-manual/l0c-stage2-second.c build/tests/triple-manual/l0c-stage2-third.c

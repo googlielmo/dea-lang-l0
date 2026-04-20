@@ -144,7 +144,7 @@ install-dev-stage1:
 	@"$(DEA_BUILD_DIR)/bin/l0c-stage1" --version
 
 install-dev-stage2:
-	DEA_BUILD_DIR="$(DEA_BUILD_DIR)" ./scripts/build-stage2-l0c.sh
+	DEA_BUILD_DIR="$(DEA_BUILD_DIR)" $(PYTHON) ./scripts/build_stage2_l0c.py
 	$(PYTHON) ./scripts/gen_dist_tools.py write-env-script --dea-build-dir "$(DEA_BUILD_DIR)"
 	@printf 'Repo-local Stage 2 compiler version:\n'
 	@"$(DEA_BUILD_DIR)/bin/l0c-stage2" --version
@@ -239,10 +239,10 @@ print-dea-build-dir:
 	@printf '%s\n' "$(DEA_BUILD_DIR)"
 
 docs:
-	./scripts/gen-docs.sh --strict
+	$(PYTHON) ./scripts/gen_docs.py --strict
 
 docs-pdf:
-	./scripts/gen-docs.sh --strict --pdf
+	$(PYTHON) ./scripts/gen_docs.py --strict --pdf
 
 clean:
 	rm -rf ./build/*
