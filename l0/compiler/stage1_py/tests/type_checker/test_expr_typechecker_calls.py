@@ -41,3 +41,24 @@ def test_call_argument_type_mismatch(analyze_single):
     result = analyze_single("main", src)
     assert result.has_errors()
     assert has_error_code(result.diagnostics, "TYP-0312")
+
+
+def test_type_alias_struct_constructor_call(analyze_single):
+    src = """
+    module main;
+
+    struct Point {
+        x: int;
+        y: int;
+    }
+
+    type Alias = Point;
+
+    func main() -> int {
+        let p: Alias = Alias(3, 4);
+        return p.x + p.y;
+    }
+    """
+
+    result = analyze_single("main", src)
+    assert not result.has_errors()

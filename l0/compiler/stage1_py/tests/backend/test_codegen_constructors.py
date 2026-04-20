@@ -147,6 +147,40 @@ def test_struct_constructor_as_argument(analyze_single):
     assert not result.has_errors()
 
 
+def test_type_alias_struct_constructor_codegen(analyze_single):
+    """Test that type aliases to structs reuse struct constructor lowering."""
+    result = analyze_single(
+        "main",
+        """
+        module main;
+
+        struct Point {
+            x: int;
+            y: int;
+        }
+
+        type Alias = Point;
+
+        func main() -> int {
+            let p: Alias = Alias(1, 2);
+            return p.x + p.y;
+        }
+        """,
+    )
+
+    assert not result.has_errors()
+
+    try:
+        from l0_backend import Backend
+        backend = Backend(result)
+        c_code = backend.generate()
+
+        assert "{ .x = 1, .y = 2 }" in c_code
+        assert "Alias(1, 2)" not in c_code or ".x = 1" in c_code
+    except ImportError:
+        pass
+
+
 # ============================================================================
 # Enum variant constructor type checking
 # ============================================================================

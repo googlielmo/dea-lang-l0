@@ -2625,6 +2625,15 @@ func etc_infer_call(self: ExpressionTypeChecker*, expr_id: ExprId, expr: ExprNod
                 callee_ty = type_new_enum(cs.module_name, cs.name);
             } else if (ord(cs.kind) == ord(SYM_ENUM_VARIANT)) {
                 callee_ty = type_new_enum(cs.module_name, cs.owner_name);
+            } else if (ord(cs.kind) == ord(SYM_TYPE_ALIAS)) {
+                let alias_ty = etc_symbol_as_type(self, cs);
+                if (alias_ty != null && ord((alias_ty as Type*).kind) == ord(TY_STRUCT)) {
+                    callee_ty = alias_ty;
+                } else {
+                    if (alias_ty != null) {
+                        type_free(alias_ty as Type*);
+                    }
+                }
             }
         }
     }

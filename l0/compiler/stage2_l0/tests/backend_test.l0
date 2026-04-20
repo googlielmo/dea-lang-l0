@@ -247,7 +247,7 @@ func test_analysis_has_arc_data_for_struct_and_nullable_pointer() {
 func test_backend_generate_types_and_top_level_lets() {
     with (let filenames = vs_create(1) => vs_free(filenames),
           let sources = vs_create(1) => vs_free(sources),
-          let lines = vs_create(12) => vs_free(lines),
+          let lines = vs_create(14) => vs_free(lines),
           let cfg = log_config_create(LL_ERROR, false) => drop cfg,
           let opts = cg_options_create() => cg_options_free(opts)) {
         opts.emit_line_directives = false;
@@ -261,9 +261,10 @@ func test_backend_generate_types_and_top_level_lets() {
         vs_push(lines, "    None;");
         vs_push(lines, "    Some(value: Point);");
         vs_push(lines, "}");
-        vs_push(lines, "let origin = Point(0, 0);");
+        vs_push(lines, "type Alias = Point;");
+        vs_push(lines, "let origin: Alias = Alias(0, 0);");
         vs_push(lines, "func main() -> int {");
-        vs_push(lines, "    let p = origin;");
+        vs_push(lines, "    let p: Alias = Alias(origin.x, origin.y);");
         vs_push(lines, "    return p.x;");
         vs_push(lines, "}");
         vs_push(sources, bt_source(lines));
@@ -278,7 +279,9 @@ func test_backend_generate_types_and_top_level_lets() {
             "struct l0_demo_main_Point {\n    l0_int x;\n    l0_int y;\n};\n#endif\n\n#ifndef L0_DEFINED_l0_demo_main_MaybePoint"),
             "struct should be emitted before dependent enum");
         assert(contains_s(generated, "static struct l0_demo_main_Point l0_demo_main_origin = { .x = 0, .y = 0 };"),
-            "top-level struct constructor let mismatch");
+            "top-level alias-backed struct constructor let mismatch");
+        assert(contains_s(generated, "struct l0_demo_main_Point p = (struct l0_demo_main_Point){ .x = (l0_demo_main_origin).x, .y = (l0_demo_main_origin).y };"),
+            "local alias-backed struct constructor lowering mismatch");
         assert(contains_s(generated, "return (p).x;"), "field access lowering mismatch");
 
         analysis_result_free(result);

@@ -1478,10 +1478,8 @@ func be_try_emit_const_constructor(self: Backend*, expr_id: ExprId, expected_typ
         return be_ice_string("[ICE-1031] unknown constant constructor name");
     }
 
-    if (ord((sym as Symbol*).kind) == ord(SYM_STRUCT)) {
-        if (ord(expected_type.kind) != ord(TY_STRUCT)) {
-            return be_ice_string("[ICE-1032] struct constructor expected struct type");
-        }
+    if (ord(expected_type.kind) == ord(TY_STRUCT) &&
+        (ord((sym as Symbol*).kind) == ord(SYM_STRUCT) || ord((sym as Symbol*).kind) == ord(SYM_TYPE_ALIAS))) {
         let info = sig_lookup_struct_info(self.result.signatures as SignatureTables*, expected_type.module_name, expected_type.name);
         if (info == null) {
             return be_ice_string("[ICE-1040] missing StructInfo for constant constructor");
@@ -2070,7 +2068,8 @@ func be_emit_binary_op(self: Backend*, expr_id: ExprId) -> string {
  */
 func be_emit_constructor_call(self: Backend*, expr_id: ExprId, sym: Symbol*, result_ty: Type*) -> string {
     let expr = expr_arena_get(be_current_expr_arena(self), expr_id);
-    if (ord((sym as Symbol*).kind) == ord(SYM_STRUCT)) {
+    if (ord(result_ty.kind) == ord(TY_STRUCT) &&
+        (ord((sym as Symbol*).kind) == ord(SYM_STRUCT) || ord((sym as Symbol*).kind) == ord(SYM_TYPE_ALIAS))) {
         let info = sig_lookup_struct_info(self.result.signatures as SignatureTables*, result_ty.module_name, result_ty.name);
         if (info == null) {
             return be_ice_string("[ICE-1040] missing StructInfo for constructor");
@@ -2161,7 +2160,9 @@ func be_emit_call(self: Backend*, expr_id: ExprId) -> string {
 
         if (callee_sym != null) {
             with (let result_ty = be_expr_type(self, expr_id) => type_free_opt(result_ty)) {
-                if (result_ty != null && (ord((callee_sym as Symbol*).kind) == ord(SYM_STRUCT) ||
+                if (result_ty != null && ((ord((callee_sym as Symbol*).kind) == ord(SYM_STRUCT)) ||
+                    (ord((callee_sym as Symbol*).kind) == ord(SYM_TYPE_ALIAS) &&
+                        ord((result_ty as Type*).kind) == ord(TY_STRUCT)) ||
                     ord((callee_sym as Symbol*).kind) == ord(SYM_ENUM_VARIANT))) {
                     return be_emit_constructor_call(self, expr_id, callee_sym as Symbol*, result_ty as Type*);
                 }
