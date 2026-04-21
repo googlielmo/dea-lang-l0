@@ -1,6 +1,6 @@
 # Dea/L<sub>1</sub> Grammar
 
-Version: 2026-04-19
+Version: 2026-04-21
 
 The following is the formal grammar for the Dea/L<sub>1</sub> programming language in EBNF-style. This describes the
 concrete syntax that lexers and parsers should accept.
@@ -183,12 +183,17 @@ syntax.
 
 ## 4. Types
 
-L<sub>1</sub> has simple named types, pointer suffixes, and an optional nullable suffix.
+L<sub>1</sub> has simple named types, function pointer types, pointer suffixes, and an optional nullable suffix.
 
 ```ebnf
-Type                ::=     SimpleType PointerSuffix* NullableSuffix?
+Type                ::=     UnsuffixedType PointerSuffix* NullableSuffix?
 
+UnsuffixedType      ::=     SimpleType
+                      |     FuncPointerType
+                      |     "(" FuncPointerType ")"     (* useful before nullable suffixes *)
 SimpleType          ::=     QualifiedIdent
+FuncPointerType     ::=     "func" "(" TypeList? ")" "->" Type
+TypeList            ::=     Type ("," Type)*
 PointerSuffix       ::=     "*"
 NullableSuffix      ::=     "?"     (* applies to the preceding type syntactically *)
 
@@ -207,6 +212,8 @@ Examples (all syntactically valid types in L<sub>1</sub>):
 - `Expr**`
 - `int?`
 - `Expr*?`
+- `func(int, bool) -> int`
+- `(func() -> void)?`
 
 Exact semantic rules (e.g. when `?` is allowed) are enforced in the type checker, not in the grammar.
 

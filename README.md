@@ -50,7 +50,7 @@ L0 `1.0.0.dev0` is the current development line following the `l0-v0.9.2` monore
 
 - Stage 2: self-hosted and parity-tested against Stage 1 on a committed golden corpus.
 
-  - Bootstrap artifact: buildable today under `build/dea/bin` via `./scripts/build-stage2-l0c.sh`.
+  - Bootstrap artifact: buildable today under `build/dea/bin` via `python scripts/build_stage2_l0c.py`.
 
   - Repo-local Dea build workflow: `make use-dev-stage2` builds, installs, and selects the Stage 2 compiler under
     `build/dea/bin` for development use.

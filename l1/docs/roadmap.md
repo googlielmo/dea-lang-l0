@@ -1,6 +1,6 @@
 # Dea/L1 Roadmap
 
-Version: 2026-04-19
+Version: 2026-04-21
 
 This is the live direction document for the Dea/L1 subtree. It records the current L1 position, the assumptions that
 constrain future work, completed milestones that shape the baseline, active work, and backlog items that have not yet
@@ -96,6 +96,13 @@ L1 carries post-L0 language growth and bootstrap compiler work.
   [2026-04-19-nullable-identity-equality-noref](../work/plans/features/closed/2026-04-19-nullable-identity-equality-noref.md)
   added strict `T? == T?` equality with same-inner-type payload comparison and explicit-cast requirement for cross-form
   `T? vs T` compares.
+- Feature
+  [2026-04-19-pointer-identity-equality-noref](../work/plans/features/closed/2026-04-19-pointer-identity-equality-noref.md)
+  added `==` and `!=` over same-type non-nullable `T*` operands using reference identity.
+- Feature
+  [2026-04-18-l1-function-pointer-types-noref](../work/plans/features/closed/2026-04-18-l1-function-pointer-types-noref.md)
+  added first-class `func(...) -> T` function pointer types, indirect calls, nullable function pointers, and
+  same-signature identity comparisons.
 
 </details>
 
@@ -109,13 +116,6 @@ L1 carries post-L0 language growth and bootstrap compiler work.
 - Tool
   [2026-04-02-l1-bootstrap-productization-noref](../work/plans/tools/2026-04-02-l1-bootstrap-productization-noref.md)
   defines the first L1 bootstrap install/dist/product workflow.
-- Feature
-  [2026-04-18-l1-function-pointer-types-noref](../work/plans/features/2026-04-18-l1-function-pointer-types-noref.md)
-  adds first-class `func(...) -> T` function pointer types, indirect calls, and C ABI typedef emission.
-- Feature
-  [2026-04-19-pointer-identity-equality-noref](../work/plans/features/2026-04-19-pointer-identity-equality-noref.md)
-  adds `==` and `!=` over same-type non-nullable `T*` operands using reference identity, narrowing `TYP-0173`
-  accordingly.
 - Feature [2026-04-20-is-intrinsic-noref](../work/plans/features/2026-04-20-is-intrinsic-noref.md) introduces the
   `is(x, Variant)` intrinsic for payload-ignoring enum tag comparison.
 
@@ -138,8 +138,8 @@ surface.
 - Typed arrays, buffers, shared buffers, and slices as general language features. The current `std.array` / `std.vector`
   surface is library-level storage, not typed language-level arrays or slices.
 - Unsafe module boundaries and raw pointer operations, including address-of (`&`) semantics and pointer indexing /
-  addressing gates. Current `sys.unsafe` is a low-level runtime binding only. Pointer identity equality is covered by
-  [2026-04-19-pointer-identity-equality-noref](../work/plans/features/2026-04-19-pointer-identity-equality-noref.md).
+  addressing gates. Current `sys.unsafe` is a low-level runtime binding only. Same-type non-null pointer identity
+  equality is implemented; ordered pointer comparisons remain rejected.
 - `_` struct-member semantics: whether placeholder/discard fields are allowed and how they affect construction, field
   access, layout, and ABI.
 - Named arguments for functions and constructors.

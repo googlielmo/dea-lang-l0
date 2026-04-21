@@ -1,12 +1,12 @@
 # Dea Project Status
 
-Version: 2026-04-04
+Version: 2026-04-21
 
 This document summarizes the current status of the Dea project at the monorepo level.
 
-Today the repository contains one active release line, Dea/L0, plus an early bootstrap scaffold for Dea/L1. L0 remains
+Today the repository contains one active release line, Dea/L0, plus an active bootstrap subtree for Dea/L1. L0 remains
 the canonical user-facing toolchain and documentation set for current releases. L1 exists so post-L0 language evolution
-can begin inside the monorepo without changing the current L0 release target.
+can continue inside the monorepo without changing the current L0 release target.
 
 ## Scope and Canonical References
 
@@ -49,7 +49,7 @@ Its repository status today is:
 
 ### Dea/L1
 
-L1 is in bootstrap setup.
+L1 is in bootstrap development.
 
 Its repository status today is:
 
@@ -58,6 +58,8 @@ Its repository status today is:
 - buildable as a repo-local `l1c-stage1` compiler,
 - validated through copied Stage 1 implementation tests written in `.l0` and run through the upstream L0 compiler,
 - using `.l1` as the current L1 source surface for the copied L1 stdlib, example programs, and bootstrap test fixtures,
+- carrying implemented post-L0 language work such as wider numeric types, real literals, bitwise operators, top-level
+  `const`, string value comparisons, nullable/pointer identity equality, and function pointer types,
 - not yet an install/dist/release-bearing product.
 
 ## Release Model
@@ -89,6 +91,7 @@ by the relevant level subtree.
 Near-term project direction is split cleanly by level:
 
 1. Keep Dea/L0 focused on release-readiness, documentation completion, and residual bug fixes toward `1.0.0`.
-2. Keep Dea/L1 focused on bootstrap stabilization and subtree layout, not on release/distribution parity yet.
+2. Keep Dea/L1 focused on bootstrap stabilization and planned post-L0 language/library growth, not on release parity
+   yet.
 3. Only move or duplicate level-local reference documents into root `docs/reference/` when they clearly become Dea-wide
    rather than L0-specific.

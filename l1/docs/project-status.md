@@ -1,6 +1,6 @@
 # L1 Project Status
 
-Version: 2026-04-19
+Version: 2026-04-21
 
 This document summarizes what is implemented in the Dea/L1 subtree today.
 
@@ -54,16 +54,20 @@ This gives the subtree a complete bootstrap environment without claiming a self-
 The current implemented language surface matches the bootstrap subset exercised by the compiler, tests, and example
 checks, including:
 
-- functions, structs, enums, type aliases, top-level `let`, and deferred module-init lowering for non-constant top-level
-  `let` initializers before user `main`
+- functions, structs, enums, type aliases, top-level `let`, top-level `const`, and deferred module-init lowering for
+  non-constant top-level `let` initializers before user `main`
 - modules/imports with qualified-name disambiguation
 - structured control flow including `if`, `while`, `for`, `match`, `case`, and `with` / `cleanup`
+- function pointer types, indirect calls, same-signature function pointer identity comparisons, and nullable function
+  pointers
 - fixed-width integer builtins `tiny`, `short`, `ushort`, `int`, `uint`, `long`, and `ulong`, with contextual wide
   integer literals carried through the bigint path when they exceed bootstrap `int`
+- integer bitwise operators `&`, `|`, `^`, `~`, `<<`, and `>>`
 - builtin `float` and `double`, real literals, the current narrow numeric conversion rules, and backend-validated
   floating-point lowering
 - explicit nullability, `T` to `T?` wrapping, integer casts to nullable integer targets, `new` / `drop`, ARC-managed
-  `string`, casts, and postfix `expr?`
+  `string`, casts, postfix `expr?`, string value comparisons, same-type `T?` equality, and same-type pointer identity
+  equality
 
 The stdlib currently includes the core bootstrap modules for I/O, strings, text, paths, filesystem access, time,
 randomness, assertions, optionals, the current container set, the shared `int` helper surface in `std.math`, L1-only

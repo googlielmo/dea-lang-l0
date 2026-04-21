@@ -1,6 +1,6 @@
 # L1 C Backend Design
 
-Version: 2026-04-19
+Version: 2026-04-21
 
 This is the canonical backend implementation document for the current Dea/L1 bootstrap compiler.
 
@@ -47,7 +47,7 @@ The generated C file is organized in this order:
 1. file header and includes
 2. forward declarations
 3. builtin and wrapper typedefs
-4. struct and enum definitions in dependency order
+4. function pointer typedefs plus struct and enum definitions in dependency order
 5. top-level `let` storage
 6. function declarations
 7. hidden module/global init functions for deferred top-level `let` initializers
@@ -104,6 +104,7 @@ build mode preserve the L1 floating-point contract.
 
 - user-defined structs lower to C structs with mangled module-qualified names
 - enums lower to tagged unions
+- function pointer types lower to signature-specific `dea_func_*` typedefs over plain C function pointers
 - pointer-shaped nullable values use `NULL` representation
 - non-pointer nullable values lower to wrapper structs carrying `has_value` plus the wrapped value
 - non-null values used in matching nullable contexts lower to present wrappers; for example, returning `0 as ulong` from
@@ -115,7 +116,8 @@ build mode preserve the L1 floating-point contract.
 
 Implemented lowering currently includes:
 
-- literals, local/global references, unary/binary operators, calls, field/index access, casts, and constructors
+- literals, local/global references, unary/binary operators, direct and indirect calls, field/index access, casts, and
+  constructors
 - `new` allocation and `drop` deallocation via runtime helpers
 - `if`, `while`, `for`, `match`, `case`, `with`, `break`, `continue`, and `return`
 - `expr?` null-propagation lowering with early return on empty

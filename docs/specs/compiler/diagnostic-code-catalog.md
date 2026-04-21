@@ -1,6 +1,6 @@
 # Compiler Diagnostic Code Catalog
 
-Version: 2026-04-20
+Version: 2026-04-21
 
 Normative catalog of Dea compiler diagnostic codes.
 

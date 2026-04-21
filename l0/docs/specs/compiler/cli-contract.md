@@ -1,6 +1,6 @@
 # L0 Compiler CLI Contract
 
-Version: 2026-04-14
+Version: 2026-04-21
 
 This document is the normative shared CLI contract for the L0 compiler across Stage 1 and Stage 2. Stage-specific
 differences are called out explicitly in [Section 9](#9-stage-specific-differences).

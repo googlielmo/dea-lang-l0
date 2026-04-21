@@ -1,6 +1,6 @@
 # L0 Project Status
 
-Version: 2026-04-14
+Version: 2026-04-21
 
 This document summarizes what is implemented in this repository today and what defines the current Dea/L0 `1.0.0.dev0`
 development branch after the `l0-v0.9.2` release. L0 now lives as one language subtree inside the Dea monorepo; monorepo
@@ -50,7 +50,8 @@ At a high level, it provides:
 - strict triple-bootstrap validation via `make triple-test`,
 - embedded provenance in artifact-producing Stage 2 binaries via `--version`,
 - release packaging plus docs/PDF publishing automation through the repository workflows,
-- current parity fixes for Stage 2 return diagnostics, drop-liveness checks, and trace-runner behavior on Windows.
+- current parity fixes for Stage 2 diagnostics, drop-liveness checks, string comparisons, bare enum variants in
+  top-level bindings, ARC borrowed-parameter reassignment, and Windows trace-runner behavior.
 
 Stage 1 remains the behavioral oracle for equivalent Stage 2 paths.
 
@@ -61,7 +62,8 @@ The current implemented language surface covers the core bootstrap subset used t
 - functions, structs, enums, type aliases, and top-level `let`,
 - modules/imports with qualified-name disambiguation,
 - structured control flow including `if`, `while`, `for`, `match`, `case`, and `with`/`cleanup`,
-- explicit nullability, `new`/`drop`, ARC-managed `string`, casts, and postfix `expr?`.
+- explicit nullability, `new`/`drop`, ARC-managed `string`, casts, postfix `expr?`, and value-based `string`
+  equality/ordering operators.
 
 The standard library now includes the core runtime-facing and bootstrap-facing modules for I/O, strings, text, paths,
 filesystem access, the shared integer helper surface in `std.math`, time, randomness, assertions, optionals, and the
@@ -111,8 +113,8 @@ The current `1.0.0.dev0` branch starts from the `l0-v0.9.2` release baseline:
    requires a targeted correction.
 2. Keep the existing validation gates (`make test-all`, `make triple-test`, workflow/distribution checks, and strict
    docs generation) as the default bar for release-readiness.
-3. Carry forward the recent Windows/MSYS2 fixes, trace-runner hardening, and Stage 2 diagnostic-parity work as part of
-   the normal development baseline.
+3. Carry forward the recent Windows/MSYS2 fixes, trace-runner hardening, string comparison work, ARC cleanup fixes, and
+   Stage 2 diagnostic-parity work as part of the normal development baseline.
 4. Treat the limitations listed above as explicit L0 scope boundaries unless a narrowly-scoped `1.0.0` blocker demands
    otherwise.
 
