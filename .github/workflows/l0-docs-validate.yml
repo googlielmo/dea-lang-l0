@@ -22,7 +22,7 @@ on:
       - "l0/CLAUDE.md"
       - "l0/pyproject.toml"
       - "l0/scripts/docs/**"
-      - "l0/scripts/gen-docs.sh"
+      - "l0/scripts/gen_docs.py"
       - "l0/uv.lock"
   workflow_dispatch:
   push:
@@ -46,7 +46,7 @@ on:
       - "l0/CLAUDE.md"
       - "l0/pyproject.toml"
       - "l0/scripts/docs/**"
-      - "l0/scripts/gen-docs.sh"
+      - "l0/scripts/gen_docs.py"
       - "l0/uv.lock"
 
 jobs:
@@ -76,10 +76,10 @@ jobs:
           sudo apt-get install -y doxygen graphviz make
 
       - name: Sync docs dependencies
-        run: uv sync --group docs
+        run: UV_PROJECT_ENVIRONMENT=../.venv uv sync --group docs
 
       - name: Build docs strictly
-        run: ./scripts/gen-docs.sh --strict
+        run: python3 scripts/gen_docs.py --strict
 
       - name: Show undocumented functions report
         run: cat build/docs/undocumented-functions.txt

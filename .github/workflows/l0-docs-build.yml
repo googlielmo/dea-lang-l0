@@ -59,12 +59,12 @@ jobs:
             texlive-fonts-recommended
 
       - name: Sync docs dependencies
-        run: uv sync --group docs
+        run: UV_PROJECT_ENVIRONMENT=../.venv uv sync --group docs
 
       - name: Build HTML, Markdown, LaTeX, and PDF
         env:
           L0_DOCS_RELEASE_TAG: ${{ inputs.release_tag }}
-        run: ./scripts/gen-docs.sh ${{ inputs.build_pdf && '--pdf' || '' }} --strict
+        run: python3 scripts/gen_docs.py ${{ inputs.build_pdf && '--pdf' || '' }} --strict
 
       - name: Stage Pages site
         run: |
