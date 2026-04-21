@@ -125,11 +125,26 @@ func us_strip_utf8_bom(s: string) -> string {
     return s;
 }
 
+/**
+ * Return whether a byte is a UTF-8 continuation byte.
+ *
+ * @param c Byte to inspect.
+ * @return `true` for bytes in the `0x80..0xBF` range.
+ */
 func us_is_utf8_continuation(c: byte) -> bool {
     let v = c as int;
     return v >= 128 && v <= 191;
 }
 
+/**
+ * Validate that a string contains only well-formed UTF-8 byte sequences.
+ *
+ * The validator rejects overlong forms, surrogate code points, truncated
+ * sequences, and byte sequences above `U+10FFFF`.
+ *
+ * @param s String to validate.
+ * @return `true` when `s` is well-formed UTF-8.
+ */
 func us_is_valid_utf8(s: string) -> bool {
     let i = 0;
     let n = len_s(s);

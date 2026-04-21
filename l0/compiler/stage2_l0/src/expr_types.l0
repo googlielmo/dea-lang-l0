@@ -258,6 +258,12 @@ func etc_alive_scope_pop(self: ExpressionTypeChecker*) {
     scopes.length = scopes.length - 1;
 }
 
+/**
+ * Return the innermost declaration-tracking map.
+ *
+ * @param self Expression checker state.
+ * @return Current declaration map, or `null` when no scope is active.
+ */
 func etc_decl_scope_current(self: ExpressionTypeChecker*) -> StringIntMap*? {
     if (self.decl_scopes == null || vec_size(self.decl_scopes as VectorBase*) == 0) {
         return null;
@@ -266,6 +272,15 @@ func etc_decl_scope_current(self: ExpressionTypeChecker*) -> StringIntMap*? {
     return ptr_vec_get(scopes, vec_size(scopes) - 1) as StringIntMap*;
 }
 
+/**
+ * Push one declaration-tracking map for a scope.
+ *
+ * Parameters and pattern variables are predeclared so later local checks can
+ * reject duplicate names and warn about shadowing.
+ *
+ * @param self Expression checker state.
+ * @param scope Scope whose immediate non-local bindings should seed the map.
+ */
 func etc_decl_scope_push(self: ExpressionTypeChecker*, scope: Scope*?) {
     if (self.decl_scopes == null) {
         self.decl_scopes = ptr_vec_create(4);
@@ -285,6 +300,11 @@ func etc_decl_scope_push(self: ExpressionTypeChecker*, scope: Scope*?) {
     ptr_vec_push(self.decl_scopes as VectorBase*, map as void*);
 }
 
+/**
+ * Pop the innermost declaration-tracking map.
+ *
+ * @param self Expression checker state.
+ */
 func etc_decl_scope_pop(self: ExpressionTypeChecker*) {
     if (self.decl_scopes == null || vec_size(self.decl_scopes as VectorBase*) == 0) {
         return;
@@ -295,6 +315,16 @@ func etc_decl_scope_pop(self: ExpressionTypeChecker*) {
     scopes.length = scopes.length - 1;
 }
 
+/**
+ * Check whether an outer declaration-tracking scope contains a name.
+ *
+ * The current innermost scope is skipped because duplicate checks inspect it
+ * separately.
+ *
+ * @param self Expression checker state.
+ * @param name Local name to look up.
+ * @return `true` when an outer scope already declares `name`.
+ */
 func etc_decl_outer_has(self: ExpressionTypeChecker*, name: string) -> bool {
     if (self.decl_scopes == null) {
         return false;
@@ -308,6 +338,16 @@ func etc_decl_outer_has(self: ExpressionTypeChecker*, name: string) -> bool {
     return false;
 }
 
+/**
+ * Validate a local declaration name before binding it in the current scope.
+ *
+ * Reports duplicate local errors and shadowing warnings for outer locals, enum
+ * variants, and imported symbols.
+ *
+ * @param self Expression checker state.
+ * @param name Local name being declared.
+ * @param span Source span to report for diagnostics.
+ */
 func etc_check_local_declaration(self: ExpressionTypeChecker*, name: string, span: Span) {
     let current = etc_decl_scope_current(self);
     if (current == null) {
@@ -705,6 +745,18 @@ func etc_symbol_as_type(self: ExpressionTypeChecker*, sym: Symbol*) -> Type*? {
     }
 }
 
+/**
+ * Emit the most specific diagnostic for a failed type-reference resolution.
+ *
+ * Special cases preserve shared diagnostic codes for nullable `void`, ambiguous
+ * names, unresolved aliases, and value symbols used as types. Other failures use
+ * `fallback_code` so callers can keep context-specific unknown-type codes.
+ *
+ * @param self Expression checker state.
+ * @param tref Type reference that failed to resolve.
+ * @param fallback_code Diagnostic code for generic unknown-type failures.
+ * @param span Source span to report for diagnostics.
+ */
 func etc_diag_type_ref_failure(self: ExpressionTypeChecker*, tref: TypeRef*, fallback_code: string, span: Span) {
     let unit = self.current_unit as DriverUnit*;
     if (tref.is_nullable && tref.pointer_depth == 0 && tref.module_path == null && tref.name == "void") {
