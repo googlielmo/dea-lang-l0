@@ -79,6 +79,17 @@ def stage2_launcher_path(base: Path) -> str:
     return native_path(base)
 
 
+def resolve_tool(bin_dir: Path, name: str) -> Path:
+    """Return the correct executable path, falling back to a Windows wrapper if needed."""
+    base = bin_dir / name
+    if is_windows_host():
+        for candidate in (base.with_suffix(".exe"), base.with_suffix(".cmd"), base):
+            if candidate.is_file():
+                return candidate
+        return base.with_suffix(".exe")
+    return base
+
+
 def clean_env(path: str | None = None, extra: Mapping[str, str] | None = None) -> dict[str, str]:
     """Return a small environment for wrapper isolation tests."""
 

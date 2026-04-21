@@ -18,6 +18,7 @@ from tool_test_common import (
     build_stage2,
     clean_env,
     make_temp_dir,
+    resolve_tool,
     run,
 )
 
@@ -35,10 +36,12 @@ def main() -> int:
     test_dea_build = make_temp_dir("l0_stage2_default_dea_build.", BUILD_TESTS_ROOT)
     try:
         build_stage2(test_dea_build)
-        assert_file(test_dea_build / "bin" / "l0c-stage2")
-        assert_file(test_dea_build / "bin" / "l0c-stage2.native")
+        l0c = resolve_tool(test_dea_build / "bin", "l0c-stage2")
+        native = resolve_tool(test_dea_build / "bin", "l0c-stage2.native")
+        assert_file(l0c)
+        assert_file(native)
         assert_no_file(test_dea_build / "bin" / "l0c-stage2.c")
-        run([test_dea_build / "bin" / "l0c-stage2", "--check", "-P", "examples", "hello"], env=clean_env())
+        run([l0c, "--check", "-P", "examples", "hello"], env=clean_env())
     except ToolTestFailure as exc:
         return fail(str(exc))
     finally:

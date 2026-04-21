@@ -17,6 +17,8 @@ import sys
 import tempfile
 import textwrap
 
+from tool_test_common import resolve_tool
+
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
 L0_ROOT = REPO_ROOT / "l0"
@@ -41,7 +43,7 @@ def stage2_compiler() -> Path:
     build_dir = Path(os.environ.get("DEA_BUILD_DIR", "build/dea"))
     if not build_dir.is_absolute():
         build_dir = L0_ROOT / build_dir
-    return build_dir / "bin" / "l0c-stage2"
+    return resolve_tool(build_dir / "bin", "l0c-stage2")
 
 
 def parse_arc_lines(stderr: str) -> list[dict[str, str]]:

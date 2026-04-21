@@ -21,6 +21,7 @@ from tool_test_common import (
     clean_env,
     make_temp_dir,
     read_text,
+    resolve_tool,
     run_to_files,
 )
 
@@ -54,8 +55,8 @@ def main() -> int:
     try:
         dea_build_dir = tmp_dir / "dea"
         build_stage2(dea_build_dir)
-        l0c = dea_build_dir / "bin" / "l0c-stage2"
-        native = dea_build_dir / "bin" / "l0c-stage2.native"
+        l0c = resolve_tool(dea_build_dir / "bin", "l0c-stage2")
+        native = resolve_tool(dea_build_dir / "bin", "l0c-stage2.native")
 
         help_stdout = tmp_dir / "help.stdout"
         help_stderr = tmp_dir / "help.stderr"

@@ -13,6 +13,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from tool_test_common import resolve_tool
+
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
 L0_ROOT = REPO_ROOT / "l0"
@@ -22,7 +24,7 @@ def main() -> int:
     build_dir = Path(os.environ.get("DEA_BUILD_DIR", "build/dea"))
     if not build_dir.is_absolute():
         build_dir = L0_ROOT / build_dir
-    compiler = build_dir / "bin" / "l0c-stage2"
+    compiler = resolve_tool(build_dir / "bin", "l0c-stage2")
     return subprocess.run(
         [
             sys.executable,
