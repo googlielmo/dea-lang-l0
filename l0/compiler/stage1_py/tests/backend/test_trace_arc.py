@@ -1006,3 +1006,213 @@ def test_trace_arc_leak_freedom_balance(
     assert total_frees == len(by_ptr), (
         f"free count ({total_frees}) != unique heap ptrs ({len(by_ptr)})"
     )
+
+
+# ---------------------------------------------------------------------------
+# M – Borrowed ARC parameter reassignment
+# ---------------------------------------------------------------------------
+
+
+def _assert_no_double_free(arc: list[dict[str, str]]) -> None:
+    """No heap event may release an already-freed object or produce a negative refcount.
+
+    This catches the borrowed-param reassignment bug directly: the pre-fix
+    lowering releases the caller's value while it is still referenced, so a
+    later release by the caller would see ``rc_before=0`` (or ``rc_after<0``
+    under non-reuse heaps) or fail outright under UCRT.
+    """
+    heap = [e for e in arc if e["kind"] == "heap"]
+    assert heap, "expected heap ARC events"
+    for ev in heap:
+        rc_before = int(ev["rc_before"])
+        rc_after = int(ev["rc_after"])
+        assert rc_before >= 1, f"release of already-freed object: {ev}"
+        assert rc_after >= 0, f"negative refcount: {ev}"
+        if ev["op"] == "release":
+            assert rc_after == rc_before - 1, f"malformed release: {ev}"
+        else:
+            assert rc_after == rc_before + 1, f"malformed retain: {ev}"
+
+
+def _assert_last_event_is_free(arc: list[dict[str, str]]) -> None:
+    """Every heap pointer's final event must be a free (reuse-safe; covers no-reuse leaks)."""
+    heap = [e for e in arc if e["kind"] == "heap"]
+    by_ptr: dict[str, list[dict[str, str]]] = defaultdict(list)
+    for ev in heap:
+        by_ptr[ev["ptr"]].append(ev)
+    assert by_ptr, "expected at least one heap pointer in trace"
+    for ptr, events in by_ptr.items():
+        last = events[-1]
+        assert last["action"] == "free", (
+            f"ptr {ptr}: last action is {last['action']}, not free. events={events}"
+        )
+
+
+def test_trace_arc_param_unconditional_reassign(
+    analyze_single, compile_and_run, tmp_path
+):
+    """Unconditional reassignment of a borrowed string param must balance and not double-free."""
+    ok, stdout, _stderr, arc = _compile_with_trace_arc(
+        analyze_single,
+        compile_and_run,
+        tmp_path,
+        """
+        module main;
+        import std.io;
+        import std.string;
+
+        func f(s: string) {
+            s = concat_s("one", "1");
+            s = concat_s("two", "2");
+            printl_s(s);
+        }
+
+        func main() -> int {
+            let input: string = concat_s("o", "ld");
+            f(input);
+            return 0;
+        }
+        """,
+    )
+    assert ok, _stderr
+    assert stdout.strip() == "two2"
+    _assert_no_double_free(arc)
+    _assert_last_event_is_free(arc)
+
+
+def test_trace_arc_param_conditional_reassign(
+    analyze_single, compile_and_run, tmp_path
+):
+    """Reassignment in only one branch must not double-free the caller's value on the other branch."""
+    ok, stdout, _stderr, arc = _compile_with_trace_arc(
+        analyze_single,
+        compile_and_run,
+        tmp_path,
+        """
+        module main;
+        import std.io;
+        import std.string;
+
+        func f(flag: bool, s: string) {
+            if (flag) {
+                s = concat_s("new", "-value");
+            }
+            printl_s(s);
+        }
+
+        func main() -> int {
+            let input: string = concat_s("o", "ld");
+            f(false, input);
+            f(true, input);
+            return 0;
+        }
+        """,
+    )
+    assert ok, _stderr
+    assert stdout.splitlines() == ["old", "new-value"]
+    _assert_no_double_free(arc)
+    _assert_last_event_is_free(arc)
+
+
+def test_trace_arc_param_loop_carried_reassign(
+    analyze_single, compile_and_run, tmp_path
+):
+    """Reassignment inside a loop body must balance across iterations and at exit."""
+    ok, stdout, _stderr, arc = _compile_with_trace_arc(
+        analyze_single,
+        compile_and_run,
+        tmp_path,
+        """
+        module main;
+        import std.io;
+        import std.string;
+
+        func f(s: string) {
+            let i: int = 0;
+            while (i < 3) {
+                s = concat_s("x", "y");
+                i = i + 1;
+            }
+            printl_s(s);
+        }
+
+        func main() -> int {
+            let input: string = concat_s("o", "ld");
+            f(input);
+            return 0;
+        }
+        """,
+    )
+    assert ok, _stderr
+    assert stdout.strip() == "xy"
+    _assert_no_double_free(arc)
+    _assert_last_event_is_free(arc)
+
+
+def test_trace_arc_param_for_update_reassign(
+    analyze_single, compile_and_run, tmp_path
+):
+    """Reassignment in a `for` update clause must be discovered and balanced."""
+    ok, stdout, _stderr, arc = _compile_with_trace_arc(
+        analyze_single,
+        compile_and_run,
+        tmp_path,
+        """
+        module main;
+        import std.io;
+        import std.string;
+
+        func f(s: string) {
+            let i: int = 0;
+            for (; i < 2; s = concat_s("up", "date")) {
+                i = i + 1;
+            }
+            printl_s(s);
+        }
+
+        func main() -> int {
+            let input: string = concat_s("o", "ld");
+            f(input);
+            printl_s(input);
+            return 0;
+        }
+        """,
+    )
+    assert ok, _stderr
+    assert stdout.splitlines() == ["update", "old"]
+    _assert_no_double_free(arc)
+    _assert_last_event_is_free(arc)
+
+
+def test_trace_arc_param_with_header_and_cleanup_reassign(
+    analyze_single, compile_and_run, tmp_path
+):
+    """Reassignment in `with` header init/cleanup must be discovered and balanced."""
+    ok, stdout, _stderr, arc = _compile_with_trace_arc(
+        analyze_single,
+        compile_and_run,
+        tmp_path,
+        """
+        module main;
+        import std.io;
+        import std.string;
+
+        func f(s: string) {
+            with (s = concat_s("head", "er") => s = concat_s("clean", "up")) {
+                printl_s(s);
+            }
+            printl_s(s);
+        }
+
+        func main() -> int {
+            let input: string = concat_s("o", "ld");
+            f(input);
+            printl_s(input);
+            return 0;
+        }
+        """,
+    )
+    assert ok, _stderr
+    assert stdout.splitlines() == ["header", "cleanup", "old"]
+    _assert_no_double_free(arc)
+    _assert_last_event_is_free(arc)

@@ -967,10 +967,17 @@ class Backend:
         func_scope = self._push_scope()
         self._next_stmt_unreachable = False
 
-        # Add parameters to scope (for type lookup only; caller owns them, no cleanup)
+        # An ARC-typed parameter reassigned anywhere in the body is defensively
+        # retained on entry and registered as owned, so the scope-exit release
+        # balances the entry retain on every control-flow path.
+        reassigned = self._collect_reassigned_arc_params(decl, func_type)
         for param, ptype in zip(decl.params, func_type.params):
             c_param_name = self.emitter.mangle_identifier(param.name)
-            func_scope.add_declared(c_param_name, ptype)
+            if param.name in reassigned:
+                self._emit_retain_for_copied_value(c_param_name, ptype)
+                func_scope.add_owned(c_param_name, ptype)
+            else:
+                func_scope.add_declared(c_param_name, ptype)
 
         # Emit body (backend responsibility - statement emission)
         saved = self._current_func_result
@@ -1570,50 +1577,74 @@ class Backend:
 
         return self._next_stmt_unreachable
 
-    def _find_declaring_scope(self, mangled_name: str) -> 'Optional[ScopeContext]':
-        """Walk the scope chain to find where a name was declared.
+    def _iter_body_stmts(self, stmt: Optional[Stmt]):
+        """Yield every statement reachable from stmt, recursing into block-bearing nodes.
 
         Args:
-            mangled_name: The mangled name to search for.
+            stmt: The root statement (or None).
 
-        Returns:
-            The scope where the name was declared, or None if not found.
+        Yields:
+            Every Stmt in the sub-tree, including stmt itself.
         """
-        scope = self._current_scope
-        while scope is not None:
-            for name, _ in scope.declared_vars:
-                if name == mangled_name:
-                    return scope
-            scope = scope.parent
-        return None
+        if stmt is None:
+            return
+        yield stmt
+        if isinstance(stmt, Block):
+            for s in stmt.stmts:
+                yield from self._iter_body_stmts(s)
+        elif isinstance(stmt, IfStmt):
+            yield from self._iter_body_stmts(stmt.then_stmt)
+            yield from self._iter_body_stmts(stmt.else_stmt)
+        elif isinstance(stmt, WhileStmt):
+            yield from self._iter_body_stmts(stmt.body)
+        elif isinstance(stmt, ForStmt):
+            yield from self._iter_body_stmts(stmt.init)
+            yield from self._iter_body_stmts(stmt.update)
+            yield from self._iter_body_stmts(stmt.body)
+        elif isinstance(stmt, MatchStmt):
+            for arm in stmt.arms:
+                yield from self._iter_body_stmts(arm.body)
+        elif isinstance(stmt, WithStmt):
+            for item in stmt.items:
+                yield from self._iter_body_stmts(item.init)
+                yield from self._iter_body_stmts(item.cleanup)
+            yield from self._iter_body_stmts(stmt.body)
+            yield from self._iter_body_stmts(stmt.cleanup_body)
+        elif isinstance(stmt, CaseStmt):
+            for arm in stmt.arms:
+                yield from self._iter_body_stmts(arm.body)
+            if stmt.else_arm is not None:
+                yield from self._iter_body_stmts(stmt.else_arm.body)
 
-    def _is_borrowed_arc_param(self, target_expr: Expr, dst_ty: Type) -> tuple:
-        """Check if target is a borrowed ARC param.
+    def _collect_reassigned_arc_params(self, decl: FuncDecl, func_type: FuncType) -> set:
+        """Collect the names of ARC-typed parameters reassigned syntactically in the body.
+
+        Any function whose body contains an ``AssignStmt`` whose target is a bare
+        ``VarRef`` naming an ARC-typed parameter needs a defensive retain on that
+        parameter at entry.
 
         Args:
-            target_expr: The target expression.
-            dst_ty: The destination type.
+            decl: The FuncDecl AST node.
+            func_type: The resolved FuncType for the declaration.
 
         Returns:
-            A tuple (is_borrowed: bool, declaring_scope: Optional[ScopeContext]).
+            Set of parameter names (source names, not mangled) to retain at entry.
         """
-        if not isinstance(target_expr, VarRef):
-            return False, None
-        if not self.analysis.has_arc_data(dst_ty):
-            return False, None
-        mangled = self.emitter.mangle_identifier(target_expr.name)
-        # Check it's not owned anywhere in the scope chain
-        scope = self._current_scope
-        while scope is not None:
-            for owned_name, _ in scope.owned_vars:
-                if owned_name == mangled:
-                    return False, None
-            scope = scope.parent
-        # Check it IS declared somewhere
-        declaring = self._find_declaring_scope(mangled)
-        if declaring is None:
-            return False, None
-        return True, declaring
+        arc_params = {
+            param.name
+            for param, ptype in zip(decl.params, func_type.params)
+            if self.analysis.has_arc_data(ptype)
+        }
+        if not arc_params:
+            return set()
+
+        hits = set()
+        for stmt in self._iter_body_stmts(decl.body):
+            if isinstance(stmt, AssignStmt) and isinstance(stmt.target, VarRef):
+                name = stmt.target.name
+                if name in arc_params:
+                    hits.add(name)
+        return hits
 
     def _emit_reassignment(self, stmt: AssignStmt) -> None:
         """Emit an assignment statement.
@@ -1642,17 +1673,10 @@ class Backend:
             self.ice("[ICE-1241] failed to emit assignment", node=stmt)
 
         if self.analysis.has_arc_data(dst_ty):
-            is_borrowed, declaring_scope = self._is_borrowed_arc_param(stmt.target, dst_ty)
-            if is_borrowed:
-                # Borrowed param: skip release of old value, promote to owned
-                self.emitter.emit_assignment(c_target, c_value)
-                mangled = self.emitter.mangle_identifier(stmt.target.name)
-                declaring_scope.add_owned(mangled, dst_ty)
-            else:
-                temp = self.emitter.fresh_tmp("tmp")
-                self.emitter.emit_temp_decl(self.emitter.emit_type(dst_ty), temp, c_value)
-                self._emit_value_cleanup(c_target, dst_ty)
-                self.emitter.emit_assignment(c_target, temp)
+            temp = self.emitter.fresh_tmp("tmp")
+            self.emitter.emit_temp_decl(self.emitter.emit_type(dst_ty), temp, c_value)
+            self._emit_value_cleanup(c_target, dst_ty)
+            self.emitter.emit_assignment(c_target, temp)
         else:
             self.emitter.emit_assignment(c_target, c_value)
 

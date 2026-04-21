@@ -1,6 +1,6 @@
 # L0 Ownership and Memory Management Reference
 
-Version: 2026-04-14
+Version: 2026-04-21
 
 This document describes how ownership works in L0 today, covering:
 
@@ -78,6 +78,19 @@ In practice:
 - Most ordinary L0 code never needs manual retain/release: the compiler balances ARC automatically on assignments and
   copies.
 - Manual retain/release is reserved for **low-level container internals** and **raw-memory boundaries** (see section 7).
+
+### Borrowed ARC parameters and reassignment
+
+ARC-typed parameters (`string`, ARC-managed containers) are borrowed at function entry: the caller owns the value and
+the callee must not release it. Reassigning such a parameter inside the body is permitted. When the compiler detects any
+syntactic assignment to an ARC parameter in the function body, it inserts one defensive retain at the function prologue
+and marks the parameter as owned for scope-exit cleanup. Subsequent reassignments then follow normal owned-lvalue
+semantics (release the current value, take ownership of the new one), and scope exit performs a single release that
+balances the entry retain. For functions that never reassign their ARC parameters, no extra retain/release is emitted
+and the parameter stays plain borrowed.
+
+**Cost:** one retain + one release per call, but only for functions whose body syntactically reassigns an ARC parameter.
+The common borrowed pattern pays nothing extra.
 
 ## 5. Optional Unwrap: `string?` to `string` via `opt as string`
 

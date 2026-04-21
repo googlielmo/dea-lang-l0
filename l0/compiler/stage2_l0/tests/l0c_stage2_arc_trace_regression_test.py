@@ -983,6 +983,156 @@ def test_param_reassign_twice_no_double_free(artifact_dir: Path) -> None:
     assert_true(len(heap_frees(arc)) >= 3, f"expected frees for input and reassigned values, got {heap_frees(arc)!r}", artifact_dir)
 
 
+def test_param_reassign_conditional_branch_safe(artifact_dir: Path) -> None:
+    """One-branch reassignment of a borrowed string param must not double-free the caller's value."""
+
+    stdout, _stderr, _report, arc = run_case(
+        "param_reassign_conditional_branch_safe",
+        """
+        module main;
+        import std.io;
+        import std.string;
+
+        func f(s: string, flag: bool) {
+            if (flag) {
+                s = concat_s("new", "");
+            }
+            printl_s(s);
+        }
+
+        func main() -> int {
+            let a = concat_s("keep", "");
+            f(a, false);
+            f(a, true);
+            printl_s(a);
+            return 0;
+        }
+        """,
+        artifact_dir,
+    )
+    assert_equal(stdout, "keep\nnew\nkeep\n", "conditional param reassign stdout mismatch", artifact_dir)
+
+    frees = heap_frees(arc)
+    for event in frees:
+        assert_true(
+            event.get("rc_before") == "1" and event.get("rc_after") == "0",
+            f"expected rc 1->0 free, got {event!r}",
+            artifact_dir,
+        )
+
+
+def test_param_reassign_loop_carried_safe(artifact_dir: Path) -> None:
+    """A borrowed string param reassigned inside a loop body must stay leak-free across iterations."""
+
+    stdout, _stderr, _report, arc = run_case(
+        "param_reassign_loop_carried_safe",
+        """
+        module main;
+        import std.io;
+        import std.string;
+
+        func f(s: string) {
+            for (let i = 0; i < 3; i = i + 1) {
+                s = concat_s("i", "");
+            }
+            printl_s(s);
+        }
+
+        func main() -> int {
+            let a = concat_s("start", "");
+            f(a);
+            printl_s(a);
+            return 0;
+        }
+        """,
+        artifact_dir,
+    )
+    assert_equal(stdout, "i\nstart\n", "loop-carried param reassign stdout mismatch", artifact_dir)
+
+    frees = heap_frees(arc)
+    for event in frees:
+        assert_true(
+            event.get("rc_before") == "1" and event.get("rc_after") == "0",
+            f"expected rc 1->0 free, got {event!r}",
+            artifact_dir,
+        )
+
+
+def test_param_reassign_for_update_safe(artifact_dir: Path) -> None:
+    """A borrowed string param reassigned in a `for` update clause must stay leak-free."""
+
+    stdout, _stderr, _report, arc = run_case(
+        "param_reassign_for_update_safe",
+        """
+        module main;
+        import std.io;
+        import std.string;
+
+        func f(s: string) {
+            let i = 0;
+            for (; i < 2; s = concat_s("up", "date")) {
+                i = i + 1;
+            }
+            printl_s(s);
+        }
+
+        func main() -> int {
+            let a = concat_s("old", "");
+            f(a);
+            printl_s(a);
+            return 0;
+        }
+        """,
+        artifact_dir,
+    )
+    assert_equal(stdout, "update\nold\n", "for-update param reassign stdout mismatch", artifact_dir)
+
+    frees = heap_frees(arc)
+    for event in frees:
+        assert_true(
+            event.get("rc_before") == "1" and event.get("rc_after") == "0",
+            f"expected rc 1->0 free, got {event!r}",
+            artifact_dir,
+        )
+
+
+def test_param_reassign_with_header_and_cleanup_safe(artifact_dir: Path) -> None:
+    """A borrowed string param reassigned from `with` header init/cleanup must stay leak-free."""
+
+    stdout, _stderr, _report, arc = run_case(
+        "param_reassign_with_header_and_cleanup_safe",
+        """
+        module main;
+        import std.io;
+        import std.string;
+
+        func f(s: string) {
+            with (s = concat_s("head", "er") => s = concat_s("clean", "up")) {
+                printl_s(s);
+            }
+            printl_s(s);
+        }
+
+        func main() -> int {
+            let a = concat_s("old", "");
+            f(a);
+            printl_s(a);
+            return 0;
+        }
+        """,
+        artifact_dir,
+    )
+    assert_equal(stdout, "header\ncleanup\nold\n", "with-header param reassign stdout mismatch", artifact_dir)
+
+    frees = heap_frees(arc)
+    for event in frees:
+        assert_true(
+            event.get("rc_before") == "1" and event.get("rc_after") == "0",
+            f"expected rc 1->0 free, got {event!r}",
+            artifact_dir,
+        )
+
+
 def test_leak_freedom_balance(artifact_dir: Path) -> None:
     """Every unique heap pointer in one mixed ARC program must end in one terminal free."""
 
@@ -1161,6 +1311,10 @@ def main() -> int:
         test_control_flow_condition_temp_cleanup,
         test_logical_expression_temp_cleanup,
         test_param_reassign_twice_no_double_free,
+        test_param_reassign_conditional_branch_safe,
+        test_param_reassign_loop_carried_safe,
+        test_param_reassign_for_update_safe,
+        test_param_reassign_with_header_and_cleanup_safe,
         test_leak_freedom_balance,
         test_with_early_return_cleanup_order,
         test_with_header_try_failure_runs_prior_inline_cleanup,
