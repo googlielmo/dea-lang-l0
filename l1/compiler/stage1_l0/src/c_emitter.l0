@@ -1941,6 +1941,42 @@ func cem_emit_string_equals_call(lhs: string, rhs: string) -> string {
 }
 
 /**
+ * Emits the inline equality check for a nullable non-pointer value.
+ *
+ * @param op The equality operator ("==" or "!=").
+ * @param lhs The C expression for the left-hand side.
+ * @param rhs The C expression for the right-hand side.
+ * @param inner_ty The inner type of the nullable.
+ * @return The parenthesized C expression for the equality check.
+ */
+func cem_emit_opt_equals_call(op: string, lhs: string, rhs: string, inner_ty: Type*) -> string {
+    let cmp_inner = "";
+    if (type_is_builtin(inner_ty, "string")) {
+        cmp_inner = cem_emit_string_equals_call(concat_s(lhs, ".value"), concat_s(rhs, ".value"));
+        if (op == "!=") {
+            cmp_inner = cem_emit_unary_op("!", cmp_inner);
+        }
+    } else {
+        cmp_inner = cem_emit_binary_op(op, concat_s(lhs, ".value"), concat_s(rhs, ".value"));
+    }
+
+    let hl = concat_s(lhs, ".has_value");
+    let hr = concat_s(rhs, ".has_value");
+
+    if (op == "==") {
+        // ((!a.has_value && !b.has_value) || (a.has_value && b.has_value && a.value == b.value))
+        let part1 = concat4_s("((!", hl, " && !", hr);
+        let part2 = concat4_s(") || (", hl, " && ", hr);
+        return concat4_s(part1, part2, " && ", concat_s(cmp_inner, "))"));
+    }
+
+    // ((a.has_value != b.has_value) || (a.has_value && b.has_value && a.value != b.value))
+    let part1 = concat4_s("((", hl, " != ", hr);
+    let part2 = concat4_s(") || (", hl, " && ", hr);
+    return concat4_s(part1, part2, " && ", concat_s(cmp_inner, "))"));
+}
+
+/**
  * Emit the runtime string-compare helper call plus a relational check.
  *
  * @param op Relational operator token.

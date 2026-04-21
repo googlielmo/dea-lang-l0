@@ -934,6 +934,34 @@ func test_typing_dea_intrinsic_ref_err() {
 }
 
 /**
+ * Tests successful typing for nullable identity equality.
+ */
+func test_typing_nullable_identity_ok() {
+    let sp = make_paths();
+    with (let cfg = log_config_create(LL_SILENT, false) => drop cfg) {
+        let result = analysis_analyze_entry(sp, "typing_nullable_identity_ok", cfg);
+        assert(!analysis_has_errors(result), "expected no typing errors for typing_nullable_identity_ok");
+        analysis_result_free(result);
+    }
+    sp_free(sp);
+}
+
+/**
+ * Tests diagnostic reporting for invalid nullable equality.
+ */
+func test_typing_nullable_identity_err() {
+    let sp = make_paths();
+    with (let cfg = log_config_create(LL_SILENT, false) => drop cfg) {
+        let result = analysis_analyze_entry(sp, "typing_nullable_identity_err", cfg);
+        assert(analysis_has_errors(result), "expected typing errors for typing_nullable_identity_err");
+        assert(count_diag_code(result, "TYP-0172") == 4, "expected four TYP-0172 diagnostics for mismatched nullable types");
+        assert(count_diag_code(result, "TYP-0173") == 1, "expected one TYP-0173 diagnostic for unsupported nullable struct equality");
+        analysis_result_free(result);
+    }
+    sp_free(sp);
+}
+
+/**
  * Main entry point for the module.
  */
 func main() {
@@ -961,6 +989,8 @@ func main() {
     test_typing_string_equality_ok();
     test_typing_pointer_identity_ok();
     test_typing_pointer_identity_err();
+    test_typing_nullable_identity_ok();
+    test_typing_nullable_identity_err();
     test_typing_cast_ok();
     test_typing_cast_err();
     test_typing_cast_optional_int_ok();

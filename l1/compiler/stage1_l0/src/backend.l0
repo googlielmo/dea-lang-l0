@@ -2028,6 +2028,17 @@ func be_emit_binary_op(self: Backend*, expr_id: ExprId) -> string {
 
         let c_left = be_emit_expr(self, expr.expr_a);
         let c_right = be_emit_expr(self, expr.expr_b);
+
+        if ((expr.text_value == "==" || expr.text_value == "!=") &&
+            left_ty != null && right_ty != null &&
+            ord((left_ty as Type*).kind) == ord(TY_NULLABLE) &&
+            ord((right_ty as Type*).kind) == ord(TY_NULLABLE)) {
+            let l_ty = left_ty as Type*;
+            if (!cem_is_niche_nullable(l_ty)) {
+                return cem_emit_opt_equals_call(expr.text_value, c_left, c_right, l_ty.inner as Type*);
+            }
+        }
+
         if (common_int_ty != null) {
             if (left_ty != null) {
                 c_left = be_convert_expr_with_expected_type(c_left, left_ty as Type*, common_int_ty as Type*);

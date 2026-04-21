@@ -2020,6 +2020,39 @@ func etc_can_widen_real(dst: Type*, src: Type*) -> bool {
 }
 
 /**
+ * Check whether a type is nullable.
+ *
+ * @param ty Type to inspect.
+ * @return `true` if `ty` is `TY_NULLABLE`.
+ */
+func etc_is_nullable(ty: Type*?) -> bool {
+    if (ty == null) return false;
+    return ord((ty as Type*).kind) == ord(TY_NULLABLE);
+}
+
+/**
+ * Return the inner type of a nullable type.
+ *
+ * @param ty A nullable type.
+ * @return The inner type.
+ */
+func etc_nullable_inner(ty: Type*) -> Type* {
+    return ty.inner as Type*;
+}
+
+/**
+ * Check whether a type supports identity/value equality (== and !=).
+ *
+ * @param ty Type to inspect.
+ * @return `true` if equality is supported.
+ */
+func etc_supports_equality(ty: Type*?) -> bool {
+    if (ty == null) return false;
+    let t = ty as Type*;
+    return etc_is_int(t) || etc_is_bool(t) || etc_is_real(t) || etc_is_string(t) || ord(t.kind) == ord(TY_POINTER);
+}
+
+/**
  * Check whether a type is `bool`.
  *
  * @param ty Type to inspect.
@@ -2520,10 +2553,18 @@ func etc_infer_binary(self: ExpressionTypeChecker*, expr_id: ExprId, expr: ExprN
         let is_null_check = false;
         let comparable = false;
         if (etc_types_equal(l_ty, r_ty)) {
-            comparable = etc_is_int(l_ty) || etc_is_bool(l_ty) || etc_is_real(l_ty) || etc_is_string(l_ty) || ord(l_ty.kind) == ord(TY_POINTER);
+            if (etc_is_nullable(l_ty)) {
+                let inner = etc_nullable_inner(l_ty);
+                if (etc_supports_equality(inner)) {
+                    comparable = true;
+                }
+            } else {
+                comparable = etc_supports_equality(l_ty);
+            }
         } else if (etc_is_real(l_ty) && etc_is_real(r_ty)) {
             comparable = true;
         }
+
         if (!comparable) {
             if (ord(l_ty.kind) == ord(TY_NULL) && (ord(r_ty.kind) == ord(TY_POINTER) || ord(r_ty.kind) == ord(TY_NULLABLE))) {
                 is_null_check = true;
@@ -2541,10 +2582,13 @@ func etc_infer_binary(self: ExpressionTypeChecker*, expr_id: ExprId, expr: ExprN
                         concat3_s("equality not supported for type '", type_format(l_ty), "'"),
                         (self.current_unit as DriverUnit*).path, expr.span);
                 } else {
-                    etc_diag_error(self, "TYP-0172",
-                        concat_s(concat4_s("binary '", op, "' type mismatch: ", type_format(l_ty)),
-                            concat_s(" and ", type_format(r_ty))),
-                        (self.current_unit as DriverUnit*).path, expr.span);
+                    let msg = concat_s(concat4_s("binary '", op, "' type mismatch: ", type_format(l_ty)),
+                                       concat_s(" and ", type_format(r_ty)));
+                    if ((etc_is_nullable(l_ty) && etc_types_equal(etc_nullable_inner(l_ty), r_ty)) ||
+                        (etc_is_nullable(r_ty) && etc_types_equal(etc_nullable_inner(r_ty), l_ty))) {
+                         msg = concat_s(msg, "; use 'as' to cast for same-type nullable equality");
+                    }
+                    etc_diag_error(self, "TYP-0172", msg, (self.current_unit as DriverUnit*).path, expr.span);
                 }
             }
         }

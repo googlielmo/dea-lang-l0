@@ -136,6 +136,18 @@ Current policy:
   types; it does not yet mean that every implicit widening conversion composes with `as`
 - `expr?` is the null-propagation operator
 
+Equality operators (`==` and `!=`) are accepted between two operands of the same nullable type `T?`, provided the inner
+type `T` itself supports equality. The semantics follow a three-valued rule:
+
+- both operands null returns `true` (for `==`) or `false` (for `!=`)
+- exactly one operand null returns `false` (for `==`) or `true` (for `!=`)
+- both operands non-null return the result of the inner `T == T` or `T != T` comparison
+
+The rule is strict: `T? == T` and `T == T?` are rejected even when `T` supports equality. Users must cast explicitly to
+reach a same-type pair, for example `x as T? == y` or `x == y as T`, depending on the side whose type they want to move.
+Nullable-pointer operands (`T*?`) use the same pointer-null niche representation as non-nullable pointers (see §7), so
+they inherit the same reference-identity semantics consistently.
+
 For non-pointer nullable values, generated C uses wrapper representations rather than exposing host-specific niche
 assumptions.
 

@@ -392,6 +392,16 @@ func test_emitter_expression_and_statement_helpers() {
             "string-compare helper mismatch");
         assert(cem_emit_unary_op("!", cem_emit_string_equals_call("lhs", "rhs")) == "(!rt_string_equals(lhs, rhs))",
             "string-not-equals helper mismatch");
+
+        let int_ty = type_builtin_int();
+        let string_ty = type_builtin_string();
+        assert(cem_emit_opt_equals_call("==", "a", "b", int_ty) == "((!a.has_value && !b.has_value) || (a.has_value && b.has_value && (a.value == b.value)))", "int? == int? mismatch");
+        assert(cem_emit_opt_equals_call("!=", "a", "b", int_ty) == "((a.has_value != b.has_value) || (a.has_value && b.has_value && (a.value != b.value)))", "int? != int? mismatch");
+        assert(cem_emit_opt_equals_call("==", "a", "b", string_ty) == "((!a.has_value && !b.has_value) || (a.has_value && b.has_value && rt_string_equals(a.value, b.value)))", "string? == string? mismatch");
+        assert(cem_emit_opt_equals_call("!=", "a", "b", string_ty) == "((a.has_value != b.has_value) || (a.has_value && b.has_value && (!rt_string_equals(a.value, b.value))))", "string? != string? mismatch");
+        type_free(int_ty);
+        type_free(string_ty);
+
         assert(cem_emit_discard_expr("tmp") == "(void)(tmp)", "discard helper mismatch");
         assert(cem_emit_struct_constructor_for_type(point_ty, field_inits) == "(struct dea_demo_main_Point){ .x = 1, .y = 2 }", "struct constructor helper mismatch");
         assert(cem_emit_variant_constructor_for_type(maybe_point_ty, "Some", payload_inits) == "(struct dea_demo_main_MaybePoint){ .tag = dea_demo_main_MaybePoint_Some, .data = { .Some = { .value = pt } } }",

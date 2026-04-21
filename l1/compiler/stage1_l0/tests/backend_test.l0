@@ -1144,6 +1144,58 @@ func test_backend_pointer_identity() {
 }
 
 /**
+ * Tests nullable identity backend lowering.
+ */
+func test_backend_nullable_identity() {
+    with (let filenames = vs_create(1) => vs_free(filenames),
+          let sources = vs_create(1) => vs_free(sources),
+          let lines = vs_create(32) => vs_free(lines),
+          let cfg = log_config_create(LL_ERROR, false) => drop cfg,
+          let opts = cg_options_create() => cg_options_free(opts)) {
+        opts.emit_line_directives = false;
+
+        vs_push(filenames, "demo/main.l1");
+        vs_push(lines, "module demo.main;");
+        vs_push(lines, "struct T { val: int; }");
+        vs_push(lines, "func main() -> int {");
+        vs_push(lines, "    let a: int? = 5;");
+        vs_push(lines, "    let b: int? = null;");
+        vs_push(lines, "    if (a == a) { }");
+        vs_push(lines, "    if (a != b) { }");
+        vs_push(lines, "    let s1: string? = \"hi\";");
+        vs_push(lines, "    let s2: string? = null;");
+        vs_push(lines, "    if (s1 == s1) { }");
+        vs_push(lines, "    if (s1 != s2) { }");
+        vs_push(lines, "    let p1: T*? = new T(1);");
+        vs_push(lines, "    let p2: T*? = null;");
+        vs_push(lines, "    if (p1 == p1) { }");
+        vs_push(lines, "    if (p1 != p2) { }");
+        vs_push(lines, "    return 0;");
+        vs_push(lines, "}");
+        vs_push(sources, bt_source(lines));
+
+        let result = bt_analyze_sources("demo.main", filenames, sources);
+        assert(!analysis_has_errors(result), "nullable identity test should analyze without errors");
+
+        let generated = backend_generate(result, opts, cfg);
+
+        // int? lowering
+        assert(contains_s(generated, "((!a.has_value && !a.has_value) || (a.has_value && a.has_value && (a.value == a.value)))"), "int? equality lowering mismatch");
+        assert(contains_s(generated, "((a.has_value != b.has_value) || (a.has_value && b.has_value && (a.value != b.value)))"), "int? inequality lowering mismatch");
+
+        // string? lowering
+        assert(contains_s(generated, "((!s1.has_value && !s1.has_value) || (s1.has_value && s1.has_value && rt_string_equals(s1.value, s1.value)))"), "string? equality lowering mismatch");
+        assert(contains_s(generated, "((s1.has_value != s2.has_value) || (s1.has_value && s2.has_value && (!rt_string_equals(s1.value, s2.value))))"), "string? inequality lowering mismatch");
+
+        // T*? lowering (niche, raw C)
+        assert(contains_s(generated, "(p1 == p1)"), "T*? equality lowering mismatch");
+        assert(contains_s(generated, "(p1 != p2)"), "T*? inequality lowering mismatch");
+
+        analysis_result_free(result);
+    }
+}
+
+/**
  * Main entry point for the module.
  */
 func main() {
@@ -1171,5 +1223,6 @@ func main() {
     test_backend_generate_float_double_ops();
     test_backend_generate_float_zero_division_plain_c();
     test_backend_pointer_identity();
+    test_backend_nullable_identity();
     printl_s("backend_test: all tests passed");
 }

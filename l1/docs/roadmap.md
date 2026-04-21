@@ -92,6 +92,10 @@ L1 carries post-L0 language growth and bootstrap compiler work.
   [2026-04-17-l1-diagnostic-tab-caret-alignment-noref](../work/plans/bug-fixes/closed/2026-04-17-l1-diagnostic-tab-caret-alignment-noref.md)
   aligned stored diagnostic spans and printed carets for source lines that contain ASCII tabs under a logical-source
   column contract.
+- Feature
+  [2026-04-19-nullable-identity-equality-noref](../work/plans/features/closed/2026-04-19-nullable-identity-equality-noref.md)
+  added strict `T? == T?` equality with same-inner-type payload comparison and explicit-cast requirement for cross-form
+  `T? vs T` compares.
 
 </details>
 
@@ -112,10 +116,6 @@ L1 carries post-L0 language growth and bootstrap compiler work.
   [2026-04-19-pointer-identity-equality-noref](../work/plans/features/2026-04-19-pointer-identity-equality-noref.md)
   adds `==` and `!=` over same-type non-nullable `T*` operands using reference identity, narrowing `TYP-0173`
   accordingly.
-- Feature
-  [2026-04-19-nullable-identity-equality-noref](../work/plans/features/2026-04-19-nullable-identity-equality-noref.md)
-  adds strict `T? == T?` equality with same-inner-type payload comparison and explicit-cast requirement for cross-form
-  `T? vs T` compares.
 - Feature [2026-04-20-is-intrinsic-noref](../work/plans/features/2026-04-20-is-intrinsic-noref.md) introduces the
   `is(x, Variant)` intrinsic for payload-ignoring enum tag comparison.
 
