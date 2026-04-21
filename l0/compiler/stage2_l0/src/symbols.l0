@@ -5,8 +5,6 @@
 
 module symbols;
 
-import util.strings;
-
 import ast;
 import types;
 
@@ -48,7 +46,7 @@ struct Symbol {
  */
 func symbol_create(name: string, kind: SymbolKind, module_name: string, owner_name: string, decl_ptr: void*,
                    span: Span) -> Symbol* {
-    return new Symbol(us_clone_s(name), kind, us_clone_s(module_name), us_clone_s(owner_name), decl_ptr, span, null);
+    return new Symbol(name, kind, module_name, owner_name, decl_ptr, span, null);
 }
 
 /**

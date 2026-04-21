@@ -391,8 +391,8 @@ func nr_define_local(env: ModuleEnv*, diags: DiagCollector*, name: string, sym: 
         return;
     }
 
-    spm_put(env.locals, us_clone_s(name), sym as void*);
-    spm_put(env.all, us_clone_s(name), sym as void*);
+    spm_put(env.locals, name, sym as void*);
+    spm_put(env.all, name, sym as void*);
 }
 
 /**
@@ -496,9 +496,9 @@ func nr_open_imports_one(env: ModuleEnv*, imported_env: ModuleEnv*, diags: DiagC
                         );
                         spm_remove(env.imported, name);
                         spm_remove(env.all, name);
-                        spm_put(env.imported, us_clone_s(name), sym as void*);
+                        spm_put(env.imported, name, sym as void*);
                         if (!ss_has(env.ambiguous_imports, name)) {
-                            spm_put(env.all, us_clone_s(name), sym as void*);
+                            spm_put(env.all, name, sym as void*);
                         }
                         ss_remove(env.prelude_imported, name);
                         continue;
@@ -510,12 +510,12 @@ func nr_open_imports_one(env: ModuleEnv*, imported_env: ModuleEnv*, diags: DiagC
                         env.module_ptr.filename,
                         env.module_ptr.span
                     );
-                    ss_add(env.ambiguous_imports, us_clone_s(name));
+                    ss_add(env.ambiguous_imports, name);
                     spm_remove(env.all, name);
                 } else {
-                    spm_put(env.imported, us_clone_s(name), sym as void*);
+                    spm_put(env.imported, name, sym as void*);
                     if (!ss_has(env.ambiguous_imports, name)) {
-                        spm_put(env.all, us_clone_s(name), sym as void*);
+                        spm_put(env.all, name, sym as void*);
                     }
                 }
             }
@@ -534,7 +534,7 @@ func nr_open_imports(nr: NameResolution*, env: ModuleEnv*, diags: DiagCollector*
     if (!dea_is_virtual_module_name(env.module_name)) {
         let dea_env = nr_env_find(nr, dea_module_name());
         if (dea_env != null) {
-            ss_add(env.imported_modules, us_clone_s(dea_module_name()));
+            ss_add(env.imported_modules, dea_module_name());
             nr_open_imports_one(env, dea_env as ModuleEnv*, diags, null);
             for (let i = 0; i < spm_capacity((dea_env as ModuleEnv*).locals); i = i + 1) {
                 if (!spm_slot_occupied((dea_env as ModuleEnv*).locals, i)) {
@@ -543,7 +543,7 @@ func nr_open_imports(nr: NameResolution*, env: ModuleEnv*, diags: DiagCollector*
                 let name = spm_slot_key((dea_env as ModuleEnv*).locals, i);
                 if (spm_has(env.imported, name) && !ss_has(env.ambiguous_imports, name) &&
                     ((nr_module_env_imported(env, name) as Symbol*)).module_name == dea_module_name()) {
-                    ss_add(env.prelude_imported, us_clone_s(name));
+                    ss_add(env.prelude_imported, name);
                 }
             }
         }
@@ -555,7 +555,7 @@ func nr_open_imports(nr: NameResolution*, env: ModuleEnv*, diags: DiagCollector*
         if (dea_is_virtual_module_name(imp.name)) {
             continue;
         }
-        ss_add(env.imported_modules, us_clone_s(imp.name));
+        ss_add(env.imported_modules, imp.name);
         let imported_env = nr_env_find(nr, imp.name);
         if (imported_env == null) {
             nr_span_diag_error(
@@ -590,7 +590,7 @@ func nr_make_env(module_ptr: Module*) -> ModuleEnv* {
  */
 func nr_make_owned_env(module_ptr: Module*, module_ptr_owned: bool) -> ModuleEnv* {
     return new ModuleEnv(
-        us_clone_s(module_ptr.name),
+        module_ptr.name,
         module_ptr,
         module_ptr_owned,
         spm_create(),
@@ -645,12 +645,12 @@ func nr_resolve(driver_state: DriverState*, diags: DiagCollector*) -> NameResolu
         let module_ptr = unit.parse_result.root_module as Module*;
         let env = nr_make_env(module_ptr);
         ptr_vec_push(result.envs, env as void*);
-        spm_put(result.by_name, us_clone_s(env.module_name), env as void*);
+        spm_put(result.by_name, env.module_name, env as void*);
     }
 
     let dea_env = nr_make_dea_env();
     ptr_vec_push(result.envs, dea_env as void*);
-    spm_put(result.by_name, us_clone_s(dea_env.module_name), dea_env as void*);
+    spm_put(result.by_name, dea_env.module_name, dea_env as void*);
 
     for (let env_i = 0; env_i < vec_size(result.envs); env_i = env_i + 1) {
         nr_collect_locals(ptr_vec_get(result.envs, env_i) as ModuleEnv*, diags);

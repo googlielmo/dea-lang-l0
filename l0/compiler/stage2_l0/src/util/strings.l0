@@ -11,16 +11,6 @@ import std.text;
 import std.vector;
 
 /**
- * Return a copied string with the same contents.
- *
- * @param s String to clone.
- * @return New string containing the contents of `s`.
- */
-func us_clone_s(s: string) -> string {
-    return slice_s(s, 0, len_s(s));
-}
-
-/**
  * Clone a vector of strings.
  *
  * @param src Source vector to copy.

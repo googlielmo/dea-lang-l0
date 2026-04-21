@@ -1446,7 +1446,7 @@ func cem_emit_optional_wrappers(self: CEmitter*, early: bool) {
             ccb_emit(self.out, concat4_s("typedef struct { dea_bool has_value; ", c_inner, " value; } ", concat_s(name, ";")));
             ccb_emit(self.out, concat3_s("#endif /* ", guard, " */"));
             ccb_emit(self.out, "");
-            ss_add(self.opt_emitted, us_clone_s(name));
+            ss_add(self.opt_emitted, name);
         }
     }
 }
@@ -1508,7 +1508,7 @@ func cem_emit_func_ptr_typedef(self: CEmitter*, name: string) {
         }
         sb_append(sb, ");");
         ccb_emit(self.out, sb_to_string(sb));
-        ss_add(self.func_ptr_emitted, us_clone_s(name));
+        ss_add(self.func_ptr_emitted, name);
     }
 }
 

@@ -1109,7 +1109,7 @@ func etc_check_match_exhaustiveness(self: ExpressionTypeChecker*, match_ty: Type
             if (ord(pattern.kind) == ord(PT_WILDCARD)) {
                 wildcard_present = true;
             } else if (ord(pattern.kind) == ord(PT_VARIANT)) {
-                ss_add(covered, us_clone_s(pattern.name));
+                ss_add(covered, pattern.name);
             }
         }
 
@@ -1297,7 +1297,7 @@ func etc_check_stmt(self: ExpressionTypeChecker*, stmt_id: StmtId) -> StmtFlowKi
             let right_ty = etc_infer_expr(self, stmt.expr_b);
             if (left_ty != null && right_ty != null) {
                 if (!etc_can_assign(self, left_ty as Type*, right_ty as Type*)) {
-                    etc_diag_error(self, "TYP-0311", concat_s("assignment type mismatch", ""), unit.path, stmt.span);
+                    etc_diag_error(self, "TYP-0311", "assignment type mismatch", unit.path, stmt.span);
                 }
             }
             if (left_ty != null) type_free(left_ty as Type*);
@@ -1472,7 +1472,7 @@ func etc_check_stmt(self: ExpressionTypeChecker*, stmt_id: StmtId) -> StmtFlowKi
                                                 arm_literal.span
                                             );
                                         } else {
-                                            ss_add(seen_literals, us_clone_s(case_key));
+                                            ss_add(seen_literals, case_key);
                                         }
                                     }
                                 }
@@ -1518,7 +1518,7 @@ func etc_check_stmt(self: ExpressionTypeChecker*, stmt_id: StmtId) -> StmtFlowKi
                                         if (cleanup_guards == null) {
                                             cleanup_guards = ss_create();
                                         }
-                                        ss_add(cleanup_guards as StringSet*, us_clone_s(init_stmt.name));
+                                        ss_add(cleanup_guards as StringSet*, init_stmt.name);
                                     }
                                     type_free(ty);
                                 }
@@ -1974,7 +1974,7 @@ func etc_infer_call(self: ExpressionTypeChecker*, expr_id: ExprId, expr: ExprNod
         if (args != null) arg_count = vec_size(args);
         
         if (arg_count != vec_size(params)) {
-            etc_diag_error(self, "TYP-0183", concat_s("function call argument count mismatch", ""),
+            etc_diag_error(self, "TYP-0183", "function call argument count mismatch",
                 (self.current_unit as DriverUnit*).path, expr.span);
         } else {
             for (let i = 0; i < arg_count; i = i + 1) {
@@ -1983,7 +1983,7 @@ func etc_infer_call(self: ExpressionTypeChecker*, expr_id: ExprId, expr: ExprNod
                 if (arg_ty != null) {
                     let p_ty = *(vec_get(params, i) as Type**);
                     if (!etc_can_assign(self, p_ty, arg_ty as Type*)) {
-                        etc_diag_error(self, "TYP-0312", concat_s("function call argument type mismatch", ""),
+                        etc_diag_error(self, "TYP-0312", "function call argument type mismatch",
                             (self.current_unit as DriverUnit*).path, expr.span);
                     }
                     type_free(arg_ty as Type*);
@@ -2004,7 +2004,7 @@ func etc_infer_call(self: ExpressionTypeChecker*, expr_id: ExprId, expr: ExprNod
             if (args2 != null) arg_count2 = vec_size(args2);
             
             if (arg_count2 != vec_size(fields)) {
-                etc_diag_error(self, "TYP-0191", concat_s("struct constructor field count mismatch", ""),
+                etc_diag_error(self, "TYP-0191", "struct constructor field count mismatch",
                     (self.current_unit as DriverUnit*).path, expr.span);
             } else {
                 for (let i = 0; i < arg_count2; i = i + 1) {
@@ -2013,7 +2013,7 @@ func etc_infer_call(self: ExpressionTypeChecker*, expr_id: ExprId, expr: ExprNod
                     if (arg_ty2 != null) {
                         let f_info = ptr_vec_get(fields, i) as StructFieldInfo*;
                         if (!etc_can_assign(self, f_info.field_type, arg_ty2 as Type*)) {
-                            etc_diag_error(self, "TYP-0313", concat_s("struct constructor field type mismatch", ""),
+                            etc_diag_error(self, "TYP-0313", "struct constructor field type mismatch",
                                 (self.current_unit as DriverUnit*).path, expr.span);
                         }
                         type_free(arg_ty2 as Type*);
@@ -2044,7 +2044,7 @@ func etc_infer_call(self: ExpressionTypeChecker*, expr_id: ExprId, expr: ExprNod
                             if (args3 != null) arg_count3 = vec_size(args3);
                             
                             if (arg_count3 != vec_size(fields2)) {
-                                etc_diag_error(self, "TYP-0201", concat_s("enum variant constructor field count mismatch", ""),
+                                etc_diag_error(self, "TYP-0201", "enum variant constructor field count mismatch",
                                     (self.current_unit as DriverUnit*).path, expr.span);
                             } else {
                                 for (let j = 0; j < arg_count3; j = j + 1) {
@@ -2053,7 +2053,7 @@ func etc_infer_call(self: ExpressionTypeChecker*, expr_id: ExprId, expr: ExprNod
                                     if (arg_ty3 != null) {
                                         let f_ty = ptr_vec_get(fields2, j) as Type*;
                                         if (!etc_can_assign(self, f_ty, arg_ty3 as Type*)) {
-                                            etc_diag_error(self, "TYP-0314", concat_s("enum variant constructor field type mismatch", ""),
+                                            etc_diag_error(self, "TYP-0314", "enum variant constructor field type mismatch",
                                                 (self.current_unit as DriverUnit*).path, expr.span);
                                         }
                                         type_free(arg_ty3 as Type*);
@@ -2067,17 +2067,17 @@ func etc_infer_call(self: ExpressionTypeChecker*, expr_id: ExprId, expr: ExprNod
             }
         }
         if (!constructed_variant) {
-            etc_diag_error(self, "TYP-0181", concat_s("enum type is not callable; call a variant instead", ""),
+            etc_diag_error(self, "TYP-0181", "enum type is not callable; call a variant instead",
                 (self.current_unit as DriverUnit*).path, expr.span);
         }
         return c_ty;
     }
 
     if (ord(c_ty.kind) == ord(TY_ENUM)) {
-        etc_diag_error(self, "TYP-0181", concat_s("enum type is not callable; call a variant instead", ""),
+        etc_diag_error(self, "TYP-0181", "enum type is not callable; call a variant instead",
             (self.current_unit as DriverUnit*).path, expr.span);
     } else {
-        etc_diag_error(self, "TYP-0180", concat_s("expression is not callable", ""),
+        etc_diag_error(self, "TYP-0180", "expression is not callable",
             (self.current_unit as DriverUnit*).path, expr.span);
     }
     type_free(c_ty);
@@ -2386,7 +2386,7 @@ func etc_infer_expr(self: ExpressionTypeChecker*, expr_id: ExprId) -> Type*? {
                             let field_count = vec_size(variant.field_types);
                             if (arg_count != field_count) {
                                 etc_diag_error(self, "TYP-0201",
-                                    concat_s("enum variant constructor field count mismatch", ""),
+                                    "enum variant constructor field count mismatch",
                                     unit.path, expr.span);
                             }
                             for (let j = 0; j < arg_count; j = j + 1) {
@@ -2396,7 +2396,7 @@ func etc_infer_expr(self: ExpressionTypeChecker*, expr_id: ExprId) -> Type*? {
                                         let field_ty = ptr_vec_get(variant.field_types, j) as Type*;
                                         if (!etc_can_assign(self, field_ty, arg_ty as Type*)) {
                                             etc_diag_error(self, "TYP-0314",
-                                                concat_s("enum variant constructor field type mismatch", ""),
+                                                "enum variant constructor field type mismatch",
                                                 unit.path, expr.span);
                                         }
                                     }

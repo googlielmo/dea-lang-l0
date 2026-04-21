@@ -113,7 +113,7 @@ func lc_scope_define(self: Scope*, name: string, kind: LocalKind, decl_ptr: void
     if (spm_has(self.symbols, name)) {
         return;
     }
-    spm_put(self.symbols, us_clone_s(name), new LocalSymbol(us_clone_s(name), kind, decl_ptr) as void*);
+    spm_put(self.symbols, name, new LocalSymbol(name, kind, decl_ptr) as void*);
 }
 
 /**
@@ -474,9 +474,9 @@ func lc_visit_stmt(env: FunctionEnv*, stmt_id: StmtId, scope: Scope*) {
 func lc_make_function_env(module_name: string, unit: DriverUnit*, decl: FuncDecl*) -> FunctionEnv* {
     let stmt_count = vec_size(unit.parse_result.stmt_arena.nodes);
     let env = new FunctionEnv(
-        us_clone_s(lc_key(module_name, decl.name)),
-        us_clone_s(module_name),
-        us_clone_s(decl.name),
+        lc_key(module_name, decl.name),
+        module_name,
+        decl.name,
         decl,
         unit.parse_result.pattern_arena,
         unit.parse_result.stmt_arena,
@@ -530,7 +530,7 @@ func locals_resolve(driver_state: DriverState*, diags: DiagCollector*) -> Locals
             }
             let env = lc_make_function_env(mod.name, unit, decl);
             ptr_vec_push(result.envs, env as void*);
-            spm_put(result.by_name, us_clone_s(env.key), env as void*);
+            spm_put(result.by_name, env.key, env as void*);
         }
     }
 

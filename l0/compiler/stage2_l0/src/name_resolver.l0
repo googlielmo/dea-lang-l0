@@ -370,8 +370,8 @@ func nr_define_local(env: ModuleEnv*, diags: DiagCollector*, name: string, sym: 
         return;
     }
 
-    spm_put(env.locals, us_clone_s(name), sym as void*);
-    spm_put(env.all, us_clone_s(name), sym as void*);
+    spm_put(env.locals, name, sym as void*);
+    spm_put(env.all, name, sym as void*);
 }
 
 /**
@@ -465,12 +465,12 @@ func nr_open_imports_one(env: ModuleEnv*, imported_env: ModuleEnv*, diags: DiagC
                         env.module_ptr.filename,
                         env.module_ptr.span
                     );
-                    ss_add(env.ambiguous_imports, us_clone_s(name));
+                    ss_add(env.ambiguous_imports, name);
                     spm_remove(env.all, name);
                 } else {
-                    spm_put(env.imported, us_clone_s(name), sym as void*);
+                    spm_put(env.imported, name, sym as void*);
                     if (!ss_has(env.ambiguous_imports, name)) {
-                        spm_put(env.all, us_clone_s(name), sym as void*);
+                        spm_put(env.all, name, sym as void*);
                     }
                 }
             }
@@ -489,7 +489,7 @@ func nr_open_imports(nr: NameResolution*, env: ModuleEnv*, diags: DiagCollector*
     let mod = env.module_ptr;
     for (let i = 0; i < vec_size(mod.imports); i = i + 1) {
         let imp = ptr_vec_get(mod.imports, i) as Import*;
-        ss_add(env.imported_modules, us_clone_s(imp.name));
+        ss_add(env.imported_modules, imp.name);
         let imported_env = nr_env_find(nr, imp.name);
         if (imported_env == null) {
             nr_span_diag_error(
@@ -513,7 +513,7 @@ func nr_open_imports(nr: NameResolution*, env: ModuleEnv*, diags: DiagCollector*
  */
 func nr_make_env(module_ptr: Module*) -> ModuleEnv* {
     return new ModuleEnv(
-        us_clone_s(module_ptr.name),
+        module_ptr.name,
         module_ptr,
         spm_create(),
         spm_create(),
@@ -542,7 +542,7 @@ func nr_resolve(driver_state: DriverState*, diags: DiagCollector*) -> NameResolu
         let module_ptr = unit.parse_result.root_module as Module*;
         let env = nr_make_env(module_ptr);
         ptr_vec_push(result.envs, env as void*);
-        spm_put(result.by_name, us_clone_s(env.module_name), env as void*);
+        spm_put(result.by_name, env.module_name, env as void*);
     }
 
     for (let env_i = 0; env_i < vec_size(result.envs); env_i = env_i + 1) {

@@ -12,7 +12,6 @@ import std.vector;
 import ast;
 import symbols;
 import types;
-import util.strings;
 
 /**
  * Return the synthesized prelude module name.
@@ -89,8 +88,8 @@ func dea_make_virtual_module() -> Module* {
  * @param sym Symbol to insert.
  */
 func dea_put_local_symbol(locals: StringPtrMap*, all: StringPtrMap*, sym: Symbol*) {
-    spm_put(locals, us_clone_s(sym.name), sym as void*);
-    spm_put(all, us_clone_s(sym.name), sym as void*);
+    spm_put(locals, sym.name, sym as void*);
+    spm_put(all, sym.name, sym as void*);
 }
 
 /**
