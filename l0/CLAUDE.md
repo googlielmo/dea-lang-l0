@@ -200,7 +200,7 @@ pathways.
 
 When adding or moving tests, follow `compiler/stage1_py/tests/README.md` for placement and naming rules.
 
-Requires pytest >= 9.0.2, pytest-xdist >= 3.5, and a C compiler. Compiler auto-detection follows the logic defined in
+Requires pytest >= 9.0.3, pytest-xdist >= 3.5, and a C compiler. Compiler auto-detection follows the logic defined in
 the Commands section.
 
 ## Critical Constraints
