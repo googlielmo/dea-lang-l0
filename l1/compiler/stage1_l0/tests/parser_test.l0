@@ -429,6 +429,35 @@ func test_new_expr_bitwise_arg_ok() {
 }
 
 /**
+ * Tests function pointer type syntax in annotations and aliases.
+ */
+func test_function_pointer_type_syntax_ok() {
+    let src = "module main; type Callback = func(int, bool) -> int; type MaybeCallback = (func() -> void)?; func main(cb: func(int) -> int) -> int { let chosen: (func(int) -> int)? = cb; return cb(1); }";
+    let result = parse_module_source(src, "<test>");
+    if (parse_has_errors(result)) {
+        let diag = parse_diag_get(result, 0);
+        printl_ss("unexpected parse error code:", diag.code);
+        printl_ss("unexpected parse error message:", diag.message);
+        assert(false, "Expected function pointer type syntax to parse");
+    }
+
+    let root = result.root_module as Module*;
+    let callback_top = ptr_vec_get(root.decls, 0) as TopLevelDecl*;
+    let callback = callback_top.data as TypeAliasDecl*;
+    assert(callback.target.func_params != null, "expected function type params");
+    assert(vec_size(callback.target.func_params as VectorBase*) == 2, "expected two callback parameters");
+    assert(callback.target.func_result != null, "expected callback result");
+
+    let maybe_top = ptr_vec_get(root.decls, 1) as TopLevelDecl*;
+    let maybe = maybe_top.data as TypeAliasDecl*;
+    assert(maybe.target.is_nullable, "expected nullable function pointer alias");
+    assert(maybe.target.func_params != null, "expected nullable function pointer params");
+    assert(vec_size(maybe.target.func_params as VectorBase*) == 0, "expected zero-arg function type");
+
+    parse_result_free(result);
+}
+
+/**
  * Tests test_top_level_multi_error_collection.
  */
 func test_top_level_multi_error_collection() {
@@ -469,6 +498,7 @@ func main() {
     test_struct_field_error();
     test_enum_variant_field_error();
     test_new_expr_bitwise_arg_ok();
+    test_function_pointer_type_syntax_ok();
     test_top_level_multi_error_collection();
     printl_s("parser_test: all tests passed");
 }

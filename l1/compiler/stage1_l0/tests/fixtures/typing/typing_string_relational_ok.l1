@@ -15,7 +15,7 @@ func branch_and_loop(seed: string) -> int {
     while (seed <= "go" && count < 2) {
         count = count + 1;
     }
-    if (seed >= "go" && seed > "fn" && count == 2) {
+    if (seed >= "go" && seed > "func" && count == 2) {
         return count;
     }
     return 0;

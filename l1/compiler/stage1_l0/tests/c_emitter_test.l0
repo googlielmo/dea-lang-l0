@@ -48,7 +48,7 @@ func cet_empty_analysis_result() -> AnalysisResult* {
  * @return New type-ref node.
  */
 func cet_builtin_type_ref(name: string) -> TypeRef* {
-    return new TypeRef(name, 0, false, null, null, span_here(1, 1));
+    return new TypeRef(name, 0, false, null, null, null, null, span_here(1, 1));
 }
 
 /**
@@ -377,7 +377,7 @@ func test_emitter_expression_and_statement_helpers() {
         assert(cem_emit_binary_op("==", "p1", "p2") == "(p1 == p2)", "pointer equality binary-op mismatch");
         assert(cem_emit_binary_op("!=", "p1", "p2") == "(p1 != p2)", "pointer inequality binary-op mismatch");
         assert(cem_emit_checked_int_add("a", "b") == "(_rt_iadd(a, b))", "checked add helper mismatch");
-        assert(cem_emit_function_call("fn", "x, y") == "fn(x, y)", "function call helper mismatch");
+        assert(cem_emit_function_call("func", "x, y") == "func(x, y)", "function call helper mismatch");
         assert(cem_emit_field_access("obj", "x", false) == "(obj).x", "field access helper mismatch");
         assert(cem_emit_cast("dea_int", "b") == "((dea_int)(b))", "cast helper mismatch");
         assert(cem_emit_checked_narrow_cast("dea_tiny", "x") == "(_rt_narrow_dea_tiny(x))",

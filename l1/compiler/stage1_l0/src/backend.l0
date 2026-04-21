@@ -2304,7 +2304,19 @@ func be_emit_call(self: Backend*, expr_id: ExprId) -> string {
                 sb_append(sb2, c_arg3);
             }
         }
-        return cem_emit_function_call(cem_emit_paren_expr(be_emit_expr(self, expr.expr_a)), sb_to_string(sb2));
+        with (let callee_ty = be_expr_type(self, expr.expr_a) => type_free_opt(callee_ty)) {
+            let c_callee = be_emit_expr(self, expr.expr_a);
+            if (callee_ty != null && ord((callee_ty as Type*).kind) == ord(TY_FUNC)) {
+                let callee_tmp = cem_fresh_tmp(self.emitter, "func");
+                cem_emit_temp_decl(self.emitter, cem_emit_type(callee_ty as Type*), callee_tmp, c_callee);
+                cem_emit_if_header(self.emitter, cem_emit_pointer_null_check(callee_tmp, "=="));
+                cem_emit_block_start(self.emitter);
+                cem_emit_expr_stmt(self.emitter, "_rt_panic(\"call through null function pointer\")");
+                cem_emit_block_end(self.emitter);
+                c_callee = callee_tmp;
+            }
+            return cem_emit_function_call(cem_emit_paren_expr(c_callee), sb_to_string(sb2));
+        }
     }
 }
 
@@ -3553,6 +3565,8 @@ func backend_generate(result: AnalysisResult*, opts: CodegenOptions*, cfg: LogCo
         be_emit_type_definitions(self);
         cem_emit_section_comment(self.emitter, "Optional wrapper types (late)");
         cem_emit_optional_wrappers(self.emitter, false);
+        cem_emit_section_comment(self.emitter, "Function pointer typedefs");
+        cem_emit_func_ptr_typedefs(self.emitter);
         be_emit_let_declarations(self);
         be_emit_function_declarations(self);
         let has_global_init = be_emit_top_level_init_functions(self);

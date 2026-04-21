@@ -3,21 +3,25 @@
 ## Add L1 function pointer types
 
 - Date: 2026-04-18
-- Status: Draft
+- Status: Completed
 - Title: Add L1 function pointer types
 - Kind: Feature
 - Severity: Medium
 - Stage: L1
 - Subsystem: Parser / type system / expression typing / C emitter / ABI
 - Modules:
-  - `l1/compiler/stage1_l0/src/tokens.l0`
-  - `l1/compiler/stage1_l0/src/parser/types.l0`
-  - `l1/compiler/stage1_l0/src/parser/expr.l0`
+  - `l1/compiler/stage1_l0/src/ast.l0`
+  - `l1/compiler/stage1_l0/src/parser/shared.l0`
+  - `l1/compiler/stage1_l0/src/parser/decl.l0`
+  - `l1/compiler/stage1_l0/src/type_resolve.l0`
+  - `l1/compiler/stage1_l0/src/types.l0`
   - `l1/compiler/stage1_l0/src/expr_types.l0`
   - `l1/compiler/stage1_l0/src/backend.l0`
   - `l1/compiler/stage1_l0/src/c_emitter.l0`
 - Test modules:
   - `l1/compiler/stage1_l0/tests/parser_test.l0`
+  - `l1/compiler/stage1_l0/tests/type_resolve_test.l0`
+  - `l1/compiler/stage1_l0/tests/c_emitter_test.l0`
   - `l1/compiler/stage1_l0/tests/expr_types_test.l0`
   - `l1/compiler/stage1_l0/tests/l0c_lib_test.l0`
 - Related:
@@ -29,10 +33,19 @@
 
 ## Summary
 
-L1 today has no first-class way to spell a function type. Functions can be defined and called by name, but they cannot
-be stored, passed, or returned as values, which blocks callbacks, dispatch tables, plugin boundaries, and several C FFI
-scenarios that Initiative 0001 will eventually need. This plan introduces function pointer types as a typed, ABI-aware
-language feature.
+This completed plan introduced first-class function pointer type syntax, typing, C typedef emission, indirect calls, and
+runtime coverage. Functions can now be stored, passed, compared by identity when signatures match, and called
+indirectly, giving Initiative 0001 a typed callback surface for later C FFI work.
+
+## Completion Notes
+
+1. Function pointer types use `func(T1, T2) -> U` syntax and `(func(...) -> U)?` for nullable function pointers.
+2. C typedefs use the `dea_func_` prefix with signature-derived names such as `dea_func_int_int_int`.
+3. Indirect calls through function pointer values include a runtime null check before dispatch.
+4. No new diagnostic codes were registered; existing type mismatch and call diagnostics cover the rejected cases added
+   by this plan.
+5. ARC trace validation caught an owned type leak in function-pointer call typing, which was fixed before closing the
+   plan.
 
 ## Current State
 
@@ -141,3 +154,13 @@ Add tests in:
    at call sites.
 5. Any newly registered diagnostic codes appear in `docs/specs/compiler/diagnostic-code-catalog.md`.
 6. `l1/docs/reference/design-decisions.md` records the function pointer type syntax and ABI choice.
+
+## Final Validation
+
+- `make -C l1 test-stage1 TESTS="parser_test expr_types_test"`
+- `make -C l1 test-stage1 TESTS="l0c_lib_test"`
+- `make -C l1 test-stage1`
+- `make -C l1 check-examples`
+- `make -C l1 test-stage1-trace TESTS="expr_types_test l0c_lib_test"`
+- `make -C l1 test-stage1-trace`
+- `make clean test-all`

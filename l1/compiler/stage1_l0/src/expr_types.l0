@@ -2049,7 +2049,8 @@ func etc_nullable_inner(ty: Type*) -> Type* {
 func etc_supports_equality(ty: Type*?) -> bool {
     if (ty == null) return false;
     let t = ty as Type*;
-    return etc_is_int(t) || etc_is_bool(t) || etc_is_real(t) || etc_is_string(t) || ord(t.kind) == ord(TY_POINTER);
+    return etc_is_int(t) || etc_is_bool(t) || etc_is_real(t) || etc_is_string(t) ||
+        ord(t.kind) == ord(TY_POINTER) || ord(t.kind) == ord(TY_FUNC);
 }
 
 /**
@@ -2083,6 +2084,17 @@ func etc_is_string(ty: Type*?) -> bool {
  */
 func etc_types_equal(a: Type*?, b: Type*?) -> bool {
     return type_equals(a, b);
+}
+
+/**
+ * Free an optional owned type.
+ *
+ * @param ty Optional type to free.
+ */
+func etc_type_free_opt(ty: Type*?) {
+    if (ty != null) {
+        type_free(ty as Type*);
+    }
 }
 
 /**
@@ -2649,12 +2661,14 @@ func etc_infer_call(self: ExpressionTypeChecker*, expr_id: ExprId, expr: ExprNod
         if (dea_is_intrinsic_symbol(callee_sym, "ord")) {
             return etc_infer_ord_intrinsic(self, expr);
         }
-        if (etc_lookup_local(self, callee.text_value) == null && callee_sym == null &&
-            callee.module_path == null && callee.name_qualifier == null &&
-            !nr_module_env_is_ambiguous(self.current_env as ModuleEnv*, callee.text_value)) {
-            etc_diag_error(self, "TYP-0189", concat3_s("unknown function '", callee.text_value, "'"),
-                (self.current_unit as DriverUnit*).path, callee.span);
-            return null;
+        with (let local_callee_ty = etc_lookup_local(self, callee.text_value) => etc_type_free_opt(local_callee_ty)) {
+            if (local_callee_ty == null && callee_sym == null &&
+                callee.module_path == null && callee.name_qualifier == null &&
+                !nr_module_env_is_ambiguous(self.current_env as ModuleEnv*, callee.text_value)) {
+                etc_diag_error(self, "TYP-0189", concat3_s("unknown function '", callee.text_value, "'"),
+                    (self.current_unit as DriverUnit*).path, callee.span);
+                return null;
+            }
         }
     }
 

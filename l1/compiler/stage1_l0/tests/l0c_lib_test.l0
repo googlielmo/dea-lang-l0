@@ -381,6 +381,44 @@ func test_run_bitwise_build_and_keep_c() {
 }
 
 /**
+ * Tests function pointer typedefs, equality, and indirect calls in `--run --keep-c` mode.
+ */
+func test_run_function_pointer_build_and_keep_c() {
+    let out_path = run_keep_c_output_path();
+    let c_path = run_keep_c_c_path();
+    rt_delete_file(out_path);
+    rt_delete_file(c_path);
+
+    with (let argv = vs_create(12) => vs_free(argv)) {
+        vs_push(argv, "--run");
+        vs_push(argv, "--keep-c");
+        vs_push(argv, "-P");
+        vs_push(argv, fixture_root());
+        vs_push(argv, "--output");
+        vs_push(argv, out_path);
+        vs_push(argv, "function_pointer_main");
+
+        let rc = run_with_argv(argv);
+        assert(rc == 42, "--run --keep-c should compile and execute function_pointer_main");
+    }
+
+    let c_text = read_file(c_path);
+    assert(c_text != null, "function_pointer_main kept C file should exist");
+    assert(contains_s(c_text as string, "typedef dea_int (*dea_func_int_int_int)(dea_int, dea_int);"),
+        "function pointer typedef missing");
+    assert(contains_s(c_text as string, "dea_func_int_int_int op = dea_function_pointer_main_add;"),
+        "function pointer local declaration mismatch");
+    assert(contains_s(c_text as string, "(op == other)"), "function pointer equality lowering mismatch");
+    assert(contains_s(c_text as string, "_rt_panic(\"call through null function pointer\")"),
+        "function pointer null-call guard missing");
+    assert(contains_s(c_text as string, ")(left, right)"),
+        "function pointer indirect call lowering mismatch");
+
+    rt_delete_file(out_path);
+    rt_delete_file(c_path);
+}
+
+/**
  * Tests string equality and inequality execution in `--run --keep-c` mode.
  */
 func test_run_string_equality_build_and_keep_c() {
@@ -877,6 +915,7 @@ func main() {
     test_run_try_chain_short_circuits();
     test_run_shadowed_qualified_variant();
     test_run_bitwise_build_and_keep_c();
+    test_run_function_pointer_build_and_keep_c();
     test_run_string_equality_build_and_keep_c();
     test_run_pointer_identity_build_and_keep_c();
     test_run_nullable_identity_build_and_keep_c();

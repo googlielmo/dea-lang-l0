@@ -461,6 +461,9 @@ func type_format(self: Type*) -> string {
         return concat_s(type_format(self.inner as Type*), "*");
     }
     if (ord(self.kind) == ord(TY_NULLABLE)) {
+        if (ord((self.inner as Type*).kind) == ord(TY_FUNC)) {
+            return concat3_s("(", type_format(self.inner as Type*), ")?");
+        }
         return concat_s(type_format(self.inner as Type*), "?");
     }
 

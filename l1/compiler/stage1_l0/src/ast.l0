@@ -144,6 +144,8 @@ struct TypeRef {
     is_nullable: bool;
     module_path: VectorString*?;      // string entries
     name_qualifier: VectorString*?;   // string entries
+    func_params: VectorBase*?;        // TypeRef*
+    func_result: TypeRef*?;
     span: Span;
 }
 
@@ -656,6 +658,14 @@ func type_ref_free(self: TypeRef*?) {
         let type_ref = self as TypeRef*;
         vs_free_opt(type_ref.module_path);
         vs_free_opt(type_ref.name_qualifier);
+        if (type_ref.func_params != null) {
+            let params = type_ref.func_params as VectorBase*;
+            for (let i = 0; i < vec_size(params); i = i + 1) {
+                type_ref_free(ptr_vec_get(params, i) as TypeRef*);
+            }
+            vec_free(params);
+        }
+        type_ref_free(type_ref.func_result);
         drop type_ref;
     }
 }

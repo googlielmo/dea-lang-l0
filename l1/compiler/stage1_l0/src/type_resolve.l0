@@ -171,6 +171,17 @@ func tr_diag_error(diags: DiagCollector*, code: string, message: string, filenam
 }
 
 /**
+ * Free an optional resolved type.
+ *
+ * @param ty Optional type to free.
+ */
+func tr_type_free_opt(ty: Type*?) {
+    if (ty != null) {
+        type_free(ty as Type*);
+    }
+}
+
+/**
  * Resolve a symbol visible from a module environment.
  *
  * @param nr Name-resolution data containing module environments.
@@ -343,6 +354,28 @@ func tr_apply_suffix(base: Type*, tref: TypeRef*, diags: DiagCollector*, filenam
  */
 func tr_resolve_type_ref(tables: SignatureTables*, nr: NameResolution*, env: ModuleEnv*, tref: TypeRef*,
                          diags: DiagCollector*, seen: StringSet*) -> Type*? {
+    if (tref.func_params != null) {
+        with (let params: VectorBase*? = ptr_vec_create(vec_size(tref.func_params as VectorBase*)) => type_param_vec_free(params),
+              let result: Type*? = null => tr_type_free_opt(result)) {
+            let parsed_params = tref.func_params as VectorBase*;
+            for (let i = 0; i < vec_size(parsed_params); i = i + 1) {
+                let param_type = tr_resolve_type_ref(tables, nr, env, ptr_vec_get(parsed_params, i) as TypeRef*, diags, seen);
+                if (param_type == null) {
+                    return null;
+                }
+                ptr_vec_push(params as VectorBase*, param_type as void*);
+            }
+            result = tr_resolve_type_ref(tables, nr, env, tref.func_result as TypeRef*, diags, seen);
+            if (result == null) {
+                return null;
+            }
+            let func_ty = type_new_func(params as VectorBase*, result as Type*);
+            params = null;
+            result = null;
+            return tr_apply_suffix(func_ty, tref, diags, env.module_ptr.filename);
+        }
+    }
+
     if (tref.name_qualifier != null) {
         let full = tr_type_ref_full_name(tref);
         let simple = tr_type_ref_simple_name(tref);

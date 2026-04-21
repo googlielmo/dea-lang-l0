@@ -1,6 +1,6 @@
 # L1 Language and Runtime Design Decisions
 
-Version: 2026-04-20
+Version: 2026-04-21
 
 This document records current design rationale and policy decisions for Dea/L1 as implemented by the bootstrap compiler.
 
@@ -104,7 +104,7 @@ Current bootstrap policy includes:
 - ARC-managed `string`
 
 Equality operators (`==` and `!=`) on same-type pointer operands compare by reference identity. This contrasts with
-§15's explicit refusal of `string` identity equality, as heap pointers do not share string's potential for deduplication
+§16's explicit refusal of `string` identity equality, as heap pointers do not share string's potential for deduplication
 or re-homing. Ordered pointer comparisons remain rejected, as address ordering is not defined in L1.
 
 No design decision has been finalized yet on:
@@ -120,7 +120,26 @@ Current bootstrap status:
 
 These docs should not be read as excluding either feature from L1 going forward.
 
-## 8. Nullability, Casts, and Introspection
+## 8. Function Pointer Types
+
+L1 supports function pointer types with the spelling `func(T1, T2) -> U`. The zero-argument form is `func() -> U`, and
+`void` remains the result type for functions that do not return a value. Bare references to top-level functions have the
+function pointer type matching their signature, so they can be stored in variables, passed as arguments, returned, and
+called indirectly.
+
+Function pointer types are pointer-valued ABI objects. Generated C represents each distinct signature with a
+`dea_func_*` typedef over a plain C function pointer. Two function pointer types are compatible only when parameter
+arity, parameter types, and result type match exactly.
+
+Nullability follows the existing `T?` model. Because `func(...) -> U?` means a non-null function pointer returning
+nullable `U`, a nullable function pointer is written with parentheses: `(func(...) -> U)?`. Nullable function pointer
+values use the same `NULL` niche representation as object pointers. Equality operators compare function pointer identity
+for same-signature operands; ordered comparisons remain rejected.
+
+Lambdas, closures, method pointers, and C variadic function pointer types are intentionally out of scope for the current
+bootstrap feature.
+
+## 9. Nullability, Casts, and Introspection
 
 Current policy:
 
@@ -156,7 +175,7 @@ operand and `V` can be implicitly widened to `U`. That would make the current in
 instance of a general "explicit conversion followed by implicit widening" rule, covering future cases such as broader
 numeric widenings or nullable pointer-family widenings when those conversions are deliberately added.
 
-## 9. The `dea` Prelude Module
+## 10. The `dea` Prelude Module
 
 The compiler synthesizes one implicit module, `dea`, for language-level primitives.
 
@@ -183,7 +202,7 @@ Rationale:
 - leave room for future compiler-owned type aliases and other prelude-level symbols without introducing a synthetic
   source file
 
-## 10. Integer and Failure Semantics
+## 11. Integer and Failure Semantics
 
 The bootstrap compiler keeps integer behavior defined rather than inheriting host-C vagueness:
 
@@ -224,7 +243,7 @@ suffixes prevent shadowing and ambiguity between `float` and `double`. To minimi
 library (`-lm`) and the `l1_real.h` C wrapper are only linked and included when the compilation unit actually uses
 `sys.real`, rather than treating every float-using program as a math-library consumer.
 
-## 11. Floating-Point Semantics and Backend Contract
+## 12. Floating-Point Semantics and Backend Contract
 
 L1 now includes builtin `float` and `double` types and floating-point (FP) literals. Their semantic contract is
 intentionally narrow and must not be left as an accident of generated C.
@@ -293,7 +312,7 @@ Consequences:
 - FP support is conditional on backend validation rather than assumed on every possible C99 target
 - future backend or optimization changes must preserve the stated FP contract rather than silently weakening it
 
-## 12. I/O and Runtime API Shape
+## 13. I/O and Runtime API Shape
 
 Bootstrap-stage tooling intentionally favors simple whole-file and console APIs over richer streaming abstractions. That
 is sufficient for compiler bootstrapping, diagnostics, and current examples while keeping the language/library surface
@@ -317,7 +336,7 @@ Current stdin token policy keeps parsing layered:
 - integer parsing remains in `std.text`, not in `std.io`
 - float/double reads are deferred until the library has an explicit floating-point parsing contract
 
-## 13. Name Disambiguation
+## 14. Name Disambiguation
 
 Qualified references (`module.path::Name`) are the current cross-module disambiguation mechanism.
 
@@ -332,7 +351,7 @@ Rationale:
 - provide an explicit escape hatch for ambiguity
 - avoid introducing more namespace surface before it is needed
 
-## 14. Numeric Literal Representation in L1
+## 15. Numeric Literal Representation in L1
 
 L1 introduces numeric types that are not native to the L0 implementation language, including implemented integer forms
 such as `uint`, `long`, and `ulong`, plus the implemented floating-point forms `float` and `double`.
@@ -375,7 +394,7 @@ Future direction:
 - when L1 needs target-independent constant evaluation or richer compile-time semantics, migrate the payload
   representation to an APInt/APFloat-style structured form that carries explicit type/width/value information
 
-## 15. String Value Semantics
+## 16. String Value Semantics
 
 `string` is an ARC-managed value type. Two `string` values are language-equivalent when their byte contents are equal;
 their runtime representation (static versus heap, deduplicated or not) is not observable through the language.
@@ -402,7 +421,7 @@ Rationale:
 The top-level `==`, `!=`, `<`, `<=`, `>`, and `>=` operators are now wired for `string` operands in the current
 bootstrap compiler. String concatenation via `+` remains deferred in the roadmap.
 
-## 16. Top-level `const` and `let`
+## 17. Top-level `const` and `let`
 
 L1 distinguishes between two top-level binding forms:
 
@@ -426,7 +445,7 @@ Rationale:
 - requiring an explicit type keeps the accepted constant subset deterministic during bootstrap and avoids depending on a
   broader compile-time evaluator, which is not yet a priority for L1
 
-## 17. Comparison Operator Scope
+## 18. Comparison Operator Scope
 
 The grammar admits `==`, `!=`, `<`, `<=`, `>`, `>=` between any operand types. The type checker intentionally restricts
 which operand types each operator accepts; this section records the deliberate rejections.

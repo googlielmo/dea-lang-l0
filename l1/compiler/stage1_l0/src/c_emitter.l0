@@ -43,6 +43,8 @@ struct CEmitter {
     tmp_counter: int;
     opt_wrappers: StringPtrMap*; // wrapper name -> Type*
     opt_emitted: StringSet*;
+    func_ptrs: StringPtrMap*; // typedef name -> Type*
+    func_ptr_emitted: StringSet*;
 }
 
 /**
@@ -118,6 +120,20 @@ func cem_mangle_source_leaf_name(name: string) -> string {
  * @param items Wrapper map to free.
  */
 func cem_opt_wrapper_map_free(items: StringPtrMap*) {
+    for (let i = 0; i < spm_capacity(items); i = i + 1) {
+        if (spm_slot_occupied(items, i)) {
+            type_free(spm_slot_value(items, i) as Type*);
+        }
+    }
+    spm_free(items);
+}
+
+/**
+ * Free every collected function-pointer typedef type.
+ *
+ * @param items Typedef map to free.
+ */
+func cem_func_ptr_map_free(items: StringPtrMap*) {
     for (let i = 0; i < spm_capacity(items); i = i + 1) {
         if (spm_slot_occupied(items, i)) {
             type_free(spm_slot_value(items, i) as Type*);
@@ -231,7 +247,7 @@ func ccb_to_string(self: CCodeBuilder*) -> string {
  * @return New emitter.
  */
 func cem_create() -> CEmitter* {
-    return new CEmitter(null, null, ccb_create(), 0, spm_create(), ss_create());
+    return new CEmitter(null, null, ccb_create(), 0, spm_create(), ss_create(), spm_create(), ss_create());
 }
 
 /**
@@ -247,6 +263,18 @@ func cem_reset_optional_wrappers(self: CEmitter*) {
 }
 
 /**
+ * Clear every collected function-pointer typedef entry.
+ *
+ * @param self Emitter to update.
+ */
+func cem_reset_func_ptr_typedefs(self: CEmitter*) {
+    cem_func_ptr_map_free(self.func_ptrs);
+    ss_free(self.func_ptr_emitted);
+    self.func_ptrs = spm_create();
+    self.func_ptr_emitted = ss_create();
+}
+
+/**
  * Free a Stage 1 C emitter.
  *
  * @param self Emitter to free.
@@ -254,6 +282,8 @@ func cem_reset_optional_wrappers(self: CEmitter*) {
 func cem_free(self: CEmitter*) {
     cem_opt_wrapper_map_free(self.opt_wrappers);
     ss_free(self.opt_emitted);
+    cem_func_ptr_map_free(self.func_ptrs);
+    ss_free(self.func_ptr_emitted);
     ccb_free(self.out);
     drop self;
 }
@@ -473,7 +503,8 @@ func cem_emit_enum_tag(enum_type: Type*, variant_name: string) -> string {
  * @return `true` when `null` lowers to `NULL`.
  */
 func cem_is_niche_nullable(t: Type*) -> bool {
-    return ord(t.kind) == ord(TY_NULLABLE) && (ord((t.inner as Type*).kind) == ord(TY_POINTER));
+    return ord(t.kind) == ord(TY_NULLABLE) &&
+        (ord((t.inner as Type*).kind) == ord(TY_POINTER) || ord((t.inner as Type*).kind) == ord(TY_FUNC));
 }
 
 /**
@@ -499,9 +530,30 @@ func cem_opt_key_for_type(t: Type*) -> string {
         return concat_s("n_", cem_opt_key_for_type(t.inner as Type*));
     }
     if (ord(t.kind) == ord(TY_FUNC)) {
-        return "fn";
+        with (let sb = sb_create() => sb_free(sb)) {
+            sb_append(sb, cem_opt_key_for_type(t.result as Type*));
+            let params = t.params as VectorBase*;
+            for (let i = 0; i < vec_size(params); i = i + 1) {
+                sb_append(sb, "_");
+                sb_append(sb, cem_opt_key_for_type(ptr_vec_get(params, i) as Type*));
+            }
+            if (vec_size(params) == 0) {
+                sb_append(sb, "_void");
+            }
+            return sb_to_string(sb);
+        }
     }
     return "unk";
+}
+
+/**
+ * Return the typedef name used for a function pointer type.
+ *
+ * @param typ Function pointer type.
+ * @return Stable typedef name.
+ */
+func cem_func_ptr_name_for_type(typ: Type*) -> string {
+    return concat_s("dea_func_", cem_opt_key_for_type(typ));
 }
 
 /**
@@ -577,7 +629,7 @@ func cem_emit_type(typ: Type*) -> string {
         return cem_opt_wrapper_name_for_inner(typ.inner as Type*);
     }
     if (ord(typ.kind) == ord(TY_FUNC)) {
-        return cem_ice_string("[ICE-1291] function pointer type emission not implemented");
+        return cem_func_ptr_name_for_type(typ);
     }
     if (ord(typ.kind) == ord(TY_BUILTIN)) {
         return cem_ice_string(concat3_s("[ICE-1290] unknown builtin type '", type_format(typ), "'"));
@@ -1225,6 +1277,41 @@ func cem_note_opt_wrapper(self: CEmitter*, inner: Type*) {
 }
 
 /**
+ * Record one function-pointer typedef if it was not already collected.
+ *
+ * @param self Emitter to update.
+ * @param typ Function pointer type to store.
+ */
+func cem_note_func_ptr_typedef(self: CEmitter*, typ: Type*) {
+    let name = cem_func_ptr_name_for_type(typ);
+    if (spm_get(self.func_ptrs, name) == null) {
+        spm_put(self.func_ptrs, name, type_clone(typ) as void*);
+    }
+}
+
+/**
+ * Recursively collect function-pointer typedefs reachable from one type.
+ *
+ * @param self Emitter to update.
+ * @param t Type to scan.
+ */
+func cem_collect_func_ptrs_from_type(self: CEmitter*, t: Type*) {
+    if (ord(t.kind) == ord(TY_NULLABLE) || ord(t.kind) == ord(TY_POINTER)) {
+        cem_collect_func_ptrs_from_type(self, t.inner as Type*);
+        return;
+    }
+
+    if (ord(t.kind) == ord(TY_FUNC)) {
+        cem_note_func_ptr_typedef(self, t);
+        let params = t.params as VectorBase*;
+        for (let i = 0; i < vec_size(params); i = i + 1) {
+            cem_collect_func_ptrs_from_type(self, ptr_vec_get(params, i) as Type*);
+        }
+        cem_collect_func_ptrs_from_type(self, t.result as Type*);
+    }
+}
+
+/**
  * Recursively collect optional-wrapper types reachable from one type.
  *
  * @param self Emitter to update.
@@ -1278,6 +1365,7 @@ func cem_is_early_inner(inner: Type*) -> bool {
  */
 func cem_prepare_optional_wrappers(self: CEmitter*) {
     cem_reset_optional_wrappers(self);
+    cem_reset_func_ptr_typedefs(self);
     let analysis = cem_analysis(self);
     if (analysis.signatures == null) {
         return;
@@ -1287,7 +1375,13 @@ func cem_prepare_optional_wrappers(self: CEmitter*) {
 
     for (let i = 0; i < spm_capacity(tables.func_types); i = i + 1) {
         if (spm_slot_occupied(tables.func_types, i)) {
-            cem_collect_opt_wrappers_from_type(self, spm_slot_value(tables.func_types, i) as Type*);
+            let func_type = spm_slot_value(tables.func_types, i) as Type*;
+            cem_collect_opt_wrappers_from_type(self, func_type);
+            let params = func_type.params as VectorBase*;
+            for (let j = 0; j < vec_size(params); j = j + 1) {
+                cem_collect_func_ptrs_from_type(self, ptr_vec_get(params, j) as Type*);
+            }
+            cem_collect_func_ptrs_from_type(self, func_type.result as Type*);
         }
     }
 
@@ -1299,6 +1393,7 @@ func cem_prepare_optional_wrappers(self: CEmitter*) {
         for (let j = 0; j < vec_size(info.fields); j = j + 1) {
             let field_info = ptr_vec_get(info.fields, j) as StructFieldInfo*;
             cem_collect_opt_wrappers_from_type(self, field_info.field_type);
+            cem_collect_func_ptrs_from_type(self, field_info.field_type);
         }
     }
 
@@ -1311,6 +1406,7 @@ func cem_prepare_optional_wrappers(self: CEmitter*) {
             let variant_info = ptr_vec_get(enum_info.variants, j) as EnumVariantInfo*;
             for (let k = 0; k < vec_size(variant_info.field_types); k = k + 1) {
                 cem_collect_opt_wrappers_from_type(self, ptr_vec_get(variant_info.field_types, k) as Type*);
+                cem_collect_func_ptrs_from_type(self, ptr_vec_get(variant_info.field_types, k) as Type*);
             }
         }
     }
@@ -1318,6 +1414,7 @@ func cem_prepare_optional_wrappers(self: CEmitter*) {
     for (let expr_type_i = 0; expr_type_i < spm_capacity(analysis.expr_types); expr_type_i = expr_type_i + 1) {
         if (spm_slot_occupied(analysis.expr_types, expr_type_i)) {
             cem_collect_opt_wrappers_from_type(self, spm_slot_value(analysis.expr_types, expr_type_i) as Type*);
+            cem_collect_func_ptrs_from_type(self, spm_slot_value(analysis.expr_types, expr_type_i) as Type*);
         }
     }
 }
@@ -1350,6 +1447,84 @@ func cem_emit_optional_wrappers(self: CEmitter*, early: bool) {
             ccb_emit(self.out, concat3_s("#endif /* ", guard, " */"));
             ccb_emit(self.out, "");
             ss_add(self.opt_emitted, us_clone_s(name));
+        }
+    }
+}
+
+/**
+ * Emit dependencies for one function-pointer typedef type.
+ *
+ * @param self Emitter to update.
+ * @param typ Function pointer type to inspect.
+ */
+func cem_emit_func_ptr_type_deps(self: CEmitter*, typ: Type*) {
+    if (ord(typ.kind) == ord(TY_NULLABLE) || ord(typ.kind) == ord(TY_POINTER)) {
+        cem_emit_func_ptr_type_deps(self, typ.inner as Type*);
+        return;
+    }
+    if (ord(typ.kind) != ord(TY_FUNC)) {
+        return;
+    }
+    let name = cem_func_ptr_name_for_type(typ);
+    cem_emit_func_ptr_typedef(self, name);
+}
+
+/**
+ * Emit one collected function-pointer typedef after its function-type dependencies.
+ *
+ * @param self Emitter to update.
+ * @param name Collected typedef name.
+ */
+func cem_emit_func_ptr_typedef(self: CEmitter*, name: string) {
+    if (ss_has(self.func_ptr_emitted, name)) {
+        return;
+    }
+    let typ_ptr = spm_get(self.func_ptrs, name);
+    if (typ_ptr == null) {
+        return;
+    }
+    let typ = typ_ptr as Type*;
+    let params = typ.params as VectorBase*;
+    for (let i = 0; i < vec_size(params); i = i + 1) {
+        cem_emit_func_ptr_type_deps(self, ptr_vec_get(params, i) as Type*);
+    }
+    cem_emit_func_ptr_type_deps(self, typ.result as Type*);
+
+    with (let sb = sb_create() => sb_free(sb)) {
+        sb_append(sb, "typedef ");
+        sb_append(sb, cem_emit_type(typ.result as Type*));
+        sb_append(sb, " (*");
+        sb_append(sb, name);
+        sb_append(sb, ")(");
+        if (vec_size(params) == 0) {
+            sb_append(sb, "void");
+        } else {
+            for (let i2 = 0; i2 < vec_size(params); i2 = i2 + 1) {
+                if (i2 > 0) {
+                    sb_append(sb, ", ");
+                }
+                sb_append(sb, cem_emit_type(ptr_vec_get(params, i2) as Type*));
+            }
+        }
+        sb_append(sb, ");");
+        ccb_emit(self.out, sb_to_string(sb));
+        ss_add(self.func_ptr_emitted, us_clone_s(name));
+    }
+}
+
+/**
+ * Emit every collected function-pointer typedef.
+ *
+ * @param self Emitter to update.
+ */
+func cem_emit_func_ptr_typedefs(self: CEmitter*) {
+    with (let names = spm_keys(self.func_ptrs) => vs_free(names)) {
+        vs_sort(names);
+        for (let i = 0; i < vs_size(names); i = i + 1) {
+            cem_emit_func_ptr_typedef(self, vs_get(names, i));
+        }
+        if (vs_size(names) > 0) {
+            ccb_emit(self.out, "");
         }
     }
 }
